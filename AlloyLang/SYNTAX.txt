@@ -44,7 +44,7 @@ ENUM_DEFINITION:		'enum' ENUM_NAME '{' { IDENTIFIER } '}' ;
 FN_DEFINITION:			'fn' FN_NAME '(' [ DECLARATION { ',' DECLARATION } ] ')' [':' TYPE_DECLARATION] STATEMENT_BLOCK ;
 
 (* An expression is an operation which results in a value, or a literal value. *)
-EXPRESSION:				VAR_NAME | CONST_NAME | FN_CALL | DEREFERENCE | ENCLOSED_EXPRESSION | UNARY_OPERATION | BINARY_OPERATION | LITERAL ;
+EXPRESSION:				VAR_NAME | CONST_NAME | LITERAL | FN_CALL | DEREFERENCE | ENCLOSED_EXPRESSION | UNARY_OPERATION | BINARY_OPERATION ;
 
 FN_CALL:				FN_NAME '(' [ EXPRESSION { ',' EXPRESSION } ] ')' ;
 DEREFERENCE:			'@' EXPRESSION ;
@@ -65,7 +65,7 @@ CHAR_LITERAL:			'\'' [ LETTER ] '\'' ;
 * Statements are definitions or certain expressions which actually do something, i.e. expressions like 'a + b;' are not statements, since the resulting value is not used and there are no side-effects.
 * This also means that structs and functions can be defined within the scope of a function, in which case they can only be used within this function's scope.
 *)
-STATEMENT:				DEFINITION | FN_CALL ';' | VARIABLE_ASSIGNMENT | FOR_LOOP | WHILE_LOOP | IF_STATEMENT | MATCH_STATEMENT | STATEMENT_BLOCK ;
+STATEMENT:				DEFINITION | FN_CALL ';' | VARIABLE_ASSIGNMENT | FOR_LOOP | WHILE_LOOP | IF_STATEMENT | MATCH_STATEMENT | STATEMENT_BLOCK | RETURN_STATEMENT ;
 
 VARIABLE_ASSIGNMENT:	VAR_NAME '=' EXPRESSION ';' ;
 FOR_LOOP:				'for' '(' EXPRESSION ';' EXPRESSION ';' EXPRESSION ';' ')' STATEMENT ;
@@ -73,4 +73,4 @@ WHILE_LOOP:				'while' ENCLOSED_EXPRESSION STATEMENT ;
 IF_STATEMENT:			'if' ENCLOSED_EXPRESSION STATEMENT ['else' STATEMENT] ;
 MATCH_STATEMENT:		'match' ENCLOSED_EXPRESSION '{' { EXPRESSION '=>' STATEMENT } '}' ;
 STATEMENT_BLOCK:		'{' {STATEMENT} '}' ;
-
+RETURN_STATEMENT:		'return' [ EXPRESSION ] ';' ;

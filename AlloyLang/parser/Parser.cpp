@@ -131,14 +131,64 @@ namespace AlloyCompiler::Parser
 #pragma region Expressions
 
 	/// <summary>
+	/// FN_CALL: FN_NAME '(' [ EXPRESSION { ',' EXPRESSION } ] ')' ;
+	/// </summary>
+	inline static Ptr<FunctionCall> parseFunctionCall(TokenIterator& iter)
+	{
+		logError(iter, "Not implemented!");
+
+		return nullptr;
+	}
+
+	/// <summary>
+	/// DEREFERENCE: '@' EXPRESSION ;
+	/// </summary>
+	inline static Ptr<Dereference> parseDereference(TokenIterator& iter)
+	{
+		logError(iter, "Not implemented!");
+
+		return nullptr;
+	}
+
+	/// <summary>
+	/// ENCLOSED_EXPRESSION: '(' EXPRESSION ')' ;
+	/// </summary>
+	inline static Ptr<EnclosedExpression> parseEnclosedExpression(TokenIterator& iter)
+	{
+		logError(iter, "Not implemented!");
+
+		return nullptr;
+	}
+
+	/// <summary>
+	/// UNARY_OPERATION: UNARY_OPERATOR EXPRESSION ;
+	/// </summary>
+	//inline static Ptr<UnaryOperation> parseUnaryOperation(TokenIterator& iter)
+	//{
+	//	logError(iter, "Not implemented!");
+	//
+	//	return nullptr;
+	//}
+
+	/// <summary>
+	/// BINARY_OPERATION: EXPRESSION BINARY_OPERATOR EXPRESSION ; (* DOES NOT INCLUDE ASSIGNMENT OPERATORS! *)
+	/// </summary>
+	//inline static Ptr<BinaryOperation> parseBinaryOperation(TokenIterator& iter)
+	//{
+	//	logError(iter, "Not implemented!");
+	//
+	//	return nullptr;
+	//}
+
+	/// <summary>
 	/// EXPRESSION: VAR_NAME 
 	///		| CONST_NAME 
+	///		| LITERAL
 	///		| FN_CALL 
 	///		| DEREFERENCE 
 	///		| ENCLOSED_EXPRESSION 
 	///		| UNARY_OPERATION 
-	///		| BINARY_OPERATION 
-	///		| LITERAL ;
+	///		| BINARY_OPERATION ;
 	/// </summary>
 	inline static Ptr<Expression> parseExpression(TokenIterator& iter)
 	{
@@ -153,6 +203,56 @@ namespace AlloyCompiler::Parser
 
 	// forward declaration
 	inline static Ptr<Statement> parseStatement(TokenIterator& iter);
+
+	/// <summary>
+	/// VARIABLE_ASSIGNMENT: VAR_NAME '=' EXPRESSION ';' ;
+	/// </summary>
+	inline static Ptr<VariableAssignment> parseVariableAssignment(TokenIterator& iter)
+	{
+		logError(iter, "Not implemented!");
+
+		return nullptr;
+	}
+
+	/// <summary>
+	/// FOR_LOOP: 'for' '(' EXPRESSION ';' EXPRESSION ';' EXPRESSION ';' ')' STATEMENT ;
+	/// </summary>
+	inline static Ptr<ForLoop> parseForLoop(TokenIterator& iter)
+	{
+		logError(iter, "Not implemented!");
+
+		return nullptr;
+	}
+
+	/// <summary>
+	/// WHILE_LOOP: 'while' ENCLOSED_EXPRESSION STATEMENT ;
+	/// </summary>
+	inline static Ptr<WhileLoop> parseWhileLoop(TokenIterator& iter)
+	{
+		logError(iter, "Not implemented!");
+
+		return nullptr;
+	}
+
+	/// <summary>
+	/// IF_STATEMENT: 'if' ENCLOSED_EXPRESSION STATEMENT ['else' STATEMENT] ;
+	/// </summary>
+	inline static Ptr<IfStatement> parseIfStatement(TokenIterator& iter)
+	{
+		logError(iter, "Not implemented!");
+
+		return nullptr;
+	}
+
+	/// <summary>
+	/// MATCH_STATEMENT: 'match' ENCLOSED_EXPRESSION '{' { EXPRESSION '=>' STATEMENT } '}' ;
+	/// </summary>
+	inline static Ptr<MatchStatement> parseMatchStatement(TokenIterator& iter)
+	{
+		logError(iter, "Not implemented!");
+
+		return nullptr;
+	}
 
 	/// <summary>
 	/// STATEMENT_BLOCK: '{' {STATEMENT} '}' ;
@@ -195,6 +295,52 @@ namespace AlloyCompiler::Parser
 	}
 
 	/// <summary>
+	/// RETURN_STATEMENT: 'return' [ EXPRESSION ] ';' ;
+	/// </summary>
+	inline static Ptr<ReturnStatement> parseReturnStatement(TokenIterator& iter)
+	{
+		// assert we have a return keyword
+		ASSERT(iter.CurrentToken().Value == TokenValue::Return, "Expected 'return'!");
+
+		// consume the return keyword
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an expression or ';' after 'return'.");
+			return nullptr;
+		}
+
+		Ptr<Expression> expression = nullptr;
+
+		// check for expression
+		if (iter.CurrentToken().Value != TokenValue::Semicolon)
+		{
+			// parse the expression
+			expression = parseExpression(iter);
+
+			// check if the expression was valid
+			if (!expression)
+			{
+				return nullptr;
+			}
+		}
+
+		// check for semicolon
+		if (iter.CurrentToken().Value != TokenValue::Semicolon)
+		{
+			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
+		}
+
+		// consume the semicolon
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<ReturnStatement>(std::move(expression));
+	}
+
+	/// <summary>
 	/// STATEMENT: DEFINITION 
 	///		| FN_CALL ';' 
 	///		| VARIABLE_ASSIGNMENT 
@@ -202,13 +348,35 @@ namespace AlloyCompiler::Parser
 	///		| WHILE_LOOP 
 	///		| IF_STATEMENT 
 	///		| MATCH_STATEMENT 
-	///		| STATEMENT_BLOCK ;
+	///		| STATEMENT_BLOCK
+	///		| RETURN_STATEMENT ;
 	/// </summary>
 	inline static Ptr<Statement> parseStatement(TokenIterator& iter)
 	{
-		logError(iter, "Not implemented!");
+		switch (iter.CurrentToken().Value)
+		{
+		case TokenValue::For:
+			return parseForLoop(iter);
 
-		return nullptr;
+		case TokenValue::While:
+			return parseWhileLoop(iter);
+
+		case TokenValue::If:
+			return parseIfStatement(iter);
+
+		case TokenValue::Match:
+			return parseMatchStatement(iter);
+
+		case TokenValue::OpenBrace:
+			return parseStatementBlock(iter);
+
+		case TokenValue::Return:
+			return parseReturnStatement(iter);
+
+		default:
+			logError(iter, "Expected a statement! Got '{0}' instead.", iter.CurrentSourceView());
+			return nullptr;
+		}
 	}
 
 #pragma endregion

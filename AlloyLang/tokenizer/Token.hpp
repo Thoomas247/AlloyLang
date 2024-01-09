@@ -67,7 +67,7 @@ namespace AlloyCompiler
 		Void, I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, Bool,
 
 		// control flow
-		If, Else, While, For, Break, Continue, Return,
+		If, Else, While, For, Match, Break, Continue, Return,
 
 		// literals
 		True, False, Null, Integer, Float, String, Character,

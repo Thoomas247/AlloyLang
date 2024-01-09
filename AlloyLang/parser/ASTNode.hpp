@@ -54,6 +54,55 @@ namespace AlloyCompiler
 		std::string ToString() override = 0;
 	};
 
+	struct FunctionCall : public Expression
+	{
+		FunctionCall(const std::string_view& name, Vec<Expression> arguments)
+			: Name(name), Arguments(std::move(arguments))
+		{}
+		~FunctionCall() = default;
+
+		std::string ToString() override
+		{
+			return "FUNCTION_CALL";
+		}
+
+
+		std::string_view Name;
+		Vec<Expression> Arguments;
+	};
+
+	struct Dereference : public Expression
+	{
+		Dereference(Ptr<Expression> expression)
+			: Expr(std::move(expression))
+		{}
+		~Dereference() = default;
+
+		std::string ToString() override
+		{
+			return "DEREFERENCE";
+		}
+
+
+		Ptr<Expression> Expr;
+	};
+
+	struct EnclosedExpression : public Expression
+	{
+		EnclosedExpression(Ptr<Expression> expression)
+			: Expr(std::move(expression))
+		{}
+		~EnclosedExpression() = default;
+
+		std::string ToString() override
+		{
+			return "ENCLOSED_EXPRESSION";
+		}
+
+
+		Ptr<Expression> Expr;
+	};
+
 #pragma endregion
 
 #pragma region Statements
@@ -64,6 +113,22 @@ namespace AlloyCompiler
 		~Statement() = default;
 
 		std::string ToString() override = 0;
+	};
+
+	struct ReturnStatement : public Statement
+	{
+		ReturnStatement(Ptr<Expression> expression)
+			: Expr(std::move(expression))
+		{}
+		~ReturnStatement() = default;
+
+		std::string ToString() override
+		{
+			return "RETURN_STATEMENT";
+		}
+
+
+		Ptr<Expression> Expr;
 	};
 
 	struct StatementBlock : public Statement
@@ -80,6 +145,88 @@ namespace AlloyCompiler
 
 
 		Vec<Statement> Statements;
+	};
+
+	struct VariableAssignment : public Statement
+	{
+		VariableAssignment(const std::string_view& name, Ptr<Expression> value)
+			: Name(name), Value(std::move(value))
+		{}
+		~VariableAssignment() = default;
+
+		std::string ToString() override
+		{
+			return "VAR_ASSIGNMENT";
+		}
+
+
+		std::string_view Name;
+		Ptr<Expression> Value;
+	};
+
+	struct ForLoop : public Statement
+	{
+		ForLoop(Ptr<Expression> init, Ptr<Expression> check, Ptr<Expression> next, Ptr<StatementBlock> body)
+			: Init(std::move(init)), Check(std::move(check)), Next(std::move(next)), Body(std::move(body))
+		{}
+		~ForLoop() = default;
+
+		std::string ToString() override
+		{
+			return "FOR_LOOP";
+		}
+
+
+		Ptr<Expression> Init;
+		Ptr<Expression> Check;
+		Ptr<Expression> Next;
+		Ptr<StatementBlock> Body;
+	};
+
+	struct WhileLoop : public Statement
+	{
+		WhileLoop(Ptr<EnclosedExpression> condition, Ptr<StatementBlock> body)
+			: Condition(std::move(condition)), Body(std::move(body))
+		{}
+		~WhileLoop() = default;
+
+		std::string ToString() override
+		{
+			return "WHILE_LOOP";
+		}
+
+
+		Ptr<EnclosedExpression> Condition;
+		Ptr<StatementBlock> Body;
+	};
+
+	struct IfStatement : public Statement
+	{
+		IfStatement(Ptr<EnclosedExpression> condition, Ptr<StatementBlock> body, Ptr<StatementBlock> elseBody)
+			: Condition(std::move(condition)), Body(std::move(body))
+		{}
+		~IfStatement() = default;
+
+		std::string ToString() override
+		{
+			return "IF_STATEMENT";
+		}
+
+
+		Ptr<EnclosedExpression> Condition;
+		Ptr<StatementBlock> Body;
+		Ptr<StatementBlock> ElseBody;
+	};
+
+	struct MatchStatement : public Statement
+	{
+		MatchStatement() = default;
+		~MatchStatement() = default;
+
+		std::string ToString() override
+		{
+			return "MATCH_STATEMENT";
+		}
 	};
 
 #pragma endregion

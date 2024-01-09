@@ -38,6 +38,7 @@ namespace AlloyCompiler
 		{ "else",		Token(TokenKind::ControlFlow, TokenValue::Else) },
 		{ "while",		Token(TokenKind::ControlFlow, TokenValue::While) },
 		{ "for",		Token(TokenKind::ControlFlow, TokenValue::For) },
+		{ "match",		Token(TokenKind::ControlFlow, TokenValue::Match) },
 		{ "break",		Token(TokenKind::ControlFlow, TokenValue::Break) },
 		{ "continue",	Token(TokenKind::ControlFlow, TokenValue::Continue) },
 		{ "return",		Token(TokenKind::ControlFlow, TokenValue::Return) },
