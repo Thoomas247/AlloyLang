@@ -1,0 +1,76 @@
+(* Programs are a list of modules. *)
+PROGRAM:				{ MODULE } ;
+
+(* Modules are made up of qualified definitions. *)
+MODULE:					{ QUALIFIED_DEFINITION } ;
+
+QUALIFIED_DEFINITION:	VISIBILITY_QUALIFIER DEFINITION ;
+
+(* 
+* Types are made up of many parts. 
+* The type name is just a human-readable name corresponding to a built-in type name or struct name.
+* A type can be further described with a '&' or '*', denoting if the memory addressed by this type is a reference or pointer.
+*)
+TYPE_NAME:				BUILTIN_TYPE_NAME | STRUCT_NAME | ENUM_NAME ;
+TYPE_IDENTIFIER:		['&' | '*'] TYPE_NAME ;
+
+(* 
+* Type declarations describe types more fully by having either 'var' or 'const' denoting whether the referenced value or pointed value can be modified.
+* This is used by function return type declarations, where the name of the return value(s) is decided by the caller, not the function itself.
+*)
+TYPE_DECLARATION:		VALUE_TYPE_DECLARATION | VAR_TYPE_DECLARATION | CONST_TYPE_DECLARATION | TUPLE_TYPE_DECLARATION ;
+
+VALUE_TYPE_DECLARATION:	TYPE_IDENTIFIER ;
+VAR_TYPE_DECLARATION:	'var' TYPE_IDENTIFIER ;
+CONST_TYPE_DECLARATION:	'const' TYPE_IDENTIFIER ;
+TUPLE_TYPE_DECLARATION: '(' TYPE_DECLARATION ',' TYPE_DECLARATION { ',' TYPE_DECLARATION } ')' ;
+
+(* Declarations are the name and type identifier of a value *)
+DECLARATION:			VAR_DECLARATION | CONST_DECLARATION ;
+
+VAR_DECLARATION:		'var' VAR_NAME ':' TYPE_IDENTIFIER ;
+CONST_DECLARATION:		'const' CONST_NAME ':' TYPE_IDENTIFIER ;
+
+(* Visibility qualifier can be 'exp', 'pub', or empty, corresponding to exported, public, and private. *)
+VISIBILITY_QUALIFIER:	[ 'exp' | 'pub' ] ;
+
+(* Definitions are variable, constant, struct, or function definitions. *)
+DEFINITION:				VAR_DEFINITION | CONST_DEFINITION | STRUCT_DEFINITION | ENUM_DEFINITION | FN_DEFINITION ;
+
+VAR_DEFINITION:			VAR_DECLARATION '=' EXPRESSION ';' ;
+CONST_DEFINITION:		CONST_DECLARATION '=' EXPRESSION ';' ;
+STRUCT_DEFINITION:		'struct' STRUCT_NAME '{' { DECLARATION } '}' ;
+ENUM_DEFINITION:		'enum' ENUM_NAME '{' { IDENTIFIER } '}' ;
+FN_DEFINITION:			'fn' FN_NAME '(' [ DECLARATION { ',' DECLARATION } ] ')' [':' TYPE_DECLARATION] STATEMENT_BLOCK ;
+
+(* An expression is an operation which results in a value, or a literal value. *)
+EXPRESSION:				VAR_NAME | CONST_NAME | FN_CALL | DEREFERENCE | ENCLOSED_EXPRESSION | UNARY_OPERATION | BINARY_OPERATION | LITERAL ;
+
+FN_CALL:				FN_NAME '(' [ EXPRESSION { ',' EXPRESSION } ] ')' ;
+DEREFERENCE:			'@' EXPRESSION ;
+ENCLOSED_EXPRESSION:	'(' EXPRESSION ')' ;
+UNARY_OPERATION:		UNARY_OPERATOR EXPRESSION ;
+BINARY_OPERATION:		EXPRESSION BINARY_OPERATOR EXPRESSION ; (* DOES NOT INCLUDE ASSIGNMENT OPERATORS! *)
+
+(* A literal is a compile-time constant which represents an integer, float, boolean, string, or character. *)
+LITERAL:				INT_LITERAL | FLOAT_LITERAL | BOOLEAN_LITERAL | STRING_LITERAL | CHAR_LITERAL ;
+
+INT_LITERAL:			NUMBER ;
+FLOAT_LITERAL:			NUMBER '.' NUMBER ;
+BOOLEAN_LITERAL:		'true' | 'false' ;
+STRING_LITERAL:			'\"' { LETTER } '\"' ;
+CHAR_LITERAL:			'\'' [ LETTER ] '\'' ;
+
+(* 
+* Statements are definitions or certain expressions which actually do something, i.e. expressions like 'a + b;' are not statements, since the resulting value is not used and there are no side-effects.
+* This also means that structs and functions can be defined within the scope of a function, in which case they can only be used within this function's scope.
+*)
+STATEMENT:				DEFINITION | FN_CALL ';' | VARIABLE_ASSIGNMENT | FOR_LOOP | WHILE_LOOP | IF_STATEMENT | MATCH_STATEMENT | STATEMENT_BLOCK ;
+
+VARIABLE_ASSIGNMENT:	VAR_NAME '=' EXPRESSION ';' ;
+FOR_LOOP:				'for' '(' EXPRESSION ';' EXPRESSION ';' EXPRESSION ';' ')' STATEMENT ;
+WHILE_LOOP:				'while' ENCLOSED_EXPRESSION STATEMENT ;
+IF_STATEMENT:			'if' ENCLOSED_EXPRESSION STATEMENT ['else' STATEMENT] ;
+MATCH_STATEMENT:		'match' ENCLOSED_EXPRESSION '{' { EXPRESSION '=>' STATEMENT } '}' ;
+STATEMENT_BLOCK:		'{' {STATEMENT} '}' ;
+
