@@ -6,7 +6,7 @@
 
 namespace AlloyCompiler
 {
-	using TokenID = size_t;
+	using TokenID = uint32_t;
 
 	/// <summary>
 	/// General description of a token.

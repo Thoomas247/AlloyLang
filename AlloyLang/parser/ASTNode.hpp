@@ -294,22 +294,6 @@ namespace AlloyCompiler
 		Vec<Statement> Statements;
 	};
 
-	struct VariableAssignment : public Statement
-	{
-		VariableAssignment(Ptr<AssignmentExpression> expr)
-			: Expr(std::move(expr))
-		{}
-		~VariableAssignment() = default;
-
-		std::string ToString() override
-		{
-			return "VAR_ASSIGNMENT";
-		}
-
-
-		Ptr<AssignmentExpression> Expr;
-	};
-
 	struct ForLoop : public Statement
 	{
 		ForLoop(Ptr<Expression> init, Ptr<Expression> check, Ptr<Expression> next, Ptr<StatementBlock> body)

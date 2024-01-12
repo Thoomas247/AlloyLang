@@ -11,7 +11,16 @@ namespace AlloyCompiler::Tokenizer
 	public:
 		TokenDataBuffers(const std::string_view& source)
 			: m_FullSourceView(source)
-		{}
+		{
+			// this is a very rough estimate which assumes that every token is 2 characters long
+			// this probably allocates more than necessary, but it's better than not allocating enough
+			// cuts down about 1/3 of the tokenization time
+			const size_t estTokenCount = source.size() / 2;
+
+			m_Tokens.reserve(estTokenCount);
+			m_Locations.reserve(estTokenCount);
+			m_SourceViews.reserve(estTokenCount);
+		}
 
 		void AddToken(const Token& token, const Location& location, const SourceView& sourceView)
 		{
