@@ -79,7 +79,7 @@ namespace AlloyCompiler
 		Plus, Minus, /*alias*/ Negate = Minus, Multiply, /*alias*/ Pointer = Multiply, Divide, Modulo,
 		LogicalAnd, LogicalOr, LeftShift, RightShift,
 		BitwiseAnd, /*alias*/ Reference = BitwiseAnd, BitwiseOr, BitwiseXor, BitwiseNot,
-		Equals, NotEquals, LessThan, GreaterThan, LessThanOrEqual, GreaterThanOrEqual,
+		Equal, NotEqual, LessThan, GreaterThan, LessThanOrEqual, GreaterThanOrEqual,
 
 		Not,
 

@@ -22,6 +22,8 @@ namespace AlloyCompiler::Parser
 			return true;
 		}
 
+		[[nodiscard]] bool HasNext() const { return m_CurrentTokenID + 1 < m_Buffers.GetTokenCount(); }
+
 		void Previous()
 		{
 			--m_CurrentTokenID;
@@ -130,71 +132,609 @@ namespace AlloyCompiler::Parser
 
 #pragma region Expressions
 
+	// forward declaration
+	inline static Ptr<Expression> parseExpression(TokenIterator& iter);
+
 	/// <summary>
 	/// FN_CALL: FN_NAME '(' [ EXPRESSION { ',' EXPRESSION } ] ')' ;
 	/// </summary>
 	inline static Ptr<FunctionCall> parseFunctionCall(TokenIterator& iter)
 	{
-		logError(iter, "Not implemented!");
+		// assert we have an identifier
+		ASSERT(iter.CurrentToken().Kind == TokenKind::Identifier, "Expected an identifier!");
 
-		return nullptr;
+		// get the identifier
+		const auto& identifier = iter.CurrentSourceView();
+
+		// consume the identifier
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected a '('.");
+			return nullptr;
+		}
+
+		// check that we have an opening parenthesis
+		if (iter.CurrentToken().Value != TokenValue::OpenParen)
+		{
+			logError(iter, "Expected a '('! Got '{0}' instead.", iter.CurrentSourceView());
+			return nullptr;
+		}
+
+		// consume the opening parenthesis
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an expression or ')' after '('.");
+			return nullptr;
+		}
+
+		// get all the arguments
+		Vec<Expression> arguments;
+
+		while (iter.CurrentToken().Value != TokenValue::CloseParen)
+		{
+			// parse the expression
+			Ptr<Expression> expression = parseExpression(iter);
+
+			// check if the expression was valid
+			if (!expression)
+			{
+				return nullptr;
+			}
+
+			// add the expression to the list
+			arguments.push_back(std::move(expression));
+
+			// check for comma
+			if (iter.CurrentToken().Value == TokenValue::Comma)
+			{
+				// consume the comma
+				if (!iter.Next())
+				{
+					logError(iter, "Unexpected end of file! Expected an expression or ')' instead of ','.");
+					return nullptr;
+				}
+			}
+
+			// othwerwise we must have a closing parenthesis
+			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
+			{
+				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
+				return nullptr;
+			}
+		}
+
+		// consume the closing parenthesis
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<FunctionCall>(identifier, std::move(arguments));
 	}
 
 	/// <summary>
-	/// DEREFERENCE: '@' EXPRESSION ;
-	/// </summary>
-	inline static Ptr<Dereference> parseDereference(TokenIterator& iter)
-	{
-		logError(iter, "Not implemented!");
-
-		return nullptr;
-	}
-
-	/// <summary>
-	/// ENCLOSED_EXPRESSION: '(' EXPRESSION ')' ;
+	/// ENCLOSED_EXPRESSION: '(' EXPRESSION [',' EXPRESSION] ')' ;
 	/// </summary>
 	inline static Ptr<EnclosedExpression> parseEnclosedExpression(TokenIterator& iter)
 	{
-		logError(iter, "Not implemented!");
+		// assert we have an opening parenthesis
+		ASSERT(iter.CurrentToken().Value == TokenValue::OpenParen, "Expected '('!");
 
-		return nullptr;
+		// consume the opening parenthesis
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an expression or ')' after '('.");
+			return nullptr;
+		}
+
+		Vec<Expression> expressions;
+
+		while (iter.CurrentToken().Value != TokenValue::CloseParen)
+		{
+			// parse the expression
+			Ptr<Expression> expression = parseExpression(iter);
+
+			// check if the expression was valid
+			if (!expression)
+			{
+				return nullptr;
+			}
+
+			// add the expression to the list
+			expressions.push_back(std::move(expression));
+
+			// check for comma
+			if (iter.CurrentToken().Value == TokenValue::Comma)
+			{
+				// consume the comma
+				if (!iter.Next())
+				{
+					logError(iter, "Unexpected end of file! Expected an expression or ')' instead of ','.");
+					return nullptr;
+				}
+			}
+
+			// othwerwise we must have a closing parenthesis
+			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
+			{
+				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
+				return nullptr;
+			}
+		}
+
+		// consume the closing parenthesis
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<EnclosedExpression>(std::move(expressions));
+	}
+
+#pragma region Literals
+
+	/// <summary>
+	/// INT_LITERAL: NUMBER ;
+	/// </summary>
+	inline static Ptr<IntegerLiteral> parseIntegerLiteral(TokenIterator& iter)
+	{
+		// assert that we have an integer literal
+		ASSERT(iter.CurrentToken().Value == TokenValue::Integer, "Expected an integer literal!");
+
+		int64_t value = std::stoll(iter.CurrentSourceView().data());
+
+		// consume the integer literal
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<IntegerLiteral>(value);
 	}
 
 	/// <summary>
-	/// UNARY_OPERATION: UNARY_OPERATOR EXPRESSION ;
+	/// FLOAT_LITERAL: NUMBER '.' NUMBER ;
 	/// </summary>
-	//inline static Ptr<UnaryOperation> parseUnaryOperation(TokenIterator& iter)
-	//{
-	//	logError(iter, "Not implemented!");
-	//
-	//	return nullptr;
-	//}
+	inline static Ptr<FloatLiteral> parseFloatLiteral(TokenIterator& iter)
+	{
+		// assert that we have a float literal
+		ASSERT(iter.CurrentToken().Value == TokenValue::Float, "Expected a float literal!");
+
+		double value = std::stod(iter.CurrentSourceView().data());
+
+		// consume the float literal
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<FloatLiteral>(value);
+	}
 
 	/// <summary>
-	/// BINARY_OPERATION: EXPRESSION BINARY_OPERATOR EXPRESSION ; (* DOES NOT INCLUDE ASSIGNMENT OPERATORS! *)
+	/// BOOLEAN_LITERAL: 'true' | 'false' ;
 	/// </summary>
-	//inline static Ptr<BinaryOperation> parseBinaryOperation(TokenIterator& iter)
-	//{
-	//	logError(iter, "Not implemented!");
-	//
-	//	return nullptr;
-	//}
+	inline static Ptr<BooleanLiteral> parseBooleanLiteral(TokenIterator& iter)
+	{
+		// assert that we have a boolean literal
+		ASSERT(iter.CurrentToken().Value == TokenValue::Bool, "Expected a boolean literal!");
+
+		bool value = iter.CurrentSourceView() == "true";	// if kind is bool, only possible values are true and false
+
+		// consume the boolean literal
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<BooleanLiteral>(value);
+	}
 
 	/// <summary>
-	/// EXPRESSION: VAR_NAME 
-	///		| CONST_NAME 
-	///		| LITERAL
-	///		| FN_CALL 
-	///		| DEREFERENCE 
-	///		| ENCLOSED_EXPRESSION 
-	///		| UNARY_OPERATION 
-	///		| BINARY_OPERATION ;
+	/// STRING_LITERAL: '\"' { LETTER } '\"' ;
+	/// </summary>
+	inline static Ptr<StringLiteral> parseStringLiteral(TokenIterator& iter)
+	{
+		// assert that we have a string literal
+		ASSERT(iter.CurrentToken().Value == TokenValue::String, "Expected a string literal!");
+
+		// store the string
+		const auto& string = iter.CurrentSourceView();
+
+		// consume the string
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<StringLiteral>(string);
+	}
+
+	/// <summary>
+	/// CHAR_LITERAL: '\'' [ LETTER ] '\'' ;
+	/// </summary>
+	inline static Ptr<CharacterLiteral> parseCharacterLiteral(TokenIterator& iter)
+	{
+		// assert that we have a character literal
+		ASSERT(iter.CurrentToken().Value == TokenValue::Character, "Expected a character literal!");
+
+		// store the character
+		char c = iter.CurrentSourceView()[0];
+
+		// consume the character
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<CharacterLiteral>(c);
+	}
+
+	/// <summary>
+	/// LITERAL: INT_LITERAL | FLOAT_LITERAL | BOOLEAN_LITERAL | STRING_LITERAL | CHAR_LITERAL ;
+	/// </summary>
+	inline static Ptr<Literal> parseLiteral(TokenIterator& iter)
+	{
+		// assert that we have a literal
+		ASSERT(iter.CurrentToken().Kind == TokenKind::Literal, "Expected a literal!");
+
+		switch (iter.CurrentToken().Value)
+		{
+		case TokenValue::Integer:
+			return parseIntegerLiteral(iter);
+
+		case TokenValue::Float:
+			return parseFloatLiteral(iter);
+
+		case TokenValue::Bool:
+			return parseBooleanLiteral(iter);
+
+		case TokenValue::String:
+			return parseStringLiteral(iter);
+
+		case TokenValue::Character:
+			return parseCharacterLiteral(iter);
+
+		default:
+			logError(iter, "Expected a literal! Got '{0}' instead.", iter.CurrentSourceView());
+			return nullptr;
+		}
+	}
+
+#pragma endregion
+
+	// forward declaration
+	inline static Ptr<Expression> parseExpression(TokenIterator& iter);
+
+	/// <summary>
+	/// PRIMARY_EXPRESSION: VAR_NAME | CONST_NAME | FN_CALL | LITERAL | ENCLOSED_EXPRESSION ;
+	/// </summary>
+	inline static Ptr<Expression> parsePrimaryExpression(TokenIterator& iter)
+	{
+		switch (iter.CurrentToken().Kind)
+		{
+		case TokenKind::Identifier:
+		{
+			// get the identifier
+			const auto& identifier = iter.CurrentSourceView();
+
+			// consume the identifier
+			if (!iter.Next())
+			{
+				logError(iter, "Unexpected end of file!");
+				return nullptr;
+			}
+
+			// check for function call
+			if (iter.CurrentToken().Value == TokenValue::OpenParen)
+			{
+				// go back to the identifier
+				iter.Previous();
+
+				return parseFunctionCall(iter);
+			}
+
+			// otherwise we have a variable or constant
+			return std::make_unique<MemoryAccess>(identifier);
+		}
+
+		case TokenKind::Literal:
+			return parseLiteral(iter);
+
+		case TokenKind::Delimiter:
+		{
+			if (iter.CurrentToken().Value == TokenValue::OpenParen)
+			{
+				return parseEnclosedExpression(iter);
+			}
+
+			logError(iter, "Expected an expression! Got '{0}' instead.", iter.CurrentSourceView());
+			return nullptr;
+		}
+
+		default:
+			logError(iter, "Expected an expression! Got '{0}' instead.", iter.CurrentSourceView());
+			return nullptr;
+		}
+	}
+
+	/// <summary>
+	/// UNARY_EXPRESSION: UNARY_OPERATOR EXPRESSION ;
+	/// </summary>
+	inline static Ptr<Expression> parseUnaryExpression(TokenIterator& iter)
+	{
+		// assert that we have an operator
+		ASSERT(iter.CurrentToken().Kind == TokenKind::Operator, "Expected an operator!");
+
+		// save the operator
+		TokenValue op = iter.CurrentToken().Value;
+
+		// consume the operator
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an expression.");
+			return nullptr;
+		}
+
+		// parse the expression
+		Ptr<Expression> expression = parsePrimaryExpression(iter);
+
+		// check if the expression was valid
+		if (!expression)
+		{
+			return nullptr;
+		}
+
+		return std::make_unique<UnaryExpression>(op, std::move(expression));
+	}
+
+	/// <summary>
+	/// BINARY_EXPRESSION: EXPRESSION BINARY_OPERATOR EXPRESSION ;
+	/// </summary>
+	inline static Ptr<Expression> parseBinaryExpresssion(TokenIterator& iter)
+	{
+		// handles *, / and %
+		auto tryParseMultiplicativeExpression = [&](TokenIterator& iter)->Ptr<Expression>
+			{
+				Ptr<Expression> left;
+
+				if (iter.CurrentToken().Kind == TokenKind::Operator)
+				{
+					left = parseUnaryExpression(iter);
+				}
+
+				else
+				{
+					left = parsePrimaryExpression(iter);
+				}
+
+				if (!left)
+					return nullptr;
+
+				while (iter.CurrentToken().Value == TokenValue::Multiply
+					|| iter.CurrentToken().Value == TokenValue::Divide
+					|| iter.CurrentToken().Value == TokenValue::Modulo)
+				{
+					TokenValue op = iter.CurrentToken().Value;
+
+					// consume operator
+					if (!iter.Next())
+					{
+						logError(iter, "Unexpected end of file!");
+						return nullptr;
+					}
+
+					Ptr<Expression> right;
+
+					if (iter.CurrentToken().Kind == TokenKind::Operator)
+					{
+						right = parseUnaryExpression(iter);
+					}
+
+					else
+					{
+						right = parsePrimaryExpression(iter);
+					}
+
+					if (!right)
+						return nullptr;
+
+					left = std::make_unique<BinaryExpression>(op, std::move(left), std::move(right));
+				}
+
+				return left;
+			};
+
+		// handles + and -
+		auto tryParseAdditiveExpression = [&](TokenIterator& iter)->Ptr<Expression>
+			{
+				Ptr<Expression> left = tryParseMultiplicativeExpression(iter);
+
+				if (!left)
+					return nullptr;
+
+				while (iter.CurrentToken().Value == TokenValue::Plus || iter.CurrentToken().Value == TokenValue::Minus)
+				{
+					TokenValue op = iter.CurrentToken().Value;
+
+					// consume operator
+					if (!iter.Next())
+					{
+						logError(iter, "Unexpected end of file!");
+						return nullptr;
+					}
+
+					Ptr<Expression> right = tryParseMultiplicativeExpression(iter);
+
+					if (!right)
+						return nullptr;
+
+					left = std::make_unique<BinaryExpression>(op, std::move(left), std::move(right));
+				}
+
+				return left;
+			};
+
+		// handles ==, !=, <, <=, >, >=
+		auto tryParseRelationalExpression = [&](TokenIterator& iter)->Ptr<Expression>
+			{
+				Ptr<Expression> left = tryParseAdditiveExpression(iter);
+
+				if (!left)
+					return nullptr;
+
+				while (iter.CurrentToken().Value == TokenValue::Equal
+					|| iter.CurrentToken().Value == TokenValue::NotEqual
+					|| iter.CurrentToken().Value == TokenValue::LessThan
+					|| iter.CurrentToken().Value == TokenValue::LessThanOrEqual
+					|| iter.CurrentToken().Value == TokenValue::GreaterThan
+					|| iter.CurrentToken().Value == TokenValue::GreaterThanOrEqual)
+				{
+					TokenValue op = iter.CurrentToken().Value;
+
+					// consume operator
+					if (!iter.Next())
+					{
+						logError(iter, "Unexpected end of file!");
+						return nullptr;
+					}
+
+					Ptr<Expression> right = tryParseAdditiveExpression(iter);
+
+					if (!right)
+						return nullptr;
+
+					left = std::make_unique<BinaryExpression>(op, std::move(left), std::move(right));
+				}
+
+				return left;
+			};
+
+		// handles && and ||
+		auto tryParseLogicalExpression = [&](TokenIterator& iter) -> Ptr<Expression>
+			{
+				Ptr<Expression> left = tryParseRelationalExpression(iter);
+
+				if (!left)
+					return nullptr;
+
+				while (iter.CurrentToken().Value == TokenValue::LogicalAnd
+					|| iter.CurrentToken().Value == TokenValue::LogicalOr)
+				{
+					TokenValue op = iter.CurrentToken().Value;
+
+					// consume operator
+					if (!iter.Next())
+					{
+						logError(iter, "Unexpected end of file! Expected an expression.");
+						return nullptr;
+					}
+
+					Ptr<Expression> right = tryParseRelationalExpression(iter);
+
+					if (!right)
+						return nullptr;
+
+					left = std::make_unique<BinaryExpression>(op, std::move(left), std::move(right));
+				}
+
+				return left;
+			};
+
+		return tryParseLogicalExpression(iter);
+	}
+
+	/// <summary>
+	/// ASSIGNMENT_EXPRESSION: VAR_NAME ASSIGNMENT_OPERATOR EXPRESSION ;
+	/// </summary>
+	inline static Ptr<AssignmentExpression> parseAssignmentExpression(TokenIterator& iter, bool failIsError = true)
+	{
+		// assert that we have an identifier
+		if (iter.CurrentToken().Kind != TokenKind::Identifier)
+		{
+			if (failIsError)
+			{
+				logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
+			}
+
+			return nullptr;
+		}
+
+		// parse the identifier
+		const auto& identifier = iter.CurrentSourceView();
+
+		// consume the identifier
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an assignment operator.");
+			return nullptr;
+		}
+
+		// check for assignment operator
+		if (iter.CurrentToken().Value != TokenValue::Assign)
+		{
+			if (failIsError)
+			{
+				logError(iter, "Expected an assignment operator! Got '{0}' instead.", iter.CurrentSourceView());
+			}
+			else
+			{
+				// go back to the identifier
+				iter.Previous();
+			}
+
+			return nullptr;
+		}
+
+		// from here, we know we have an assignment expression
+
+		// save the operator
+		TokenValue op = iter.CurrentToken().Value;
+
+		// consume the assignment operator
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an expression.");
+			return nullptr;
+		}
+
+		// parse the expression
+		Ptr<Expression> expression = parseExpression(iter);
+
+		// check if the expression was valid
+		if (!expression)
+		{
+			return nullptr;
+		}
+
+		return std::make_unique<AssignmentExpression>(op, identifier, std::move(expression));
+	}
+
+	/// <summary>
+	/// EXPRESSION: PRIMARY_EXPRESSION | UNARY_EXPRESSION | BINARY_EXPRESSION | ASSIGNMENT_EXPRESSION ;
 	/// </summary>
 	inline static Ptr<Expression> parseExpression(TokenIterator& iter)
 	{
-		logError(iter, "Not implemented!");
+		// assignment expressions are a special case
+		// depending on the context, the function is allowed to fail
+		if (Ptr<Expression> expression = parseAssignmentExpression(iter, false))
+			return std::move(expression);
 
-		return nullptr;
+		Ptr<Expression> expression = parseBinaryExpresssion(iter);
+
+		if (!expression)
+		{
+			return nullptr;
+		}
+
+		return std::move(expression);
 	}
 
 #pragma endregion
@@ -205,13 +745,31 @@ namespace AlloyCompiler::Parser
 	inline static Ptr<Statement> parseStatement(TokenIterator& iter);
 
 	/// <summary>
-	/// VARIABLE_ASSIGNMENT: VAR_NAME '=' EXPRESSION ';' ;
+	/// VARIABLE_ASSIGNMENT: ASSIGNMENT_EXPRESSION ';' ;
 	/// </summary>
 	inline static Ptr<VariableAssignment> parseVariableAssignment(TokenIterator& iter)
 	{
-		logError(iter, "Not implemented!");
+		Ptr<AssignmentExpression> assignmentExpression = parseAssignmentExpression(iter);
 
-		return nullptr;
+		if (!assignmentExpression)
+		{
+			return nullptr;
+		}
+
+		// check for semicolon
+		if (iter.CurrentToken().Value != TokenValue::Semicolon)
+		{
+			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
+		}
+
+		// consume the semicolon
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return nullptr;
+		}
+
+		return std::make_unique<VariableAssignment>(std::move(assignmentExpression));
 	}
 
 	/// <summary>
@@ -290,6 +848,9 @@ namespace AlloyCompiler::Parser
 			// add the statement to the list
 			statements.push_back(std::move(statement));
 		}
+
+		// consume the closing brace
+		(void)iter.Next();
 
 		return std::make_unique<StatementBlock>(std::move(statements));
 	}
@@ -922,7 +1483,7 @@ namespace AlloyCompiler::Parser
 		// check for semicolon
 		if (iter.CurrentToken().Value != TokenValue::Semicolon)
 		{
-			Log::Error("Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
+			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
 			return nullptr;
 		}
 
@@ -1032,7 +1593,7 @@ namespace AlloyCompiler::Parser
 			}
 
 			qualifiedDefinitions.push_back(std::move(definition));
-		} while (iter.Next());
+		} while (iter.HasNext());
 
 		return std::make_unique<Module>(std::move(qualifiedDefinitions));
 	}
@@ -1057,5 +1618,3 @@ namespace AlloyCompiler::Parser
 	}
 
 }
-
-

@@ -1,4 +1,5 @@
 #pragma once
+#include "tokenizer/Token.hpp"
 
 #include <string>
 #include <vector>
@@ -54,6 +55,168 @@ namespace AlloyCompiler
 		std::string ToString() override = 0;
 	};
 
+#pragma region Literals
+
+	struct Literal : public Expression
+	{
+		Literal() = default;
+		~Literal() = default;
+
+		std::string ToString() override = 0;
+	};
+
+	struct IntegerLiteral : public Literal
+	{
+
+		IntegerLiteral(uint64_t value)
+			: Value(value)
+		{}
+		~IntegerLiteral() = default;
+
+		std::string ToString() override
+		{
+			return "INTEGER_LITERAL";
+		}
+
+
+		uint64_t Value;
+	};
+
+	struct FloatLiteral : public Literal
+	{
+		FloatLiteral(double value)
+			: Value(value)
+		{}
+		~FloatLiteral() = default;
+
+		std::string ToString() override
+		{
+			return "FLOAT_LITERAL";
+		}
+
+
+		double Value;
+	};
+
+	struct BooleanLiteral : public Literal
+	{
+		BooleanLiteral(bool value)
+			: Value(value)
+		{}
+		~BooleanLiteral() = default;
+
+		std::string ToString() override
+		{
+			return "BOOLEAN_LITERAL";
+		}
+
+
+		bool Value;
+	};
+
+	struct StringLiteral : public Literal
+	{
+		StringLiteral(const std::string_view& value)
+			: Value(value)
+		{}
+		~StringLiteral() = default;
+
+		std::string ToString() override
+		{
+			return "STRING_LITERAL";
+		}
+
+
+		std::string_view Value;
+	};
+
+	struct CharacterLiteral : public Literal
+	{
+		CharacterLiteral(char value)
+			: Value(value)
+		{}
+		~CharacterLiteral() = default;
+
+		std::string ToString() override
+		{
+			return "CHARACTER_LITERAL";
+		}
+
+
+		char Value;
+	};
+
+#pragma endregion
+
+	struct BinaryExpression : public Expression
+	{
+		BinaryExpression(TokenValue op, Ptr<Expression> left, Ptr<Expression> right)
+			: Op(op), Left(std::move(left)), Right(std::move(right))
+		{}
+		~BinaryExpression() = default;
+
+		std::string ToString() override
+		{
+			return "BINARY_OPERATION";
+		}
+
+
+		TokenValue Op;
+		Ptr<Expression> Left;
+		Ptr<Expression> Right;
+	};
+
+	struct UnaryExpression : public Expression
+	{
+		UnaryExpression(TokenValue op, Ptr<Expression> expr)
+			: Op(op), Expr(std::move(expr))
+		{}
+		~UnaryExpression() = default;
+
+		std::string ToString() override
+		{
+			return "UNARY_EXPRESSION";
+		}
+
+
+		TokenValue Op;
+		Ptr<Expression> Expr;
+	};
+
+	struct AssignmentExpression : public Expression
+	{
+		AssignmentExpression(TokenValue op, const std::string_view& name, Ptr<Expression> value)
+			: Op(op), Name(name), Value(std::move(value))
+		{}
+		~AssignmentExpression() = default;
+
+		std::string ToString() override
+		{
+			return "ASSIGNMENT_EXPRESSION";
+		}
+
+
+		TokenValue Op;
+		std::string_view Name;
+		Ptr<Expression> Value;
+	};
+
+	struct MemoryAccess : public Expression
+	{
+		MemoryAccess(const std::string_view& name)
+			: Name(name)
+		{}
+		~MemoryAccess() = default;
+
+		std::string ToString() override
+		{
+			return "MEMORY_ACCESS";
+		}
+
+
+		std::string_view Name;
+	};
+
 	struct FunctionCall : public Expression
 	{
 		FunctionCall(const std::string_view& name, Vec<Expression> arguments)
@@ -71,26 +234,10 @@ namespace AlloyCompiler
 		Vec<Expression> Arguments;
 	};
 
-	struct Dereference : public Expression
-	{
-		Dereference(Ptr<Expression> expression)
-			: Expr(std::move(expression))
-		{}
-		~Dereference() = default;
-
-		std::string ToString() override
-		{
-			return "DEREFERENCE";
-		}
-
-
-		Ptr<Expression> Expr;
-	};
-
 	struct EnclosedExpression : public Expression
 	{
-		EnclosedExpression(Ptr<Expression> expression)
-			: Expr(std::move(expression))
+		EnclosedExpression(Vec<Expression> expressions)
+			: Expressions(std::move(expressions))
 		{}
 		~EnclosedExpression() = default;
 
@@ -100,7 +247,7 @@ namespace AlloyCompiler
 		}
 
 
-		Ptr<Expression> Expr;
+		Vec<Expression> Expressions;
 	};
 
 #pragma endregion
@@ -149,8 +296,8 @@ namespace AlloyCompiler
 
 	struct VariableAssignment : public Statement
 	{
-		VariableAssignment(const std::string_view& name, Ptr<Expression> value)
-			: Name(name), Value(std::move(value))
+		VariableAssignment(Ptr<AssignmentExpression> expr)
+			: Expr(std::move(expr))
 		{}
 		~VariableAssignment() = default;
 
@@ -160,8 +307,7 @@ namespace AlloyCompiler
 		}
 
 
-		std::string_view Name;
-		Ptr<Expression> Value;
+		Ptr<AssignmentExpression> Expr;
 	};
 
 	struct ForLoop : public Statement

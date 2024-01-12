@@ -47,5 +47,11 @@
     <ClInclude Include="parser\Parser.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="parser\SymbolTable.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TestString.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

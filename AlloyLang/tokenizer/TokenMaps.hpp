@@ -69,8 +69,8 @@ namespace AlloyCompiler
 		{"^",	Token(TokenKind::Operator, TokenValue::BitwiseXor)},
 		{"~",	Token(TokenKind::Operator, TokenValue::BitwiseNot)},
 
-		{"==",	Token(TokenKind::Operator, TokenValue::Equals)},
-		{"!=",	Token(TokenKind::Operator, TokenValue::NotEquals)},
+		{"==",	Token(TokenKind::Operator, TokenValue::Equal)},
+		{"!=",	Token(TokenKind::Operator, TokenValue::NotEqual)},
 		{"<",	Token(TokenKind::Operator, TokenValue::LessThan)},
 		{">",	Token(TokenKind::Operator, TokenValue::GreaterThan)},
 		{"<=",	Token(TokenKind::Operator, TokenValue::LessThanOrEqual)},
