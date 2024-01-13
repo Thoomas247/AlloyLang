@@ -212,7 +212,7 @@
   <ItemGroup>
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="parser\ASTNode.hpp" />
-    <ClInclude Include="parser\ASTNodeFast.hpp" />
+    <ClInclude Include="parser\ASTNodeCompact.hpp" />
     <ClInclude Include="parser\Convert.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
     <ClInclude Include="parser\SymbolTable.hpp" />

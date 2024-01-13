@@ -2,13 +2,27 @@
 #include <cstdint>
 
 #include "tokenizer/Token.hpp"
+#include <variant>
 
 namespace AlloyCompiler
 {
-	using NodeID = uint32_t;
+	using Index = uint32_t;
+	using NodeID = Index;
 
-	using NodeVec = std::vector<NodeID>;	// TODO: make smaller implementation
+	/// <summary>
+	/// Stores an index and a size of a list of nodes which is stored in a separate array.
+	/// </summary>
+	struct NodeIDList
+	{
+		using Size = uint8_t;
 
+		NodeIDList(Index listStart, Size num)
+			: ListStart(listStart), Num(num)
+		{}
+
+		Index ListStart;
+		Size Num;
+	};
 
 #pragma region Identifiers
 
@@ -30,22 +44,6 @@ namespace AlloyCompiler
 	};
 
 #pragma endregion
-
-	struct Identifier
-	{
-		enum class Type : uint8_t
-		{
-			Type,
-		};
-
-		union Data
-		{
-			TypeIdentifier Type;
-		};
-
-		Type Type;
-		Data Data;
-	};
 
 #pragma region Expressions
 
@@ -137,62 +135,24 @@ namespace AlloyCompiler
 
 	struct FunctionCall
 	{
-		FunctionCall(TokenID nameID, NodeVec arguments)
+		FunctionCall(TokenID nameID, NodeIDList arguments)
 			: NameID(nameID), Arguments(arguments)
 		{}
 
 		TokenID NameID;
-		NodeVec Arguments;
+		NodeIDList Arguments;
 	};
 
 	struct Enclosed
 	{
-		Enclosed(NodeVec tupleExpressions)
+		Enclosed(NodeIDList tupleExpressions)
 			: TupleExpressions(tupleExpressions)
 		{}
 
-		NodeVec TupleExpressions;
+		NodeIDList TupleExpressions;
 	};
 
 #pragma endregion
-
-	struct Expression
-	{
-		enum class Type : uint8_t
-		{
-			IntegerLiteral,
-			FloatLiteral,
-			BooleanLiteral,
-			StringLiteral,
-			CharacterLiteral,
-
-			Binary,
-			Unary,
-			Assignment,
-			MemoryAccess,
-			FunctionCall,
-			Enclosed
-		};
-
-		union Data
-		{
-			IntegerLiteral IntegerLiteral;
-			FloatLiteral FloatLiteral;
-			BooleanLiteral BooleanLiteral;
-			StringLiteral StringLiteral;
-			CharacterLiteral CharacterLiteral;
-
-			Binary Binary;
-			Unary Unary;
-			Assignment Assignment;
-			MemoryAccess MemoryAccess;
-			FunctionCall FunctionCall;
-			Enclosed Enclosed;
-		};
-
-		Type Type;
-		Data Data;
-	};
 
 #pragma region Statements
 
@@ -207,11 +167,11 @@ namespace AlloyCompiler
 
 	struct StatementBlock
 	{
-		StatementBlock(NodeVec statements)
+		StatementBlock(NodeIDList statements)
 			: Statements(statements)
 		{}
 
-		NodeVec Statements;
+		NodeIDList Statements;
 	};
 
 	struct For
@@ -249,41 +209,15 @@ namespace AlloyCompiler
 
 	struct Match
 	{
-		Match(NodeID expression, NodeVec cases)
+		Match(NodeID expression, NodeIDList cases)
 			: Expression(expression), Cases(cases)
 		{}
 
 		NodeID Expression;
-		NodeVec Cases;
+		NodeIDList Cases;
 	};
 
 #pragma endregion
-
-	struct Statement
-	{
-		enum class Type : uint8_t
-		{
-			Return,
-			StatementBlock,
-			For,
-			While,
-			If,
-			Match
-		};
-
-		union Data
-		{
-			Return Return;
-			StatementBlock StatementBlock;
-			For For;
-			While While;
-			If If;
-			Match Match;
-		};
-
-		Type Type;
-		Data Data;
-	};
 
 #pragma region TypeDeclarations
 
@@ -307,34 +241,14 @@ namespace AlloyCompiler
 
 	struct TupleTypeDeclaration
 	{
-		TupleTypeDeclaration(NodeVec types)
+		TupleTypeDeclaration(NodeIDList types)
 			: Types(types)
 		{}
 
-		NodeVec Types;
+		NodeIDList Types;
 	};
 
 #pragma endregion
-
-	struct TypeDeclaration
-	{
-		enum class Type : uint8_t
-		{
-			Var,
-			Const,
-			Tuple
-		};
-
-		union Data
-		{
-			VariableTypeDeclaration Var;
-			ConstantTypeDeclaration Const;
-			TupleTypeDeclaration Tuple;
-		};
-
-		Type Type;
-		Data Data;
-	};
 
 #pragma region Declarations
 
@@ -361,24 +275,6 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-	struct Declaration
-	{
-		enum class Type : uint8_t
-		{
-			Var,
-			Const
-		};
-
-		union Data
-		{
-			VariableDeclaration Var;
-			ConstantDeclaration Const;
-		};
-
-		Type Type;
-		Data Data;
-	};
-
 #pragma region Definitions
 
 	struct VariableDefinition
@@ -403,61 +299,37 @@ namespace AlloyCompiler
 
 	struct StructDefinition
 	{
-		StructDefinition(TokenID nameID, NodeVec members)
+		StructDefinition(TokenID nameID, NodeIDList members)
 			: NameID(nameID), Members(members)
 		{}
 
 		TokenID NameID;
-		NodeVec Members;
+		NodeIDList Members;
 	};
 
 	struct EnumDefinition
 	{
-		EnumDefinition(TokenID nameID, NodeVec members)
+		EnumDefinition(TokenID nameID, NodeIDList members)
 			: NameID(nameID), Members(members)
 		{}
 
 		TokenID NameID;
-		NodeVec Members;
+		NodeIDList Members;
 	};
 
 	struct FunctionDefinition
 	{
-		FunctionDefinition(TokenID nameID, NodeVec parameters, NodeID returnType, NodeID body)
+		FunctionDefinition(TokenID nameID, NodeIDList parameters, NodeID returnType, NodeID body)
 			: NameID(nameID), ReturnType(returnType), Parameters(parameters), Body(body)
 		{}
 
 		TokenID NameID;
 		NodeID ReturnType;
-		NodeVec Parameters;
+		NodeIDList Parameters;
 		NodeID Body;
 	};
 
 #pragma endregion
-
-	struct Definition
-	{
-		enum class Type : uint8_t
-		{
-			Var,
-			Const,
-			Struct,
-			Enum,
-			Function
-		};
-
-		union Data
-		{
-			VariableDefinition Var;
-			ConstantDefinition Const;
-			StructDefinition Struct;
-			EnumDefinition Enum;
-			FunctionDefinition Function;
-		};
-
-		Type Type;
-		Data Data;
-	};
 
 	struct QualifiedDefinition
 	{
@@ -478,33 +350,59 @@ namespace AlloyCompiler
 
 	struct Module
 	{
-		Module(NodeVec qualifiedDefinitions)
+		Module(NodeIDList qualifiedDefinitions)
 			: QualifiedDefinitions(qualifiedDefinitions)
 		{}
 
-		NodeVec QualifiedDefinitions;
+		NodeIDList QualifiedDefinitions;
 	};
 
 	struct Program
 	{
-		Program(NodeVec modules)
+		Program(NodeIDList modules)
 			: Modules(modules)
 		{}
 
-		NodeVec Modules;
+		NodeIDList Modules;
 	};
 
 	enum class NodeKind : uint8_t
 	{
-		Identifier,
+		TypeIdentifier,
 
-		Expression,
-		Statement,
+		IntegerLiteral,
+		FloatLiteral,
+		BooleanLiteral,
+		StringLiteral,
+		CharacterLiteral,
 
-		TypeDeclaration,
-		Declaration,
+		Binary,
+		Unary,
+		Assignment,
+		MemoryAccess,
+		FunctionCall,
+		Enclosed,
 
-		Definition,
+		Return,
+		StatementBlock,
+		For,
+		While,
+		If,
+		Match,
+
+		VariableTypeDeclaration,
+		ConstantTypeDeclaration,
+		TupleTypeDeclaration,
+
+		VariableDeclaration,
+		ConstantDeclaration,
+
+		VariableDefinition,
+		ConstantDefinition,
+		StructDefinition,
+		EnumDefinition,
+		FunctionDefinition,
+
 		QualifiedDefinition,
 
 		Module,
@@ -517,41 +415,59 @@ namespace AlloyCompiler
 
 		union
 		{
-			Identifier Identifier;
+			TypeIdentifier TypeIdentifier;
 
-			Expression Expression;
-			Statement Statement;
+			IntegerLiteral IntegerLiteral;
+			FloatLiteral FloatLiteral;
+			BooleanLiteral BooleanLiteral;
+			StringLiteral StringLiteral;
+			CharacterLiteral CharacterLiteral;
 
-			TypeDeclaration TypeDeclaration;
-			Declaration Declaration;
+			Binary Binary;
+			Unary Unary;
+			Assignment Assignment;
+			MemoryAccess MemoryAccess;
+			FunctionCall FunctionCall;
+			Enclosed Enclosed;
 
-			Definition Definition;
+			Return Return;
+			StatementBlock StatementBlock;
+			For For;
+			While While;
+			If If;
+			Match Match;
+
+			VariableTypeDeclaration VariableTypeDeclaration;
+			ConstantTypeDeclaration ConstantTypeDeclaration;
+			TupleTypeDeclaration TupleTypeDeclaration;
+
+			VariableDeclaration VariableDeclaration;
+			ConstantDeclaration ConstantDeclaration;
+
+			VariableDefinition VariableDefinition;
+			ConstantDefinition ConstantDefinition;
+			StructDefinition StructDefinition;
+			EnumDefinition EnumDefinition;
+			FunctionDefinition FunctionDefinition;
+
 			QualifiedDefinition QualifiedDefinition;
 
 			Module Module;
 			Program Program;
 		};
-
 	};
 
-	void a()
+	Node a()
 	{
 		Node node
 		{
-			NodeKind::Identifier,
-			Identifier
+			NodeKind::TypeIdentifier,
+			TypeIdentifier
 			{
-				Identifier::Type::Type,
-				TypeIdentifier
-				{
-					TypeIdentifier::Modifier::None,
-					0
-				}
+				TypeIdentifier::Modifier::None,
+				0
 			}
 		};
 	}
-
-	// TODO: need default copyable std::vector<NodeID> implementation
-
 
 }
