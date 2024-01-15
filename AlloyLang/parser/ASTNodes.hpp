@@ -2,7 +2,6 @@
 #include <cstdint>
 
 #include "tokenizer/Token.hpp"
-#include <variant>
 
 namespace AlloyCompiler
 {
