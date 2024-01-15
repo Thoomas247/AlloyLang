@@ -1,5 +1,5 @@
 #include "tokenizer/Tokenizer.hpp"
-#include "parser/Parser.hpp"
+#include "parser/ParserCompact.hpp"
 
 #include "log/Log.hpp"
 #include "TestString.hpp"
@@ -28,7 +28,7 @@ int main()
 	const uint64_t tokenizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
-	auto application = AlloyCompiler::Parser::Parse(buffers);
+	(void)AlloyCompiler::ParserCompact::Parse(buffers);
 	end = std::chrono::high_resolution_clock::now();
 
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -38,15 +38,35 @@ int main()
 	AlloyCompiler::Log::Print("Parse: {0}ms", parseTime);
 	AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime) / numKilobytes);
 
-	// naive implementation times for TestSrc.size() * 1'000 bytes
+	// unique_ptr implementation times:
+	// 
+	// TestSrc.size() * 1'000 bytes:
 	// tokenize: 9ms
 	// parse: 500ms
-
-	// naive implementation times for TestSrc.size() * 10'000 bytes
+	// 
+	// TestSrc.size() * 10'000 bytes
 	// tokenize: 91ms
 	// parse: 50000ms
 
+	// optimized unique_ptr implementation times:
+	// 
+	// TestSrc.size() * 1'000 bytes:
+	// tokenize: 9ms
+	// parse: 6ms
+	// 
+	// TestSrc.size() * 10'000 bytes
+	// tokenize: 91ms
+	// parse: 69ms
 
+	// flat array implementation times:
+	// 
+	// TestSrc.size() * 1'000 bytes:
+	// tokenize: 9ms
+	// parse: 4ms
+	// 
+	// TestSrc.size() * 10'000 bytes
+	// tokenize: 95ms
+	// parse: 45ms
 
 
 }

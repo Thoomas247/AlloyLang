@@ -359,6 +359,21 @@ namespace AlloyCompiler
 		}
 	};
 
+	struct VariableAssignment : public Statement
+	{
+		VariableAssignment(Ptr<AssignmentExpression> expr)
+			: Expr(std::move(expr))
+		{}
+		~VariableAssignment() = default;
+
+		std::string ToString() override
+		{
+			return "VAR_ASSIGNMENT";
+		}
+
+		Ptr<AssignmentExpression> Expr;
+	};
+
 #pragma endregion
 
 #pragma region Declarations

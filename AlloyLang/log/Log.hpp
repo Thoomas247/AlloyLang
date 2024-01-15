@@ -42,6 +42,8 @@ namespace AlloyCompiler
 
 	}
 
+#ifdef DEBUG
+
 	template <typename... Args>
 	constexpr void ASSERT(bool condition, const std::string& format, Args&&... args)
 	{
@@ -51,4 +53,16 @@ namespace AlloyCompiler
 			__debugbreak();
 		}
 	}
+
+#else
+
+	template <typename... Args>
+	constexpr void ASSERT(bool condition, const std::string& format, Args&&... args) {}
+
+#endif // DEBUG
+
+
+
+
+
 }

@@ -24,6 +24,9 @@
     <ClCompile Include="parser\Parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="parser\ParserCompact.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tokenizer\Tokenizer.hpp">
@@ -36,9 +39,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="tokenizer\TokenMaps.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="parser\ASTNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="parser\Convert.hpp">
@@ -54,6 +54,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="parser\ASTNodeCompact.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="parser\ParserCompact.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="parser\ASTNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

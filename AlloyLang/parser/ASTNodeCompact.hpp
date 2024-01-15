@@ -6,22 +6,17 @@
 
 namespace AlloyCompiler
 {
-	using Index = uint32_t;
-	using NodeID = Index;
+	using NodeID = uint32_t;
 
-	/// <summary>
-	/// Stores an index and a size of a list of nodes which is stored in a separate array.
-	/// </summary>
+	constexpr NodeID ERROR_NODE_ID = std::numeric_limits<NodeID>::max();
+
 	struct NodeIDList
 	{
-		using Size = uint8_t;
-
-		NodeIDList(Index listStart, Size num)
-			: ListStart(listStart), Num(num)
+		NodeIDList(const std::vector<NodeID>& list)
+			: List(list)
 		{}
 
-		Index ListStart;
-		Size Num;
+		const std::vector<NodeID>& List;
 	};
 
 #pragma region Identifiers
@@ -35,12 +30,12 @@ namespace AlloyCompiler
 			Pointer
 		};
 
-		TypeIdentifier(Modifier modifier, TokenID nameID)
-			: Mod(modifier), NameID(nameID)
+		TypeIdentifier(Modifier modifier, SourceView name)
+			: Mod(modifier), Name(name)
 		{}
 
 		Modifier Mod;
-		TokenID NameID;
+		std::string_view Name;
 	};
 
 #pragma endregion
@@ -76,11 +71,11 @@ namespace AlloyCompiler
 
 	struct StringLiteral
 	{
-		StringLiteral(TokenID valueID)
-			: ValueID(valueID)
+		StringLiteral(SourceView value)
+			: Value(value)
 		{}
 
-		TokenID ValueID;
+		SourceView Value;
 	};
 
 	struct CharacterLiteral
@@ -113,33 +108,33 @@ namespace AlloyCompiler
 		NodeID Operand;
 	};
 
-	struct Assignment
+	struct AssignmentExpression
 	{
-		Assignment(TokenValue op, NodeID left, NodeID right)
-			: Op(op), Left(left), Right(right)
+		AssignmentExpression(TokenValue op, SourceView name, NodeID value)
+			: Op(op), Name(name), Value(value)
 		{}
 
 		TokenValue Op;
-		NodeID Left;
-		NodeID Right;
+		SourceView Name;
+		NodeID Value;
 	};
 
 	struct MemoryAccess
 	{
-		MemoryAccess(TokenID nameID)
-			: NameID(nameID)
+		MemoryAccess(SourceView name)
+			: Name(name)
 		{}
 
-		TokenID NameID;
+		SourceView Name;
 	};
 
 	struct FunctionCall
 	{
-		FunctionCall(TokenID nameID, NodeIDList arguments)
-			: NameID(nameID), Arguments(arguments)
+		FunctionCall(SourceView name, NodeIDList arguments)
+			: Name(name), Arguments(arguments)
 		{}
 
-		TokenID NameID;
+		SourceView Name;
 		NodeIDList Arguments;
 	};
 
@@ -155,6 +150,15 @@ namespace AlloyCompiler
 #pragma endregion
 
 #pragma region Statements
+
+	struct AssignmentStatement
+	{
+		AssignmentStatement(NodeID assignment)
+			: Assignment(assignment)
+		{}
+
+		NodeID Assignment;
+	};
 
 	struct Return
 	{
@@ -239,6 +243,15 @@ namespace AlloyCompiler
 		NodeID Type;
 	};
 
+	struct ValueTypeDeclaration
+	{
+		ValueTypeDeclaration(NodeID type)
+			: Type(type)
+		{}
+
+		NodeID Type;
+	};
+
 	struct TupleTypeDeclaration
 	{
 		TupleTypeDeclaration(NodeIDList types)
@@ -254,23 +267,22 @@ namespace AlloyCompiler
 
 	struct VariableDeclaration
 	{
-		VariableDeclaration(TokenID nameID, NodeID type)
-			: NameID(nameID), Type(type)
+		VariableDeclaration(SourceView name, NodeID type)
+			: Name(name), Type(type)
 		{}
 
-		TokenID NameID;
+		SourceView Name;
 		NodeID Type;
 	};
 
 	struct ConstantDeclaration
 	{
-		ConstantDeclaration(TokenID nameID, NodeID type, NodeID expression)
-			: NameID(nameID), Type(type), Expression(expression)
+		ConstantDeclaration(SourceView name, NodeID type)
+			: Name(name), Type(type)
 		{}
 
-		TokenID NameID;
+		SourceView Name;
 		NodeID Type;
-		NodeID Expression;
 	};
 
 #pragma endregion
@@ -319,21 +331,19 @@ namespace AlloyCompiler
 
 	struct FunctionDefinition
 	{
-		FunctionDefinition(TokenID nameID, NodeIDList parameters, NodeID returnType, NodeID body)
-			: NameID(nameID), ReturnType(returnType), Parameters(parameters), Body(body)
+		FunctionDefinition(SourceView name, NodeIDList parameters, NodeID returnType, NodeID body)
+			: Name(name), ReturnType(returnType), Parameters(parameters), Body(body)
 		{}
 
-		TokenID NameID;
-		NodeID ReturnType;
+		SourceView Name;
 		NodeIDList Parameters;
+		NodeID ReturnType;
 		NodeID Body;
 	};
 
-#pragma endregion
-
 	struct QualifiedDefinition
 	{
-		enum class Qualifier
+		enum class Qualifier : uint8_t
 		{
 			Private,
 			Public,
@@ -347,6 +357,9 @@ namespace AlloyCompiler
 		Qualifier Visibility;
 		NodeID Definition;
 	};
+
+
+#pragma endregion
 
 	struct Module
 	{
@@ -378,11 +391,12 @@ namespace AlloyCompiler
 
 		Binary,
 		Unary,
-		Assignment,
+		AssignmentExpression,
 		MemoryAccess,
 		FunctionCall,
 		Enclosed,
 
+		AssignmentStatement,
 		Return,
 		StatementBlock,
 		For,
@@ -392,6 +406,7 @@ namespace AlloyCompiler
 
 		VariableTypeDeclaration,
 		ConstantTypeDeclaration,
+		ValueTypeDeclaration,
 		TupleTypeDeclaration,
 
 		VariableDeclaration,
@@ -425,11 +440,12 @@ namespace AlloyCompiler
 
 			Binary Binary;
 			Unary Unary;
-			Assignment Assignment;
+			AssignmentExpression AssignmentExpression;
 			MemoryAccess MemoryAccess;
 			FunctionCall FunctionCall;
 			Enclosed Enclosed;
 
+			AssignmentStatement AssignmentStatement;
 			Return Return;
 			StatementBlock StatementBlock;
 			For For;
@@ -439,6 +455,7 @@ namespace AlloyCompiler
 
 			VariableTypeDeclaration VariableTypeDeclaration;
 			ConstantTypeDeclaration ConstantTypeDeclaration;
+			ValueTypeDeclaration ValueTypeDeclaration;
 			TupleTypeDeclaration TupleTypeDeclaration;
 
 			VariableDeclaration VariableDeclaration;
@@ -456,18 +473,4 @@ namespace AlloyCompiler
 			Program Program;
 		};
 	};
-
-	Node a()
-	{
-		Node node
-		{
-			NodeKind::TypeIdentifier,
-			TypeIdentifier
-			{
-				TypeIdentifier::Modifier::None,
-				0
-			}
-		};
-	}
-
 }

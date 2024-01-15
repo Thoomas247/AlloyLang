@@ -1,8 +1,8 @@
-#include "Parser.hpp"
+#include "ParserCompact.hpp"
 
 #include "log/Log.hpp"
 
-namespace AlloyCompiler::Parser
+namespace AlloyCompiler::ParserCompact
 {
 	class TokenIterator
 	{
@@ -81,7 +81,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// TYPE_IDENTIFIER: ['&' | '*'] TYPE_NAME ;
 	/// </summary>
-	inline static Ptr<TypeIdentifier> parseTypeIdentifier(TokenIterator& iter)
+	inline static NodeID parseTypeIdentifier(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// check for reference or pointer
 		TypeIdentifier::Modifier modifier = TypeIdentifier::Modifier::None;
@@ -95,7 +95,7 @@ namespace AlloyCompiler::Parser
 				if (!iter.Next())
 				{
 					logError(iter, "Unexpected end of file!");
-					return nullptr;
+					return ERROR_NODE_ID;
 				}
 			}
 
@@ -106,7 +106,7 @@ namespace AlloyCompiler::Parser
 				if (!iter.Next())
 				{
 					logError(iter, "Unexpected end of file!");
-					return nullptr;
+					return ERROR_NODE_ID;
 				}
 			}
 		}
@@ -115,7 +115,7 @@ namespace AlloyCompiler::Parser
 		if (iter.CurrentToken().Kind != TokenKind::Identifier && iter.CurrentToken().Kind != TokenKind::BuiltInType)
 		{
 			logError(iter, "Expected a type identifier! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		const auto& identifier = iter.CurrentSourceView();
@@ -124,21 +124,23 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<TypeIdentifier>(modifier, identifier);
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::TypeIdentifier, .TypeIdentifier = TypeIdentifier{ modifier, identifier } });
 	}
+
 
 #pragma region Expressions
 
 	// forward declaration
-	inline static Ptr<Expression> parseExpression(TokenIterator& iter);
+	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers);
 
 	/// <summary>
 	/// FN_CALL: FN_NAME '(' [ EXPRESSION { ',' EXPRESSION } ] ')' ;
 	/// </summary>
-	inline static Ptr<FunctionCall> parseFunctionCall(TokenIterator& iter)
+	inline static NodeID parseFunctionCall(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have an identifier
 		ASSERT(iter.CurrentToken().Kind == TokenKind::Identifier, "Expected an identifier!");
@@ -150,39 +152,39 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected a '('.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check that we have an opening parenthesis
 		if (iter.CurrentToken().Value != TokenValue::OpenParen)
 		{
 			logError(iter, "Expected a '('! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// consume the opening parenthesis
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected an expression or ')' after '('.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// get all the arguments
-		Vec<Expression> arguments;
+		auto& argNodeIDs = buffers.CreateNodeIDList();
 
 		while (iter.CurrentToken().Value != TokenValue::CloseParen)
 		{
 			// parse the expression
-			Ptr<Expression> expression = parseExpression(iter);
+			NodeID expressionID = parseExpression(iter, buffers);
 
 			// check if the expression was valid
-			if (!expression)
+			if (expressionID == ERROR_NODE_ID)
 			{
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
 			// add the expression to the list
-			arguments.push_back(std::move(expression));
+			argNodeIDs.push_back(expressionID);
 
 			// check for comma
 			if (iter.CurrentToken().Value == TokenValue::Comma)
@@ -191,7 +193,7 @@ namespace AlloyCompiler::Parser
 				if (!iter.Next())
 				{
 					logError(iter, "Unexpected end of file! Expected an expression or ')' instead of ','.");
-					return nullptr;
+					return ERROR_NODE_ID;
 				}
 			}
 
@@ -199,7 +201,7 @@ namespace AlloyCompiler::Parser
 			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
 			{
 				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 		}
 
@@ -207,16 +209,17 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<FunctionCall>(identifier, std::move(arguments));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::FunctionCall, .FunctionCall = FunctionCall{ identifier, std::move(argNodeIDs) } });
 	}
 
 	/// <summary>
 	/// ENCLOSED_EXPRESSION: '(' EXPRESSION [',' EXPRESSION] ')' ;
 	/// </summary>
-	inline static Ptr<EnclosedExpression> parseEnclosedExpression(TokenIterator& iter)
+	inline static NodeID parseEnclosedExpression(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have an opening parenthesis
 		ASSERT(iter.CurrentToken().Value == TokenValue::OpenParen, "Expected '('!");
@@ -225,24 +228,24 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected an expression or ')' after '('.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		Vec<Expression> expressions;
+		auto& expressionNodeIDs = buffers.CreateNodeIDList();
 
 		while (iter.CurrentToken().Value != TokenValue::CloseParen)
 		{
 			// parse the expression
-			Ptr<Expression> expression = parseExpression(iter);
+			NodeID expressionID = parseExpression(iter, buffers);
 
 			// check if the expression was valid
-			if (!expression)
+			if (expressionID == ERROR_NODE_ID)
 			{
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
 			// add the expression to the list
-			expressions.push_back(std::move(expression));
+			expressionNodeIDs.push_back(expressionID);
 
 			// check for comma
 			if (iter.CurrentToken().Value == TokenValue::Comma)
@@ -251,7 +254,7 @@ namespace AlloyCompiler::Parser
 				if (!iter.Next())
 				{
 					logError(iter, "Unexpected end of file! Expected an expression or ')' instead of ','.");
-					return nullptr;
+					return ERROR_NODE_ID;
 				}
 			}
 
@@ -259,7 +262,7 @@ namespace AlloyCompiler::Parser
 			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
 			{
 				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 		}
 
@@ -267,10 +270,11 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<EnclosedExpression>(std::move(expressions));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::Enclosed, .Enclosed = Enclosed{ std::move(expressionNodeIDs) } });
 	}
 
 #pragma region Literals
@@ -278,35 +282,37 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// INT_LITERAL: NUMBER ;
 	/// </summary>
-	inline static Ptr<IntegerLiteral> parseIntegerLiteral(TokenIterator& iter)
+	inline static NodeID parseIntegerLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert that we have an integer literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::Integer, "Expected an integer literal!");
 
-		//int64_t value = std::stoll(iter.CurrentSourceView().data());
+		//uint64_t value = std::stoll(iter.CurrentSourceView().data());
 
-		int64_t value;
+		uint64_t value;
 		(void)std::from_chars(iter.CurrentSourceView().data(), iter.CurrentSourceView().data() + iter.CurrentSourceView().size(), value);
 
 		// consume the integer literal
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<IntegerLiteral>(value);
+		// create the node
+		return buffers.CreateNode({ .Kind = NodeKind::IntegerLiteral, .IntegerLiteral = IntegerLiteral{ value } });
 	}
 
 	/// <summary>
 	/// FLOAT_LITERAL: NUMBER '.' NUMBER ;
 	/// </summary>
-	inline static Ptr<FloatLiteral> parseFloatLiteral(TokenIterator& iter)
+	inline static NodeID parseFloatLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert that we have a float literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::Float, "Expected a float literal!");
 
 		//double value = std::stod(iter.CurrentSourceView().data());
+
 		double value;
 		(void)std::from_chars(iter.CurrentSourceView().data(), iter.CurrentSourceView().data() + iter.CurrentSourceView().size(), value);
 
@@ -314,16 +320,17 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<FloatLiteral>(value);
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::FloatLiteral, .FloatLiteral = FloatLiteral{ value } });
 	}
 
 	/// <summary>
 	/// BOOLEAN_LITERAL: 'true' | 'false' ;
 	/// </summary>
-	inline static Ptr<BooleanLiteral> parseBooleanLiteral(TokenIterator& iter)
+	inline static NodeID parseBooleanLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert that we have a boolean literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::Bool, "Expected a boolean literal!");
@@ -334,16 +341,17 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<BooleanLiteral>(value);
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::BooleanLiteral, .BooleanLiteral = BooleanLiteral{ value } });
 	}
 
 	/// <summary>
 	/// STRING_LITERAL: '\"' { LETTER } '\"' ;
 	/// </summary>
-	inline static Ptr<StringLiteral> parseStringLiteral(TokenIterator& iter)
+	inline static NodeID parseStringLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert that we have a string literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::String, "Expected a string literal!");
@@ -355,16 +363,17 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<StringLiteral>(string);
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::StringLiteral, .StringLiteral = StringLiteral{ string } });
 	}
 
 	/// <summary>
 	/// CHAR_LITERAL: '\'' [ LETTER ] '\'' ;
 	/// </summary>
-	inline static Ptr<CharacterLiteral> parseCharacterLiteral(TokenIterator& iter)
+	inline static NodeID parseCharacterLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert that we have a character literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::Character, "Expected a character literal!");
@@ -376,16 +385,17 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<CharacterLiteral>(c);
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::CharacterLiteral, .CharacterLiteral = CharacterLiteral{ c } });
 	}
 
 	/// <summary>
 	/// LITERAL: INT_LITERAL | FLOAT_LITERAL | BOOLEAN_LITERAL | STRING_LITERAL | CHAR_LITERAL ;
 	/// </summary>
-	inline static Ptr<Literal> parseLiteral(TokenIterator& iter)
+	inline static NodeID parseLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert that we have a literal
 		ASSERT(iter.CurrentToken().Kind == TokenKind::Literal, "Expected a literal!");
@@ -393,35 +403,35 @@ namespace AlloyCompiler::Parser
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::Integer:
-			return parseIntegerLiteral(iter);
+			return parseIntegerLiteral(iter, buffers);
 
 		case TokenValue::Float:
-			return parseFloatLiteral(iter);
+			return parseFloatLiteral(iter, buffers);
 
 		case TokenValue::Bool:
-			return parseBooleanLiteral(iter);
+			return parseBooleanLiteral(iter, buffers);
 
 		case TokenValue::String:
-			return parseStringLiteral(iter);
+			return parseStringLiteral(iter, buffers);
 
 		case TokenValue::Character:
-			return parseCharacterLiteral(iter);
+			return parseCharacterLiteral(iter, buffers);
 
 		default:
 			logError(iter, "Expected a literal! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 	}
 
 #pragma endregion
 
 	// forward declaration
-	inline static Ptr<Expression> parseExpression(TokenIterator& iter);
+	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers);
 
 	/// <summary>
 	/// PRIMARY_EXPRESSION: VAR_NAME | CONST_NAME | FN_CALL | LITERAL | ENCLOSED_EXPRESSION ;
 	/// </summary>
-	inline static Ptr<Expression> parsePrimaryExpression(TokenIterator& iter)
+	inline static NodeID parsePrimaryExpression(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		switch (iter.CurrentToken().Kind)
 		{
@@ -434,7 +444,7 @@ namespace AlloyCompiler::Parser
 			if (!iter.Next())
 			{
 				logError(iter, "Unexpected end of file!");
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
 			// check for function call
@@ -443,37 +453,37 @@ namespace AlloyCompiler::Parser
 				// go back to the identifier
 				iter.Previous();
 
-				return parseFunctionCall(iter);
+				return parseFunctionCall(iter, buffers);
 			}
 
 			// otherwise we have a variable or constant
-			return std::make_unique<MemoryAccess>(identifier);
+			return buffers.CreateNode(Node{ .Kind = NodeKind::MemoryAccess, .MemoryAccess = MemoryAccess{ identifier } });
 		}
 
 		case TokenKind::Literal:
-			return parseLiteral(iter);
+			return parseLiteral(iter, buffers);
 
 		case TokenKind::Delimiter:
 		{
 			if (iter.CurrentToken().Value == TokenValue::OpenParen)
 			{
-				return parseEnclosedExpression(iter);
+				return parseEnclosedExpression(iter, buffers);
 			}
 
 			logError(iter, "Expected an expression! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		default:
 			logError(iter, "Expected an expression! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 	}
 
 	/// <summary>
 	/// UNARY_EXPRESSION: UNARY_OPERATOR EXPRESSION ;
 	/// </summary>
-	inline static Ptr<Expression> parseUnaryExpression(TokenIterator& iter)
+	inline static NodeID parseUnaryExpression(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert that we have an operator
 		ASSERT(iter.CurrentToken().Kind == TokenKind::Operator, "Expected an operator!");
@@ -485,43 +495,44 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected an expression.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the expression
-		Ptr<Expression> expression = parsePrimaryExpression(iter);
+		NodeID expressionID = parsePrimaryExpression(iter, buffers);
 
 		// check if the expression was valid
-		if (!expression)
+		if (expressionID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<UnaryExpression>(op, std::move(expression));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::Unary, .Unary = Unary{ op, expressionID } });
 	}
 
 	/// <summary>
 	/// BINARY_EXPRESSION: EXPRESSION BINARY_OPERATOR EXPRESSION ;
 	/// </summary>
-	inline static Ptr<Expression> parseBinaryExpresssion(TokenIterator& iter)
+	inline static NodeID parseBinaryExpresssion(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// handles *, / and %
-		auto tryParseMultiplicativeExpression = [&](TokenIterator& iter)->Ptr<Expression>
+		auto tryParseMultiplicativeExpression = [&](TokenIterator& iter) -> NodeID
 			{
-				Ptr<Expression> left;
+				NodeID left;
 
 				if (iter.CurrentToken().Kind == TokenKind::Operator)
 				{
-					left = parseUnaryExpression(iter);
+					left = parseUnaryExpression(iter, buffers);
 				}
 
 				else
 				{
-					left = parsePrimaryExpression(iter);
+					left = parsePrimaryExpression(iter, buffers);
 				}
 
-				if (!left)
-					return nullptr;
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
 
 				while (iter.CurrentToken().Value == TokenValue::Multiply
 					|| iter.CurrentToken().Value == TokenValue::Divide
@@ -533,37 +544,37 @@ namespace AlloyCompiler::Parser
 					if (!iter.Next())
 					{
 						logError(iter, "Unexpected end of file!");
-						return nullptr;
+						return ERROR_NODE_ID;
 					}
 
-					Ptr<Expression> right;
+					NodeID right;
 
 					if (iter.CurrentToken().Kind == TokenKind::Operator)
 					{
-						right = parseUnaryExpression(iter);
+						right = parseUnaryExpression(iter, buffers);
 					}
 
 					else
 					{
-						right = parsePrimaryExpression(iter);
+						right = parsePrimaryExpression(iter, buffers);
 					}
 
-					if (!right)
-						return nullptr;
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
 
-					left = std::make_unique<BinaryExpression>(op, std::move(left), std::move(right));
+					left = buffers.CreateNode(Node{ .Kind = NodeKind::Binary, .Binary = Binary{ op, left, right } });
 				}
 
 				return left;
 			};
 
 		// handles + and -
-		auto tryParseAdditiveExpression = [&](TokenIterator& iter)->Ptr<Expression>
+		auto tryParseAdditiveExpression = [&](TokenIterator& iter) -> NodeID
 			{
-				Ptr<Expression> left = tryParseMultiplicativeExpression(iter);
+				NodeID left = tryParseMultiplicativeExpression(iter);
 
-				if (!left)
-					return nullptr;
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
 
 				while (iter.CurrentToken().Value == TokenValue::Plus || iter.CurrentToken().Value == TokenValue::Minus)
 				{
@@ -573,27 +584,27 @@ namespace AlloyCompiler::Parser
 					if (!iter.Next())
 					{
 						logError(iter, "Unexpected end of file!");
-						return nullptr;
+						return ERROR_NODE_ID;
 					}
 
-					Ptr<Expression> right = tryParseMultiplicativeExpression(iter);
+					NodeID right = tryParseMultiplicativeExpression(iter);
 
-					if (!right)
-						return nullptr;
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
 
-					left = std::make_unique<BinaryExpression>(op, std::move(left), std::move(right));
+					left = buffers.CreateNode(Node{ .Kind = NodeKind::Binary, .Binary = Binary{ op, left, right } });
 				}
 
 				return left;
 			};
 
 		// handles ==, !=, <, <=, >, >=
-		auto tryParseRelationalExpression = [&](TokenIterator& iter)->Ptr<Expression>
+		auto tryParseRelationalExpression = [&](TokenIterator& iter) -> NodeID
 			{
-				Ptr<Expression> left = tryParseAdditiveExpression(iter);
+				NodeID left = tryParseAdditiveExpression(iter);
 
-				if (!left)
-					return nullptr;
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
 
 				while (iter.CurrentToken().Value == TokenValue::Equal
 					|| iter.CurrentToken().Value == TokenValue::NotEqual
@@ -608,27 +619,27 @@ namespace AlloyCompiler::Parser
 					if (!iter.Next())
 					{
 						logError(iter, "Unexpected end of file!");
-						return nullptr;
+						return ERROR_NODE_ID;
 					}
 
-					Ptr<Expression> right = tryParseAdditiveExpression(iter);
+					NodeID right = tryParseAdditiveExpression(iter);
 
-					if (!right)
-						return nullptr;
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
 
-					left = std::make_unique<BinaryExpression>(op, std::move(left), std::move(right));
+					left = buffers.CreateNode(Node{ .Kind = NodeKind::Binary, .Binary = Binary{ op, left, right } });
 				}
 
 				return left;
 			};
 
 		// handles && and ||
-		auto tryParseLogicalExpression = [&](TokenIterator& iter) -> Ptr<Expression>
+		auto tryParseLogicalExpression = [&](TokenIterator& iter) -> NodeID
 			{
-				Ptr<Expression> left = tryParseRelationalExpression(iter);
+				NodeID left = tryParseRelationalExpression(iter);
 
-				if (!left)
-					return nullptr;
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
 
 				while (iter.CurrentToken().Value == TokenValue::LogicalAnd
 					|| iter.CurrentToken().Value == TokenValue::LogicalOr)
@@ -639,15 +650,15 @@ namespace AlloyCompiler::Parser
 					if (!iter.Next())
 					{
 						logError(iter, "Unexpected end of file! Expected an expression.");
-						return nullptr;
+						return ERROR_NODE_ID;
 					}
 
-					Ptr<Expression> right = tryParseRelationalExpression(iter);
+					NodeID right = tryParseRelationalExpression(iter);
 
-					if (!right)
-						return nullptr;
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
 
-					left = std::make_unique<BinaryExpression>(op, std::move(left), std::move(right));
+					left = buffers.CreateNode(Node{ .Kind = NodeKind::Binary, .Binary = Binary{ op, left, right } });
 				}
 
 				return left;
@@ -659,7 +670,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// ASSIGNMENT_EXPRESSION: VAR_NAME ASSIGNMENT_OPERATOR EXPRESSION ;
 	/// </summary>
-	inline static Ptr<AssignmentExpression> parseAssignmentExpression(TokenIterator& iter, bool failIsError = true)
+	inline static NodeID parseAssignmentExpression(TokenIterator& iter, NodeDataBuffers& buffers, bool failIsError = true)
 	{
 		// assert that we have an identifier
 		if (iter.CurrentToken().Kind != TokenKind::Identifier)
@@ -669,7 +680,7 @@ namespace AlloyCompiler::Parser
 				logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
 			}
 
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the identifier
@@ -679,7 +690,7 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected an assignment operator.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for assignment operator
@@ -695,7 +706,7 @@ namespace AlloyCompiler::Parser
 				iter.Previous();
 			}
 
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// from here, we know we have an assignment expression
@@ -707,39 +718,41 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected an expression.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the expression
-		Ptr<Expression> expression = parseExpression(iter);
+		NodeID expressionID = parseExpression(iter, buffers);
 
 		// check if the expression was valid
-		if (!expression)
+		if (expressionID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<AssignmentExpression>(op, identifier, std::move(expression));
+		return buffers.CreateNode(Node{ .Kind = NodeKind::AssignmentExpression, .AssignmentExpression = AssignmentExpression{ op, identifier, expressionID } });
 	}
 
 	/// <summary>
 	/// EXPRESSION: PRIMARY_EXPRESSION | UNARY_EXPRESSION | BINARY_EXPRESSION | ASSIGNMENT_EXPRESSION ;
 	/// </summary>
-	inline static Ptr<Expression> parseExpression(TokenIterator& iter)
+	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
+		NodeID expressionID;
+
 		// assignment expressions are a special case
 		// depending on the context, the function is allowed to fail
-		if (Ptr<Expression> expression = parseAssignmentExpression(iter, false))
-			return std::move(expression);
+		if ((expressionID = parseAssignmentExpression(iter, buffers, false)) != ERROR_NODE_ID)
+			return expressionID;
 
-		Ptr<Expression> expression = parseBinaryExpresssion(iter);
+		expressionID = parseBinaryExpresssion(iter, buffers);
 
-		if (!expression)
+		if (expressionID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::move(expression);
+		return expressionID;
 	}
 
 #pragma endregion
@@ -747,18 +760,18 @@ namespace AlloyCompiler::Parser
 #pragma region Statements
 
 	// forward declaration
-	inline static Ptr<Statement> parseStatement(TokenIterator& iter);
+	inline static NodeID parseStatement(TokenIterator& iter, NodeDataBuffers& buffers);
 
 	/// <summary>
 	/// VARIABLE_ASSIGNMENT: ASSIGNMENT_EXPRESSION ';' ;
 	/// </summary>
-	inline static Ptr<VariableAssignment> parseVariableAssignment(TokenIterator& iter)
+	inline static NodeID parseVariableAssignment(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
-		Ptr<AssignmentExpression> assignmentExpression = parseAssignmentExpression(iter);
+		NodeID assignmentExpressionID = parseAssignmentExpression(iter, buffers);
 
-		if (!assignmentExpression)
+		if (assignmentExpressionID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for semicolon
@@ -771,99 +784,101 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<VariableAssignment>(std::move(assignmentExpression));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::AssignmentStatement, .AssignmentStatement = AssignmentStatement{ assignmentExpressionID } });
 	}
 
 	/// <summary>
 	/// FOR_LOOP: 'for' '(' EXPRESSION ';' EXPRESSION ';' EXPRESSION ';' ')' STATEMENT ;
 	/// </summary>
-	inline static Ptr<ForLoop> parseForLoop(TokenIterator& iter)
+	inline static NodeID parseForLoop(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		logError(iter, "Not implemented!");
 
-		return nullptr;
+		return ERROR_NODE_ID;
 	}
 
 	/// <summary>
 	/// WHILE_LOOP: 'while' ENCLOSED_EXPRESSION STATEMENT ;
 	/// </summary>
-	inline static Ptr<WhileLoop> parseWhileLoop(TokenIterator& iter)
+	inline static NodeID parseWhileLoop(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		logError(iter, "Not implemented!");
 
-		return nullptr;
+		return ERROR_NODE_ID;
 	}
 
 	/// <summary>
 	/// IF_STATEMENT: 'if' ENCLOSED_EXPRESSION STATEMENT ['else' STATEMENT] ;
 	/// </summary>
-	inline static Ptr<IfStatement> parseIfStatement(TokenIterator& iter)
+	inline static NodeID parseIfStatement(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		logError(iter, "Not implemented!");
 
-		return nullptr;
+		return ERROR_NODE_ID;
 	}
 
 	/// <summary>
 	/// MATCH_STATEMENT: 'match' ENCLOSED_EXPRESSION '{' { EXPRESSION '=>' STATEMENT } '}' ;
 	/// </summary>
-	inline static Ptr<MatchStatement> parseMatchStatement(TokenIterator& iter)
+	inline static NodeID parseMatchStatement(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		logError(iter, "Not implemented!");
 
-		return nullptr;
+		return ERROR_NODE_ID;
 	}
 
 	/// <summary>
 	/// STATEMENT_BLOCK: '{' {STATEMENT} '}' ;
 	/// </summary>
-	inline static Ptr<StatementBlock> parseStatementBlock(TokenIterator& iter)
+	inline static NodeID parseStatementBlock(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// check for opening brace
 		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
 		{
 			logError(iter, "Expected a '{0}'! Got '{1}' instead.", "{", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// consume the opening brace
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected a statement or '}'.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse all statements
-		Vec<Statement> statements;
+		auto& statementIDs = buffers.CreateNodeIDList();
 
 		while (iter.CurrentToken().Value != TokenValue::CloseBrace)
 		{
 			// parse the statement
-			Ptr<Statement> statement = parseStatement(iter);
+			NodeID statementID = parseStatement(iter, buffers);
 
 			// check if the statement was valid
-			if (!statement)
+			if (statementID == ERROR_NODE_ID)
 			{
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
 			// add the statement to the list
-			statements.push_back(std::move(statement));
+			statementIDs.push_back(statementID);
 		}
 
 		// consume the closing brace
 		(void)iter.Next();
 
-		return std::make_unique<StatementBlock>(std::move(statements));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::StatementBlock, .StatementBlock = StatementBlock{ std::move(statementIDs) } });
 	}
 
 	/// <summary>
 	/// RETURN_STATEMENT: 'return' [ EXPRESSION ] ';' ;
 	/// </summary>
-	inline static Ptr<ReturnStatement> parseReturnStatement(TokenIterator& iter)
+	inline static NodeID parseReturnStatement(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a return keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Return, "Expected 'return'!");
@@ -872,21 +887,21 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected an expression or ';' after 'return'.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		Ptr<Expression> expression = nullptr;
+		NodeID expressionID = ERROR_NODE_ID;
 
 		// check for expression
 		if (iter.CurrentToken().Value != TokenValue::Semicolon)
 		{
 			// parse the expression
-			expression = parseExpression(iter);
+			expressionID = parseExpression(iter, buffers);
 
 			// check if the expression was valid
-			if (!expression)
+			if (expressionID == ERROR_NODE_ID)
 			{
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 		}
 
@@ -900,10 +915,11 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<ReturnStatement>(std::move(expression));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::Return, .Return = Return{ expressionID } });
 	}
 
 	/// <summary>
@@ -917,31 +933,31 @@ namespace AlloyCompiler::Parser
 	///		| STATEMENT_BLOCK
 	///		| RETURN_STATEMENT ;
 	/// </summary>
-	inline static Ptr<Statement> parseStatement(TokenIterator& iter)
+	inline static NodeID parseStatement(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::For:
-			return parseForLoop(iter);
+			return parseForLoop(iter, buffers);
 
 		case TokenValue::While:
-			return parseWhileLoop(iter);
+			return parseWhileLoop(iter, buffers);
 
 		case TokenValue::If:
-			return parseIfStatement(iter);
+			return parseIfStatement(iter, buffers);
 
 		case TokenValue::Match:
-			return parseMatchStatement(iter);
+			return parseMatchStatement(iter, buffers);
 
 		case TokenValue::OpenBrace:
-			return parseStatementBlock(iter);
+			return parseStatementBlock(iter, buffers);
 
 		case TokenValue::Return:
-			return parseReturnStatement(iter);
+			return parseReturnStatement(iter, buffers);
 
 		default:
 			logError(iter, "Expected a statement! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 	}
 
@@ -950,12 +966,12 @@ namespace AlloyCompiler::Parser
 #pragma region Declarations
 
 	// forward declaration
-	inline static Ptr<TypeDeclaration> parseTypeDeclaration(TokenIterator& iter);
+	inline static NodeID parseTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers);
 
 	/// <summary>
 	/// TUPLE_TYPE_DECLARATION: '(' TYPE_DECLARATION ',' TYPE_DECLARATION { ',' TYPE_DECLARATION } ')' ;
 	/// </summary>
-	inline static Ptr<TupleTypeDeclaration> parseTupleTypeDeclaration(TokenIterator& iter)
+	inline static NodeID parseTupleTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have an opening parenthesis
 		ASSERT(iter.CurrentToken().Value == TokenValue::OpenParen, "Expected '('!");
@@ -964,25 +980,25 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Expected a type identifier after '('!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse all type identifiers
-		Vec<TypeDeclaration> typeDeclarations;
+		auto& typeDeclarationIDs = buffers.CreateNodeIDList();
 
 		while (iter.CurrentToken().Value != TokenValue::CloseParen)
 		{
 			// parse the type declaration
-			Ptr<TypeDeclaration> typeDeclaration = parseTypeDeclaration(iter);
+			NodeID typeDeclarationID = parseTypeDeclaration(iter, buffers);
 
 			// check if the type declaration was valid
-			if (!typeDeclaration)
+			if (typeDeclarationID == ERROR_NODE_ID)
 			{
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
 			// add the type declaration to the list
-			typeDeclarations.push_back(std::move(typeDeclaration));
+			typeDeclarationIDs.push_back(typeDeclarationID);
 
 			// check for comma
 			if (iter.CurrentToken().Value == TokenValue::Comma)
@@ -991,7 +1007,7 @@ namespace AlloyCompiler::Parser
 				if (!iter.Next())
 				{
 					logError(iter, "Unexpected end of file! Expected a type declaration or ')' instead of ','.");
-					return nullptr;
+					return ERROR_NODE_ID;
 				}
 			}
 
@@ -999,7 +1015,7 @@ namespace AlloyCompiler::Parser
 			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
 			{
 				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 		}
 
@@ -1007,23 +1023,24 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected a type identifier after ')'!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check we have more than one type declaration
-		if (typeDeclarations.size() < 2)
+		if (typeDeclarationIDs.size() < 2)
 		{
 			logError(iter, "Single type tuples are not supported! Remove the '(' and ')'.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<TupleTypeDeclaration>(std::move(typeDeclarations));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::TupleTypeDeclaration, .TupleTypeDeclaration = TupleTypeDeclaration{ std::move(typeDeclarationIDs) } });
 	}
 
 	/// <summary>
 	/// CONST_TYPE_DECLARATION: 'const' TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static Ptr<ConstantTypeDeclaration> parseConstantTypeDeclaration(TokenIterator& iter)
+	inline static NodeID parseConstantTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a const keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
@@ -1032,24 +1049,25 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Expected a type identifier after 'const'!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the type identifier
-		Ptr<TypeIdentifier> typeIdentifier = parseTypeIdentifier(iter);
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
 
-		if (!typeIdentifier)
+		if (typeIdentifierID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<ConstantTypeDeclaration>(std::move(typeIdentifier));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::ConstantTypeDeclaration, .ConstantTypeDeclaration = ConstantTypeDeclaration{ typeIdentifierID } });
 	}
 
 	/// <summary>
 	/// VAR_TYPE_DECLARATION: 'var' TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static Ptr<VariableTypeDeclaration> parseVariableTypeDeclaration(TokenIterator& iter)
+	inline static NodeID parseVariableTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a var keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
@@ -1058,61 +1076,63 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Expected a type identifier after 'var'!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the type identifier
-		Ptr<TypeIdentifier> typeIdentifier = parseTypeIdentifier(iter);
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
 
-		if (!typeIdentifier)
+		if (typeIdentifierID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<VariableTypeDeclaration>(std::move(typeIdentifier));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::VariableTypeDeclaration, .VariableTypeDeclaration = VariableTypeDeclaration{ typeIdentifierID } });
 	}
 
 	/// <summary>
 	/// VALUE_TYPE_DECLARATION: TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static Ptr<ValueTypeDeclaration> parseValueTypeDeclaration(TokenIterator& iter)
+	inline static NodeID parseValueTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
-		// parse the type identifier
-		Ptr<TypeIdentifier> typeIdentifier = parseTypeIdentifier(iter);
+		// parse the type identifiers
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
 
-		if (!typeIdentifier)
+		if (typeIdentifierID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<ValueTypeDeclaration>(std::move(typeIdentifier));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::ValueTypeDeclaration, .ValueTypeDeclaration = ValueTypeDeclaration{ typeIdentifierID } });
 	}
 
 	/// <summary>
 	/// TYPE_DECLARATION: VALUE_TYPE_DECLARATION | VAR_TYPE_DECLARATION | CONST_TYPE_DECLARATION | TUPLE_TYPE_DECLARATION ;
 	/// </summary>
-	inline static Ptr<TypeDeclaration> parseTypeDeclaration(TokenIterator& iter)
+	inline static NodeID parseTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::OpenParen:
-			return parseTupleTypeDeclaration(iter);
+			return parseTupleTypeDeclaration(iter, buffers);
 
 		case TokenValue::Const:
-			return parseConstantTypeDeclaration(iter);
+			return parseConstantTypeDeclaration(iter, buffers);
 
 		case TokenValue::Var:
-			return parseVariableTypeDeclaration(iter);
+			return parseVariableTypeDeclaration(iter, buffers);
 
 		default:
-			return parseValueTypeDeclaration(iter);
+			return parseValueTypeDeclaration(iter, buffers);
 		}
 	}
 
 	/// <summary>
 	/// VAR_DECLARATION: 'var' VAR_NAME ':' TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static Ptr<VariableDeclaration> parseVariableDeclaration(TokenIterator& iter)
+	inline static NodeID parseVariableDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a var keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
@@ -1121,71 +1141,14 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Expected an identifier after 'var'!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for identifier
 		if (iter.CurrentToken().Kind != TokenKind::Identifier)
 		{
 			logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
-		}
-
-		auto identifier = iter.CurrentSourceView();
-
-		// consume the identifier
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return nullptr;
-		}
-
-		// check for colon
-		if (iter.CurrentToken().Value != TokenValue::Colon)
-		{
-			logError(iter, "Expected a ':'! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
-		}
-
-		// consume the colon
-		if (!iter.Next())
-		{
-			logError(iter, "Expected a type identifier after ':'!");
-			return nullptr;
-		}
-
-		// parse the type identifier
-		Ptr<TypeIdentifier> typeIdentifier = parseTypeIdentifier(iter);
-
-		// check if the type identifier was valid
-		if (!typeIdentifier)
-		{
-			return nullptr;
-		}
-
-		return std::make_unique<VariableDeclaration>(std::move(identifier), std::move(typeIdentifier));
-	}
-
-	/// <summary>
-	/// CONST_DECLARATION: 'const' CONST_NAME ':' TYPE_IDENTIFIER ;
-	/// </summary>
-	inline static Ptr<ConstantDeclaration> parseConstantDeclaration(TokenIterator& iter)
-	{
-		// assert we have a const keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
-
-		// consume the const keyword
-		if (!iter.Next())
-		{
-			logError(iter, "Expected an identifier after 'const'!");
-			return nullptr;
-		}
-
-		// check for identifier
-		if (iter.CurrentToken().Kind != TokenKind::Identifier)
-		{
-			logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		const auto& identifier = iter.CurrentSourceView();
@@ -1194,55 +1157,114 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for colon
 		if (iter.CurrentToken().Value != TokenValue::Colon)
 		{
 			logError(iter, "Expected a ':'! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// consume the colon
 		if (!iter.Next())
 		{
 			logError(iter, "Expected a type identifier after ':'!");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the type identifier
-		Ptr<TypeIdentifier> typeIdentifier = parseTypeIdentifier(iter);
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
 
 		// check if the type identifier was valid
-		if (!typeIdentifier)
+		if (typeIdentifierID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<ConstantDeclaration>(std::move(identifier), std::move(typeIdentifier));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::VariableDeclaration, .VariableDeclaration = VariableDeclaration{ identifier, typeIdentifierID } });
+	}
+
+	/// <summary>
+	/// CONST_DECLARATION: 'const' CONST_NAME ':' TYPE_IDENTIFIER ;
+	/// </summary>
+	inline static NodeID parseConstantDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	{
+		// assert we have a const keyword
+		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
+
+		// consume the const keyword
+		if (!iter.Next())
+		{
+			logError(iter, "Expected an identifier after 'const'!");
+			return ERROR_NODE_ID;
+		}
+
+		// check for identifier
+		if (iter.CurrentToken().Kind != TokenKind::Identifier)
+		{
+			logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
+			return ERROR_NODE_ID;
+		}
+
+		const auto& identifier = iter.CurrentSourceView();
+
+		// consume the identifier
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return ERROR_NODE_ID;
+		}
+
+		// check for colon
+		if (iter.CurrentToken().Value != TokenValue::Colon)
+		{
+			logError(iter, "Expected a ':'! Got '{0}' instead.", iter.CurrentSourceView());
+			return ERROR_NODE_ID;
+		}
+
+		// consume the colon
+		if (!iter.Next())
+		{
+			logError(iter, "Expected a type identifier after ':'!");
+			return ERROR_NODE_ID;
+		}
+
+		// parse the type identifier
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
+
+		// check if the type identifier was valid
+		if (typeIdentifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::ConstantDeclaration, .ConstantDeclaration = ConstantDeclaration{ identifier, typeIdentifierID } });
 	}
 
 	/// <summary>
 	/// DECLARATION: VAR_DECLARATION | CONST_DECLARATION ;
 	/// </summary>
-	inline static Ptr<Declaration> parseDeclaration(TokenIterator& iter)
+	inline static NodeID parseDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// quick exit if token kind is not valid
 		if (iter.CurrentToken().Kind != TokenKind::Declaration)
-			return nullptr;
+			return ERROR_NODE_ID;
 
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::Var:
-			return parseVariableDeclaration(iter);
+			return parseVariableDeclaration(iter, buffers);
 
 		case TokenValue::Const:
-			return parseConstantDeclaration(iter);
+			return parseConstantDeclaration(iter, buffers);
 
 		default:
 			logError(iter, "Expected a declaration! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 	}
 
@@ -1253,7 +1275,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// FN_DEFINITION: 'fn' FN_NAME '(' [ DECLARATION { ',' DECLARATION } ] ')' [':' TYPE_DECLARATION] STATEMENT_BLOCK ;
 	/// </summary>
-	inline static Ptr<FunctionDefinition> parseFunctionDefinition(TokenIterator& iter)
+	inline static NodeID parseFunctionDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a fn keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Fn, "Expected 'fn'!");
@@ -1262,7 +1284,7 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected an identifier after 'fn'.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// get the function name
@@ -1272,39 +1294,39 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected a '('.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for opening parenthesis
 		if (iter.CurrentToken().Value != TokenValue::OpenParen)
 		{
 			logError(iter, "Expected a '('! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// consume the opening parenthesis
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected a parameter declaration.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the parameter declarations
-		Vec<Declaration> parameterDeclarations;
+		auto& parameterDeclarationIDs = buffers.CreateNodeIDList();
 
 		while (iter.CurrentToken().Value != TokenValue::CloseParen)
 		{
 			// parse the declaration
-			Ptr<Declaration> declaration = parseDeclaration(iter);
+			NodeID declarationID = parseDeclaration(iter, buffers);
 
 			// check if the declaration was valid
-			if (!declaration)
+			if (declarationID == ERROR_NODE_ID)
 			{
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
 			// add the declaration to the list
-			parameterDeclarations.push_back(std::move(declaration));
+			parameterDeclarationIDs.push_back(declarationID);
 
 			// check for comma
 			if (iter.CurrentToken().Value == TokenValue::Comma)
@@ -1313,7 +1335,7 @@ namespace AlloyCompiler::Parser
 				if (!iter.Next())
 				{
 					logError(iter, "Unexpected end of file! Expected a parameter declaration or ')' instead of ','.");
-					return nullptr;
+					return ERROR_NODE_ID;
 				}
 			}
 
@@ -1321,7 +1343,7 @@ namespace AlloyCompiler::Parser
 			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
 			{
 				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 		}
 
@@ -1329,11 +1351,11 @@ namespace AlloyCompiler::Parser
 		if (!iter.Next())
 		{
 			logError(iter, "Unexpected end of file! Expected a '->' or '{'.");
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for return type
-		Ptr<TypeDeclaration> returnType;
+		NodeID returnTypeID = ERROR_NODE_ID;
 
 		if (iter.CurrentToken().Value == TokenValue::Arrow)
 		{
@@ -1341,161 +1363,166 @@ namespace AlloyCompiler::Parser
 			if (!iter.Next())
 			{
 				logError(iter, "Unexpected end of file! Expected a return type.");
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
 			// parse the return type
-			returnType = parseTypeDeclaration(iter);
+			returnTypeID = parseTypeDeclaration(iter, buffers);
 
 			// check if the return type was valid
-			if (!returnType)
+			if (returnTypeID == ERROR_NODE_ID)
 			{
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 		}
 
 		// parse the statement block
-		Ptr<StatementBlock> statementBlock = parseStatementBlock(iter);
+		NodeID statementBlockID = parseStatementBlock(iter, buffers);
 
 		// check if the statement block was valid
-		if (!statementBlock)
+		if (statementBlockID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<FunctionDefinition>(functionName, std::move(parameterDeclarations), std::move(returnType), std::move(statementBlock));
+		FunctionDefinition functionDefinition{ functionName, std::move(parameterDeclarationIDs), returnTypeID, statementBlockID };
+
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::FunctionDefinition, .FunctionDefinition = FunctionDefinition { functionName, parameterDeclarationIDs, returnTypeID, statementBlockID } });
 	}
 
 	/// <summary>
 	/// ENUM_DEFINITION: 'enum' ENUM_NAME '{' { IDENTIFIER } '}' ;
 	/// </summary>
-	inline static Ptr<EnumDefinition> parseEnumDefinition(TokenIterator& iter)
+	inline static NodeID parseEnumDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have an enum keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Enum, "Expected 'enum'!");
 
 		logError(iter, "Not implemented!");
 
-		return nullptr;
+		return ERROR_NODE_ID;
 	}
 
 	/// <summary>
 	/// STRUCT_DEFINITION: 'struct' STRUCT_NAME '{' { DECLARATION } '}' ;
 	/// </summary>
-	inline static Ptr<StructDefinition> parseStructDefinition(TokenIterator& iter)
+	inline static NodeID parseStructDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a struct keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Struct, "Expected 'struct'!");
 
 		logError(iter, "Not implemented!");
 
-		return nullptr;
+		return ERROR_NODE_ID;
 	}
 
 	/// <summary>
 	/// CONST_DEFINITION: CONST_DECLARATION '=' EXPRESSION ';' ;
 	/// </summary>
-	inline static Ptr<ConstantDefinition> parseConstantDefinition(TokenIterator& iter)
+	inline static NodeID parseConstantDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a const keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
 
 		// parse the declaration
-		Ptr<ConstantDeclaration> declaration = parseConstantDeclaration(iter);
+		NodeID declarationID = parseConstantDeclaration(iter, buffers);
 
 		// check if the declaration was valid
-		if (!declaration)
+		if (declarationID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for assignment operator
 		if (iter.CurrentToken().Value != TokenValue::Assign)
 		{
 			logError(iter, "Expected a '='! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// consume the assignment operator
 		if (!iter.Next())
 		{
 			logError(iter, "Expected an expression after '{0}'!", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the expression
-		Ptr<Expression> expression = parseExpression(iter);
+		NodeID expressionID = parseExpression(iter, buffers);
 
 		// check if the expression was valid
-		if (!expression)
+		if (expressionID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for semicolon
 		if (iter.CurrentToken().Value != TokenValue::Semicolon)
 		{
 			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// consume the semicolon
 		(void)iter.Next();
 
-		return std::make_unique<ConstantDefinition>(std::move(declaration), std::move(expression));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::ConstantDefinition, .ConstantDefinition = ConstantDefinition{ declarationID, expressionID } });
 	}
 
 	/// <summary>
 	/// VAR_DEFINITION: VAR_DECLARATION '=' EXPRESSION ';' ;
 	/// </summary>
-	inline static Ptr<VariableDefinition> parseVariableDefinition(TokenIterator& iter)
+	inline static NodeID parseVariableDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a var keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
 
 		// parse the declaration
-		Ptr<VariableDeclaration> declaration = parseVariableDeclaration(iter);
+		NodeID declarationID = parseVariableDeclaration(iter, buffers);
 
 		// check if the declaration was valid
-		if (!declaration)
+		if (declarationID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for assignment operator
 		if (iter.CurrentToken().Value != TokenValue::Assign)
 		{
 			logError(iter, "Expected a '='! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// consume the assignment operator
 		if (!iter.Next())
 		{
 			logError(iter, "Expected an expression after '{0}'!", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// parse the expression
-		Ptr<Expression> expression = parseExpression(iter);
+		NodeID expressionID = parseExpression(iter, buffers);
 
 		// check if the expression was valid
-		if (!expression)
+		if (expressionID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// check for semicolon
 		if (iter.CurrentToken().Value != TokenValue::Semicolon)
 		{
 			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		// consume the semicolon
 		(void)iter.Next();
 
-		return std::make_unique<VariableDefinition>(std::move(declaration), std::move(expression));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::VariableDefinition, .VariableDefinition = VariableDefinition{ declarationID, expressionID } });
 	}
 
 	/// <summary>
@@ -1505,42 +1532,41 @@ namespace AlloyCompiler::Parser
 	///		| ENUM_DEFINITION 
 	///		| FN_DEFINITION ;
 	/// </summary>
-	inline static Ptr<Definition> parseDefinition(TokenIterator& iter)
+	inline static NodeID parseDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// quick exit if token kind is not valid
 		if (iter.CurrentToken().Kind != TokenKind::Declaration)
 		{
 			logError(iter, "Expected a definition! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::Var:
-			return parseVariableDefinition(iter);
+			return parseVariableDefinition(iter, buffers);
 
 		case TokenValue::Const:
-			return parseConstantDefinition(iter);
+			return parseConstantDefinition(iter, buffers);
 
 		case TokenValue::Struct:
-			return parseStructDefinition(iter);
+			return parseStructDefinition(iter, buffers);
 
 		case TokenValue::Enum:
-			return parseEnumDefinition(iter);
+			return parseEnumDefinition(iter, buffers);
 
 		case TokenValue::Fn:
-			return parseFunctionDefinition(iter);
-
-		default:
-			logError(iter, "Expected a definition! Got '{0}' instead.", iter.CurrentSourceView());
-			return nullptr;
+			return parseFunctionDefinition(iter, buffers);
 		}
+
+		logError(iter, "Expected a definition! Got '{0}' instead.", iter.CurrentSourceView());
+		return ERROR_NODE_ID;
 	}
 
 	/// <summary>
 	/// QUALIFIED_DEFINITION: VISIBILITY_QUALIFIER DEFINITION ;
 	/// </summary>
-	inline static Ptr<QualifiedDefinition> parseQualifiedDefinition(TokenIterator& iter)
+	inline static NodeID parseQualifiedDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// check for qualifier, default is private
 		QualifiedDefinition::Qualifier visibility = QualifiedDefinition::Qualifier::Private;
@@ -1558,26 +1584,27 @@ namespace AlloyCompiler::Parser
 			else
 			{
 				ASSERT(false, "Unknown qualifier {0}!", iter.CurrentSourceView());
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
 			// check for next token
 			if (!iter.Next())
 			{
 				logError(iter, "Unexpected end of file! Expected a definition.");
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 		}
 
 		// parse definition
-		Ptr<Definition> definition = parseDefinition(iter);
+		NodeID definitionID = parseDefinition(iter, buffers);
 
-		if (!definition)
+		if (definitionID == ERROR_NODE_ID)
 		{
-			return nullptr;
+			return ERROR_NODE_ID;
 		}
 
-		return std::make_unique<QualifiedDefinition>(visibility, std::move(definition));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::QualifiedDefinition, .QualifiedDefinition = QualifiedDefinition{ visibility, definitionID } });
 	}
 
 #pragma endregion
@@ -1585,42 +1612,48 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// MODULE: { QUALIFIED_DEFINITION } ;
 	/// </summary>
-	inline static Ptr<Module> parseModule(TokenIterator& iter)
+	inline static NodeID parseModule(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
-		Vec<QualifiedDefinition> qualifiedDefinitions;
+		auto& qualifiedDefinitionIDs = buffers.CreateNodeIDList();
 
 		do
 		{
-			auto definition = parseQualifiedDefinition(iter);
+			NodeID definitionID = parseQualifiedDefinition(iter, buffers);
 
-			if (!definition)
+			if (definitionID == ERROR_NODE_ID)
 			{
-				return nullptr;
+				return ERROR_NODE_ID;
 			}
 
-			qualifiedDefinitions.push_back(std::move(definition));
+			qualifiedDefinitionIDs.push_back(definitionID);
 		} while (iter.HasNext());
 
-		return std::make_unique<Module>(std::move(qualifiedDefinitions));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::Module, .Module = Module{ std::move(qualifiedDefinitionIDs) } });
 	}
 
 	/// <summary>
 	/// PROGRAM: { MODULE } ;
 	/// </summary>
-	inline static Ptr<Program> parseProgram(TokenIterator& iter)
+	inline static NodeID parseProgram(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
-		Vec<Module> modules;
+		auto& moduleIDs = buffers.CreateNodeIDList();
 
-		modules.push_back(std::move(parseModule(iter)));
+		moduleIDs.push_back(parseModule(iter, buffers));
 
-		return std::make_unique<Program>(std::move(modules));
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::Program, .Program = Program{ std::move(moduleIDs) } });
 	}
 
-	Ptr<Program> Parse(const Tokenizer::TokenDataBuffers& buffers)
+
+	NodeDataBuffers Parse(const Tokenizer::TokenDataBuffers& tokenBuffers)
 	{
-		TokenIterator iter(buffers);
+		TokenIterator iter(tokenBuffers);
+		NodeDataBuffers buffers(tokenBuffers);
 
-		return parseProgram(iter);
+		// parse the program
+		NodeID programID = parseProgram(iter, buffers);
+
+		return buffers;
 	}
-
 }
