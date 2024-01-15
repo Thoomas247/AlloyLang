@@ -1,6 +1,25 @@
 #pragma once
 
 constexpr auto TestSrc = R"(
+struct Vector3
+{
+	var x : f32;
+	var y : f32;
+	var z : f32;
+}
+
+enum TokenTypes
+{
+	Identifier,
+	Number,
+	Operator,
+	Keyword,
+	Comment,
+	Whitespace,
+	Newline,
+	Unknown
+}
+
 fn do_nothing (var a : i64, const b : &bool)
 {}
 

@@ -1252,7 +1252,10 @@ namespace AlloyCompiler::Parser
 	{
 		// quick exit if token kind is not valid
 		if (iter.CurrentToken().Kind != TokenKind::Declaration)
+		{
+			logError(iter, "Expected a declaration! Got '{0}' instead.", iter.CurrentSourceView());
 			return ERROR_NODE_ID;
+		}
 
 		switch (iter.CurrentToken().Value)
 		{
@@ -1399,22 +1402,171 @@ namespace AlloyCompiler::Parser
 		// assert we have an enum keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Enum, "Expected 'enum'!");
 
-		logError(iter, "Not implemented!");
+		// consume the enum keyword
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an identifier after 'enum'.");
+			return ERROR_NODE_ID;
+		}
 
-		return ERROR_NODE_ID;
+		// get the enum name
+		const auto& enumName = iter.CurrentSourceView();
+
+		// consume the enum name
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected a '{'.");
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening brace
+		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
+		{
+			logError(iter, "Expected a '{0}'! Got '{1}' instead.", "{", iter.CurrentSourceView());
+			return ERROR_NODE_ID;
+		}
+
+		// consume the opening brace
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an identifier.");
+			return ERROR_NODE_ID;
+		}
+
+		// parse all identifiers
+		auto& identifierIDs = buffers.CreateNodeIDList();
+
+		while (iter.CurrentToken().Value != TokenValue::CloseBrace)
+		{
+			// check for identifier
+			if (iter.CurrentToken().Kind != TokenKind::Identifier)
+			{
+				logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
+				return ERROR_NODE_ID;
+			}
+
+			const auto& identifier = iter.CurrentSourceView();
+
+			// consume the identifier
+			if (!iter.Next())
+			{
+				logError(iter, "Unexpected end of file! Expected an identifier or '}'.");
+				return ERROR_NODE_ID;
+			}
+
+			// add the identifier to the list
+			identifierIDs.push_back(buffers.CreateNode(Node{ .Kind = NodeKind::EnumMember, .EnumMember = EnumMember{ identifier } }));
+
+			// check for comma
+			if (iter.CurrentToken().Value == TokenValue::Comma)
+			{
+				// consume the comma
+				if (!iter.Next())
+				{
+					logError(iter, "Unexpected end of file! Expected an identifier or '}'.");
+					return ERROR_NODE_ID;
+				}
+			}
+
+			// othwerwise we must have a closing brace
+			else if (iter.CurrentToken().Value != TokenValue::CloseBrace)
+			{
+				logError(iter, "Expected a '}'! Got '{0}' instead.", iter.CurrentSourceView());
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume the closing brace
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected a ';' or '}'.");
+			return ERROR_NODE_ID;
+		}
+
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::EnumDefinition, .EnumDefinition = EnumDefinition{ enumName, std::move(identifierIDs) } });
 	}
 
 	/// <summary>
-	/// STRUCT_DEFINITION: 'struct' STRUCT_NAME '{' { DECLARATION } '}' ;
+	/// STRUCT_DEFINITION: 'struct' STRUCT_NAME '{' { DECLARATION ';' } '}' ;
 	/// </summary>
 	inline static NodeID parseStructDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
 		// assert we have a struct keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Struct, "Expected 'struct'!");
 
-		logError(iter, "Not implemented!");
+		// consume the struct keyword
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected an identifier after 'struct'.");
+			return ERROR_NODE_ID;
+		}
 
-		return ERROR_NODE_ID;
+		// get the struct name
+		const auto& structName = iter.CurrentSourceView();
+
+		// consume the struct name
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected a '{0}'.", "{");
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening brace
+		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
+		{
+			logError(iter, "Expected a '{0}'! Got '{1}' instead.", "{", iter.CurrentSourceView());
+			return ERROR_NODE_ID;
+		}
+
+		// consume the opening brace
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected a declaration.");
+			return ERROR_NODE_ID;
+		}
+
+		// parse the declarations
+		auto& declarationIDs = buffers.CreateNodeIDList();
+
+		while (iter.CurrentToken().Value != TokenValue::CloseBrace)
+		{
+			// parse the declaration
+			NodeID declarationID = parseDeclaration(iter, buffers);
+
+			// check if the declaration was valid
+			if (declarationID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			// check for semicolon
+			if (iter.CurrentToken().Value != TokenValue::Semicolon)
+			{
+				logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
+				return ERROR_NODE_ID;
+			}
+
+			// consume the semicolon
+			if (!iter.Next())
+			{
+				logError(iter, "Unexpected end of file! Expected a declaration or '}'.");
+				return ERROR_NODE_ID;
+			}
+
+			// add the declaration to the list
+			declarationIDs.push_back(declarationID);
+		}
+
+		// consume the closing brace
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file! Expected a ';' or '}'.");
+			return ERROR_NODE_ID;
+		}
+
+		// create the node
+		return buffers.CreateNode(Node{ .Kind = NodeKind::StructDefinition, .StructDefinition = StructDefinition{ structName, std::move(declarationIDs) } });
 	}
 
 	/// <summary>

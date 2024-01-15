@@ -310,21 +310,30 @@ namespace AlloyCompiler
 
 	struct StructDefinition
 	{
-		StructDefinition(TokenID nameID, NodeIDList members)
-			: NameID(nameID), Members(members)
+		StructDefinition(std::string_view name, NodeIDList members)
+			: Name(name), Members(members)
 		{}
 
-		TokenID NameID;
+		std::string_view Name;
 		NodeIDList Members;
+	};
+
+	struct EnumMember
+	{
+		EnumMember(std::string_view name)
+			: Name(name)
+		{}
+
+		std::string_view Name;
 	};
 
 	struct EnumDefinition
 	{
-		EnumDefinition(TokenID nameID, NodeIDList members)
-			: NameID(nameID), Members(members)
+		EnumDefinition(std::string_view name, NodeIDList members)
+			: Name(name), Members(members)
 		{}
 
-		TokenID NameID;
+		std::string_view Name;
 		NodeIDList Members;
 	};
 
@@ -414,6 +423,7 @@ namespace AlloyCompiler
 		VariableDefinition,
 		ConstantDefinition,
 		StructDefinition,
+		EnumMember,
 		EnumDefinition,
 		FunctionDefinition,
 
@@ -463,6 +473,7 @@ namespace AlloyCompiler
 			VariableDefinition VariableDefinition;
 			ConstantDefinition ConstantDefinition;
 			StructDefinition StructDefinition;
+			EnumMember EnumMember;
 			EnumDefinition EnumDefinition;
 			FunctionDefinition FunctionDefinition;
 
