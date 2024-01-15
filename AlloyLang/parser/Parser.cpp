@@ -39,7 +39,7 @@ namespace AlloyCompiler::Parser
 			return m_Buffers.GetLocation(m_CurrentTokenID);
 		}
 
-		const SourceView& CurrentSourceView() const
+		const std::string_view& CurrentSourceView() const
 		{
 			return m_Buffers.GetSourceView(m_CurrentTokenID);
 		}

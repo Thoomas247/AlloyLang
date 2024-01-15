@@ -29,7 +29,7 @@ namespace AlloyCompiler
 			Pointer
 		};
 
-		TypeIdentifier(Modifier modifier, SourceView name)
+		TypeIdentifier(Modifier modifier, std::string_view name)
 			: Mod(modifier), Name(name)
 		{}
 
@@ -70,11 +70,11 @@ namespace AlloyCompiler
 
 	struct StringLiteral
 	{
-		StringLiteral(SourceView value)
+		StringLiteral(std::string_view value)
 			: Value(value)
 		{}
 
-		SourceView Value;
+		std::string_view Value;
 	};
 
 	struct CharacterLiteral
@@ -109,31 +109,31 @@ namespace AlloyCompiler
 
 	struct AssignmentExpression
 	{
-		AssignmentExpression(TokenValue op, SourceView name, NodeID value)
+		AssignmentExpression(TokenValue op, std::string_view name, NodeID value)
 			: Op(op), Name(name), Value(value)
 		{}
 
 		TokenValue Op;
-		SourceView Name;
+		std::string_view Name;
 		NodeID Value;
 	};
 
 	struct MemoryAccess
 	{
-		MemoryAccess(SourceView name)
+		MemoryAccess(std::string_view name)
 			: Name(name)
 		{}
 
-		SourceView Name;
+		std::string_view Name;
 	};
 
 	struct FunctionCall
 	{
-		FunctionCall(SourceView name, NodeIDList arguments)
+		FunctionCall(std::string_view name, NodeIDList arguments)
 			: Name(name), Arguments(arguments)
 		{}
 
-		SourceView Name;
+		std::string_view Name;
 		NodeIDList Arguments;
 	};
 
@@ -266,21 +266,21 @@ namespace AlloyCompiler
 
 	struct VariableDeclaration
 	{
-		VariableDeclaration(SourceView name, NodeID type)
+		VariableDeclaration(std::string_view name, NodeID type)
 			: Name(name), Type(type)
 		{}
 
-		SourceView Name;
+		std::string_view Name;
 		NodeID Type;
 	};
 
 	struct ConstantDeclaration
 	{
-		ConstantDeclaration(SourceView name, NodeID type)
+		ConstantDeclaration(std::string_view name, NodeID type)
 			: Name(name), Type(type)
 		{}
 
-		SourceView Name;
+		std::string_view Name;
 		NodeID Type;
 	};
 
@@ -330,11 +330,11 @@ namespace AlloyCompiler
 
 	struct FunctionDefinition
 	{
-		FunctionDefinition(SourceView name, NodeIDList parameters, NodeID returnType, NodeID body)
+		FunctionDefinition(std::string_view name, NodeIDList parameters, NodeID returnType, NodeID body)
 			: Name(name), ReturnType(returnType), Parameters(parameters), Body(body)
 		{}
 
-		SourceView Name;
+		std::string_view Name;
 		NodeIDList Parameters;
 		NodeID ReturnType;
 		NodeID Body;

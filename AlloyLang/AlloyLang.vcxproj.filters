@@ -38,9 +38,6 @@
     <ClInclude Include="tokenizer\TokenMaps.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\Convert.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="parser\SymbolTable.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

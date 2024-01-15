@@ -81,13 +81,13 @@ namespace AlloyCompiler::Tokenizer
 			return Location(m_LineStarts.top(), m_Line, m_Column);
 		}
 
-		SourceView View(size_t start, size_t end) const
+		std::string_view View(size_t start, size_t end) const
 		{
 			return m_SourceView.substr(start, end - start);
 		}
 
 	private:
-		SourceView m_SourceView;
+		std::string_view m_SourceView;
 		uint32_t m_CharIndex;
 		uint32_t m_Line;
 		uint32_t m_Column;

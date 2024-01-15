@@ -126,10 +126,4 @@ namespace AlloyCompiler
 			: LineStart(lineStart), Line(line), Column(column)
 		{}
 	};
-
-	/// <summary>
-	/// A view into the source code string for tokens with extra data.
-	/// </summary>
-	using SourceView = std::string_view;
-
 }
