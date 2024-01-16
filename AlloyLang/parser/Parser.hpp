@@ -33,9 +33,14 @@ namespace AlloyCompiler::Parser
 
 		const Node& GetNode(NodeID id) const { return m_Nodes[id]; }
 
+		void SetRootNodeID(NodeID id) { m_RootNodeID = id; }
+		NodeID GetRootNodeID() const { return m_RootNodeID; }
+
 	private:
 		std::vector<Node> m_Nodes;
 		std::vector<std::unique_ptr<std::vector<NodeID>>> m_NodeIDLists;
+
+		NodeID m_RootNodeID = ERROR_NODE_ID;
 	};
 
 	NodeDataBuffers Parse(const Tokenizer::TokenDataBuffers& tokenBuffers);

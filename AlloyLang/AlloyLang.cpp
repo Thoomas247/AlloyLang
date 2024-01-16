@@ -1,5 +1,6 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
+#include "parser/TreePrinter.hpp"
 
 #include "log/Log.hpp"
 #include "TestString.hpp"
@@ -8,7 +9,7 @@
 
 int main()
 {
-	const size_t n = 1'000;
+	const size_t n = 1;// 0'000;
 	std::string str = TestSrc;
 	str.reserve(str.size() * (n + 1));
 
@@ -17,7 +18,8 @@ int main()
 		str += TestSrc;
 	}
 
-	const uint64_t numKilobytes = str.size() / 8 / 1000;
+	const uint64_t numBytes = str.size();
+	const uint64_t numKilobytes = std::max(numBytes / 1000, 1ull);
 
 	AlloyCompiler::Log::Print("Compiling {0} kB...", numKilobytes);
 
@@ -28,7 +30,7 @@ int main()
 	const uint64_t tokenizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
-	(void)AlloyCompiler::Parser::Parse(buffers);
+	AlloyCompiler::Parser::NodeDataBuffers nodeBuffers = AlloyCompiler::Parser::Parse(buffers);
 	end = std::chrono::high_resolution_clock::now();
 
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -37,4 +39,6 @@ int main()
 	AlloyCompiler::Log::Print("Tokenize: {0}ms", tokenizeTime);
 	AlloyCompiler::Log::Print("Parse: {0}ms", parseTime);
 	AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime) / numKilobytes);
+
+	AlloyCompiler::Log::Print("");
 }

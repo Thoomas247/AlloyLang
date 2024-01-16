@@ -1806,6 +1806,8 @@ namespace AlloyCompiler::Parser
 		// parse the program
 		NodeID programID = parseProgram(iter, buffers);
 
+		buffers.SetRootNodeID(programID);
+
 		return buffers;
 	}
 }

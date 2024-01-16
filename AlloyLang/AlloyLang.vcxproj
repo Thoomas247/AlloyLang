@@ -207,6 +207,7 @@
   <ItemGroup>
     <ClCompile Include="AlloyLang.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
+    <ClCompile Include="parser\TreePrinter.cpp" />
     <ClCompile Include="tokenizer\Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -214,6 +215,7 @@
     <ClInclude Include="parser\ASTNodes.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
     <ClInclude Include="parser\SymbolTable.hpp" />
+    <ClInclude Include="parser\TreePrinter.hpp" />
     <ClInclude Include="TestString.hpp" />
     <ClInclude Include="tokenizer\Token.hpp" />
     <ClInclude Include="tokenizer\Tokenizer.hpp" />
