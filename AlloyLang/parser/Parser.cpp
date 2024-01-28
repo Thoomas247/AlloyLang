@@ -1,6 +1,7 @@
 #include "Parser.hpp"
 
 #include "log/Log.hpp"
+#include "SymbolTable.hpp"
 
 namespace AlloyCompiler::Parser
 {
@@ -81,7 +82,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// TYPE_IDENTIFIER: ['&' | '*'] TYPE_NAME ;
 	/// </summary>
-	inline static NodeID parseTypeIdentifier(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseTypeIdentifier(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// check for reference or pointer
 		TypeIdentifier::Modifier modifier = TypeIdentifier::Modifier::None;
@@ -135,12 +136,12 @@ namespace AlloyCompiler::Parser
 #pragma region Expressions
 
 	// forward declaration
-	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers);
+	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols);
 
 	/// <summary>
 	/// FN_CALL: FN_NAME '(' [ EXPRESSION { ',' EXPRESSION } ] ')' ;
 	/// </summary>
-	inline static NodeID parseFunctionCall(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseFunctionCall(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have an identifier
 		ASSERT(iter.CurrentToken().Kind == TokenKind::Identifier, "Expected an identifier!");
@@ -175,7 +176,7 @@ namespace AlloyCompiler::Parser
 		while (iter.CurrentToken().Value != TokenValue::CloseParen)
 		{
 			// parse the expression
-			NodeID expressionID = parseExpression(iter, buffers);
+			NodeID expressionID = parseExpression(iter, buffers, symbols);
 
 			// check if the expression was valid
 			if (expressionID == ERROR_NODE_ID)
@@ -219,7 +220,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// ENCLOSED_EXPRESSION: '(' EXPRESSION [',' EXPRESSION] ')' ;
 	/// </summary>
-	inline static NodeID parseEnclosedExpression(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseEnclosedExpression(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have an opening parenthesis
 		ASSERT(iter.CurrentToken().Value == TokenValue::OpenParen, "Expected '('!");
@@ -236,7 +237,7 @@ namespace AlloyCompiler::Parser
 		while (iter.CurrentToken().Value != TokenValue::CloseParen)
 		{
 			// parse the expression
-			NodeID expressionID = parseExpression(iter, buffers);
+			NodeID expressionID = parseExpression(iter, buffers, symbols);
 
 			// check if the expression was valid
 			if (expressionID == ERROR_NODE_ID)
@@ -282,7 +283,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// INT_LITERAL: NUMBER ;
 	/// </summary>
-	inline static NodeID parseIntegerLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseIntegerLiteral(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert that we have an integer literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::Integer, "Expected an integer literal!");
@@ -306,7 +307,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// FLOAT_LITERAL: NUMBER '.' NUMBER ;
 	/// </summary>
-	inline static NodeID parseFloatLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseFloatLiteral(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert that we have a float literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::Float, "Expected a float literal!");
@@ -330,7 +331,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// BOOLEAN_LITERAL: 'true' | 'false' ;
 	/// </summary>
-	inline static NodeID parseBooleanLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseBooleanLiteral(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert that we have a boolean literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::Bool, "Expected a boolean literal!");
@@ -351,7 +352,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// STRING_LITERAL: '\"' { LETTER } '\"' ;
 	/// </summary>
-	inline static NodeID parseStringLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseStringLiteral(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert that we have a string literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::String, "Expected a string literal!");
@@ -373,7 +374,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// CHAR_LITERAL: '\'' [ LETTER ] '\'' ;
 	/// </summary>
-	inline static NodeID parseCharacterLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseCharacterLiteral(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert that we have a character literal
 		ASSERT(iter.CurrentToken().Value == TokenValue::Character, "Expected a character literal!");
@@ -395,7 +396,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// LITERAL: INT_LITERAL | FLOAT_LITERAL | BOOLEAN_LITERAL | STRING_LITERAL | CHAR_LITERAL ;
 	/// </summary>
-	inline static NodeID parseLiteral(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseLiteral(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert that we have a literal
 		ASSERT(iter.CurrentToken().Kind == TokenKind::Literal, "Expected a literal!");
@@ -403,19 +404,19 @@ namespace AlloyCompiler::Parser
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::Integer:
-			return parseIntegerLiteral(iter, buffers);
+			return parseIntegerLiteral(iter, buffers, symbols);
 
 		case TokenValue::Float:
-			return parseFloatLiteral(iter, buffers);
+			return parseFloatLiteral(iter, buffers, symbols);
 
 		case TokenValue::Bool:
-			return parseBooleanLiteral(iter, buffers);
+			return parseBooleanLiteral(iter, buffers, symbols);
 
 		case TokenValue::String:
-			return parseStringLiteral(iter, buffers);
+			return parseStringLiteral(iter, buffers, symbols);
 
 		case TokenValue::Character:
-			return parseCharacterLiteral(iter, buffers);
+			return parseCharacterLiteral(iter, buffers, symbols);
 
 		default:
 			logError(iter, "Expected a literal! Got '{0}' instead.", iter.CurrentSourceView());
@@ -426,12 +427,12 @@ namespace AlloyCompiler::Parser
 #pragma endregion
 
 	// forward declaration
-	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers);
+	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols);
 
 	/// <summary>
 	/// PRIMARY_EXPRESSION: VAR_NAME | CONST_NAME | FN_CALL | LITERAL | ENCLOSED_EXPRESSION ;
 	/// </summary>
-	inline static NodeID parsePrimaryExpression(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parsePrimaryExpression(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		switch (iter.CurrentToken().Kind)
 		{
@@ -453,7 +454,7 @@ namespace AlloyCompiler::Parser
 				// go back to the identifier
 				iter.Previous();
 
-				return parseFunctionCall(iter, buffers);
+				return parseFunctionCall(iter, buffers, symbols);
 			}
 
 			// otherwise we have a variable or constant
@@ -461,13 +462,13 @@ namespace AlloyCompiler::Parser
 		}
 
 		case TokenKind::Literal:
-			return parseLiteral(iter, buffers);
+			return parseLiteral(iter, buffers, symbols);
 
 		case TokenKind::Delimiter:
 		{
 			if (iter.CurrentToken().Value == TokenValue::OpenParen)
 			{
-				return parseEnclosedExpression(iter, buffers);
+				return parseEnclosedExpression(iter, buffers, symbols);
 			}
 
 			logError(iter, "Expected an expression! Got '{0}' instead.", iter.CurrentSourceView());
@@ -483,7 +484,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// UNARY_EXPRESSION: UNARY_OPERATOR EXPRESSION ;
 	/// </summary>
-	inline static NodeID parseUnaryExpression(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseUnaryExpression(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert that we have an operator
 		ASSERT(iter.CurrentToken().Kind == TokenKind::Operator, "Expected an operator!");
@@ -499,7 +500,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the expression
-		NodeID expressionID = parsePrimaryExpression(iter, buffers);
+		NodeID expressionID = parsePrimaryExpression(iter, buffers, symbols);
 
 		// check if the expression was valid
 		if (expressionID == ERROR_NODE_ID)
@@ -514,7 +515,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// BINARY_EXPRESSION: EXPRESSION BINARY_OPERATOR EXPRESSION ;
 	/// </summary>
-	inline static NodeID parseBinaryExpresssion(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseBinaryExpresssion(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// handles *, / and %
 		auto tryParseMultiplicativeExpression = [&](TokenIterator& iter) -> NodeID
@@ -523,12 +524,12 @@ namespace AlloyCompiler::Parser
 
 				if (iter.CurrentToken().Kind == TokenKind::Operator)
 				{
-					left = parseUnaryExpression(iter, buffers);
+					left = parseUnaryExpression(iter, buffers, symbols);
 				}
 
 				else
 				{
-					left = parsePrimaryExpression(iter, buffers);
+					left = parsePrimaryExpression(iter, buffers, symbols);
 				}
 
 				if (left == ERROR_NODE_ID)
@@ -551,12 +552,12 @@ namespace AlloyCompiler::Parser
 
 					if (iter.CurrentToken().Kind == TokenKind::Operator)
 					{
-						right = parseUnaryExpression(iter, buffers);
+						right = parseUnaryExpression(iter, buffers, symbols);
 					}
 
 					else
 					{
-						right = parsePrimaryExpression(iter, buffers);
+						right = parsePrimaryExpression(iter, buffers, symbols);
 					}
 
 					if (right == ERROR_NODE_ID)
@@ -670,7 +671,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// ASSIGNMENT_EXPRESSION: VAR_NAME ASSIGNMENT_OPERATOR EXPRESSION ;
 	/// </summary>
-	inline static NodeID parseAssignmentExpression(TokenIterator& iter, NodeDataBuffers& buffers, bool failIsError = true)
+	inline static NodeID parseAssignmentExpression(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols, bool failIsError = true)
 	{
 		// assert that we have an identifier
 		if (iter.CurrentToken().Kind != TokenKind::Identifier)
@@ -722,7 +723,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the expression
-		NodeID expressionID = parseExpression(iter, buffers);
+		NodeID expressionID = parseExpression(iter, buffers, symbols);
 
 		// check if the expression was valid
 		if (expressionID == ERROR_NODE_ID)
@@ -736,16 +737,16 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// EXPRESSION: PRIMARY_EXPRESSION | UNARY_EXPRESSION | BINARY_EXPRESSION | ASSIGNMENT_EXPRESSION ;
 	/// </summary>
-	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		NodeID expressionID;
 
 		// assignment expressions are a special case
 		// depending on the context, the function is allowed to fail
-		if ((expressionID = parseAssignmentExpression(iter, buffers, false)) != ERROR_NODE_ID)
+		if ((expressionID = parseAssignmentExpression(iter, buffers, symbols, false)) != ERROR_NODE_ID)
 			return expressionID;
 
-		expressionID = parseBinaryExpresssion(iter, buffers);
+		expressionID = parseBinaryExpresssion(iter, buffers, symbols);
 
 		if (expressionID == ERROR_NODE_ID)
 		{
@@ -760,14 +761,14 @@ namespace AlloyCompiler::Parser
 #pragma region Statements
 
 	// forward declaration
-	inline static NodeID parseStatement(TokenIterator& iter, NodeDataBuffers& buffers);
+	inline static NodeID parseStatement(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols);
 
 	/// <summary>
 	/// VARIABLE_ASSIGNMENT: ASSIGNMENT_EXPRESSION ';' ;
 	/// </summary>
-	inline static NodeID parseVariableAssignment(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseVariableAssignment(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
-		NodeID assignmentExpressionID = parseAssignmentExpression(iter, buffers);
+		NodeID assignmentExpressionID = parseAssignmentExpression(iter, buffers, symbols);
 
 		if (assignmentExpressionID == ERROR_NODE_ID)
 		{
@@ -794,7 +795,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// FOR_LOOP: 'for' '(' EXPRESSION ';' EXPRESSION ';' EXPRESSION ';' ')' STATEMENT ;
 	/// </summary>
-	inline static NodeID parseForLoop(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseForLoop(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		logError(iter, "Not implemented!");
 
@@ -804,7 +805,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// WHILE_LOOP: 'while' ENCLOSED_EXPRESSION STATEMENT ;
 	/// </summary>
-	inline static NodeID parseWhileLoop(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseWhileLoop(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		logError(iter, "Not implemented!");
 
@@ -814,7 +815,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// IF_STATEMENT: 'if' ENCLOSED_EXPRESSION STATEMENT ['else' STATEMENT] ;
 	/// </summary>
-	inline static NodeID parseIfStatement(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseIfStatement(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		logError(iter, "Not implemented!");
 
@@ -824,7 +825,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// MATCH_STATEMENT: 'match' ENCLOSED_EXPRESSION '{' { EXPRESSION '=>' STATEMENT } '}' ;
 	/// </summary>
-	inline static NodeID parseMatchStatement(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseMatchStatement(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		logError(iter, "Not implemented!");
 
@@ -834,7 +835,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// STATEMENT_BLOCK: '{' {STATEMENT} '}' ;
 	/// </summary>
-	inline static NodeID parseStatementBlock(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseStatementBlock(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// check for opening brace
 		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
@@ -856,7 +857,7 @@ namespace AlloyCompiler::Parser
 		while (iter.CurrentToken().Value != TokenValue::CloseBrace)
 		{
 			// parse the statement
-			NodeID statementID = parseStatement(iter, buffers);
+			NodeID statementID = parseStatement(iter, buffers, symbols);
 
 			// check if the statement was valid
 			if (statementID == ERROR_NODE_ID)
@@ -878,7 +879,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// RETURN_STATEMENT: 'return' [ EXPRESSION ] ';' ;
 	/// </summary>
-	inline static NodeID parseReturnStatement(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseReturnStatement(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a return keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Return, "Expected 'return'!");
@@ -896,7 +897,7 @@ namespace AlloyCompiler::Parser
 		if (iter.CurrentToken().Value != TokenValue::Semicolon)
 		{
 			// parse the expression
-			expressionID = parseExpression(iter, buffers);
+			expressionID = parseExpression(iter, buffers, symbols);
 
 			// check if the expression was valid
 			if (expressionID == ERROR_NODE_ID)
@@ -933,27 +934,27 @@ namespace AlloyCompiler::Parser
 	///		| STATEMENT_BLOCK
 	///		| RETURN_STATEMENT ;
 	/// </summary>
-	inline static NodeID parseStatement(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseStatement(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::For:
-			return parseForLoop(iter, buffers);
+			return parseForLoop(iter, buffers, symbols);
 
 		case TokenValue::While:
-			return parseWhileLoop(iter, buffers);
+			return parseWhileLoop(iter, buffers, symbols);
 
 		case TokenValue::If:
-			return parseIfStatement(iter, buffers);
+			return parseIfStatement(iter, buffers, symbols);
 
 		case TokenValue::Match:
-			return parseMatchStatement(iter, buffers);
+			return parseMatchStatement(iter, buffers, symbols);
 
 		case TokenValue::OpenBrace:
-			return parseStatementBlock(iter, buffers);
+			return parseStatementBlock(iter, buffers, symbols);
 
 		case TokenValue::Return:
-			return parseReturnStatement(iter, buffers);
+			return parseReturnStatement(iter, buffers, symbols);
 
 		default:
 			logError(iter, "Expected a statement! Got '{0}' instead.", iter.CurrentSourceView());
@@ -966,12 +967,12 @@ namespace AlloyCompiler::Parser
 #pragma region Declarations
 
 	// forward declaration
-	inline static NodeID parseTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers);
+	inline static NodeID parseTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols);
 
 	/// <summary>
 	/// TUPLE_TYPE_DECLARATION: '(' TYPE_DECLARATION ',' TYPE_DECLARATION { ',' TYPE_DECLARATION } ')' ;
 	/// </summary>
-	inline static NodeID parseTupleTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseTupleTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have an opening parenthesis
 		ASSERT(iter.CurrentToken().Value == TokenValue::OpenParen, "Expected '('!");
@@ -989,7 +990,7 @@ namespace AlloyCompiler::Parser
 		while (iter.CurrentToken().Value != TokenValue::CloseParen)
 		{
 			// parse the type declaration
-			NodeID typeDeclarationID = parseTypeDeclaration(iter, buffers);
+			NodeID typeDeclarationID = parseTypeDeclaration(iter, buffers, symbols);
 
 			// check if the type declaration was valid
 			if (typeDeclarationID == ERROR_NODE_ID)
@@ -1040,7 +1041,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// CONST_TYPE_DECLARATION: 'const' TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static NodeID parseConstantTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseConstantTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a const keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
@@ -1053,7 +1054,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the type identifier
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers, symbols);
 
 		if (typeIdentifierID == ERROR_NODE_ID)
 		{
@@ -1067,7 +1068,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// VAR_TYPE_DECLARATION: 'var' TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static NodeID parseVariableTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseVariableTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a var keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
@@ -1080,7 +1081,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the type identifier
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers, symbols);
 
 		if (typeIdentifierID == ERROR_NODE_ID)
 		{
@@ -1094,10 +1095,10 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// VALUE_TYPE_DECLARATION: TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static NodeID parseValueTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseValueTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// parse the type identifiers
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers, symbols);
 
 		if (typeIdentifierID == ERROR_NODE_ID)
 		{
@@ -1111,28 +1112,28 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// TYPE_DECLARATION: VALUE_TYPE_DECLARATION | VAR_TYPE_DECLARATION | CONST_TYPE_DECLARATION | TUPLE_TYPE_DECLARATION ;
 	/// </summary>
-	inline static NodeID parseTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseTypeDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::OpenParen:
-			return parseTupleTypeDeclaration(iter, buffers);
+			return parseTupleTypeDeclaration(iter, buffers, symbols);
 
 		case TokenValue::Const:
-			return parseConstantTypeDeclaration(iter, buffers);
+			return parseConstantTypeDeclaration(iter, buffers, symbols);
 
 		case TokenValue::Var:
-			return parseVariableTypeDeclaration(iter, buffers);
+			return parseVariableTypeDeclaration(iter, buffers, symbols);
 
 		default:
-			return parseValueTypeDeclaration(iter, buffers);
+			return parseValueTypeDeclaration(iter, buffers, symbols);
 		}
 	}
 
 	/// <summary>
 	/// VAR_DECLARATION: 'var' VAR_NAME ':' TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static NodeID parseVariableDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseVariableDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a var keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
@@ -1175,7 +1176,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the type identifier
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers, symbols);
 
 		// check if the type identifier was valid
 		if (typeIdentifierID == ERROR_NODE_ID)
@@ -1190,7 +1191,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// CONST_DECLARATION: 'const' CONST_NAME ':' TYPE_IDENTIFIER ;
 	/// </summary>
-	inline static NodeID parseConstantDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseConstantDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a const keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
@@ -1233,7 +1234,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the type identifier
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers);
+		NodeID typeIdentifierID = parseTypeIdentifier(iter, buffers, symbols);
 
 		// check if the type identifier was valid
 		if (typeIdentifierID == ERROR_NODE_ID)
@@ -1248,7 +1249,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// DECLARATION: VAR_DECLARATION | CONST_DECLARATION ;
 	/// </summary>
-	inline static NodeID parseDeclaration(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseDeclaration(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// quick exit if token kind is not valid
 		if (iter.CurrentToken().Kind != TokenKind::Declaration)
@@ -1260,10 +1261,10 @@ namespace AlloyCompiler::Parser
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::Var:
-			return parseVariableDeclaration(iter, buffers);
+			return parseVariableDeclaration(iter, buffers, symbols);
 
 		case TokenValue::Const:
-			return parseConstantDeclaration(iter, buffers);
+			return parseConstantDeclaration(iter, buffers, symbols);
 
 		default:
 			logError(iter, "Expected a declaration! Got '{0}' instead.", iter.CurrentSourceView());
@@ -1278,7 +1279,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// FN_DEFINITION: 'fn' FN_NAME '(' [ DECLARATION { ',' DECLARATION } ] ')' [':' TYPE_DECLARATION] STATEMENT_BLOCK ;
 	/// </summary>
-	inline static NodeID parseFunctionDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseFunctionDefinition(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a fn keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Fn, "Expected 'fn'!");
@@ -1320,7 +1321,7 @@ namespace AlloyCompiler::Parser
 		while (iter.CurrentToken().Value != TokenValue::CloseParen)
 		{
 			// parse the declaration
-			NodeID declarationID = parseDeclaration(iter, buffers);
+			NodeID declarationID = parseDeclaration(iter, buffers, symbols);
 
 			// check if the declaration was valid
 			if (declarationID == ERROR_NODE_ID)
@@ -1370,7 +1371,7 @@ namespace AlloyCompiler::Parser
 			}
 
 			// parse the return type
-			returnTypeID = parseTypeDeclaration(iter, buffers);
+			returnTypeID = parseTypeDeclaration(iter, buffers, symbols);
 
 			// check if the return type was valid
 			if (returnTypeID == ERROR_NODE_ID)
@@ -1380,7 +1381,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the statement block
-		NodeID statementBlockID = parseStatementBlock(iter, buffers);
+		NodeID statementBlockID = parseStatementBlock(iter, buffers, symbols);
 
 		// check if the statement block was valid
 		if (statementBlockID == ERROR_NODE_ID)
@@ -1397,7 +1398,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// ENUM_DEFINITION: 'enum' ENUM_NAME '{' { IDENTIFIER } '}' ;
 	/// </summary>
-	inline static NodeID parseEnumDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseEnumDefinition(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have an enum keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Enum, "Expected 'enum'!");
@@ -1490,7 +1491,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// STRUCT_DEFINITION: 'struct' STRUCT_NAME '{' { DECLARATION ';' } '}' ;
 	/// </summary>
-	inline static NodeID parseStructDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseStructDefinition(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a struct keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Struct, "Expected 'struct'!");
@@ -1532,7 +1533,7 @@ namespace AlloyCompiler::Parser
 		while (iter.CurrentToken().Value != TokenValue::CloseBrace)
 		{
 			// parse the declaration
-			NodeID declarationID = parseDeclaration(iter, buffers);
+			NodeID declarationID = parseDeclaration(iter, buffers, symbols);
 
 			// check if the declaration was valid
 			if (declarationID == ERROR_NODE_ID)
@@ -1572,13 +1573,13 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// CONST_DEFINITION: CONST_DECLARATION '=' EXPRESSION ';' ;
 	/// </summary>
-	inline static NodeID parseConstantDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseConstantDefinition(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a const keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
 
 		// parse the declaration
-		NodeID declarationID = parseConstantDeclaration(iter, buffers);
+		NodeID declarationID = parseConstantDeclaration(iter, buffers, symbols);
 
 		// check if the declaration was valid
 		if (declarationID == ERROR_NODE_ID)
@@ -1601,7 +1602,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the expression
-		NodeID expressionID = parseExpression(iter, buffers);
+		NodeID expressionID = parseExpression(iter, buffers, symbols);
 
 		// check if the expression was valid
 		if (expressionID == ERROR_NODE_ID)
@@ -1626,13 +1627,13 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// VAR_DEFINITION: VAR_DECLARATION '=' EXPRESSION ';' ;
 	/// </summary>
-	inline static NodeID parseVariableDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseVariableDefinition(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// assert we have a var keyword
 		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
 
 		// parse the declaration
-		NodeID declarationID = parseVariableDeclaration(iter, buffers);
+		NodeID declarationID = parseVariableDeclaration(iter, buffers, symbols);
 
 		// check if the declaration was valid
 		if (declarationID == ERROR_NODE_ID)
@@ -1655,7 +1656,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the expression
-		NodeID expressionID = parseExpression(iter, buffers);
+		NodeID expressionID = parseExpression(iter, buffers, symbols);
 
 		// check if the expression was valid
 		if (expressionID == ERROR_NODE_ID)
@@ -1684,7 +1685,7 @@ namespace AlloyCompiler::Parser
 	///		| ENUM_DEFINITION 
 	///		| FN_DEFINITION ;
 	/// </summary>
-	inline static NodeID parseDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseDefinition(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// quick exit if token kind is not valid
 		if (iter.CurrentToken().Kind != TokenKind::Declaration)
@@ -1696,19 +1697,19 @@ namespace AlloyCompiler::Parser
 		switch (iter.CurrentToken().Value)
 		{
 		case TokenValue::Var:
-			return parseVariableDefinition(iter, buffers);
+			return parseVariableDefinition(iter, buffers, symbols);
 
 		case TokenValue::Const:
-			return parseConstantDefinition(iter, buffers);
+			return parseConstantDefinition(iter, buffers, symbols);
 
 		case TokenValue::Struct:
-			return parseStructDefinition(iter, buffers);
+			return parseStructDefinition(iter, buffers, symbols);
 
 		case TokenValue::Enum:
-			return parseEnumDefinition(iter, buffers);
+			return parseEnumDefinition(iter, buffers, symbols);
 
 		case TokenValue::Fn:
-			return parseFunctionDefinition(iter, buffers);
+			return parseFunctionDefinition(iter, buffers, symbols);
 		}
 
 		logError(iter, "Expected a definition! Got '{0}' instead.", iter.CurrentSourceView());
@@ -1718,7 +1719,7 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// QUALIFIED_DEFINITION: VISIBILITY_QUALIFIER DEFINITION ;
 	/// </summary>
-	inline static NodeID parseQualifiedDefinition(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseQualifiedDefinition(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		// check for qualifier, default is private
 		QualifiedDefinition::Qualifier visibility = QualifiedDefinition::Qualifier::Private;
@@ -1748,7 +1749,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse definition
-		NodeID definitionID = parseDefinition(iter, buffers);
+		NodeID definitionID = parseDefinition(iter, buffers, symbols);
 
 		if (definitionID == ERROR_NODE_ID)
 		{
@@ -1764,13 +1765,13 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// MODULE: { QUALIFIED_DEFINITION } ;
 	/// </summary>
-	inline static NodeID parseModule(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseModule(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		auto& qualifiedDefinitionIDs = buffers.CreateNodeIDList();
 
 		do
 		{
-			NodeID definitionID = parseQualifiedDefinition(iter, buffers);
+			NodeID definitionID = parseQualifiedDefinition(iter, buffers, symbols);
 
 			if (definitionID == ERROR_NODE_ID)
 			{
@@ -1787,11 +1788,11 @@ namespace AlloyCompiler::Parser
 	/// <summary>
 	/// PROGRAM: { MODULE } ;
 	/// </summary>
-	inline static NodeID parseProgram(TokenIterator& iter, NodeDataBuffers& buffers)
+	inline static NodeID parseProgram(TokenIterator& iter, NodeDataBuffers& buffers, SymbolTable& symbols)
 	{
 		auto& moduleIDs = buffers.CreateNodeIDList();
 
-		moduleIDs.push_back(parseModule(iter, buffers));
+		moduleIDs.push_back(parseModule(iter, buffers, symbols));
 
 		// create the node
 		return buffers.CreateNode(Node{ .Kind = NodeKind::Program, .Program = Program{ std::move(moduleIDs) } });
@@ -1802,9 +1803,10 @@ namespace AlloyCompiler::Parser
 	{
 		TokenIterator iter(tokenBuffers);
 		NodeDataBuffers buffers(tokenBuffers);
+		SymbolTable symbols;
 
 		// parse the program
-		NodeID programID = parseProgram(iter, buffers);
+		NodeID programID = parseProgram(iter, buffers, symbols);
 
 		buffers.SetRootNodeID(programID);
 

@@ -1,50 +1,52 @@
 #pragma once
-#include "tokenizer/Token.hpp"
+#include "parser/ASTNodes.hpp"
 
 #include <memory>
+#include <stack>
 
 namespace AlloyCompiler
 {
-	template <typename T>
-	using Ptr = std::unique_ptr<T>;
+	// struct decl is encountered
+	//	parse it
+	//	look for type identifier (struct name) in the symbol table's current scope
+	//		if it exists, error ("Type already defined within this scope! See previous definition:")
+	//	create new TypeIdentifier node with type identifier
+	//	add it to the symbol table's current scope
+	//	create new scope
+	//	parse members
+	//	pop scope
 
-	template <typename T>
-	using Vec = std::vector<std::unique_ptr<T>>;
+	// enum decl is encountered
+	//	parse it
+	//	look for type identifier (enum name) in the symbol table's current scope
+	//		if it exists, error ("Type already defined within this scope! See previous definition:")
+	//	create new TypeIdentifier node with type identifier
+	//	add it to the symbol table's current scope
+	//	create new scope
+	//	parse members
+	//	pop scope
 
-	constexpr auto ROOT_SYMBOL_TOKEN_ID = std::numeric_limits<TokenID>::max();
+	// fn decl is encountered
+	//	parse it
+	//  look for argument and return types in the symbol table
+	// 		if any doesn't exist, error ("Type must be defined before being used!")
+	//	create mangled name (this is the function's identifier, eg. doSomething(args)(ret))
+	//	look for mangled name in the symbol table's current scope
+	//		if it exists, error ("Function already defined within this scope! See previous definition:")
+	//	create new FunctionIdentifier node with mangled name
+	//	add it to the symbol table's current scope
+	//	create new scope
+	//	add argument identifiers to the symbol table's current scope
+	//	parse body
+	//	pop scope
 
-	struct Symbol
-	{
-		Symbol(TokenID tokenID, Symbol* parent)
-			: TokenID(tokenID), Parent(parent)
-		{}
+	// var/const decl is encountered (do not contain their own scope)
+	//	parse it
+	//	look for type identifier in the symbol table's current scope
+	//		if it doesn't exist, error ("Type must be defined before being used!")
+	//	look for identifier in the symbol table's current scope
+	//		if it exists, error ("Duplicate variable name in this scope! See previous use:")
+	//	create new VariableIdentifier node with type and identifier
+	//	add it to the symbol table's current scope
 
-		TokenID TokenID;
-
-		Symbol* Parent;
-		Vec<Symbol> Nested;
-	};
-
-	class SymbolTable
-	{
-	public:
-		SymbolTable()
-			: m_Root(std::make_unique<Symbol>(ROOT_SYMBOL_TOKEN_ID, nullptr)), m_pCurrentScope(m_Root.get())
-		{}
-
-		void PushScope(TokenID tokenID)
-		{
-			m_pCurrentScope = m_pCurrentScope->Nested.emplace_back(std::make_unique<Symbol>(tokenID, m_pCurrentScope)).get();
-		}
-
-		void PopScope()
-		{
-			m_pCurrentScope = m_pCurrentScope->Parent;
-		}
-
-	private:
-		Ptr<Symbol> m_Root;
-
-		Symbol* m_pCurrentScope;
-	};
 }

@@ -24,13 +24,13 @@ int main()
 	AlloyCompiler::Log::Print("Compiling {0} kB...", numKilobytes);
 
 	auto start = std::chrono::high_resolution_clock::now();
-	auto buffers = AlloyCompiler::Tokenizer::Tokenize(str);
+	auto tokenBuffers = AlloyCompiler::Tokenizer::Tokenize(str);
 	auto end = std::chrono::high_resolution_clock::now();
 
 	const uint64_t tokenizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
-	AlloyCompiler::Parser::NodeDataBuffers nodeBuffers = AlloyCompiler::Parser::Parse(buffers);
+	auto nodeBuffers = AlloyCompiler::Parser::Parse(tokenBuffers);
 	end = std::chrono::high_resolution_clock::now();
 
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
