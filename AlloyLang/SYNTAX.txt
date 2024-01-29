@@ -1,3 +1,6 @@
+(* Grammar can be visualised using https://www.bottlecaps.de/rr/ui *)
+(* An html file with the current grammar exists in the project files *)
+
 (* -- TOKEN DEFINITIONS -- *)
 
 identifier:					( letter | '_' ) { letter | digit | '_' } ;

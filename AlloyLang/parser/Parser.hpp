@@ -11,13 +11,13 @@ namespace AlloyCompiler::Parser
 	class NodeDataBuffers
 	{
 	public:
-		NodeDataBuffers(const Tokenizer::TokenDataBuffers& buffers)
+		NodeDataBuffers(const Tokenizer::TokenDataBuffers& nodeBuffers)
 		{
 			// assume one node per token
-			m_Nodes.reserve(buffers.GetTokenCount());
+			m_Nodes.reserve(nodeBuffers.GetTokenCount());
 
 			// assume 1/10th of node types have lists of children
-			m_NodeIDLists.reserve(buffers.GetTokenCount() / 10);
+			m_NodeIDLists.reserve(nodeBuffers.GetTokenCount() / 10);
 		}
 
 		NodeID CreateNode(const Node& node)
