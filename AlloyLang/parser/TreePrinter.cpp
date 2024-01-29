@@ -2,6 +2,8 @@
 
 #include "log/Log.hpp"
 
+#define NAME_OF_NODE(x) buffers.GetNode(x.IdentifierID).Identifier.Name
+
 namespace AlloyCompiler::Parser
 {
 	constexpr auto INDENT_SIZE = 2;
@@ -21,7 +23,7 @@ namespace AlloyCompiler::Parser
 		switch (currentNode.Kind)
 		{
 		case NodeKind::TypeIdentifier:
-			Log::Print("{0}TypeIdentifier: {1}", indentStr, currentNode.TypeIdentifier.Name);
+			Log::Print("{0}TypeIdentifier: {1}", indentStr, NAME_OF_NODE(currentNode.TypeIdentifier));
 			break;
 
 
@@ -58,16 +60,16 @@ namespace AlloyCompiler::Parser
 			break;
 
 		case NodeKind::AssignmentExpression:
-			Log::Print("{0}AssignmentExpression: {1} {2}", indentStr, currentNode.AssignmentExpression.Name, (size_t)currentNode.AssignmentExpression.Op);
+			Log::Print("{0}AssignmentExpression: {1} {2}", indentStr, NAME_OF_NODE(currentNode.AssignmentExpression), (size_t)currentNode.AssignmentExpression.Op);
 			printNode(buffers, currentNode.AssignmentExpression.Value, indent + 1);
 			break;
 
 		case NodeKind::MemoryAccess:
-			Log::Print("{0}MemoryAccess: {1}", indentStr, currentNode.MemoryAccess.Name);
+			Log::Print("{0}MemoryAccess: {1}", indentStr, NAME_OF_NODE(currentNode.MemoryAccess));
 			break;
 
 		case NodeKind::FunctionCall:
-			Log::Print("{0}FunctionCall: {1}", indentStr, currentNode.FunctionCall.Name);
+			Log::Print("{0}FunctionCall: {1}", indentStr, NAME_OF_NODE(currentNode.FunctionCall));
 			for (const auto& arg : currentNode.FunctionCall.Arguments.List)
 			{
 				printNode(buffers, arg, indent + 1);
@@ -154,12 +156,12 @@ namespace AlloyCompiler::Parser
 			break;
 
 		case NodeKind::VariableDeclaration:
-			Log::Print("{0}VariableDeclaration: {1}", indentStr, currentNode.VariableDeclaration.Name);
+			Log::Print("{0}VariableDeclaration: {1}", indentStr, NAME_OF_NODE(currentNode.VariableDeclaration));
 			printNode(buffers, currentNode.VariableDeclaration.Type, indent + 1);
 			break;
 
 		case NodeKind::ConstantDeclaration:
-			Log::Print("{0}ConstantDeclaration: {1}", indentStr, currentNode.ConstantDeclaration.Name);
+			Log::Print("{0}ConstantDeclaration: {1}", indentStr, NAME_OF_NODE(currentNode.ConstantDeclaration));
 			printNode(buffers, currentNode.ConstantDeclaration.Type, indent + 1);
 			break;
 
@@ -176,7 +178,7 @@ namespace AlloyCompiler::Parser
 			break;
 
 		case NodeKind::StructDefinition:
-			Log::Print("{0}StructDefinition: {1}", indentStr, currentNode.StructDefinition.Name);
+			Log::Print("{0}StructDefinition: {1}", indentStr, NAME_OF_NODE(currentNode.StructDefinition));
 			for (const auto& member : currentNode.StructDefinition.Members.List)
 			{
 				printNode(buffers, member, indent + 1);
@@ -184,11 +186,11 @@ namespace AlloyCompiler::Parser
 			break;
 
 		case NodeKind::EnumMember:
-			Log::Print("{0}EnumMember: {1}", indentStr, currentNode.EnumMember.Name);
+			Log::Print("{0}EnumMember: {1}", indentStr, NAME_OF_NODE(currentNode.EnumMember));
 			break;
 
 		case NodeKind::EnumDefinition:
-			Log::Print("{0}EnumDefinition: {1}", indentStr, currentNode.EnumDefinition.Name);
+			Log::Print("{0}EnumDefinition: {1}", indentStr, NAME_OF_NODE(currentNode.EnumDefinition));
 			for (const auto& member : currentNode.EnumDefinition.Members.List)
 			{
 				printNode(buffers, member, indent + 1);
@@ -196,7 +198,7 @@ namespace AlloyCompiler::Parser
 			break;
 
 		case NodeKind::FunctionDefinition:
-			Log::Print("{0}FunctionDefinition: {1}", indentStr, currentNode.FunctionDefinition.Name);
+			Log::Print("{0}FunctionDefinition: {1}", indentStr, NAME_OF_NODE(currentNode.FunctionDefinition));
 			for (const auto& param : currentNode.FunctionDefinition.Parameters.List)
 			{
 				printNode(buffers, param, indent + 1);

@@ -20,6 +20,15 @@ namespace AlloyCompiler
 
 #pragma region Identifiers
 
+	struct Identifier
+	{
+		Identifier(TokenID tokenID)
+			: Token(tokenID)
+		{}
+
+		TokenID Token;
+	};
+
 	struct TypeIdentifier
 	{
 		enum class Modifier : uint8_t
@@ -29,12 +38,12 @@ namespace AlloyCompiler
 			Pointer
 		};
 
-		TypeIdentifier(Modifier modifier, std::string_view name)
-			: Mod(modifier), Name(name)
+		TypeIdentifier(Modifier modifier, NodeID identifierID)
+			: Mod(modifier), IdentifierID(identifierID)
 		{}
 
 		Modifier Mod;
-		std::string_view Name;
+		NodeID IdentifierID;
 	};
 
 #pragma endregion
@@ -109,31 +118,31 @@ namespace AlloyCompiler
 
 	struct AssignmentExpression
 	{
-		AssignmentExpression(TokenValue op, std::string_view name, NodeID value)
-			: Op(op), Name(name), Value(value)
+		AssignmentExpression(TokenValue op, NodeID identifierID, NodeID value)
+			: Op(op), IdentifierID(identifierID), Value(value)
 		{}
 
 		TokenValue Op;
-		std::string_view Name;
+		NodeID IdentifierID;
 		NodeID Value;
 	};
 
 	struct MemoryAccess
 	{
-		MemoryAccess(std::string_view name)
-			: Name(name)
+		MemoryAccess(NodeID identifierID)
+			: IdentifierID(identifierID)
 		{}
 
-		std::string_view Name;
+		NodeID IdentifierID;
 	};
 
 	struct FunctionCall
 	{
-		FunctionCall(std::string_view name, NodeIDList arguments)
-			: Name(name), Arguments(arguments)
+		FunctionCall(NodeID identifierID, NodeIDList arguments)
+			: IdentifierID(identifierID), Arguments(arguments)
 		{}
 
-		std::string_view Name;
+		NodeID IdentifierID;
 		NodeIDList Arguments;
 	};
 
@@ -266,21 +275,21 @@ namespace AlloyCompiler
 
 	struct VariableDeclaration
 	{
-		VariableDeclaration(std::string_view name, NodeID type)
-			: Name(name), Type(type)
+		VariableDeclaration(NodeID identifierID, NodeID type)
+			: IdentifierID(identifierID), Type(type)
 		{}
 
-		std::string_view Name;
+		NodeID IdentifierID;
 		NodeID Type;
 	};
 
 	struct ConstantDeclaration
 	{
-		ConstantDeclaration(std::string_view name, NodeID type)
-			: Name(name), Type(type)
+		ConstantDeclaration(NodeID identifierID, NodeID type)
+			: IdentifierID(identifierID), Type(type)
 		{}
 
-		std::string_view Name;
+		NodeID IdentifierID;
 		NodeID Type;
 	};
 
@@ -310,40 +319,40 @@ namespace AlloyCompiler
 
 	struct StructDefinition
 	{
-		StructDefinition(std::string_view name, NodeIDList members)
-			: Name(name), Members(members)
+		StructDefinition(NodeID identifierID, NodeIDList members)
+			: IdentifierID(identifierID), Members(members)
 		{}
 
-		std::string_view Name;
+		NodeID IdentifierID;
 		NodeIDList Members;
 	};
 
 	struct EnumMember
 	{
-		EnumMember(std::string_view name)
-			: Name(name)
+		EnumMember(NodeID identifierID)
+			: IdentifierID(identifierID)
 		{}
 
-		std::string_view Name;
+		NodeID IdentifierID;
 	};
 
 	struct EnumDefinition
 	{
-		EnumDefinition(std::string_view name, NodeIDList members)
-			: Name(name), Members(members)
+		EnumDefinition(NodeID identifierID, NodeIDList members)
+			: IdentifierID(identifierID), Members(members)
 		{}
 
-		std::string_view Name;
+		NodeID IdentifierID;
 		NodeIDList Members;
 	};
 
 	struct FunctionDefinition
 	{
-		FunctionDefinition(std::string_view name, NodeIDList parameters, NodeID returnType, NodeID body)
-			: Name(name), ReturnType(returnType), Parameters(parameters), Body(body)
+		FunctionDefinition(NodeID identifierID, NodeIDList parameters, NodeID returnType, NodeID body)
+			: IdentifierID(identifierID), ReturnType(returnType), Parameters(parameters), Body(body)
 		{}
 
-		std::string_view Name;
+		NodeID IdentifierID;
 		NodeIDList Parameters;
 		NodeID ReturnType;
 		NodeID Body;
@@ -389,6 +398,7 @@ namespace AlloyCompiler
 
 	enum class NodeKind : uint8_t
 	{
+		Identifier,
 		TypeIdentifier,
 
 		IntegerLiteral,
@@ -435,10 +445,11 @@ namespace AlloyCompiler
 
 	struct Node
 	{
-		NodeKind Kind;
+		const NodeKind Kind;
 
 		union
 		{
+			Identifier Identifier;
 			TypeIdentifier TypeIdentifier;
 
 			IntegerLiteral IntegerLiteral;

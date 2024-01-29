@@ -1,7 +1,6 @@
 #include "Parser.hpp"
 
 #include "log/Log.hpp"
-#include "SymbolTable.hpp"
 
 namespace AlloyCompiler::Parser
 {
@@ -33,6 +32,11 @@ namespace AlloyCompiler::Parser
 		const Token& CurrentToken() const
 		{
 			return m_Buffers.GetToken(m_CurrentTokenID);
+		}
+
+		TokenID CurrentTokenID() const
+		{
+			return m_CurrentTokenID;
 		}
 
 		const Location& CurrentLocation() const
@@ -80,7 +84,26 @@ namespace AlloyCompiler::Parser
 	}
 
 	/// <summary>
-	/// TYPE_IDENTIFIER: ['&' | '*'] TYPE_NAME ;
+	/// IDENTIFIER: NAME ;
+	/// </summary>
+	inline static NodeID parseIdentifier(TokenIterator& iter, NodeDataBuffers& buffers)
+	{
+		ASSERT(iter.CurrentToken().Kind == TokenKind::Identifier, "Expected an identifier!");
+
+		NodeID identifier = buffers.CreateNode(Node{ .Kind = NodeKind::Identifier, .Identifier = Identifier{iter.CurrentTokenID()} });
+
+		// consume the identifier
+		if (!iter.Next())
+		{
+			logError(iter, "Unexpected end of file!");
+			return ERROR_NODE_ID;
+		}
+
+		return identifier;
+	}
+
+	/// <summary>
+	/// TYPE_IDENTIFIER: ['&' | '*'] IDENTIFIER ;
 	/// </summary>
 	inline static NodeID parseTypeIdentifier(TokenIterator& iter, NodeDataBuffers& buffers)
 	{
@@ -119,17 +142,10 @@ namespace AlloyCompiler::Parser
 			return ERROR_NODE_ID;
 		}
 
-		const auto& identifier = iter.CurrentSourceView();
-
-		// consume the identifier
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
+		NodeID identifier = parseIdentifier(iter, buffers);
 
 		// create the node
-		return buffers.CreateNode(Node{ .Kind = NodeKind::TypeIdentifier, .TypeIdentifier = TypeIdentifier{ modifier, identifier } });
+		return buffers.CreateNode(Node{ .Kind = NodeKind::TypeIdentifier, .TypeIdentifier = TypeIdentifier{modifier, identifier} });
 	}
 
 
@@ -147,14 +163,7 @@ namespace AlloyCompiler::Parser
 		ASSERT(iter.CurrentToken().Kind == TokenKind::Identifier, "Expected an identifier!");
 
 		// get the identifier
-		const auto& identifier = iter.CurrentSourceView();
-
-		// consume the identifier
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected a '('.");
-			return ERROR_NODE_ID;
-		}
+		NodeID identifier = parseIdentifier(iter, buffers);
 
 		// check that we have an opening parenthesis
 		if (iter.CurrentToken().Value != TokenValue::OpenParen)
@@ -439,14 +448,7 @@ namespace AlloyCompiler::Parser
 		case TokenKind::Identifier:
 		{
 			// get the identifier
-			const auto& identifier = iter.CurrentSourceView();
-
-			// consume the identifier
-			if (!iter.Next())
-			{
-				logError(iter, "Unexpected end of file!");
-				return ERROR_NODE_ID;
-			}
+			NodeID identifier = parseIdentifier(iter, buffers);
 
 			// check for function call
 			if (iter.CurrentToken().Value == TokenValue::OpenParen)
@@ -685,14 +687,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// parse the identifier
-		const auto& identifier = iter.CurrentSourceView();
-
-		// consume the identifier
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected an assignment operator.");
-			return ERROR_NODE_ID;
-		}
+		NodeID identifier = parseIdentifier(iter, buffers);
 
 		// check for assignment operator
 		if (iter.CurrentToken().Value != TokenValue::Assign)
@@ -1152,14 +1147,7 @@ namespace AlloyCompiler::Parser
 			return ERROR_NODE_ID;
 		}
 
-		const auto& identifier = iter.CurrentSourceView();
-
-		// consume the identifier
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
+		NodeID identifier = parseIdentifier(iter, buffers);
 
 		// check for colon
 		if (iter.CurrentToken().Value != TokenValue::Colon)
@@ -1210,14 +1198,7 @@ namespace AlloyCompiler::Parser
 			return ERROR_NODE_ID;
 		}
 
-		const auto& identifier = iter.CurrentSourceView();
-
-		// consume the identifier
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
+		NodeID identifier = parseIdentifier(iter, buffers);
 
 		// check for colon
 		if (iter.CurrentToken().Value != TokenValue::Colon)
@@ -1292,14 +1273,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// get the function name
-		const auto& functionName = iter.CurrentSourceView();
-
-		// consume the function name
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected a '('.");
-			return ERROR_NODE_ID;
-		}
+		NodeID functionName = parseIdentifier(iter, buffers);
 
 		// check for opening parenthesis
 		if (iter.CurrentToken().Value != TokenValue::OpenParen)
@@ -1411,14 +1385,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// get the enum name
-		const auto& enumName = iter.CurrentSourceView();
-
-		// consume the enum name
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected a '{'.");
-			return ERROR_NODE_ID;
-		}
+		NodeID enumName = parseIdentifier(iter, buffers);
 
 		// check for opening brace
 		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
@@ -1446,14 +1413,7 @@ namespace AlloyCompiler::Parser
 				return ERROR_NODE_ID;
 			}
 
-			const auto& identifier = iter.CurrentSourceView();
-
-			// consume the identifier
-			if (!iter.Next())
-			{
-				logError(iter, "Unexpected end of file! Expected an identifier or '}'.");
-				return ERROR_NODE_ID;
-			}
+			NodeID identifier = parseIdentifier(iter, buffers);
 
 			// add the identifier to the list
 			identifierIDs.push_back(buffers.CreateNode(Node{ .Kind = NodeKind::EnumMember, .EnumMember = EnumMember{ identifier } }));
@@ -1504,14 +1464,7 @@ namespace AlloyCompiler::Parser
 		}
 
 		// get the struct name
-		const auto& structName = iter.CurrentSourceView();
-
-		// consume the struct name
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected a '{0}'.", "{");
-			return ERROR_NODE_ID;
-		}
+		NodeID structName = parseIdentifier(iter, buffers);
 
 		// check for opening brace
 		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
@@ -1798,11 +1751,11 @@ namespace AlloyCompiler::Parser
 		return buffers.CreateNode(Node{ .Kind = NodeKind::Program, .Program = Program{ std::move(moduleIDs) } });
 	}
 
-
 	NodeDataBuffers Parse(const Tokenizer::TokenDataBuffers& tokenBuffers)
 	{
 		TokenIterator iter(tokenBuffers);
 		NodeDataBuffers buffers(tokenBuffers);
+
 
 		// parse the program
 		NodeID programID = parseProgram(iter, buffers);

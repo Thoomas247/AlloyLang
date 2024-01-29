@@ -1,79 +1,101 @@
-(* Programs are a list of modules. *)
-PROGRAM:				{ MODULE } ;
+(* -- TOKEN DEFINITIONS -- *)
 
-(* Modules are made up of qualified definitions. *)
-MODULE:					{ QUALIFIED_DEFINITION } ;
+identifier:					( letter | '_' ) { letter | digit | '_' } ;
 
-QUALIFIED_DEFINITION:	VISIBILITY_QUALIFIER DEFINITION ;
+export:						'exp' ;
+public:						'pub' ;
 
-(* 
-* Types are made up of many parts. 
-* The type name is just a human-readable name corresponding to a built-in type name or struct name.
-* A type can be further described with a '&' or '*', denoting if the memory addressed by this type is a reference or pointer.
-*)
-TYPE_NAME:				BUILTIN_TYPE_NAME | STRUCT_NAME | ENUM_NAME ;
-TYPE_IDENTIFIER:		['&' | '*'] TYPE_NAME ;
+struct:						'struct' ;
+enum:						'enum' ;
+function:					'fn' ;
 
-(* 
-* Type declarations describe types more fully by having either 'var' or 'const' denoting whether the referenced value or pointed value can be modified.
-* This is used by function return type declarations, where the name of the return value(s) is decided by the caller, not the function itself.
-*)
-TYPE_DECLARATION:		VALUE_TYPE_DECLARATION | VAR_TYPE_DECLARATION | CONST_TYPE_DECLARATION | TUPLE_TYPE_DECLARATION ;
+variable:					'var' ;
+constant:					'const' ;
 
-VALUE_TYPE_DECLARATION:	TYPE_IDENTIFIER ;
-VAR_TYPE_DECLARATION:	'var' TYPE_IDENTIFIER ;
-CONST_TYPE_DECLARATION:	'const' TYPE_IDENTIFIER ;
-TUPLE_TYPE_DECLARATION: '(' TYPE_DECLARATION ',' TYPE_DECLARATION { ',' TYPE_DECLARATION } ')' ;
+for:						'for' ;
+while:						'while' ;
+if:							'if' ;
+else:						'else' ;
+return:						'return' ;
 
-(* Declarations are the name and type identifier of a value *)
-DECLARATION:			VAR_DECLARATION | CONST_DECLARATION ;
+reference:					'&' ;
+pointer:					'*' ;
 
-VAR_DECLARATION:		'var' VAR_NAME ':' TYPE_IDENTIFIER ;
-CONST_DECLARATION:		'const' CONST_NAME ':' TYPE_IDENTIFIER ;
+comma:						',' ;
+colon:						':' ;
+semicolon:					';' ;
+arrow:						'->' ;
 
-(* Visibility qualifier can be 'exp', 'pub', or empty, corresponding to exported, public, and private. *)
-VISIBILITY_QUALIFIER:	[ 'exp' | 'pub' ] ;
+open_paren:					'(' ;
+close_paren:				')' ;
+open_brace:					'{' ;
+close_brace:				'}' ;
 
-(* Definitions are variable, constant, struct, or function definitions. *)
-DEFINITION:				VAR_DEFINITION | CONST_DEFINITION | STRUCT_DEFINITION | ENUM_DEFINITION | FN_DEFINITION ;
+assignment_operator:		'=' ;
 
-VAR_DEFINITION:			VAR_DECLARATION '=' EXPRESSION ';' ;
-CONST_DEFINITION:		CONST_DECLARATION '=' EXPRESSION ';' ;
-STRUCT_DEFINITION:		'struct' STRUCT_NAME '{' { DECLARATION ';' } '}' ;
-ENUM_DEFINITION:		'enum' ENUM_NAME '{' { IDENTIFIER } '}' ;
-FN_DEFINITION:			'fn' FN_NAME '(' [ DECLARATION { ',' DECLARATION } ] ')' [':' TYPE_DECLARATION] STATEMENT_BLOCK ;
+logical_operator:			'&&' | '||' ;
+relational_operator:		'==' | '!=' | '>' | '<' | '>=' | '<=' ;
+additive_operator:			'+' | '-' ;
+multiplicative_operator:	'*' | '/' | '%' ;
 
-(* An expression is an operation which results in a value, or a literal value. *)
-EXPRESSION:				PRIMARY_EXPRESSION | UNARY_EXPRESSION | BINARY_EXPRESSION | ASSIGNMENT_EXPRESSION ;
+unary_operator:				'!' | '@' ;
 
-PRIMARY_EXPRESSION:		MEMORY_ACCESS | FN_CALL | LITERAL | ENCLOSED_EXPRESSION ;
-MEMORY_ACCESS:			VAR_NAME | CONST_NAME ;
-FN_CALL:				FN_NAME '(' [ EXPRESSION { ',' EXPRESSION } ] ')' ;
-ENCLOSED_EXPRESSION:	'(' EXPRESSION  [',' EXPRESSION] ')' ;
+integer_literal:			(* digit regex *) { (* digit regex *) } ;
+float_literal:				(* digit regex *) { (* digit regex *) } '.' (* digit regex *) { (* digit regex *) } ;
+boolean_literal:			'true' | 'false' ;
+string_literal:				'"' { (* character regex *) } '"' ;
+character_literal:			'\'' [ (* character regex *) ] '\'' ;
 
-UNARY_EXPRESSION:		UNARY_OPERATOR EXPRESSION ;
-BINARY_EXPRESSION:		EXPRESSION BINARY_OPERATOR EXPRESSION ; (* DOES NOT INCLUDE ASSIGNMENT OPERATORS! *)
-ASSIGNMENT_EXPRESSION:	VAR_NAME ASSIGNMENT_OPERATOR EXPRESSION ;
+identifier:					( (* letter regex *) | '_' ) { (* character regex *) } ;
 
-(* A literal is a compile-time constant which represents an integer, float, boolean, string, or character. *)
-LITERAL:				INT_LITERAL | FLOAT_LITERAL | BOOLEAN_LITERAL | STRING_LITERAL | CHAR_LITERAL ;
 
-INT_LITERAL:			NUMBER ;
-FLOAT_LITERAL:			NUMBER '.' NUMBER ;
-BOOLEAN_LITERAL:		'true' | 'false' ;
-STRING_LITERAL:			'\"' { LETTER } '\"' ;
-CHAR_LITERAL:			'\'' [ LETTER ] '\'' ;
+(* -- AST NODE DEFINITIONS -- *)
 
-(* 
-* Statements are definitions or certain expressions which actually do something, i.e. expressions like 'a + b;' are not statements, since the resulting value is not used and there are no side-effects.
-* This also means that structs and functions can be defined within the scope of a function, in which case they can only be used within this function's scope.
-*)
-STATEMENT:				DEFINITION | FN_CALL ';' | VARIABLE_ASSIGNMENT | FOR_LOOP | WHILE_LOOP | IF_STATEMENT | MATCH_STATEMENT | STATEMENT_BLOCK | RETURN_STATEMENT ;
+LITERAL:					integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
 
-VARIABLE_ASSIGNMENT:	ASSIGNMENT_EXPRESSION ';' ;
-FOR_LOOP:				'for' '(' EXPRESSION ';' EXPRESSION ';' EXPRESSION ';' ')' STATEMENT ;
-WHILE_LOOP:				'while' ENCLOSED_EXPRESSION STATEMENT ;
-IF_STATEMENT:			'if' ENCLOSED_EXPRESSION STATEMENT ['else' STATEMENT] ;
-MATCH_STATEMENT:		'match' ENCLOSED_EXPRESSION '{' { EXPRESSION '=>' STATEMENT } '}' ;
-STATEMENT_BLOCK:		'{' {STATEMENT} '}' ;
-RETURN_STATEMENT:		'return' [ EXPRESSION ] ';' ;
+
+TYPE_IDENTIFIER:			[ reference | pointer ] identifier ;
+
+
+TYPE_DECLARATION:			[ variable | constant ] TYPE_IDENTIFIER ;
+
+
+VALUE_DECLARATION:			[ variable | constant ] identifier colon TYPE_IDENTIFIER ;
+
+
+VALUE_DEFINITION:			VALUE_DECLARATION assignment_operator EXPRESSION semicolon ;
+STRUCT_DEFINITION:			struct identifier open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
+ENUM_DEFINITION:			enum identifier open_brace identifier { comma identifier } close_brace ;
+FUNCTION_DEFINITION:		function identifier open_paren [ VALUE_DECLARATION { comma VALUE_DECLARATION } ] close_paren [ arrow TYPE_DECLARATION ] BLOCK_STATEMENT ;
+
+
+DEFINITION:					VALUE_DECLARATION | STRUCT_DEFINITION | ENUM_DEFINITION | FUNCTION_DEFINITION ;
+QUALIFIED_DEFINITION:		[ export | public ] DEFINITION ;
+
+
+FUNCTION_CALL_EXPRESSION:	identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
+ENCLOSED_EXPRESSION:		open_paren EXPRESSION close_paren ;
+
+MULTIPLICATIVE_EXPRESSION:	ADDITIVE_EXPRESSION [ multiplicative_operator MULTIPLICATIVE_EXPRESSION ] ;
+ADDITIVE_EXPRESSION:		RELATIONAL_EXPRESSION [ additive_operator ADDITIVE_EXPRESSION ] ;
+RELATIONAL_EXPRESSION:		LOGICAL_EXPRESSION [ relational_operator RELATIONAL_EXPRESSION ] ;
+LOGICAL_EXPRESSION:			PRIMARY_EXPRESSION [ logical_operator LOGICAL_EXPRESSION ] ;
+PRIMARY_EXPRESSION:			identifier | LITERAL | FUNCTION_CALL_EXPRESSION | ENCLOSED_EXPRESSION ;
+
+ASSIGNMENT_EXPRESSION:		identifier assignment_operator EXPRESSION ;
+
+EXPRESSION:					MULTIPLICATIVE_EXPRESSION | ASSIGNMENT_EXPRESSION ;
+
+
+ASSIGNMENT_STATEMENT:		ASSIGNMENT_EXPRESSION semicolon ;
+FOR_LOOP_STATEMENT:			for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION semicolon close_brace STATEMENT ;
+WHILE_LOOP_STATEMENT:		while ENCLOSED_EXPRESSION STATEMENT ;
+IF_STATEMENT:				if ENCLOSED_EXPRESSION STATEMENT [ else STATEMENT ] ;
+BLOCK_STATEMENT:			open_brace {STATEMENT} close_brace ;
+RETURN_STATEMENT:			return [ EXPRESSION ] semicolon ;
+
+
+MODULE:						{ QUALIFIED_DEFINITION } ;
+
+
+PROGRAM:					{ MODULE } ;

@@ -1,11 +1,13 @@
 #pragma once
-#include "ASTNodes.hpp"
-#include "Parser.hpp"
+#include "parser/ASTNodes.hpp"
+#include "parser/Parser.hpp"
+#include "log/Log.hpp"
 
 #include <memory>
 #include <stack>
 
-namespace AlloyCompiler::Parser
+
+namespace AlloyCompiler
 {
 	using SymbolID = uint32_t;
 
@@ -21,62 +23,6 @@ namespace AlloyCompiler::Parser
 		Symbol(NodeID nodeID, SymbolID parentID)
 			: Node(nodeID), ParentID(parentID)
 		{}
-	};
-
-	class SymbolTable
-	{
-	public:
-		SymbolID CreateSymbol(NodeID nodeID)
-		{
-			SymbolID id = (SymbolID)m_Symbols.size();
-
-			if (m_ScopeStack.empty())
-			{
-				m_Symbols.emplace_back(nodeID, ERROR_SYMBOL_ID);
-			}
-			else
-			{
-				m_Symbols[m_ScopeStack.back()].NestedIDs.push_back(id);
-				m_Symbols.emplace_back(nodeID, m_ScopeStack.back());
-			}
-
-			return id;
-		}
-
-		void PushScope(SymbolID symbolID)
-		{
-			ASSERT(symbolID < m_Symbols.size(), "Invalid symbol ID!");
-
-			m_ScopeStack.push_back(symbolID);
-		}
-
-		void PopScope()
-		{
-			ASSERT(!m_ScopeStack.empty(), "No scope to pop!");
-
-			m_ScopeStack.pop_back();
-		}
-
-		NodeID GetSymbolNode(const std::string_view& identifier) const
-		{
-			// look for identifier in the current scope
-			for (size_t i = m_ScopeStack.size() - 1; i >= 0; --i)
-			{
-				for (SymbolID id : m_Symbols[m_ScopeStack[i]].NestedIDs)
-				{
-					//if (m_NodeData.GetNode(m_Symbols[id].Node) == identifier)
-					//{
-					//	return m_Symbols[id].Node;
-					//}
-				}
-			}
-		}
-
-	private:
-		std::deque<SymbolID> m_ScopeStack;
-		std::vector<Symbol> m_Symbols;
-
-		NodeDataBuffers& m_NodeData;
 	};
 
 	// struct decl is encountered
