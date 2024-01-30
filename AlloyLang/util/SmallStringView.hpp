@@ -24,6 +24,11 @@ namespace AlloyCompiler
 			return m_pData;
 		}
 
+		size_type Size() const
+		{
+			return m_Size;
+		}
+
 		std::string_view ToStringView() const
 		{
 			return std::string_view(m_pData, m_Size);

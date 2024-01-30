@@ -5,4 +5,6 @@
 namespace AlloyCompiler
 {
 	TokenBuffers Tokenize(const Source& source);
+
+	void PrintTokens(const TokenBuffers& tokenBuffers);
 }

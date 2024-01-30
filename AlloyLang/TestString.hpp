@@ -53,8 +53,6 @@ pub var c : char = 'A';
 
 const res : i64 = div(a, 200);
 
-
-
 var s : String = "ABC";
 const d : char = '\0';
 var e : f32 = 1.01;

@@ -22,7 +22,7 @@ namespace AlloyCompiler
 			}
 		}
 
-		logErrorAtPosition("Unexpected token '{0}'! Expected {1}.", GetValue(), tokenKindVectorToString(options));
+		logErrorAtPosition("Unexpected token '{0}'! Expected {1}.", GetValue().ToStringView(), tokenKindVectorToString(options));
 		return false;
 	}
 
@@ -43,7 +43,7 @@ namespace AlloyCompiler
 			}
 		}
 
-		logErrorAtPosition("Unexpected token '{0}'! Expected {1}.", GetValue(), stringVectorToString(options));
+		logErrorAtPosition("Unexpected token '{0}'! Expected {1}.", GetValue().ToStringView(), stringVectorToString(options));
 		return false;
 	}
 
@@ -101,6 +101,8 @@ namespace AlloyCompiler
 		}
 
 		result += "or " + TOKEN_KIND_NAMES.at(tokens[tokens.size() - 1]);
+
+		return result;
 	}
 
 	std::string TokenBuffers::Iterator::stringVectorToString(const std::vector<std::string>& strings)
@@ -123,6 +125,8 @@ namespace AlloyCompiler
 		}
 
 		result += "or " + strings[strings.size() - 1];
+
+		return result;
 	}
 
 	std::string_view TokenBuffers::Iterator::getLine()

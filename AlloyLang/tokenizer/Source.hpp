@@ -34,12 +34,6 @@ namespace AlloyCompiler
 
 			/// <summary>
 			/// Moves to the next character and returns true if there is a next character.
-			/// If there is no next character, logs an error and returns false.
-			/// </summary>
-			bool Expect();
-
-			/// <summary>
-			/// Moves to the next character and returns true if there is a next character.
 			/// If there is no next character, returns false.
 			/// </summary>
 			bool NextChar();

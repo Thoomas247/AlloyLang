@@ -7,17 +7,6 @@ namespace AlloyCompiler
 		: m_Source(source), m_CharIndex(0), m_Line(1), m_Column(1), m_LineStarts({ 0 })
 	{}
 
-	bool Source::Iterator::Expect()
-	{
-		if (!NextChar())
-		{
-			Log::Error("Unexpected end of file!");
-			return false;
-		}
-
-		return true;
-	}
-
 	bool Source::Iterator::NextChar()
 	{
 		// check if we have a new line
