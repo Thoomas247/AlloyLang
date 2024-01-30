@@ -208,6 +208,7 @@
     <ClCompile Include="AlloyLang.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="parser\TreePrinter.cpp" />
+    <ClCompile Include="tokenizer\Source.cpp" />
     <ClCompile Include="tokenizer\Token.cpp" />
     <ClCompile Include="tokenizer\Tokenizer.cpp" />
   </ItemGroup>
@@ -218,6 +219,7 @@
     <ClInclude Include="parser\Parser.hpp" />
     <ClInclude Include="parser\TreePrinter.hpp" />
     <ClInclude Include="TestString.hpp" />
+    <ClInclude Include="tokenizer\Source.hpp" />
     <ClInclude Include="tokenizer\Token.hpp" />
     <ClInclude Include="tokenizer\Tokenizer.hpp" />
     <ClInclude Include="util\SmallStringView.hpp" />

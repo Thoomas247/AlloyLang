@@ -1,7 +1,7 @@
 #pragma once
 #include <unordered_map>
 
-#include "util/SmallStringView.hpp"
+#include "Source.hpp"
 
 namespace AlloyCompiler
 {
@@ -199,20 +199,6 @@ namespace AlloyCompiler
 		{ '/', { } },		// /
 		{ '%', { } },		// %
 		{ '@', { } }		// @
-	};
-
-	/// <summary>
-	/// Description of a token's location in the source code using line and column numbers.
-	/// </summary>
-	struct Location
-	{
-		uint32_t LineStart;
-		uint32_t Line;
-		uint32_t Column;
-
-		constexpr explicit Location(uint32_t lineStart, uint32_t line, uint32_t column)
-			: LineStart(lineStart), Line(line), Column(column)
-		{}
 	};
 
 	/// <summary>
