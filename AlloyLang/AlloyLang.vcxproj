@@ -208,20 +208,20 @@
     <ClCompile Include="AlloyLang.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="parser\TreePrinter.cpp" />
-    <ClCompile Include="symbols\Symbols.cpp" />
+    <ClCompile Include="tokenizer\Token.cpp" />
     <ClCompile Include="tokenizer\Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="generate\Generator.hpp" />
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="parser\ASTNodes.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
-    <ClInclude Include="symbols\Symbols.hpp" />
-    <ClInclude Include="symbols\Symbol.hpp" />
     <ClInclude Include="parser\TreePrinter.hpp" />
     <ClInclude Include="TestString.hpp" />
     <ClInclude Include="tokenizer\Token.hpp" />
     <ClInclude Include="tokenizer\Tokenizer.hpp" />
     <ClInclude Include="tokenizer\TokenMaps.hpp" />
+    <ClInclude Include="util\SmallStringView.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

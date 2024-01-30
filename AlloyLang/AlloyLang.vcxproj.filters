@@ -27,7 +27,7 @@
     <ClCompile Include="parser\TreePrinter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="symbols\Symbols.cpp">
+    <ClCompile Include="tokenizer\Token.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -44,9 +44,6 @@
     <ClInclude Include="tokenizer\TokenMaps.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="symbols\Symbol.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="TestString.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -59,7 +56,10 @@
     <ClInclude Include="parser\TreePrinter.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="symbols\Symbols.hpp">
+    <ClInclude Include="generate\Generator.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="util\SmallStringView.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

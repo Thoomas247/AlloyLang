@@ -5,21 +5,21 @@
 
 identifier:					( letter | '_' ) { letter | digit | '_' } ;
 
-export:						'exp' ;
-public:						'pub' ;
+export_label:				'exp' ;
+public_label:				'pub' ;
 
-struct:						'struct' ;
-enum:						'enum' ;
-function:					'fn' ;
+struct_keyword:				'struct' ;
+enum_keyword:				'enum' ;
+function_keyword:			'fn' ;
 
-variable:					'var' ;
-constant:					'const' ;
+variable_keyword:			'var' ;
+constant_keyword:			'const' ;
 
-for:						'for' ;
-while:						'while' ;
-if:							'if' ;
-else:						'else' ;
-return:						'return' ;
+for_keyword:				'for' ;
+while_keyword:				'while' ;
+if_keyword:					'if' ;
+else_keyword:				'else' ;
+return_keyword:				'return' ;
 
 reference:					'&' ;
 pointer:					'*' ;
@@ -48,7 +48,6 @@ float_literal:				(* digit regex *) { (* digit regex *) } '.' (* digit regex *) 
 boolean_literal:			'true' | 'false' ;
 string_literal:				'"' { (* character regex *) } '"' ;
 character_literal:			'\'' [ (* character regex *) ] '\'' ;
-
 
 (* -- AST NODE DEFINITIONS -- *)
 
