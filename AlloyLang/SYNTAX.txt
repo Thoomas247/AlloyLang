@@ -49,8 +49,6 @@ boolean_literal:			'true' | 'false' ;
 string_literal:				'"' { (* character regex *) } '"' ;
 character_literal:			'\'' [ (* character regex *) ] '\'' ;
 
-identifier:					( (* letter regex *) | '_' ) { (* character regex *) } ;
-
 
 (* -- AST NODE DEFINITIONS -- *)
 
@@ -91,7 +89,7 @@ EXPRESSION:					MULTIPLICATIVE_EXPRESSION | ASSIGNMENT_EXPRESSION ;
 
 
 ASSIGNMENT_STATEMENT:		ASSIGNMENT_EXPRESSION semicolon ;
-FOR_LOOP_STATEMENT:			for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION semicolon close_brace STATEMENT ;
+FOR_LOOP_STATEMENT:			for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT ;
 WHILE_LOOP_STATEMENT:		while ENCLOSED_EXPRESSION STATEMENT ;
 IF_STATEMENT:				if ENCLOSED_EXPRESSION STATEMENT [ else STATEMENT ] ;
 BLOCK_STATEMENT:			open_brace {STATEMENT} close_brace ;
