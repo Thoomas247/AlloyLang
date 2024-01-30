@@ -41,7 +41,7 @@ relational_operator:		'==' | '!=' | '>' | '<' | '>=' | '<=' ;
 additive_operator:			'+' | '-' ;
 multiplicative_operator:	'*' | '/' | '%' ;
 
-unary_operator:				'!' | '@' ;
+unary_operator:				'!' | '-' | '@' ;
 
 integer_literal:			(* digit regex *) { (* digit regex *) } ;
 float_literal:				(* digit regex *) { (* digit regex *) } '.' (* digit regex *) { (* digit regex *) } ;

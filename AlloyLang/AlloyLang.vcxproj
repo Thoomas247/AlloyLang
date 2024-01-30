@@ -220,7 +220,6 @@
     <ClInclude Include="TestString.hpp" />
     <ClInclude Include="tokenizer\Token.hpp" />
     <ClInclude Include="tokenizer\Tokenizer.hpp" />
-    <ClInclude Include="tokenizer\TokenMaps.hpp" />
     <ClInclude Include="util\SmallStringView.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

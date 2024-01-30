@@ -5,8 +5,14 @@
 
 namespace AlloyCompiler
 {
+	/// <summary>
+	/// Unique ID for a token. All token data is accessed through this ID.
+	/// </summary>
 	using TokenID = uint32_t;
 
+	/// <summary>
+	/// Represents an invalid token ID.
+	/// </summary>
 	constexpr TokenID ERROR_TOKEN_ID = std::numeric_limits<TokenID>::max();
 
 	/// <summary>
@@ -63,6 +69,9 @@ namespace AlloyCompiler
 		character_literal
 	};
 
+	/// <summary>
+	/// Maps TokenKind enum values to their string representation.
+	/// </summary>
 	const std::unordered_map<TokenKind, std::string> TOKEN_KIND_NAMES =
 	{
 		{ TokenKind::none, "none" },
@@ -112,6 +121,84 @@ namespace AlloyCompiler
 		{ TokenKind::boolean_literal, "boolean_literal" },
 		{ TokenKind::string_literal, "string_literal" },
 		{ TokenKind::character_literal, "character_literal" }
+	};
+
+	/// <summary>
+	/// Maps known symbols to their TokenKind enum values.
+	/// Matches SYNTAX.txt.
+	/// </summary>
+	const std::unordered_map<std::string_view, TokenKind> KNOWN_SYMBOLS =
+	{
+		{ "exp", TokenKind::export_label },
+		{ "pub", TokenKind::public_label },
+
+		{ "struct", TokenKind::struct_keyword },
+		{ "enum", TokenKind::enum_keyword },
+		{ "fn", TokenKind::function_keyword },
+
+		{ "var", TokenKind::variable_keyword },
+		{ "const", TokenKind::constant_keyword },
+
+		{ "for", TokenKind::for_keyword },
+		{ "while", TokenKind::while_keyword },
+		{ "if", TokenKind::if_keyword },
+		{ "else", TokenKind::else_keyword },
+		{ "return", TokenKind::return_keyword },
+
+		{ "&", TokenKind::reference },
+		{ "*", TokenKind::pointer },
+
+		{ ",", TokenKind::comma },
+		{ ":", TokenKind::colon },
+		{ ";", TokenKind::semicolon },
+		{ "->", TokenKind::arrow },
+
+		{ "(", TokenKind::open_paren },
+		{ ")", TokenKind::close_paren },
+		{ "{", TokenKind::open_brace },
+		{ "}", TokenKind::close_brace },
+
+		{ "=", TokenKind::assignment_operator },
+
+		{ "&&", TokenKind::logical_operator },
+		{ "||", TokenKind::logical_operator },
+		{ "==", TokenKind::relational_operator },
+		{ "!=", TokenKind::relational_operator },
+		{ "<", TokenKind::relational_operator },
+		{ ">", TokenKind::relational_operator },
+		{ "<=", TokenKind::relational_operator },
+		{ ">=", TokenKind::relational_operator },
+		{ "+", TokenKind::additive_operator },
+		{ "-", TokenKind::additive_operator },
+		{ "*", TokenKind::multiplicative_operator },
+		{ "/", TokenKind::multiplicative_operator },
+		{ "%", TokenKind::multiplicative_operator },
+
+		{ "!", TokenKind::unary_operator },
+		//{ "-", TokenKind::unary_operator },
+		{ "@", TokenKind::unary_operator },
+
+		{ "true", TokenKind::boolean_literal },
+		{ "false", TokenKind::boolean_literal }
+	};
+
+	/// <summary>
+	/// Maps the first character of an operator to every possible character that can follow to form the full operator.
+	/// </summary>
+	const std::unordered_map<char, std::vector<char>> OPERATOR_COMBINATIONS =
+	{
+		{ '&', { '&' } },	// & or &&
+		{ '|', { '|' } },	// | or ||
+		{ '=', { '=' } },	// = or ==
+		{ '!', { '=' } },	// ! or !=
+		{ '<', { '=' } },	// < or <=
+		{ '>', { '=' } },	// > or >=
+		{ '+', { } },		// +
+		{ '-', { } },		// -
+		{ '*', { } },		// *
+		{ '/', { } },		// /
+		{ '%', { } },		// %
+		{ '@', { } }		// @
 	};
 
 	/// <summary>
@@ -184,10 +271,24 @@ namespace AlloyCompiler
 			const Location& GetLocation() const;
 
 		private:
+			/// <summary>
+			/// Converts a vector of token kinds to a formatted list string.
+			/// </summary>
 			std::string tokenKindVectorToString(const std::vector<TokenKind>& tokens);
+
+			/// <summary>
+			/// Converts a vector of strings to a formatted list string.
+			/// </summary>
 			std::string stringVectorToString(const std::vector<std::string>& strings);
+
+			/// <summary>
+			/// Returns the string value of the line the current token is on.
+			/// </summary>
 			std::string_view getLine();
 
+			/// <summary>
+			/// Logs an error to the console which includes additional context, such as line number, column, etc...
+			/// </summary>
 			template <typename... Args>
 			inline constexpr void logErrorAtPosition(const std::string& format, Args&&... args);
 

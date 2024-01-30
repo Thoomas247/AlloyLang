@@ -41,9 +41,6 @@
     <ClInclude Include="log\Log.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="tokenizer\TokenMaps.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="TestString.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
