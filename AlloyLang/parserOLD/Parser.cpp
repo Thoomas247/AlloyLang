@@ -2,78 +2,8 @@
 
 #include "log/Log.hpp"
 
-namespace AlloyCompiler::Parser
+namespace AlloyCompiler
 {
-	class TokenIterator
-	{
-	public:
-		TokenIterator(const Tokenizer::TokenDataBuffers& nodeBuffers)
-			: m_Buffers(nodeBuffers), m_CurrentTokenID(0)
-		{}
-		TokenIterator(const TokenIterator&) = delete;
-
-		[[nodiscard]] bool Next()
-		{
-			++m_CurrentTokenID;
-
-			if (m_CurrentTokenID >= m_Buffers.GetTokenCount())
-				return false;
-
-			return true;
-		}
-
-		[[nodiscard]] bool HasNext() const { return m_CurrentTokenID + 1 < m_Buffers.GetTokenCount(); }
-
-		void Previous()
-		{
-			--m_CurrentTokenID;
-		}
-
-		const Token& CurrentToken() const
-		{
-			return m_Buffers.GetToken(m_CurrentTokenID);
-		}
-
-		TokenID CurrentTokenID() const
-		{
-			return m_CurrentTokenID;
-		}
-
-		const Location& CurrentLocation() const
-		{
-			return m_Buffers.GetLocation(m_CurrentTokenID);
-		}
-
-		const std::string_view& CurrentSourceView() const
-		{
-			return m_Buffers.GetSourceView(m_CurrentTokenID);
-		}
-
-		std::string_view GetLine() const
-		{
-			auto source = m_Buffers.GetSourceView();
-
-			size_t startIndex = m_Buffers.GetLocation(m_CurrentTokenID).LineStart;
-			size_t endIndex = m_Buffers.GetSourceView().size();
-
-			// find first token on new line
-			for (TokenID i = m_CurrentTokenID; i < m_Buffers.GetTokenCount(); ++i)
-			{
-				if (m_Buffers.GetLocation(i).Line != m_Buffers.GetLocation(m_CurrentTokenID).Line)
-				{
-					endIndex = m_Buffers.GetLocation(i).LineStart;
-					break;
-				}
-			}
-
-			return source.substr(startIndex, endIndex - startIndex - 1);
-		}
-
-	private:
-		const Tokenizer::TokenDataBuffers& m_Buffers;
-		TokenID m_CurrentTokenID;
-	};
-
 	template <typename... Args>
 	inline constexpr void logError(TokenIterator& iter, const std::string& format, Args&&... args)
 	{
@@ -82,6 +12,9 @@ namespace AlloyCompiler::Parser
 		Log::Error("\t{0}^", std::string(iter.CurrentLocation().Column - 1, ' '));
 		Log::Error("\t{0}{1}", std::string(iter.CurrentLocation().Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 	}
+
+	template <typename T>
+	NodeID parse() = delete;
 
 	/// <summary>
 	/// IDENTIFIER: NAME ;

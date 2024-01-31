@@ -2,8 +2,18 @@
 
 namespace AlloyCompiler
 {
+	static void increment(TokenID& tokenID)
+	{
+		tokenID = (TokenID)((size_t)tokenID + 1);
+	}
+
+	static void decrement(TokenID& tokenID)
+	{
+		tokenID = (TokenID)((size_t)tokenID - 1);
+	}
+
 	TokenBuffers::Iterator::Iterator(const TokenBuffers& tokenBuffers)
-		: m_TokenBuffers(tokenBuffers), m_CurrentID(0)
+		: m_TokenBuffers(tokenBuffers), m_CurrentID((TokenID)0)
 	{}
 
 	bool TokenBuffers::Iterator::Expect(const std::vector<TokenKind>& options)
@@ -55,15 +65,15 @@ namespace AlloyCompiler
 			return false;
 		}
 
-		++m_CurrentID;
+		increment(m_CurrentID);
 		return true;
 	}
 
 	void TokenBuffers::Iterator::Previous()
 	{
-		ASSERT(m_CurrentID != 0, "Cannot go back from the first token! This shouldn't happen...");
+		ASSERT(m_CurrentID != (TokenID)0, "Cannot go back from the first token! This shouldn't happen...");
 
-		--m_CurrentID;
+		decrement(m_CurrentID);
 	}
 
 	TokenKind TokenBuffers::Iterator::GetKind() const
@@ -134,19 +144,19 @@ namespace AlloyCompiler
 		// find first token of line
 		TokenID firstTokenID = m_CurrentID;
 
-		while (firstTokenID != 0 && m_TokenBuffers.GetLocation(firstTokenID).Line == m_TokenBuffers.GetLocation(m_CurrentID).Line)
+		while (firstTokenID != (TokenID)0 && m_TokenBuffers.GetLocation(firstTokenID).Line == m_TokenBuffers.GetLocation(m_CurrentID).Line)
 		{
-			--firstTokenID;
+			decrement(firstTokenID);
 		}
 
-		firstTokenID++;
+		increment(firstTokenID);
 
 		// find token after last token of line
 		TokenID lastTokenID = m_CurrentID;
 
 		while (lastTokenID != m_TokenBuffers.LastTokenID() && m_TokenBuffers.GetLocation(lastTokenID).Line == m_TokenBuffers.GetLocation(m_CurrentID).Line)
 		{
-			++lastTokenID;
+			increment(lastTokenID);
 		}
 
 		return std::string_view(m_TokenBuffers.GetValue(firstTokenID).Data(),
@@ -164,27 +174,27 @@ namespace AlloyCompiler
 		m_Values.push_back(value);
 		m_Locations.push_back(location);
 
-		return (uint32_t)m_Kinds.size() - 1;
+		return (TokenID)(m_Kinds.size() - 1);
 	}
 
 	TokenID TokenBuffers::LastTokenID() const
 	{
-		return (TokenID)m_Kinds.size() - 1;
+		return (TokenID)(m_Kinds.size() - 1);
 	}
 
 	TokenKind TokenBuffers::GetKind(TokenID id) const
 	{
-		return m_Kinds[id];
+		return m_Kinds[(size_t)id];
 	}
 
 	const SmallStringView& TokenBuffers::GetValue(TokenID id) const
 	{
-		return m_Values[id];
+		return m_Values[(size_t)id];
 	}
 
 	const Location& TokenBuffers::GetLocation(TokenID id) const
 	{
-		return m_Locations[id];
+		return m_Locations[(size_t)id];
 	}
 
 }

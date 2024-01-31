@@ -6,7 +6,7 @@
 
 #include "ASTNodes.hpp"
 
-namespace AlloyCompiler::Parser
+namespace AlloyCompiler
 {
 	class NodeDataBuffers
 	{
@@ -43,5 +43,5 @@ namespace AlloyCompiler::Parser
 		NodeID m_RootNodeID = ERROR_NODE_ID;
 	};
 
-	NodeDataBuffers Parse(const Tokenizer::TokenDataBuffers& tokenBuffers);
+	NodeDataBuffers Parse(const TokenBuffers& tokenBuffers);
 }
