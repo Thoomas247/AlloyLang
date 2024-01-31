@@ -7,6 +7,8 @@
 
 #include <chrono>
 
+using namespace AlloyCompiler;
+
 int main()
 {
 	const size_t n = 1;// 0'000;
@@ -18,30 +20,32 @@ int main()
 		str += TestSrc;
 	}
 
-	AlloyCompiler::Source source(str);
+	Source source(str);
 
 	const uint64_t numBytes = str.size();
 	const uint64_t numKilobytes = std::max(numBytes / 1000, 1ull);
 
-	AlloyCompiler::Log::Print("Compiling {0} kB...", numKilobytes);
+	Log::Print("Compiling {0} kB...", numKilobytes);
 
 	auto start = std::chrono::high_resolution_clock::now();
-	auto tokenBuffers = AlloyCompiler::Tokenize(source);
-	AlloyCompiler::PrintTokens(tokenBuffers);
+	TokenBuffers tokenBuffers = Tokenize(source);
+	//PrintTokens(tokenBuffers);
 	auto end = std::chrono::high_resolution_clock::now();
 
 	const uint64_t tokenizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
+	Log::Print("Tokenize: {0}ms ({1}kB/ms)", tokenizeTime, numKilobytes / tokenizeTime);
+
 	//start = std::chrono::high_resolution_clock::now();
-	//auto nodeBuffers = AlloyCompiler::Parser::Parse(tokenBuffers);
+	//auto nodeBuffers = Parser::Parse(tokenBuffers);
 	//end = std::chrono::high_resolution_clock::now();
 	//
 	//const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	// 
+	//Log::Print("Parse: {0}ms", parseTime);
+	// 
+	//Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime);
 	//
-	//AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime);
-	//AlloyCompiler::Log::Print("Tokenize: {0}ms", tokenizeTime);
-	//AlloyCompiler::Log::Print("Parse: {0}ms", parseTime);
-	//AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime) / numKilobytes);
 	//
-	//AlloyCompiler::Log::Print("");
+	//Log::Print("");
 }

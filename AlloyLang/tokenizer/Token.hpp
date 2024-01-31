@@ -8,7 +8,7 @@ namespace AlloyCompiler
 	/// <summary>
 	/// Unique ID for a token. All token data is accessed through this ID.
 	/// </summary>
-	using TokenID = uint32_t;
+	enum class TokenID : uint32_t {};
 
 	/// <summary>
 	/// Represents an invalid token ID.

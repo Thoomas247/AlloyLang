@@ -5,6 +5,10 @@
 
 namespace AlloyCompiler
 {
+	/// <summary>
+	/// Alternative to std::string_view for small strings.
+	/// Used to keep token data compact.
+	/// </summary>
 	class SmallStringView
 	{
 	public:
