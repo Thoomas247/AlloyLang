@@ -16,48 +16,6 @@ namespace AlloyCompiler
 		: m_TokenBuffers(tokenBuffers), m_CurrentID((TokenID)0)
 	{}
 
-	bool TokenBuffers::Iterator::Expect(const std::vector<TokenKind>& options)
-	{
-		if (!Next())
-		{
-			logErrorAtPosition("Unexpected end of file! Expected {0}.", tokenKindVectorToString(options));
-			return false;
-		}
-
-		for (const TokenKind option : options)
-		{
-			if (GetKind() == option)
-			{
-				return true;
-			}
-		}
-
-		logErrorAtPosition("Unexpected token '{0}'! Expected {1}.", GetValue().ToStringView(), tokenKindVectorToString(options));
-		return false;
-	}
-
-
-	bool TokenBuffers::Iterator::Expect(std::vector<std::string> options)
-	{
-		if (!Next())
-		{
-			logErrorAtPosition("Unexpected end of file! Expected {0}.", stringVectorToString(options));
-			return false;
-		}
-
-		for (const std::string& option : options)
-		{
-			if (GetValue().ToStringView() == option)
-			{
-				return true;
-			}
-		}
-
-		logErrorAtPosition("Unexpected token '{0}'! Expected {1}.", GetValue().ToStringView(), stringVectorToString(options));
-		return false;
-	}
-
-
 	bool TokenBuffers::Iterator::Next()
 	{
 		if (m_CurrentID == m_TokenBuffers.LastTokenID())
@@ -68,6 +26,8 @@ namespace AlloyCompiler
 		increment(m_CurrentID);
 		return true;
 	}
+
+	bool TokenBuffers::Iterator::HasNext() const { return m_CurrentID != m_TokenBuffers.LastTokenID(); }
 
 	void TokenBuffers::Iterator::Previous()
 	{
@@ -91,55 +51,7 @@ namespace AlloyCompiler
 		return m_TokenBuffers.GetLocation(m_CurrentID);
 	}
 
-	std::string TokenBuffers::Iterator::tokenKindVectorToString(const std::vector<TokenKind>& tokens)
-	{
-		if (tokens.empty())
-		{
-			return "";
-		}
-
-		if (tokens.size() == 1)
-		{
-			return TOKEN_KIND_NAMES.at(tokens[0]);
-		}
-
-		std::string result;
-
-		for (size_t i = 0; i < tokens.size() - 1; ++i)
-		{
-			result += TOKEN_KIND_NAMES.at(tokens[i]) + ", ";
-		}
-
-		result += "or " + TOKEN_KIND_NAMES.at(tokens[tokens.size() - 1]);
-
-		return result;
-	}
-
-	std::string TokenBuffers::Iterator::stringVectorToString(const std::vector<std::string>& strings)
-	{
-		if (strings.empty())
-		{
-			return "";
-		}
-
-		if (strings.size() == 1)
-		{
-			return strings[0];
-		}
-
-		std::string result;
-
-		for (size_t i = 0; i < strings.size() - 1; ++i)
-		{
-			result += strings[i] + ", ";
-		}
-
-		result += "or " + strings[strings.size() - 1];
-
-		return result;
-	}
-
-	std::string_view TokenBuffers::Iterator::getLine()
+	std::string_view TokenBuffers::Iterator::GetLine()
 	{
 		// find first token of line
 		TokenID firstTokenID = m_CurrentID;
@@ -161,6 +73,11 @@ namespace AlloyCompiler
 
 		return std::string_view(m_TokenBuffers.GetValue(firstTokenID).Data(),
 			m_TokenBuffers.GetLocation(lastTokenID).LineStart - m_TokenBuffers.GetLocation(firstTokenID).LineStart);
+	}
+
+	TokenID TokenBuffers::Iterator::GetCurrentID() const
+	{
+		return m_CurrentID;
 	}
 
 	TokenBuffers::Iterator TokenBuffers::GetIterator() const

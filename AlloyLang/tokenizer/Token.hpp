@@ -13,7 +13,7 @@ namespace AlloyCompiler
 	/// <summary>
 	/// Represents an invalid token ID.
 	/// </summary>
-	constexpr TokenID ERROR_TOKEN_ID = std::numeric_limits<TokenID>::max();
+	constexpr TokenID ERROR_TOKEN_ID = (TokenID)std::numeric_limits<uint32_t>::max();
 
 	/// <summary>
 	/// TokenKind enum to match SYNTAX.txt.
@@ -217,24 +217,15 @@ namespace AlloyCompiler
 			Iterator(const TokenBuffers& tokenBuffers);
 
 			/// <summary>
-			/// Moves to the next token and checks if it matches one of the given kinds.
-			/// If no match is found, an error is reported and the function returns false.
-			/// If a match is found, returns true.
-			/// </summary>
-			[[nodiscard]] bool Expect(const std::vector<TokenKind>& options);
-
-			/// <summary>
-			/// Moves to the next token and checks if it matches one of the given values.
-			/// If no match is found, an error is reported and the function returns false.
-			/// If a match is found, returns true.
-			/// </summary>
-			[[nodiscard]] bool Expect(std::vector<std::string> options);
-
-			/// <summary>
 			/// Move to the next token.
 			/// Returns false if there are no more tokens, true otherwise.
 			/// </summary>
 			[[nodiscard]] bool Next();
+
+			/// <summary>
+			/// Returns true if Next() will return true when next called.
+			/// </summary>
+			[[nodiscard]] bool HasNext() const;
 
 			/// <summary>
 			/// Move back to the previous token.
@@ -256,27 +247,15 @@ namespace AlloyCompiler
 			/// </summary>
 			const Location& GetLocation() const;
 
-		private:
-			/// <summary>
-			/// Converts a vector of token kinds to a formatted list string.
-			/// </summary>
-			std::string tokenKindVectorToString(const std::vector<TokenKind>& tokens);
-
-			/// <summary>
-			/// Converts a vector of strings to a formatted list string.
-			/// </summary>
-			std::string stringVectorToString(const std::vector<std::string>& strings);
-
 			/// <summary>
 			/// Returns the string value of the line the current token is on.
 			/// </summary>
-			std::string_view getLine();
+			std::string_view GetLine();
 
 			/// <summary>
-			/// Logs an error to the console which includes additional context, such as line number, column, etc...
+			/// Returns the ID of the current token.
 			/// </summary>
-			template <typename... Args>
-			inline constexpr void logErrorAtPosition(const std::string& format, Args&&... args);
+			TokenID GetCurrentID() const;
 
 		private:
 			const TokenBuffers& m_TokenBuffers;
@@ -316,13 +295,4 @@ namespace AlloyCompiler
 		std::vector<SmallStringView> m_Values;
 		std::vector<Location> m_Locations;
 	};
-
-	template<typename ...Args>
-	inline constexpr void TokenBuffers::Iterator::logErrorAtPosition(const std::string& format, Args && ...args)
-	{
-		Log::Error("Error at location ({0} : {1}):", GetLocation().Line, GetLocation().Column);
-		Log::Error("\t{0}", getLine());
-		Log::Error("\t{0}^", std::string(GetLocation().Column - 1, ' '));
-		Log::Error("\t{0}{1}", std::string(GetLocation().Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
-	}
 }

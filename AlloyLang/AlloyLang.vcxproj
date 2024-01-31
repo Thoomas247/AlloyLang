@@ -206,6 +206,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AlloyLang.cpp" />
+    <ClCompile Include="parser\Node.cpp" />
+    <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="tokenizer\Source.cpp" />
     <ClCompile Include="tokenizer\Token.cpp" />
     <ClCompile Include="tokenizer\Tokenizer.cpp" />
@@ -213,6 +215,8 @@
   <ItemGroup>
     <ClInclude Include="generate\Generator.hpp" />
     <ClInclude Include="log\Log.hpp" />
+    <ClInclude Include="parser\Node.hpp" />
+    <ClInclude Include="parser\Parser.hpp" />
     <ClInclude Include="TestString.hpp" />
     <ClInclude Include="tokenizer\Source.hpp" />
     <ClInclude Include="tokenizer\Token.hpp" />

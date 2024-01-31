@@ -13,9 +13,6 @@ namespace AlloyCompiler
 		Log::Error("\t{0}{1}", std::string(iter.CurrentLocation().Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 	}
 
-	template <typename T>
-	NodeID parse() = delete;
-
 	/// <summary>
 	/// IDENTIFIER: NAME ;
 	/// </summary>
