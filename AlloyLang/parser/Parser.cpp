@@ -105,6 +105,705 @@ namespace AlloyCompiler
 	template <typename T>
 	NodeID parse(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter) = delete;
 
+#pragma region Literals
+
+	template <>
+	NodeID parse<LITERAL>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID literalTokenID = iter.GetCurrentID();
+
+		LITERAL::Type kind;
+
+		switch (iter.GetKind())
+		{
+		case TokenKind::boolean_literal:
+			kind = LITERAL::Type::Boolean;
+			break;
+
+		case TokenKind::character_literal:
+			kind = LITERAL::Type::Character;
+			break;
+
+		case TokenKind::integer_literal:
+			kind = LITERAL::Type::Integer;
+			break;
+
+		case TokenKind::float_literal:
+			kind = LITERAL::Type::Float;
+			break;
+
+		case TokenKind::string_literal:
+			kind = LITERAL::Type::String;
+			break;
+
+		default:
+			unexpectedToken(iter, { "literal" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume literal
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "statement" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::LITERAL,
+				.Literal = LITERAL
+				{
+					.Kind = kind,
+					.Info = literalTokenID
+				}
+			}
+		);
+	}
+
+#pragma endregion
+
+#pragma region Identifiers
+
+	template <>
+	NodeID parse<IDENTIFIER>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID identifierTokenID = iter.GetCurrentID();
+
+		// consume identifier
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "statement" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::IDENTIFIER,
+				.Identifier = IDENTIFIER
+				{
+					.IdentifierTokenID = identifierTokenID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<TYPE_IDENTIFIER>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		// check for reference or pointer modifier
+		TYPE_IDENTIFIER::Modifier modifier = TYPE_IDENTIFIER::Modifier::None;
+
+		if (iter.GetValue() == "&")
+		{
+			modifier = TYPE_IDENTIFIER::Modifier::Reference;
+
+			// consume & token
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "type identifier" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		else if (iter.GetValue() == "*")
+		{
+			modifier = TYPE_IDENTIFIER::Modifier::Pointer;
+
+			// consume * token
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "type identifier" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// parse identifier
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::TYPE_IDENTIFIER,
+				.TypeIdentifier = TYPE_IDENTIFIER
+				{
+					.Mod = modifier,
+					.IdentifierID = identifierID
+				}
+			}
+		);
+	}
+
+#pragma endregion
+
+#pragma region Declarations
+
+	template <>
+	NodeID parse<TYPE_DECLARATION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TYPE_DECLARATION::Type type = TYPE_DECLARATION::Type::Copy;
+
+		if (iter.GetKind() == TokenKind::constant_keyword)
+		{
+			type = TYPE_DECLARATION::Type::Constant;
+
+			// consume const keyword
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "identifier" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		else if (iter.GetKind() == TokenKind::variable_keyword)
+		{
+			type = TYPE_DECLARATION::Type::Variable;
+
+			// consume var keyword
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "type identifier" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// parse identifier
+		NodeID identifierID = parse<TYPE_IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::TYPE_DECLARATION,
+				.TypeDeclaration = TYPE_DECLARATION
+				{
+					.Kind = type,
+					.TypeIdentifierID = identifierID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<VALUE_DECLARATION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		VALUE_DECLARATION::Type type;
+
+		// check for const or var keyword
+		if (iter.GetKind() == TokenKind::constant_keyword)
+		{
+			type = VALUE_DECLARATION::Type::Constant;
+		}
+
+		else if (iter.GetKind() == TokenKind::variable_keyword)
+		{
+			type = VALUE_DECLARATION::Type::Variable;
+		}
+
+		else
+		{
+			unexpectedToken(iter, { "const", "var" });
+			return ERROR_NODE_ID;
+		}
+
+
+		// consume const or var keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse identifier
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for colon
+		if (iter.GetKind() != TokenKind::colon)
+		{
+			unexpectedToken(iter, { ":" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume colon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "type" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse type
+		NodeID typeID = parse<TYPE_IDENTIFIER>(nodeBuffers, iter);
+
+		if (typeID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::VALUE_DECLARATION,
+				.ValueDeclaration = VALUE_DECLARATION
+				{
+					.Kind = type,
+					.IdentifierID = identifierID,
+					.TypeIdentifierID = typeID
+				}
+			}
+		);
+	}
+
+#pragma endregion
+
+#pragma region Expressions
+
+	template <>
+	NodeID parse<EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
+	NodeID parse<UNARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
+	NodeID parse<PRIMARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
+	NodeID parse<FUNCTION_CALL_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening parenthesis
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression", ")" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse arguments
+		VectorRef<NodeID> argumentIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_paren)
+		{
+			NodeID argumentID = parse<EXPRESSION>(nodeBuffers, iter);
+
+			if (argumentID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			argumentIDs.push_back(argumentID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "expression" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_paren)
+			{
+				unexpectedToken(iter, { ",", ")" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::FUNCTION_CALL_EXPRESSION,
+				.FunctionCallExpression = FUNCTION_CALL_EXPRESSION
+				{
+					.IdentifierID = identifierID,
+					.ArgumentIDs = argumentIDs
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<ENCLOSED_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse expression
+		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
+
+		if (expressionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for closing parenthesis
+		if (iter.GetKind() != TokenKind::close_paren)
+		{
+			unexpectedToken(iter, { ")" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::ENCLOSED_EXPRESSION,
+				.EnclosedExpression = ENCLOSED_EXPRESSION
+				{
+					.ExpressionID = expressionID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<BINARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		// handles *, / and %
+		auto tryParseMultiplicativeExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
+			{
+				NodeID left = parse<UNARY_EXPRESSION>(nodeBuffers, iter);
+
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
+
+				while (iter.GetKind() == TokenKind::multiplicative_operator)
+				{
+					TokenID opTokenID = iter.GetCurrentID();
+
+					// consume operator
+					if (!iter.Next())
+					{
+						unexpectedEndOfFile(iter, { "expression" });
+						return ERROR_NODE_ID;
+					}
+
+					NodeID right = parse<UNARY_EXPRESSION>(nodeBuffers, iter);
+
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
+
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						}
+					);
+				}
+
+				return left;
+			};
+
+		// handles + and -
+		auto tryParseAdditiveExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
+			{
+				NodeID left = tryParseMultiplicativeExpression(iter);
+
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
+
+				while (iter.GetKind() == TokenKind::additive_operator)
+				{
+					TokenID opTokenID = iter.GetCurrentID();
+
+					// consume operator
+					if (!iter.Next())
+					{
+						unexpectedEndOfFile(iter, { "expression" });
+						return ERROR_NODE_ID;
+					}
+
+					NodeID right = tryParseMultiplicativeExpression(iter);
+
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
+
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						}
+					);
+				}
+
+				return left;
+			};
+
+		// handles ==, !=, <, <=, >, >=
+		auto tryParseRelationalExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
+			{
+				NodeID left = tryParseAdditiveExpression(iter);
+
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
+
+				while (iter.GetKind() == TokenKind::relational_operator)
+				{
+					TokenID opTokenID = iter.GetCurrentID();
+
+					// consume operator
+					if (!iter.Next())
+					{
+						unexpectedEndOfFile(iter, { "expression" });
+						return ERROR_NODE_ID;
+					}
+
+					NodeID right = tryParseAdditiveExpression(iter);
+
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
+
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						}
+					);
+				}
+
+				return left;
+			};
+
+		// handles && and ||
+		auto tryParseLogicalExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
+			{
+				NodeID left = tryParseRelationalExpression(iter);
+
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
+
+				while (iter.GetKind() == TokenKind::logical_operator)
+				{
+					TokenID opTokenID = iter.GetCurrentID();
+
+					// consume operator
+					if (!iter.Next())
+					{
+						unexpectedEndOfFile(iter, { "expression" });
+						return ERROR_NODE_ID;
+					}
+
+					NodeID right = tryParseRelationalExpression(iter);
+
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
+
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						}
+					);
+				}
+
+				return left;
+			};
+
+		return tryParseLogicalExpression(iter);
+	}
+
+	template <>
+	NodeID parse<UNARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		// check for unary operator
+		if (iter.GetKind() != TokenKind::unary_operator)
+		{
+			// try to parse primary expression
+			return parse<PRIMARY_EXPRESSION>(nodeBuffers, iter);
+		}
+
+		// consume unary operator
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse primary expression
+		NodeID primaryExpressionID = parse<PRIMARY_EXPRESSION>(nodeBuffers, iter);
+
+		if (primaryExpressionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::UNARY_EXPRESSION,
+				.UnaryExpression = UNARY_EXPRESSION
+				{
+					.OperatorTokenID = iter.GetCurrentID(),
+					.OperandID = primaryExpressionID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<PRIMARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		switch (iter.GetKind())
+		{
+		case TokenKind::identifier:
+		{
+			// check if next token is opening parenthesis
+			if (iter.Next() && iter.GetKind() == TokenKind::open_paren)
+			{
+				iter.Previous();
+
+				return parse<FUNCTION_CALL_EXPRESSION>(nodeBuffers, iter);
+			}
+
+			iter.Previous();
+			return parse<IDENTIFIER>(nodeBuffers, iter);
+		}
+
+		case TokenKind::boolean_literal:
+		case TokenKind::character_literal:
+		case TokenKind::integer_literal:
+		case TokenKind::float_literal:
+		case TokenKind::string_literal:
+			return parse<LITERAL>(nodeBuffers, iter);
+
+		case TokenKind::open_paren:
+			return parse<ENCLOSED_EXPRESSION>(nodeBuffers, iter);
+
+		default:
+			unexpectedToken(iter, { "identifier", "literal", "(" });
+			return ERROR_NODE_ID;
+		}
+	}
+
+	template <>
+	NodeID parse<ASSIGNMENT_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for assignment operator
+		if (iter.GetKind() != TokenKind::assignment_operator)
+		{
+			unexpectedToken(iter, { "=" });
+			return ERROR_NODE_ID;
+		}
+
+		TokenID operatorTokenID = iter.GetCurrentID();
+
+		// consume assignment operator
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse expression
+		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
+
+		if (expressionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::ASSIGNMENT_EXPRESSION,
+				.AssignmentExpression = ASSIGNMENT_EXPRESSION
+				{
+					.IdentifierID = identifierID,
+					.OperatorTokenID = operatorTokenID,
+					.ValueID = expressionID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		return parse<BINARY_EXPRESSION>(nodeBuffers, iter);
+	}
+
+#pragma endregion
+
+#pragma region Statements
+
+	template <>
+	NodeID parse<STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
 	template <>
 	NodeID parse<ASSIGNMENT_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
@@ -115,6 +814,31 @@ namespace AlloyCompiler
 		{
 			return ERROR_NODE_ID;
 		}
+
+		// check for semicolon
+		if (iter.GetKind() != TokenKind::semicolon)
+		{
+			unexpectedToken(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume semicolon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "}" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::ASSIGNMENT_STATEMENT,
+				.AssignmentStatement = ASSIGNMENT_STATEMENT
+				{
+					.AssignmentExpressionID = assignmentExpressionID
+				}
+			}
+		);
 	}
 
 	template <>
@@ -534,8 +1258,13 @@ namespace AlloyCompiler
 
 		default:
 			unexpectedToken(iter, { "assignment", "for", "while", "if", "{", "return" });
+			return ERROR_NODE_ID;
 		}
 	}
+
+#pragma endregion
+
+#pragma region Definitions
 
 	template <>
 	NodeID parse<VALUE_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
@@ -647,6 +1376,13 @@ namespace AlloyCompiler
 			if (iter.GetKind() != TokenKind::semicolon)
 			{
 				unexpectedToken(iter, { ";" });
+				return ERROR_NODE_ID;
+			}
+
+			// consume semicolon
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "struct member" });
 				return ERROR_NODE_ID;
 			}
 
@@ -946,6 +1682,8 @@ namespace AlloyCompiler
 			}
 		);
 	}
+
+#pragma endregion
 
 	template <>
 	NodeID parse<MODULE>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)

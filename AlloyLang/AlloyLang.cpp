@@ -1,6 +1,5 @@
 #include "tokenizer/Tokenizer.hpp"
-//#include "parser/Parser.hpp"
-//#include "parser/TreePrinter.hpp"
+#include "parser/Parser.hpp"
 
 #include "log/Log.hpp"
 #include "TestString.hpp"
@@ -36,16 +35,16 @@ int main()
 
 	Log::Print("Tokenize: {0}ms ({1}kB/ms)", tokenizeTime, numKilobytes / tokenizeTime);
 
-	//start = std::chrono::high_resolution_clock::now();
-	//auto nodeBuffers = Parser::Parse(tokenBuffers);
-	//end = std::chrono::high_resolution_clock::now();
-	//
-	//const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	// 
-	//Log::Print("Parse: {0}ms", parseTime);
-	// 
-	//Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime);
-	//
-	//
-	//Log::Print("");
+	start = std::chrono::high_resolution_clock::now();
+	auto nodeBuffers = Parse(tokenBuffers);
+	end = std::chrono::high_resolution_clock::now();
+
+	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+	Log::Print("Parse: {0}ms", parseTime);
+
+	Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime);
+
+
+	Log::Print("");
 }

@@ -38,6 +38,16 @@ namespace AlloyCompiler
 			return std::string_view(m_pData, m_Size);
 		}
 
+		bool operator==(const SmallStringView& other) const
+		{
+			return ToStringView() == other.ToStringView();
+		}
+
+		bool operator==(const std::string_view& other) const
+		{
+			return ToStringView() == other;
+		}
+
 	private:
 		const char* m_pData;
 		const size_type m_Size;

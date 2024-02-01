@@ -58,7 +58,7 @@ TYPE_IDENTIFIER:			[ reference | pointer ] IDENTIFIER ;
 
 
 TYPE_DECLARATION:			[ variable | constant ] TYPE_IDENTIFIER ;
-VALUE_DECLARATION:			[ variable | constant ] IDENTIFIER colon TYPE_IDENTIFIER ;
+VALUE_DECLARATION:			( variable | constant ) IDENTIFIER colon TYPE_IDENTIFIER ;
 
 
 FUNCTION_CALL_EXPRESSION:	IDENTIFIER open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;

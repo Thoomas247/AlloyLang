@@ -41,7 +41,7 @@ namespace AlloyCompiler
 		return_keyword,
 
 		reference,
-		pointer,
+		//pointer,
 
 		comma,
 		colon,
@@ -95,7 +95,7 @@ namespace AlloyCompiler
 		{ TokenKind::return_keyword, "return_keyword" },
 
 		{ TokenKind::reference, "reference" },
-		{ TokenKind::pointer, "pointer" },
+		//{ TokenKind::pointer, "pointer" },
 
 		{ TokenKind::comma, "comma" },
 		{ TokenKind::colon, "colon" },
@@ -146,7 +146,7 @@ namespace AlloyCompiler
 		{ "return", TokenKind::return_keyword },
 
 		{ "&", TokenKind::reference },
-		{ "*", TokenKind::pointer },
+		//{ "*", TokenKind::pointer },
 
 		{ ",", TokenKind::comma },
 		{ ":", TokenKind::colon },

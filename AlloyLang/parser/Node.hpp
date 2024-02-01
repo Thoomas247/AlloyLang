@@ -20,7 +20,7 @@ namespace AlloyCompiler
 
 	struct LITERAL
 	{
-		enum class Kind : uint8_t
+		enum class Type : uint8_t
 		{
 			Integer,
 			Float,
@@ -29,7 +29,7 @@ namespace AlloyCompiler
 			Character
 		};
 
-		Kind Kind;
+		Type Kind;
 		TokenID Info;
 	};
 
@@ -60,25 +60,26 @@ namespace AlloyCompiler
 
 	struct TYPE_DECLARATION
 	{
-		enum class Kind : uint8_t
+		enum class Type : uint8_t
 		{
+			Copy,
 			Variable,
 			Constant
 		};
 
-		Kind Kind;
+		Type Kind;
 		NodeID TypeIdentifierID;
 	};
 
 	struct VALUE_DECLARATION
 	{
-		enum class Kind : uint8_t
+		enum class Type : uint8_t
 		{
 			Variable,
 			Constant
 		};
 
-		Kind Kind;
+		Type Kind;
 		NodeID IdentifierID;
 		NodeID TypeIdentifierID;
 	};

@@ -72,7 +72,7 @@ namespace AlloyCompiler
 		}
 
 		return std::string_view(m_TokenBuffers.GetValue(firstTokenID).Data(),
-			m_TokenBuffers.GetLocation(lastTokenID).LineStart - m_TokenBuffers.GetLocation(firstTokenID).LineStart);
+			(m_TokenBuffers.GetLocation(lastTokenID).LineStart - m_TokenBuffers.GetLocation(firstTokenID).LineStart) - 1);
 	}
 
 	TokenID TokenBuffers::Iterator::GetCurrentID() const
