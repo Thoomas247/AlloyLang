@@ -155,7 +155,7 @@ namespace AlloyCompiler
 				.Literal = LITERAL
 				{
 					.Kind = kind,
-					.Info = literalTokenID
+					.InfoTokenID = literalTokenID
 				}
 			}
 		);
@@ -271,6 +271,13 @@ namespace AlloyCompiler
 				unexpectedEndOfFile(iter, { "type identifier" });
 				return ERROR_NODE_ID;
 			}
+		}
+
+		// otherwise we must have a type identifier
+		else if (iter.GetKind() != TokenKind::identifier)
+		{
+			unexpectedToken(iter, { "const", "var", "type identifier" });
+			return ERROR_NODE_ID;
 		}
 
 		// parse identifier

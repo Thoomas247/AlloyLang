@@ -43,11 +43,6 @@ fn div (const a : &i64, const b : &i64) -> i64
 	return a / b;
 }
 
-pub fn make_tuple (const a : &i64, const b : &bool) -> (const i64, var bool)
-{
-	return (a, b);
-}
-
 exp var a : i64 = 2;
 pub var c : char = 'A';
 

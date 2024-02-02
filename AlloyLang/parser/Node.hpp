@@ -30,7 +30,7 @@ namespace AlloyCompiler
 		};
 
 		Type Kind;
-		TokenID Info;
+		TokenID InfoTokenID;
 	};
 
 

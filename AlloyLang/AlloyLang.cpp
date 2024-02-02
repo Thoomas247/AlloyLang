@@ -1,5 +1,6 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
+#include "parser/TreePrinter.hpp"
 
 #include "log/Log.hpp"
 #include "TestString.hpp"
@@ -10,7 +11,7 @@ using namespace AlloyCompiler;
 
 int main()
 {
-	const size_t n = 1;// 0'000;
+	const size_t n = 0;// 0'000;
 	std::string str = TestSrc;
 	str.reserve(str.size() * (n + 1));
 
@@ -31,7 +32,7 @@ int main()
 	//PrintTokens(tokenBuffers);
 	auto end = std::chrono::high_resolution_clock::now();
 
-	const uint64_t tokenizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	const uint64_t tokenizeTime = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), 1ll);
 
 	Log::Print("Tokenize: {0}ms ({1}kB/ms)", tokenizeTime, numKilobytes / tokenizeTime);
 
@@ -43,8 +44,9 @@ int main()
 
 	Log::Print("Parse: {0}ms", parseTime);
 
-	Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime);
+	PrintTree(tokenBuffers, nodeBuffers);
 
+	Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime);
 
 	Log::Print("");
 }
