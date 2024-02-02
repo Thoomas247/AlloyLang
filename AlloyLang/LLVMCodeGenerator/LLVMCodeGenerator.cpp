@@ -4,8 +4,11 @@
 using namespace llvm;
 using namespace AlloyCompiler;
 
-LLVMCodeGenerator::LLVMCodeGenerator(const Parser::NodeDataBuffers& nodeDataBuffers)
-    : NodeBuffers(nodeDataBuffers) {
+#define NAME_OF_NODE(x) TokenBuffers.GetSourceView(NodeBuffers.GetNode(x.IdentifierID).Identifier.Token)
+
+LLVMCodeGenerator::LLVMCodeGenerator(const Tokenizer::TokenDataBuffers& tokenBuffers, 
+                const Parser::NodeDataBuffers& nodeDataBuffers)
+    : NodeBuffers(nodeDataBuffers), TokenBuffers(tokenBuffers) {
 
     // Open a new context and module.
     TheContext = std::make_unique<LLVMContext>();
@@ -51,6 +54,16 @@ Value* LLVMCodeGenerator::HandleTopLevelExpression(const AlloyCompiler::Node& no
     return nullptr;
 }
 
+/// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
+/// the function.  This is used for mutable variables etc.
+/// TBD: only works for doubles, need to implement other types
+AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName) {
+    IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+        TheFunction->getEntryBlock().begin());
+    return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr,
+        VarName);
+}
+
 Function* LLVMCodeGenerator::codegen(PrototypeAST& prototype) {
 
     // Make the function type:  double(double,double) etc.
@@ -86,8 +99,16 @@ Function* LLVMCodeGenerator::codegen(FunctionAST& function) {
 
     // Record the function arguments in the NamedValues map.
     NamedValues.clear();
-    for (auto& Arg : F->args())
-        NamedValues[std::string(Arg.getName())] = &Arg;
+    for (auto& Arg : F->args()) {
+        // Create an alloca for this variable.
+        AllocaInst* Alloca = CreateEntryBlockAlloca(F, std::string(Arg.getName()));
+
+        // Store the initial value into the alloca.
+        Builder->CreateStore(&Arg, Alloca);
+
+        // Add arguments to variable symbol table.
+        NamedValues[std::string(Arg.getName())] = Alloca;
+    }
     
     if (Value* RetVal = codegen(function.getBody())) {
         // Finish off the function.
@@ -141,8 +162,16 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
         result = codegen(node.IntegerLiteral);
         break;
 
+    case NodeKind::FloatLiteral:
+        result = codegen(node.FloatLiteral);
+        break;
+
     case NodeKind::Binary:
         result = codegen(node.Binary);
+        break;
+
+    case NodeKind::MemoryAccess:
+        result = codegen(node.MemoryAccess);
         break;
 
     default:
@@ -165,14 +194,37 @@ Value* LLVMCodeGenerator::codegen(uint32_t nodeID) {
 }
 
 Value* LLVMCodeGenerator::codegen(const VariableDefinition& node) {
-    const Node& expression = NodeBuffers.GetNode(node.Value);
-    return HandleTopLevelExpression(expression);
+    const Node& declaration(NodeBuffers.GetNode(node.Declaration));
+    assert(declaration.Kind == NodeKind::VariableDeclaration || declaration.Kind == NodeKind::ConstantDeclaration);
+
+    std::string VarName(NAME_OF_NODE(declaration.VariableDeclaration));
+    AllocaInst* A = Builder->CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
+    NamedValues[VarName] = A;
+
+    return Builder->CreateLoad(A->getAllocatedType(), A, VarName.c_str());
+}
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::MemoryAccess& node) {
+
+    // Look this variable up in the function.
+    std::string Name(NAME_OF_NODE(node));
+    AllocaInst* A = NamedValues[Name];
+    if (A) {
+        // Load the value.
+        return Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
+    }
+    
+    // TBD: LogErrorV("Unknown variable name");
+    assert(false);
+    return nullptr;
+
 }
 
 Value* LLVMCodeGenerator::codegen(const Binary& node) {
     Value* result = nullptr;
     Value* L = codegen(node.Left);
     Value* R = codegen(node.Right);
+
     if (L && R) {
         switch (node.Op) {
         case TokenValue::Plus:
@@ -195,6 +247,11 @@ Value* LLVMCodeGenerator::codegen(const Binary& node) {
 }
 
 Value* LLVMCodeGenerator::codegen(const IntegerLiteral& node) {
-//    return ConstantInt::get(*TheContext, APInt(64, node.Value));
+    // TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
+    //    return ConstantInt::get(*TheContext, APInt(64, node.Value));
     return ConstantFP::get(*TheContext, APFloat((double)node.Value));
+}
+
+Value* LLVMCodeGenerator::codegen(const FloatLiteral& node) {
+    return ConstantFP::get(*TheContext, APFloat(node.Value));
 }
