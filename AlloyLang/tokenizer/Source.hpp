@@ -2,8 +2,8 @@
 #include <string_view>
 #include <stack>
 
-#include "log/Log.hpp"
-#include "util/SmallStringView.hpp"
+#include "../log/Log.hpp"
+#include "../util/SmallStringView.hpp"
 
 namespace AlloyCompiler
 {

@@ -1,6 +1,6 @@
 #pragma once
 #include "Parser.hpp"
-#include "tokenizer/Tokenizer.hpp"
+#include "../tokenizer/Tokenizer.hpp"
 
 namespace AlloyCompiler
 {

@@ -1,6 +1,6 @@
 #include "TreePrinter.hpp"
 
-#include "log/Log.hpp"
+#include "../log/Log.hpp"
 
 namespace AlloyCompiler
 {

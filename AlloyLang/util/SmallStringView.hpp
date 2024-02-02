@@ -1,7 +1,7 @@
 #pragma once
 #include <string_view>
 
-#include "log/Log.hpp"
+#include "../log/Log.hpp"
 
 namespace AlloyCompiler
 {

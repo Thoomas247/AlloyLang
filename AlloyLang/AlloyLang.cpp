@@ -52,8 +52,8 @@ int main()
 	delete codegen;
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-  
-  AlloyCompiler::Log::Print("Codegen: {0}ms", codegenTime);
+
+	AlloyCompiler::Log::Print("Codegen: {0}ms", codegenTime);
 
 	AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime + codegenTime);
 	AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime + codegenTime) / numKilobytes);
