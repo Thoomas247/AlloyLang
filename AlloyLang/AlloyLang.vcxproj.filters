@@ -21,13 +21,19 @@
     <ClCompile Include="tokenizer\Tokenizer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="tokenizer\Token.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tokenizer\Source.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="parser\Node.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="parser\Parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="parser\TreePrinter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="symbols\Symbols.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -41,25 +47,25 @@
     <ClInclude Include="log\Log.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="tokenizer\TokenMaps.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="symbols\Symbol.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="TestString.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\ASTNodes.hpp">
+    <ClInclude Include="generate\Generator.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="util\SmallStringView.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tokenizer\Source.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="parser\Node.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="parser\Parser.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="parser\TreePrinter.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="symbols\Symbols.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

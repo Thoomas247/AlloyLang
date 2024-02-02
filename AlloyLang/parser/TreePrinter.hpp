@@ -2,7 +2,7 @@
 #include "Parser.hpp"
 #include "tokenizer/Tokenizer.hpp"
 
-namespace AlloyCompiler::Parser
+namespace AlloyCompiler
 {
-	void PrintTree(const Tokenizer::TokenDataBuffers& tokenBuffers, const NodeDataBuffers& nodeBuffers);
+	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers);
 }

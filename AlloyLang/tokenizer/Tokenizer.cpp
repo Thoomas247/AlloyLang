@@ -3,106 +3,18 @@
 #include <stack>
 
 #include "log/Log.hpp"
-#include "TokenMaps.hpp"
 
-namespace AlloyCompiler::Tokenizer
+namespace AlloyCompiler
 {
-	class SourceIterator
-	{
-	public:
-		SourceIterator(const std::string_view& source)
-			: m_SourceView(source), m_CharIndex(0), m_Line(1), m_Column(1), m_LineStarts({ 0 })
-		{}
-
-		bool NextChar()
-		{
-			// check if we have a new line
-			if (CurrentChar() == '\n')
-			{
-				m_LineStarts.push(m_CharIndex + 1);
-				++m_Line;
-				m_Column = 1;
-			}
-
-			// check if we have a tab
-			else if (CurrentChar() == '\t')
-			{
-				m_Column += NUM_SPACES_PER_TAB;
-			}
-			else
-			{
-				++m_Column;
-			}
-
-			++m_CharIndex;
-
-			// check that we haven't reached the end of the file
-			if (m_CharIndex >= m_SourceView.size())
-				return false;
-
-			return true;
-		}
-
-		char CurrentChar() const
-		{
-			return m_SourceView[m_CharIndex];
-		}
-
-		void PreviousChar()
-		{
-			ASSERT(m_CharIndex > 0, "Tokenizer::lastChar() called when current char position is 0!");
-
-			--m_CharIndex;
-
-			// if current character is a new line, go back one line
-			if (CurrentChar() == '\n')
-			{
-				m_LineStarts.pop();
-				--m_Line;
-				m_Column = 1;
-			}
-
-			// if current character is a tab, go back four columns
-			else if (CurrentChar() == '\t')
-			{
-				m_Column -= NUM_SPACES_PER_TAB;
-			}
-
-			else
-			{
-				--m_Column;
-			}
-		}
-
-		size_t CurrentIndex() const { return m_CharIndex; }
-
-		Location CurrentLocation() const
-		{
-			return Location(m_LineStarts.top(), m_Line, m_Column);
-		}
-
-		std::string_view View(size_t start, size_t end) const
-		{
-			return m_SourceView.substr(start, end - start);
-		}
-
-	private:
-		std::string_view m_SourceView;
-		uint32_t m_CharIndex;
-		uint32_t m_Line;
-		uint32_t m_Column;
-
-		std::stack<uint32_t> m_LineStarts;
-	};
 
 	template <typename... Args>
-	inline constexpr void logError(const SourceIterator& iter, const std::string& format, Args&&... args)
+	inline constexpr void logError(const Source::Iterator& iter, const std::string& format, Args&&... args)
 	{
 		Log::Error("Error at location ({0} : {1}):", iter.CurrentLocation().Line, iter.CurrentLocation().Column);
 		Log::Error("\t{0}", std::vformat(format, std::make_format_args(args...)));
 	}
 
-	inline static bool tryGetOperator(SourceIterator& iter, TokenDataBuffers& nodeBuffers)
+	bool tryGetOperator(Source::Iterator& iter, TokenBuffers& tokenBuffers)
 	{
 		// look for the current character in the operators map
 		auto it = OPERATOR_COMBINATIONS.find(iter.CurrentChar());
@@ -133,26 +45,26 @@ namespace AlloyCompiler::Tokenizer
 			iter.PreviousChar();
 
 		// get the operator string
-		auto tokenString = iter.View(start, iter.CurrentIndex() + 1);
+		auto tokenString = iter.CreateSmallStringView(start, iter.CurrentIndex() + 1);
 
-		nodeBuffers.AddToken(OPERATORS.at(tokenString), location, tokenString);
+		tokenBuffers.AddToken(KNOWN_SYMBOLS.at(tokenString.ToStringView()), tokenString, location);
 
 		return true;
 	}
 
-	inline static bool tryGetDelimiter(SourceIterator& iter, TokenDataBuffers& nodeBuffers)
+	bool tryGetDelimiter(Source::Iterator& iter, TokenBuffers& tokenBuffers)
 	{
-		// try to find the current character in the delimiters map
-		auto it = DELIMITERS.find(iter.CurrentChar());
+		// try to find the current character in the map
+		auto it = KNOWN_SYMBOLS.find(std::string(1, iter.CurrentChar()));
 
-		if (it == DELIMITERS.end())
+		if (it == KNOWN_SYMBOLS.end())
 			return false;
 
-		nodeBuffers.AddToken(it->second, iter.CurrentLocation(), iter.View(iter.CurrentIndex(), iter.CurrentIndex() + 1));
+		tokenBuffers.AddToken(it->second, iter.CreateSmallStringView(iter.CurrentIndex(), iter.CurrentIndex() + 1), iter.CurrentLocation());
 		return true;
 	}
 
-	inline static bool tryGetKeyword(SourceIterator& iter, TokenDataBuffers& nodeBuffers)
+	bool tryGetKeyword(Source::Iterator& iter, TokenBuffers& tokenBuffers)
 	{
 		if (!isalpha(iter.CurrentChar()) && iter.CurrentChar() != '_')
 			return false;
@@ -172,16 +84,16 @@ namespace AlloyCompiler::Tokenizer
 		} while (isalnum(iter.CurrentChar()) || iter.CurrentChar() == '_');	// after the first character, can also be a number
 
 		// store the word
-		std::string_view value = iter.View(start, iter.CurrentIndex());
+		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
 
 		// check if word is any keyword
-		auto it = KEYWORDS.find(value);
-		if (it != KEYWORDS.end())
-			nodeBuffers.AddToken(it->second, location, value);
+		auto it = KNOWN_SYMBOLS.find(value.ToStringView());
+		if (it != KNOWN_SYMBOLS.end())
+			tokenBuffers.AddToken(it->second, value, location);
 
 		// otherwise, it's an identifier
 		else
-			nodeBuffers.AddToken(Token(TokenKind::Identifier, TokenValue::Identifier), location, value);
+			tokenBuffers.AddToken(TokenKind::identifier, value, location);
 
 		// go back one character so the next loop can check it
 		iter.PreviousChar();
@@ -189,13 +101,13 @@ namespace AlloyCompiler::Tokenizer
 		return true;
 	}
 
-	inline static bool tryGetString(SourceIterator& iter, TokenDataBuffers& nodeBuffers)
+	bool tryGetStringLiteral(Source::Iterator& iter, TokenBuffers& tokenBuffers)
 	{
 		if (iter.CurrentChar() != '"')
 			return false;
 
 		// get the start index and location
-		size_t start = iter.CurrentIndex();
+		size_t start = iter.CurrentIndex() + 1;
 		const Location& location = iter.CurrentLocation();
 
 		// keep going until the end of the string
@@ -220,19 +132,18 @@ namespace AlloyCompiler::Tokenizer
 		} while (iter.CurrentChar() != '"');
 
 		// store the string
-		std::string_view value = iter.View(start, iter.CurrentIndex() + 1);
+		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
 
-		nodeBuffers.AddToken(Token(TokenKind::Literal, TokenValue::String), location, value);
+		tokenBuffers.AddToken(TokenKind::string_literal, value, location);
 		return true;
 	}
 
-	inline static bool tryGetChar(SourceIterator& iter, TokenDataBuffers& nodeBuffers)
+	bool tryGetCharLiteral(Source::Iterator& iter, TokenBuffers& tokenBuffers)
 	{
 		if (iter.CurrentChar() != '\'')
 			return false;
 
-		// get the start index and location
-		size_t start = iter.CurrentChar();
+		// get the  location
 		const Location& location = iter.CurrentLocation();
 
 		// consume starting quote
@@ -241,6 +152,9 @@ namespace AlloyCompiler::Tokenizer
 			logError(iter, "Unexpected end of file!");
 			return false;
 		}
+
+		// get the start index
+		const size_t start = iter.CurrentIndex();
 
 		// check for escape character
 		if (iter.CurrentChar() == '\\')
@@ -260,13 +174,13 @@ namespace AlloyCompiler::Tokenizer
 		}
 
 		// store the character
-		std::string_view value = iter.View(start, iter.CurrentIndex() + 1);
-		nodeBuffers.AddToken(Token(TokenKind::Literal, TokenValue::Character), location, value);
+		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
+		tokenBuffers.AddToken(TokenKind::character_literal, value, location);
 
 		return true;
 	}
 
-	inline static bool tryGetNumber(SourceIterator& iter, TokenDataBuffers& nodeBuffers)
+	bool tryGetNumberLiteral(Source::Iterator& iter, TokenBuffers& tokenBuffers)
 	{
 		if (!isdigit(iter.CurrentChar()))
 			return false;
@@ -292,7 +206,7 @@ namespace AlloyCompiler::Tokenizer
 				{
 					logError(iter,
 						"Invalid float literal: {0}\nExpected only one decimal point in float literal.",
-						iter.View(start, iter.CurrentIndex()));
+						iter.CreateSmallStringView(start, iter.CurrentIndex()).ToStringView());
 					return false;
 				}
 
@@ -307,13 +221,13 @@ namespace AlloyCompiler::Tokenizer
 		} while (isdigit(iter.CurrentChar()));
 
 		// store the number
-		std::string_view value = iter.View(start, iter.CurrentIndex());
+		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
 
 		// check if number is a float or int
 		if (hasDot)
-			nodeBuffers.AddToken(Token(TokenKind::Literal, TokenValue::Float), location, value);
+			tokenBuffers.AddToken(TokenKind::float_literal, value, location);
 		else
-			nodeBuffers.AddToken(Token(TokenKind::Literal, TokenValue::Integer), location, value);
+			tokenBuffers.AddToken(TokenKind::integer_literal, value, location);
 
 		// go back one character so the next loop can check it
 		iter.PreviousChar();
@@ -321,10 +235,10 @@ namespace AlloyCompiler::Tokenizer
 		return true;
 	}
 
-	TokenDataBuffers Tokenize(const std::string_view& source)
+	TokenBuffers Tokenize(const Source& source)
 	{
-		SourceIterator iter(source);
-		TokenDataBuffers nodeBuffers(source);
+		Source::Iterator iter = source.GetIterator();
+		TokenBuffers tokenBuffers;
 
 		do
 		{
@@ -333,37 +247,44 @@ namespace AlloyCompiler::Tokenizer
 				continue;
 
 			// check for any operators
-			if (tryGetOperator(iter, nodeBuffers))
+			if (tryGetOperator(iter, tokenBuffers))
 				continue;
 
 			// check for any delimiters
-			if (tryGetDelimiter(iter, nodeBuffers))
+			if (tryGetDelimiter(iter, tokenBuffers))
 				continue;
 
 			// check for keywords
-			if (tryGetKeyword(iter, nodeBuffers))
+			if (tryGetKeyword(iter, tokenBuffers))
 				continue;
 
 			// check for string literals
-			if (tryGetString(iter, nodeBuffers))
+			if (tryGetStringLiteral(iter, tokenBuffers))
 				continue;
 
 			// check for character literals
-			if (tryGetChar(iter, nodeBuffers))
+			if (tryGetCharLiteral(iter, tokenBuffers))
 				continue;
 
 			// check for any numbers
-			if (tryGetNumber(iter, nodeBuffers))
+			if (tryGetNumberLiteral(iter, tokenBuffers))
 				continue;
 
 			logError(iter, "Unexpected symbol '{0}'!", iter.CurrentChar());
 
 		} while (iter.NextChar());
 
-		// add end of file token
-		nodeBuffers.AddToken(Token(TokenKind::EndOfFile, TokenValue::EndOfFile), iter.CurrentLocation(), "");
+		return tokenBuffers;
+	}
 
-		return nodeBuffers;
+	void PrintTokens(const TokenBuffers& tokenBuffers)
+	{
+		TokenBuffers::Iterator iter(tokenBuffers);
+
+		while (iter.Next())
+		{
+			Log::Print("{0} ({1})", TOKEN_KIND_NAMES.at(iter.GetKind()), iter.GetValue().ToStringView());
+		}
 	}
 }
 

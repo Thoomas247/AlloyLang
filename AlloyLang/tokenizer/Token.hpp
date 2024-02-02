@@ -1,129 +1,298 @@
 #pragma once
-
 #include <unordered_map>
-#include <unordered_set>
-#include <string_view>
+
+#include "Source.hpp"
 
 namespace AlloyCompiler
 {
-	using TokenID = uint32_t;
+	/// <summary>
+	/// Unique ID for a token. All token data is accessed through this ID.
+	/// </summary>
+	enum class TokenID : uint32_t {};
 
 	/// <summary>
-	/// General description of a token.
-	/// Each value can apply to multiple tokens.
+	/// Represents an invalid token ID.
+	/// </summary>
+	constexpr TokenID ERROR_TOKEN_ID = (TokenID)std::numeric_limits<uint32_t>::max();
+
+	/// <summary>
+	/// TokenKind enum to match SYNTAX.txt.
 	/// </summary>
 	enum class TokenKind : uint8_t
 	{
-		Unknown = 0,
+		none = 0,
 
-		// qualifiers
-		Qualifier,
+		identifier,
 
-		// declarations
-		Declaration,
+		export_label,
+		public_label,
 
-		// built-in types
-		BuiltInType,
+		struct_keyword,
+		enum_keyword,
+		function_keyword,
 
-		// control flow
-		ControlFlow,
+		variable_keyword,
+		constant_keyword,
 
-		// literals
-		Literal,
+		for_keyword,
+		while_keyword,
+		if_keyword,
+		else_keyword,
+		return_keyword,
 
-		// delimiters
-		Delimiter,
+		reference,
+		//pointer,
 
-		// operators
-		Operator,
+		comma,
+		colon,
+		semicolon,
+		arrow,
 
-		// assignment
-		Assignment,
+		open_paren,
+		close_paren,
+		open_brace,
+		close_brace,
 
-		// any user defined name
-		Identifier,
+		assignment_operator,
 
-		// end of file
-		EndOfFile,
+		logical_operator,
+		relational_operator,
+		additive_operator,
+		multiplicative_operator,
 
-		MAX_ENUM
+		unary_operator,
+
+		integer_literal,
+		float_literal,
+		boolean_literal,
+		string_literal,
+		character_literal
 	};
 
 	/// <summary>
-	/// Specific description of a token.
-	/// Each value applies to one token only.
+	/// Maps TokenKind enum values to their string representation.
 	/// </summary>
-	enum class TokenValue : uint8_t
+	const std::unordered_map<TokenKind, std::string> TOKEN_KIND_NAMES =
 	{
-		Unknown = 0,
+		{ TokenKind::none, "none" },
 
-		// qualifiers
-		Exp, Pub,
+		{ TokenKind::identifier, "identifier" },
 
-		// declarations
-		Var, Const, Fn, Struct, Enum,
+		{ TokenKind::export_label, "export_label" },
+		{ TokenKind::public_label, "public_label" },
 
-		// built-in types
-		Void, I8, I16, I32, I64, U8, U16, U32, U64, F32, F64, Bool,
+		{ TokenKind::struct_keyword, "struct_keyword" },
+		{ TokenKind::enum_keyword, "enum_keyword" },
+		{ TokenKind::function_keyword, "function_keyword" },
 
-		// control flow
-		If, Else, While, For, Match, Break, Continue, Return,
+		{ TokenKind::variable_keyword, "variable_keyword" },
+		{ TokenKind::constant_keyword, "constant_keyword" },
 
-		// literals
-		True, False, Null, Integer, Float, String, Character,
+		{ TokenKind::for_keyword, "for_keyword" },
+		{ TokenKind::while_keyword, "while_keyword" },
+		{ TokenKind::if_keyword, "if_keyword" },
+		{ TokenKind::else_keyword, "else_keyword" },
+		{ TokenKind::return_keyword, "return_keyword" },
 
-		// delimiters
-		OpenParen, CloseParen, OpenBrace, CloseBrace, Comma, Semicolon, Colon,
+		{ TokenKind::reference, "reference" },
+		//{ TokenKind::pointer, "pointer" },
 
-		// operators
-		Plus, Minus, /*alias*/ Negate = Minus, Multiply, /*alias*/ Pointer = Multiply, Divide, Modulo,
-		LogicalAnd, LogicalOr, LeftShift, RightShift,
-		BitwiseAnd, /*alias*/ Reference = BitwiseAnd, BitwiseOr, BitwiseXor, BitwiseNot,
-		Equal, NotEqual, LessThan, GreaterThan, LessThanOrEqual, GreaterThanOrEqual,
+		{ TokenKind::comma, "comma" },
+		{ TokenKind::colon, "colon" },
+		{ TokenKind::semicolon, "semicolon" },
+		{ TokenKind::arrow, "arrow" },
 
-		Not,
+		{ TokenKind::open_paren, "open_paren" },
+		{ TokenKind::close_paren, "close_paren" },
+		{ TokenKind::open_brace, "open_brace" },
+		{ TokenKind::close_brace, "close_brace" },
 
-		Arrow,
+		{ TokenKind::assignment_operator, "assignment_operator" },
 
-		Dereference,
+		{ TokenKind::logical_operator, "logical_operator" },
+		{ TokenKind::relational_operator, "relational_operator" },
+		{ TokenKind::additive_operator, "additive_operator" },
+		{ TokenKind::multiplicative_operator, "multiplicative_operator" },
 
-		// assignment operators
-		Assign, PlusAssign, MinusAssign, MultiplyAssign, DivideAssign, ModuloAssign,
-		BitwiseAndAssign, BitwiseOrAssign, BitwiseXorAssign, BitwiseNotAssign,
+		{ TokenKind::unary_operator, "unary_operator" },
 
-		// any user defined name
-		Identifier,
-
-		// end of file
-		EndOfFile,
-
-		MAX_ENUM
+		{ TokenKind::integer_literal, "integer_literal" },
+		{ TokenKind::float_literal, "float_literal" },
+		{ TokenKind::boolean_literal, "boolean_literal" },
+		{ TokenKind::string_literal, "string_literal" },
+		{ TokenKind::character_literal, "character_literal" }
 	};
 
 	/// <summary>
-	/// Description of a token's kind and value.
+	/// Maps known symbols to their TokenKind enum values.
+	/// Matches SYNTAX.txt.
 	/// </summary>
-	struct Token
+	const std::unordered_map<std::string_view, TokenKind> KNOWN_SYMBOLS =
 	{
-		TokenKind Kind;
-		TokenValue Value;
+		{ "exp", TokenKind::export_label },
+		{ "pub", TokenKind::public_label },
 
-		constexpr explicit Token(TokenKind kind, TokenValue value)
-			: Kind(kind), Value(value)
-		{}
+		{ "struct", TokenKind::struct_keyword },
+		{ "enum", TokenKind::enum_keyword },
+		{ "fn", TokenKind::function_keyword },
+
+		{ "var", TokenKind::variable_keyword },
+		{ "const", TokenKind::constant_keyword },
+
+		{ "for", TokenKind::for_keyword },
+		{ "while", TokenKind::while_keyword },
+		{ "if", TokenKind::if_keyword },
+		{ "else", TokenKind::else_keyword },
+		{ "return", TokenKind::return_keyword },
+
+		{ "&", TokenKind::reference },
+		//{ "*", TokenKind::pointer },
+
+		{ ",", TokenKind::comma },
+		{ ":", TokenKind::colon },
+		{ ";", TokenKind::semicolon },
+		{ "->", TokenKind::arrow },
+
+		{ "(", TokenKind::open_paren },
+		{ ")", TokenKind::close_paren },
+		{ "{", TokenKind::open_brace },
+		{ "}", TokenKind::close_brace },
+
+		{ "=", TokenKind::assignment_operator },
+
+		{ "&&", TokenKind::logical_operator },
+		{ "||", TokenKind::logical_operator },
+		{ "==", TokenKind::relational_operator },
+		{ "!=", TokenKind::relational_operator },
+		{ "<", TokenKind::relational_operator },
+		{ ">", TokenKind::relational_operator },
+		{ "<=", TokenKind::relational_operator },
+		{ ">=", TokenKind::relational_operator },
+		{ "+", TokenKind::additive_operator },
+		{ "-", TokenKind::additive_operator },
+		{ "*", TokenKind::multiplicative_operator },
+		{ "/", TokenKind::multiplicative_operator },
+		{ "%", TokenKind::multiplicative_operator },
+
+		{ "!", TokenKind::unary_operator },
+		//{ "-", TokenKind::unary_operator },
+		{ "@", TokenKind::unary_operator },
+
+		{ "true", TokenKind::boolean_literal },
+		{ "false", TokenKind::boolean_literal }
 	};
 
 	/// <summary>
-	/// Description of a token's location in the source code using line and column numbers.
+	/// Maps the first character of an operator to every possible character that can follow to form the full operator.
 	/// </summary>
-	struct Location
+	const std::unordered_map<char, std::vector<char>> OPERATOR_COMBINATIONS =
 	{
-		uint32_t LineStart;
-		uint32_t Line;
-		uint32_t Column;
+		{ '&', { '&' } },	// & or &&
+		{ '|', { '|' } },	// | or ||
+		{ '=', { '=' } },	// = or ==
+		{ '!', { '=' } },	// ! or !=
+		{ '<', { '=' } },	// < or <=
+		{ '>', { '=' } },	// > or >=
+		{ '+', { } },		// +
+		{ '-', { '>'}},		// - or ->
+		{ '*', { } },		// *
+		{ '/', { } },		// /
+		{ '%', { } },		// %
+		{ '@', { } }		// @
+	};
 
-		constexpr explicit Location(uint32_t lineStart, uint32_t line, uint32_t column)
-			: LineStart(lineStart), Line(line), Column(column)
-		{}
+	/// <summary>
+	/// Holds the data for all tokens in a source file.
+	/// Token data can be accessed by the TokenID returned by AddToken, or through the iterator.
+	/// </summary>
+	class TokenBuffers
+	{
+	public:
+		/// <summary>
+		/// Utility class to iterate over the tokens in a TokenBuffers.
+		/// </summary>
+		class Iterator
+		{
+		public:
+			Iterator(const TokenBuffers& tokenBuffers);
+
+			/// <summary>
+			/// Move to the next token.
+			/// Returns false if there are no more tokens, true otherwise.
+			/// </summary>
+			[[nodiscard]] bool Next();
+
+			/// <summary>
+			/// Returns true if Next() will return true when next called.
+			/// </summary>
+			[[nodiscard]] bool HasNext() const;
+
+			/// <summary>
+			/// Move back to the previous token.
+			/// </summary>
+			void Previous();
+
+			/// <summary>
+			/// Returns the kind of the current token.
+			/// </summary>
+			TokenKind GetKind() const;
+
+			/// <summary>
+			/// Returns the string value of the current token.
+			/// </summary>
+			const SmallStringView& GetValue() const;
+
+			/// <summary>
+			/// Returns the location in the file of the current token.
+			/// </summary>
+			const Location& GetLocation() const;
+
+			/// <summary>
+			/// Returns the string value of the line the current token is on.
+			/// </summary>
+			std::string_view GetLine();
+
+			/// <summary>
+			/// Returns the ID of the current token.
+			/// </summary>
+			TokenID GetCurrentID() const;
+
+		private:
+			const TokenBuffers& m_TokenBuffers;
+			TokenID m_CurrentID;
+		};
+
+	public:
+		Iterator GetIterator() const;
+
+		/// <summary>
+		/// Creates a new token and returns its ID.
+		/// </summary>
+		TokenID AddToken(TokenKind kind, const SmallStringView& value, const Location& location);
+
+		/// <summary>
+		/// Returns the ID of the last token added.
+		/// </summary>
+		TokenID LastTokenID() const;
+
+		/// <summary>
+		/// Returns the kind of the token with the given ID.
+		/// </summary>
+		TokenKind GetKind(TokenID id) const;
+
+		/// <summary>
+		/// Returns the string value of the token with the given ID.
+		/// </summary>
+		const SmallStringView& GetValue(TokenID id) const;
+
+		/// <summary>
+		/// Returns the location in the file of the token with the given ID.
+		/// </summary>
+		const Location& GetLocation(TokenID id) const;
+
+	private:
+		std::vector<TokenKind> m_Kinds;
+		std::vector<SmallStringView> m_Values;
+		std::vector<Location> m_Locations;
 	};
 }

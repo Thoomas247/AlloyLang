@@ -226,13 +226,14 @@
   <ItemGroup>
     <ClInclude Include="LLVMCodeGenerator\LLVMCodeGenerator.hpp" />
     <ClInclude Include="log\Log.hpp" />
-    <ClInclude Include="parser\ASTNodes.hpp" />
+    <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
     <ClInclude Include="parser\TreePrinter.hpp" />
     <ClInclude Include="TestString.hpp" />
+    <ClInclude Include="tokenizer\Source.hpp" />
     <ClInclude Include="tokenizer\Token.hpp" />
     <ClInclude Include="tokenizer\Tokenizer.hpp" />
-    <ClInclude Include="tokenizer\TokenMaps.hpp" />
+    <ClInclude Include="util\SmallStringView.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,592 +1,575 @@
 #include "Parser.hpp"
 
-#include "log/Log.hpp"
-
-namespace AlloyCompiler::Parser
+namespace AlloyCompiler
 {
-	class TokenIterator
+
+#pragma region Util
+
+	static std::string tokenKindVectorToString(const std::vector<TokenKind>& tokens)
 	{
-	public:
-		TokenIterator(const Tokenizer::TokenDataBuffers& nodeBuffers)
-			: m_Buffers(nodeBuffers), m_CurrentTokenID(0)
-		{}
-		TokenIterator(const TokenIterator&) = delete;
-
-		[[nodiscard]] bool Next()
+		if (tokens.empty())
 		{
-			++m_CurrentTokenID;
-
-			if (m_CurrentTokenID >= m_Buffers.GetTokenCount())
-				return false;
-
-			return true;
+			return "";
 		}
 
-		[[nodiscard]] bool HasNext() const { return m_CurrentTokenID + 1 < m_Buffers.GetTokenCount(); }
-
-		void Previous()
+		if (tokens.size() == 1)
 		{
-			--m_CurrentTokenID;
+			return TOKEN_KIND_NAMES.at(tokens[0]);
 		}
 
-		const Token& CurrentToken() const
+		std::string result;
+
+		for (size_t i = 0; i < tokens.size() - 1; ++i)
 		{
-			return m_Buffers.GetToken(m_CurrentTokenID);
+			result += TOKEN_KIND_NAMES.at(tokens[i]) + ", ";
 		}
 
-		TokenID CurrentTokenID() const
-		{
-			return m_CurrentTokenID;
-		}
+		result += "or " + TOKEN_KIND_NAMES.at(tokens[tokens.size() - 1]);
 
-		const Location& CurrentLocation() const
-		{
-			return m_Buffers.GetLocation(m_CurrentTokenID);
-		}
+		return result;
+	}
 
-		const std::string_view& CurrentSourceView() const
-		{
-			return m_Buffers.GetSourceView(m_CurrentTokenID);
-		}
-
-		std::string_view GetLine() const
-		{
-			auto source = m_Buffers.GetSourceView();
-
-			size_t startIndex = m_Buffers.GetLocation(m_CurrentTokenID).LineStart;
-			size_t endIndex = m_Buffers.GetSourceView().size();
-
-			// find first token on new line
-			for (TokenID i = m_CurrentTokenID; i < m_Buffers.GetTokenCount(); ++i)
-			{
-				if (m_Buffers.GetLocation(i).Line != m_Buffers.GetLocation(m_CurrentTokenID).Line)
-				{
-					endIndex = m_Buffers.GetLocation(i).LineStart;
-					break;
-				}
-			}
-
-			return source.substr(startIndex, endIndex - startIndex - 1);
-		}
-
-	private:
-		const Tokenizer::TokenDataBuffers& m_Buffers;
-		TokenID m_CurrentTokenID;
-	};
-
-	template <typename... Args>
-	inline constexpr void logError(TokenIterator& iter, const std::string& format, Args&&... args)
+	static std::string stringVectorToString(const std::vector<std::string>& strings)
 	{
-		Log::Error("Error at location ({0} : {1}):", iter.CurrentLocation().Line, iter.CurrentLocation().Column);
+		if (strings.empty())
+		{
+			return "";
+		}
+
+		if (strings.size() == 1)
+		{
+			return "'" + strings[0] + "'";
+		}
+
+		std::string result;
+
+		for (size_t i = 0; i < strings.size() - 1; ++i)
+		{
+			result += "'" + strings[i] + "'" + ", ";
+		}
+
+		result += "or '" + strings[strings.size() - 1] + "'";
+
+		return result;
+	}
+
+	template<typename ...Args>
+	constexpr void logErrorAtPosition(TokenBuffers::Iterator& iter, const std::string& format, Args && ...args)
+	{
+		Log::Error("Error at location ({0} : {1}):", iter.GetLocation().Line, iter.GetLocation().Column);
 		Log::Error("\t{0}", iter.GetLine());
-		Log::Error("\t{0}^", std::string(iter.CurrentLocation().Column - 1, ' '));
-		Log::Error("\t{0}{1}", std::string(iter.CurrentLocation().Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+		Log::Error("\t{0}^", std::string(iter.GetLocation().Column - 1, ' '));
+		Log::Error("\t{0}{1}", std::string(iter.GetLocation().Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 	}
 
-	/// <summary>
-	/// IDENTIFIER: NAME ;
-	/// </summary>
-	inline static NodeID parseIdentifier(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	static bool checkTokenKind(TokenBuffers::Iterator& iter, const std::vector<TokenKind>& options)
 	{
-		ASSERT(iter.CurrentToken().Kind == TokenKind::Identifier, "Expected an identifier!");
-
-		NodeID identifier = nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Identifier, .Identifier = Identifier{iter.CurrentTokenID()} });
-
-		// consume the identifier
-		if (!iter.Next())
+		for (const TokenKind option : options)
 		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
-
-		return identifier;
-	}
-
-	/// <summary>
-	/// TYPE_IDENTIFIER: ['&' | '*'] IDENTIFIER ;
-	/// </summary>
-	inline static NodeID parseTypeIdentifier(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// check for reference or pointer
-		TypeIdentifier::Modifier modifier = TypeIdentifier::Modifier::None;
-
-		if (iter.CurrentToken().Kind == TokenKind::Operator)
-		{
-			if (iter.CurrentToken().Value == TokenValue::Reference)
+			if (iter.GetKind() == option)
 			{
-				modifier = TypeIdentifier::Modifier::Reference;
-
-				if (!iter.Next())
-				{
-					logError(iter, "Unexpected end of file!");
-					return ERROR_NODE_ID;
-				}
-			}
-
-			else if (iter.CurrentToken().Value == TokenValue::Pointer)
-			{
-				modifier = TypeIdentifier::Modifier::Pointer;
-
-				if (!iter.Next())
-				{
-					logError(iter, "Unexpected end of file!");
-					return ERROR_NODE_ID;
-				}
+				return true;
 			}
 		}
 
-		// check for identifier
-		if (iter.CurrentToken().Kind != TokenKind::Identifier && iter.CurrentToken().Kind != TokenKind::BuiltInType)
-		{
-			logError(iter, "Expected a type identifier! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		NodeID identifier = parseIdentifier(iter, nodeBuffers);
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::TypeIdentifier, .TypeIdentifier = TypeIdentifier{modifier, identifier} });
+		logErrorAtPosition(iter, "Unexpected token '{0}'! Expected {1}.", iter.GetValue().ToStringView(), tokenKindVectorToString(options));
+		return false;
 	}
 
-
-#pragma region Expressions
-
-	// forward declaration
-	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& nodeBuffers);
-
-	/// <summary>
-	/// FN_CALL: FN_NAME '(' [ EXPRESSION { ',' EXPRESSION } ] ')' ;
-	/// </summary>
-	inline static NodeID parseFunctionCall(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	static bool checkTokenValue(TokenBuffers::Iterator& iter, const std::vector<std::string>& options)
 	{
-		// assert we have an identifier
-		ASSERT(iter.CurrentToken().Kind == TokenKind::Identifier, "Expected an identifier!");
-
-		// get the identifier
-		NodeID identifier = parseIdentifier(iter, nodeBuffers);
-
-		// check that we have an opening parenthesis
-		if (iter.CurrentToken().Value != TokenValue::OpenParen)
+		for (const std::string& option : options)
 		{
-			logError(iter, "Expected a '('! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the opening parenthesis
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected an expression or ')' after '('.");
-			return ERROR_NODE_ID;
-		}
-
-		// get all the arguments
-		auto& argNodeIDs = nodeBuffers.CreateNodeIDList();
-
-		while (iter.CurrentToken().Value != TokenValue::CloseParen)
-		{
-			// parse the expression
-			NodeID expressionID = parseExpression(iter, nodeBuffers);
-
-			// check if the expression was valid
-			if (expressionID == ERROR_NODE_ID)
+			if (iter.GetValue().ToStringView() == option)
 			{
-				return ERROR_NODE_ID;
-			}
-
-			// add the expression to the list
-			argNodeIDs.push_back(expressionID);
-
-			// check for comma
-			if (iter.CurrentToken().Value == TokenValue::Comma)
-			{
-				// consume the comma
-				if (!iter.Next())
-				{
-					logError(iter, "Unexpected end of file! Expected an expression or ')' instead of ','.");
-					return ERROR_NODE_ID;
-				}
-			}
-
-			// othwerwise we must have a closing parenthesis
-			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
-			{
-				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
-				return ERROR_NODE_ID;
+				return true;
 			}
 		}
 
-		// consume the closing parenthesis
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::FunctionCall, .FunctionCall = FunctionCall{ identifier, std::move(argNodeIDs) } });
+		logErrorAtPosition(iter, "Unexpected token '{0}'! Expected {1}.", iter.GetValue().ToStringView(), stringVectorToString(options));
+		return false;
 	}
 
-	/// <summary>
-	/// ENCLOSED_EXPRESSION: '(' EXPRESSION [',' EXPRESSION] ')' ;
-	/// </summary>
-	inline static NodeID parseEnclosedExpression(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	static void unexpectedEndOfFile(TokenBuffers::Iterator& iter, const std::vector<std::string>& expected)
 	{
-		// assert we have an opening parenthesis
-		ASSERT(iter.CurrentToken().Value == TokenValue::OpenParen, "Expected '('!");
-
-		// consume the opening parenthesis
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected an expression or ')' after '('.");
-			return ERROR_NODE_ID;
-		}
-
-		auto& expressionNodeIDs = nodeBuffers.CreateNodeIDList();
-
-		while (iter.CurrentToken().Value != TokenValue::CloseParen)
-		{
-			// parse the expression
-			NodeID expressionID = parseExpression(iter, nodeBuffers);
-
-			// check if the expression was valid
-			if (expressionID == ERROR_NODE_ID)
-			{
-				return ERROR_NODE_ID;
-			}
-
-			// add the expression to the list
-			expressionNodeIDs.push_back(expressionID);
-
-			// check for comma
-			if (iter.CurrentToken().Value == TokenValue::Comma)
-			{
-				// consume the comma
-				if (!iter.Next())
-				{
-					logError(iter, "Unexpected end of file! Expected an expression or ')' instead of ','.");
-					return ERROR_NODE_ID;
-				}
-			}
-
-			// othwerwise we must have a closing parenthesis
-			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
-			{
-				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
-				return ERROR_NODE_ID;
-			}
-		}
-
-		// consume the closing parenthesis
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Enclosed, .Enclosed = Enclosed{ std::move(expressionNodeIDs) } });
+		logErrorAtPosition(iter, "Unexpected end of file! Expected: {0}.", stringVectorToString(expected));
 	}
 
-#pragma region Literals
-
-	/// <summary>
-	/// INT_LITERAL: NUMBER ;
-	/// </summary>
-	inline static NodeID parseIntegerLiteral(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	static void unexpectedToken(TokenBuffers::Iterator& iter, const std::vector<std::string>& expected)
 	{
-		// assert that we have an integer literal
-		ASSERT(iter.CurrentToken().Value == TokenValue::Integer, "Expected an integer literal!");
-
-		//uint64_t value = std::stoll(iter.CurrentSourceView().data());
-
-		uint64_t value;
-		(void)std::from_chars(iter.CurrentSourceView().data(), iter.CurrentSourceView().data() + iter.CurrentSourceView().size(), value);
-
-		// consume the integer literal
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode({ .Kind = NodeKind::IntegerLiteral, .IntegerLiteral = IntegerLiteral{ value } });
-	}
-
-	/// <summary>
-	/// FLOAT_LITERAL: NUMBER '.' NUMBER ;
-	/// </summary>
-	inline static NodeID parseFloatLiteral(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert that we have a float literal
-		ASSERT(iter.CurrentToken().Value == TokenValue::Float, "Expected a float literal!");
-
-		//double value = std::stod(iter.CurrentSourceView().data());
-
-		double value;
-		(void)std::from_chars(iter.CurrentSourceView().data(), iter.CurrentSourceView().data() + iter.CurrentSourceView().size(), value);
-
-		// consume the float literal
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::FloatLiteral, .FloatLiteral = FloatLiteral{ value } });
-	}
-
-	/// <summary>
-	/// BOOLEAN_LITERAL: 'true' | 'false' ;
-	/// </summary>
-	inline static NodeID parseBooleanLiteral(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert that we have a boolean literal
-		ASSERT(iter.CurrentToken().Value == TokenValue::Bool, "Expected a boolean literal!");
-
-		bool value = iter.CurrentSourceView() == "true";	// if kind is bool, only possible values are true and false
-
-		// consume the boolean literal
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::BooleanLiteral, .BooleanLiteral = BooleanLiteral{ value } });
-	}
-
-	/// <summary>
-	/// STRING_LITERAL: '\"' { LETTER } '\"' ;
-	/// </summary>
-	inline static NodeID parseStringLiteral(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert that we have a string literal
-		ASSERT(iter.CurrentToken().Value == TokenValue::String, "Expected a string literal!");
-
-		// store the string
-		const auto& string = iter.CurrentSourceView();
-
-		// consume the string
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::StringLiteral, .StringLiteral = StringLiteral{ string } });
-	}
-
-	/// <summary>
-	/// CHAR_LITERAL: '\'' [ LETTER ] '\'' ;
-	/// </summary>
-	inline static NodeID parseCharacterLiteral(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert that we have a character literal
-		ASSERT(iter.CurrentToken().Value == TokenValue::Character, "Expected a character literal!");
-
-		// store the character
-		char c = iter.CurrentSourceView()[0];
-
-		// consume the character
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::CharacterLiteral, .CharacterLiteral = CharacterLiteral{ c } });
-	}
-
-	/// <summary>
-	/// LITERAL: INT_LITERAL | FLOAT_LITERAL | BOOLEAN_LITERAL | STRING_LITERAL | CHAR_LITERAL ;
-	/// </summary>
-	inline static NodeID parseLiteral(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert that we have a literal
-		ASSERT(iter.CurrentToken().Kind == TokenKind::Literal, "Expected a literal!");
-
-		switch (iter.CurrentToken().Value)
-		{
-		case TokenValue::Integer:
-			return parseIntegerLiteral(iter, nodeBuffers);
-
-		case TokenValue::Float:
-			return parseFloatLiteral(iter, nodeBuffers);
-
-		case TokenValue::Bool:
-			return parseBooleanLiteral(iter, nodeBuffers);
-
-		case TokenValue::String:
-			return parseStringLiteral(iter, nodeBuffers);
-
-		case TokenValue::Character:
-			return parseCharacterLiteral(iter, nodeBuffers);
-
-		default:
-			logError(iter, "Expected a literal! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
+		logErrorAtPosition(iter, "Unexpected token '{0}'! Expected: {1}.", iter.GetValue().ToStringView(), stringVectorToString(expected));
 	}
 
 #pragma endregion
 
-	// forward declaration
-	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& nodeBuffers);
+	template <typename T>
+	NodeID parse(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter) = delete;
 
-	/// <summary>
-	/// PRIMARY_EXPRESSION: VAR_NAME | CONST_NAME | FN_CALL | LITERAL | ENCLOSED_EXPRESSION ;
-	/// </summary>
-	inline static NodeID parsePrimaryExpression(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+#pragma region Literals
+
+	template <>
+	NodeID parse<LITERAL>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		switch (iter.CurrentToken().Kind)
+		TokenID literalTokenID = iter.GetCurrentID();
+
+		LITERAL::Type kind;
+
+		switch (iter.GetKind())
 		{
-		case TokenKind::Identifier:
-		{
-			// get the identifier
-			NodeID identifier = parseIdentifier(iter, nodeBuffers);
+		case TokenKind::boolean_literal:
+			kind = LITERAL::Type::Boolean;
+			break;
 
-			// check for function call
-			if (iter.CurrentToken().Value == TokenValue::OpenParen)
-			{
-				// go back to the identifier
-				iter.Previous();
+		case TokenKind::character_literal:
+			kind = LITERAL::Type::Character;
+			break;
 
-				return parseFunctionCall(iter, nodeBuffers);
-			}
+		case TokenKind::integer_literal:
+			kind = LITERAL::Type::Integer;
+			break;
 
-			// otherwise we have a variable or constant
-			return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::MemoryAccess, .MemoryAccess = MemoryAccess{ identifier } });
-		}
+		case TokenKind::float_literal:
+			kind = LITERAL::Type::Float;
+			break;
 
-		case TokenKind::Literal:
-			return parseLiteral(iter, nodeBuffers);
-
-		case TokenKind::Delimiter:
-		{
-			if (iter.CurrentToken().Value == TokenValue::OpenParen)
-			{
-				return parseEnclosedExpression(iter, nodeBuffers);
-			}
-
-			logError(iter, "Expected an expression! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
+		case TokenKind::string_literal:
+			kind = LITERAL::Type::String;
+			break;
 
 		default:
-			logError(iter, "Expected an expression! Got '{0}' instead.", iter.CurrentSourceView());
+			unexpectedToken(iter, { "literal" });
 			return ERROR_NODE_ID;
 		}
-	}
 
-	/// <summary>
-	/// UNARY_EXPRESSION: UNARY_OPERATOR EXPRESSION ;
-	/// </summary>
-	inline static NodeID parseUnaryExpression(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert that we have an operator
-		ASSERT(iter.CurrentToken().Kind == TokenKind::Operator, "Expected an operator!");
-
-		// save the operator
-		TokenValue op = iter.CurrentToken().Value;
-
-		// consume the operator
+		// consume literal
 		if (!iter.Next())
 		{
-			logError(iter, "Unexpected end of file! Expected an expression.");
+			unexpectedEndOfFile(iter, { "statement" });
 			return ERROR_NODE_ID;
 		}
 
-		// parse the expression
-		NodeID expressionID = parsePrimaryExpression(iter, nodeBuffers);
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::LITERAL,
+				.Literal = LITERAL
+				{
+					.Kind = kind,
+					.InfoTokenID = literalTokenID
+				}
+			}
+		);
+	}
 
-		// check if the expression was valid
+#pragma endregion
+
+#pragma region Identifiers
+
+	template <>
+	NodeID parse<IDENTIFIER>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID identifierTokenID = iter.GetCurrentID();
+
+		// consume identifier
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "statement" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::IDENTIFIER,
+				.Identifier = IDENTIFIER
+				{
+					.IdentifierTokenID = identifierTokenID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<TYPE_IDENTIFIER>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		// check for reference or pointer modifier
+		TYPE_IDENTIFIER::Modifier modifier = TYPE_IDENTIFIER::Modifier::None;
+
+		if (iter.GetValue() == "&")
+		{
+			modifier = TYPE_IDENTIFIER::Modifier::Reference;
+
+			// consume & token
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "type identifier" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		else if (iter.GetValue() == "*")
+		{
+			modifier = TYPE_IDENTIFIER::Modifier::Pointer;
+
+			// consume * token
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "type identifier" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// parse identifier
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::TYPE_IDENTIFIER,
+				.TypeIdentifier = TYPE_IDENTIFIER
+				{
+					.Mod = modifier,
+					.IdentifierID = identifierID
+				}
+			}
+		);
+	}
+
+#pragma endregion
+
+#pragma region Declarations
+
+	template <>
+	NodeID parse<TYPE_DECLARATION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TYPE_DECLARATION::Type type = TYPE_DECLARATION::Type::Copy;
+
+		if (iter.GetKind() == TokenKind::constant_keyword)
+		{
+			type = TYPE_DECLARATION::Type::Constant;
+
+			// consume const keyword
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "identifier" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		else if (iter.GetKind() == TokenKind::variable_keyword)
+		{
+			type = TYPE_DECLARATION::Type::Variable;
+
+			// consume var keyword
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "type identifier" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// otherwise we must have a type identifier
+		else if (iter.GetKind() != TokenKind::identifier)
+		{
+			unexpectedToken(iter, { "const", "var", "type identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse identifier
+		NodeID identifierID = parse<TYPE_IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::TYPE_DECLARATION,
+				.TypeDeclaration = TYPE_DECLARATION
+				{
+					.Kind = type,
+					.TypeIdentifierID = identifierID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<VALUE_DECLARATION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		VALUE_DECLARATION::Type type;
+
+		// check for const or var keyword
+		if (iter.GetKind() == TokenKind::constant_keyword)
+		{
+			type = VALUE_DECLARATION::Type::Constant;
+		}
+
+		else if (iter.GetKind() == TokenKind::variable_keyword)
+		{
+			type = VALUE_DECLARATION::Type::Variable;
+		}
+
+		else
+		{
+			unexpectedToken(iter, { "const", "var" });
+			return ERROR_NODE_ID;
+		}
+
+
+		// consume const or var keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse identifier
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for colon
+		if (iter.GetKind() != TokenKind::colon)
+		{
+			unexpectedToken(iter, { ":" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume colon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "type" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse type
+		NodeID typeID = parse<TYPE_IDENTIFIER>(nodeBuffers, iter);
+
+		if (typeID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::VALUE_DECLARATION,
+				.ValueDeclaration = VALUE_DECLARATION
+				{
+					.Kind = type,
+					.IdentifierID = identifierID,
+					.TypeIdentifierID = typeID
+				}
+			}
+		);
+	}
+
+#pragma endregion
+
+#pragma region Expressions
+
+	template <>
+	NodeID parse<EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
+	NodeID parse<UNARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
+	NodeID parse<PRIMARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
+	NodeID parse<FUNCTION_CALL_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening parenthesis
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression", ")" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse arguments
+		VectorRef<NodeID> argumentIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_paren)
+		{
+			NodeID argumentID = parse<EXPRESSION>(nodeBuffers, iter);
+
+			if (argumentID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			argumentIDs.push_back(argumentID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "expression" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_paren)
+			{
+				unexpectedToken(iter, { ",", ")" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::FUNCTION_CALL_EXPRESSION,
+				.FunctionCallExpression = FUNCTION_CALL_EXPRESSION
+				{
+					.IdentifierID = identifierID,
+					.ArgumentIDs = argumentIDs
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<ENCLOSED_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse expression
+		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
+
 		if (expressionID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
 
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Unary, .Unary = Unary{ op, expressionID } });
+		// check for closing parenthesis
+		if (iter.GetKind() != TokenKind::close_paren)
+		{
+			unexpectedToken(iter, { ")" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::ENCLOSED_EXPRESSION,
+				.EnclosedExpression = ENCLOSED_EXPRESSION
+				{
+					.ExpressionID = expressionID
+				}
+			}
+		);
 	}
 
-	/// <summary>
-	/// BINARY_EXPRESSION: EXPRESSION BINARY_OPERATOR EXPRESSION ;
-	/// </summary>
-	inline static NodeID parseBinaryExpresssion(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<BINARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		// handles *, / and %
-		auto tryParseMultiplicativeExpression = [&](TokenIterator& iter) -> NodeID
+		auto tryParseMultiplicativeExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
 			{
-				NodeID left;
-
-				if (iter.CurrentToken().Kind == TokenKind::Operator)
-				{
-					left = parseUnaryExpression(iter, nodeBuffers);
-				}
-
-				else
-				{
-					left = parsePrimaryExpression(iter, nodeBuffers);
-				}
+				NodeID left = parse<UNARY_EXPRESSION>(nodeBuffers, iter);
 
 				if (left == ERROR_NODE_ID)
 					return ERROR_NODE_ID;
 
-				while (iter.CurrentToken().Value == TokenValue::Multiply
-					|| iter.CurrentToken().Value == TokenValue::Divide
-					|| iter.CurrentToken().Value == TokenValue::Modulo)
+				while (iter.GetKind() == TokenKind::multiplicative_operator)
 				{
-					TokenValue op = iter.CurrentToken().Value;
+					TokenID opTokenID = iter.GetCurrentID();
 
 					// consume operator
 					if (!iter.Next())
 					{
-						logError(iter, "Unexpected end of file!");
+						unexpectedEndOfFile(iter, { "expression" });
 						return ERROR_NODE_ID;
 					}
 
-					NodeID right;
-
-					if (iter.CurrentToken().Kind == TokenKind::Operator)
-					{
-						right = parseUnaryExpression(iter, nodeBuffers);
-					}
-
-					else
-					{
-						right = parsePrimaryExpression(iter, nodeBuffers);
-					}
+					NodeID right = parse<UNARY_EXPRESSION>(nodeBuffers, iter);
 
 					if (right == ERROR_NODE_ID)
 						return ERROR_NODE_ID;
 
-					left = nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Binary, .Binary = Binary{ op, left, right } });
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						}
+					);
 				}
 
 				return left;
 			};
 
 		// handles + and -
-		auto tryParseAdditiveExpression = [&](TokenIterator& iter) -> NodeID
+		auto tryParseAdditiveExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
 			{
 				NodeID left = tryParseMultiplicativeExpression(iter);
 
 				if (left == ERROR_NODE_ID)
 					return ERROR_NODE_ID;
 
-				while (iter.CurrentToken().Value == TokenValue::Plus || iter.CurrentToken().Value == TokenValue::Minus)
+				while (iter.GetKind() == TokenKind::additive_operator)
 				{
-					TokenValue op = iter.CurrentToken().Value;
+					TokenID opTokenID = iter.GetCurrentID();
 
 					// consume operator
 					if (!iter.Next())
 					{
-						logError(iter, "Unexpected end of file!");
+						unexpectedEndOfFile(iter, { "expression" });
 						return ERROR_NODE_ID;
 					}
 
@@ -595,33 +578,38 @@ namespace AlloyCompiler::Parser
 					if (right == ERROR_NODE_ID)
 						return ERROR_NODE_ID;
 
-					left = nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Binary, .Binary = Binary{ op, left, right } });
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						}
+					);
 				}
 
 				return left;
 			};
 
 		// handles ==, !=, <, <=, >, >=
-		auto tryParseRelationalExpression = [&](TokenIterator& iter) -> NodeID
+		auto tryParseRelationalExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
 			{
 				NodeID left = tryParseAdditiveExpression(iter);
 
 				if (left == ERROR_NODE_ID)
 					return ERROR_NODE_ID;
 
-				while (iter.CurrentToken().Value == TokenValue::Equal
-					|| iter.CurrentToken().Value == TokenValue::NotEqual
-					|| iter.CurrentToken().Value == TokenValue::LessThan
-					|| iter.CurrentToken().Value == TokenValue::LessThanOrEqual
-					|| iter.CurrentToken().Value == TokenValue::GreaterThan
-					|| iter.CurrentToken().Value == TokenValue::GreaterThanOrEqual)
+				while (iter.GetKind() == TokenKind::relational_operator)
 				{
-					TokenValue op = iter.CurrentToken().Value;
+					TokenID opTokenID = iter.GetCurrentID();
 
 					// consume operator
 					if (!iter.Next())
 					{
-						logError(iter, "Unexpected end of file!");
+						unexpectedEndOfFile(iter, { "expression" });
 						return ERROR_NODE_ID;
 					}
 
@@ -630,29 +618,38 @@ namespace AlloyCompiler::Parser
 					if (right == ERROR_NODE_ID)
 						return ERROR_NODE_ID;
 
-					left = nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Binary, .Binary = Binary{ op, left, right } });
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						}
+					);
 				}
 
 				return left;
 			};
 
 		// handles && and ||
-		auto tryParseLogicalExpression = [&](TokenIterator& iter) -> NodeID
+		auto tryParseLogicalExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
 			{
 				NodeID left = tryParseRelationalExpression(iter);
 
 				if (left == ERROR_NODE_ID)
 					return ERROR_NODE_ID;
 
-				while (iter.CurrentToken().Value == TokenValue::LogicalAnd
-					|| iter.CurrentToken().Value == TokenValue::LogicalOr)
+				while (iter.GetKind() == TokenKind::logical_operator)
 				{
-					TokenValue op = iter.CurrentToken().Value;
+					TokenID opTokenID = iter.GetCurrentID();
 
 					// consume operator
 					if (!iter.Next())
 					{
-						logError(iter, "Unexpected end of file! Expected an expression.");
+						unexpectedEndOfFile(iter, { "expression" });
 						return ERROR_NODE_ID;
 					}
 
@@ -661,7 +658,17 @@ namespace AlloyCompiler::Parser
 					if (right == ERROR_NODE_ID)
 						return ERROR_NODE_ID;
 
-					left = nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Binary, .Binary = Binary{ op, left, right } });
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						}
+					);
 				}
 
 				return left;
@@ -670,100 +677,145 @@ namespace AlloyCompiler::Parser
 		return tryParseLogicalExpression(iter);
 	}
 
-	/// <summary>
-	/// ASSIGNMENT_EXPRESSION: VAR_NAME ASSIGNMENT_OPERATOR EXPRESSION ;
-	/// </summary>
-	inline static NodeID parseAssignmentExpression(TokenIterator& iter, NodeDataBuffers& nodeBuffers, bool failIsError = true)
+	template <>
+	NodeID parse<UNARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		// assert that we have an identifier
-		if (iter.CurrentToken().Kind != TokenKind::Identifier)
+		// check for unary operator
+		if (iter.GetKind() != TokenKind::unary_operator)
 		{
-			if (failIsError)
-			{
-				logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
-			}
-
-			return ERROR_NODE_ID;
+			// try to parse primary expression
+			return parse<PRIMARY_EXPRESSION>(nodeBuffers, iter);
 		}
 
-		// parse the identifier
-		NodeID identifier = parseIdentifier(iter, nodeBuffers);
-
-		// check for assignment operator
-		if (iter.CurrentToken().Value != TokenValue::Assign)
-		{
-			if (failIsError)
-			{
-				logError(iter, "Expected an assignment operator! Got '{0}' instead.", iter.CurrentSourceView());
-			}
-			else
-			{
-				// go back to the identifier
-				iter.Previous();
-			}
-
-			return ERROR_NODE_ID;
-		}
-
-		// from here, we know we have an assignment expression
-
-		// save the operator
-		TokenValue op = iter.CurrentToken().Value;
-
-		// consume the assignment operator
+		// consume unary operator
 		if (!iter.Next())
 		{
-			logError(iter, "Unexpected end of file! Expected an expression.");
+			unexpectedEndOfFile(iter, { "expression" });
 			return ERROR_NODE_ID;
 		}
 
-		// parse the expression
-		NodeID expressionID = parseExpression(iter, nodeBuffers);
+		// parse primary expression
+		NodeID primaryExpressionID = parse<PRIMARY_EXPRESSION>(nodeBuffers, iter);
 
-		// check if the expression was valid
-		if (expressionID == ERROR_NODE_ID)
+		if (primaryExpressionID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
 
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::AssignmentExpression, .AssignmentExpression = AssignmentExpression{ op, identifier, expressionID } });
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::UNARY_EXPRESSION,
+				.UnaryExpression = UNARY_EXPRESSION
+				{
+					.OperatorTokenID = iter.GetCurrentID(),
+					.OperandID = primaryExpressionID
+				}
+			}
+		);
 	}
 
-	/// <summary>
-	/// EXPRESSION: PRIMARY_EXPRESSION | UNARY_EXPRESSION | BINARY_EXPRESSION | ASSIGNMENT_EXPRESSION ;
-	/// </summary>
-	inline static NodeID parseExpression(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<PRIMARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		NodeID expressionID;
+		switch (iter.GetKind())
+		{
+		case TokenKind::identifier:
+		{
+			// check if next token is opening parenthesis
+			if (iter.Next() && iter.GetKind() == TokenKind::open_paren)
+			{
+				iter.Previous();
 
-		// assignment expressions are a special case
-		// depending on the context, the function is allowed to fail
-		if ((expressionID = parseAssignmentExpression(iter, nodeBuffers, false)) != ERROR_NODE_ID)
-			return expressionID;
+				return parse<FUNCTION_CALL_EXPRESSION>(nodeBuffers, iter);
+			}
 
-		expressionID = parseBinaryExpresssion(iter, nodeBuffers);
+			iter.Previous();
+			return parse<IDENTIFIER>(nodeBuffers, iter);
+		}
+
+		case TokenKind::boolean_literal:
+		case TokenKind::character_literal:
+		case TokenKind::integer_literal:
+		case TokenKind::float_literal:
+		case TokenKind::string_literal:
+			return parse<LITERAL>(nodeBuffers, iter);
+
+		case TokenKind::open_paren:
+			return parse<ENCLOSED_EXPRESSION>(nodeBuffers, iter);
+
+		default:
+			unexpectedToken(iter, { "identifier", "literal", "(" });
+			return ERROR_NODE_ID;
+		}
+	}
+
+	template <>
+	NodeID parse<ASSIGNMENT_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for assignment operator
+		if (iter.GetKind() != TokenKind::assignment_operator)
+		{
+			unexpectedToken(iter, { "=" });
+			return ERROR_NODE_ID;
+		}
+
+		TokenID operatorTokenID = iter.GetCurrentID();
+
+		// consume assignment operator
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse expression
+		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
 
 		if (expressionID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
 
-		return expressionID;
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::ASSIGNMENT_EXPRESSION,
+				.AssignmentExpression = ASSIGNMENT_EXPRESSION
+				{
+					.IdentifierID = identifierID,
+					.OperatorTokenID = operatorTokenID,
+					.ValueID = expressionID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		return parse<BINARY_EXPRESSION>(nodeBuffers, iter);
 	}
 
 #pragma endregion
 
 #pragma region Statements
 
-	// forward declaration
-	inline static NodeID parseStatement(TokenIterator& iter, NodeDataBuffers& nodeBuffers);
+	template <>
+	NodeID parse<STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
 
-	/// <summary>
-	/// VARIABLE_ASSIGNMENT: ASSIGNMENT_EXPRESSION ';' ;
-	/// </summary>
-	inline static NodeID parseVariableAssignment(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<ASSIGNMENT_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		NodeID assignmentExpressionID = parseAssignmentExpression(iter, nodeBuffers);
+		// parse assignment expression
+		NodeID assignmentExpressionID = parse<ASSIGNMENT_EXPRESSION>(nodeBuffers, iter);
 
 		if (assignmentExpressionID == ERROR_NODE_ID)
 		{
@@ -771,130 +823,391 @@ namespace AlloyCompiler::Parser
 		}
 
 		// check for semicolon
-		if (iter.CurrentToken().Value != TokenValue::Semicolon)
+		if (iter.GetKind() != TokenKind::semicolon)
 		{
-			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
-		}
-
-		// consume the semicolon
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file!");
+			unexpectedToken(iter, { ";" });
 			return ERROR_NODE_ID;
 		}
 
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::AssignmentStatement, .AssignmentStatement = AssignmentStatement{ assignmentExpressionID } });
+		// consume semicolon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "}" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::ASSIGNMENT_STATEMENT,
+				.AssignmentStatement = ASSIGNMENT_STATEMENT
+				{
+					.AssignmentExpressionID = assignmentExpressionID
+				}
+			}
+		);
 	}
 
-	/// <summary>
-	/// FOR_LOOP: 'for' '(' EXPRESSION ';' EXPRESSION ';' EXPRESSION ';' ')' STATEMENT ;
-	/// </summary>
-	inline static NodeID parseForLoop(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<FOR_LOOP_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		logError(iter, "Not implemented!");
+		// check for for keyword
+		if (iter.GetKind() != TokenKind::for_keyword)
+		{
+			unexpectedToken(iter, { "for" });
+			return ERROR_NODE_ID;
+		}
 
-		return ERROR_NODE_ID;
+		// consume for keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening parenthesis
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse initializer
+		NodeID initializerID = parse<EXPRESSION>(nodeBuffers, iter);
+
+		if (initializerID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for semicolon
+		if (iter.GetKind() != TokenKind::semicolon)
+		{
+			unexpectedToken(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume semicolon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse condition
+		NodeID conditionID = parse<EXPRESSION>(nodeBuffers, iter);
+
+		if (conditionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for semicolon
+		if (iter.GetKind() != TokenKind::semicolon)
+		{
+			unexpectedToken(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume semicolon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse increment
+		NodeID incrementID = parse<EXPRESSION>(nodeBuffers, iter);
+
+		if (incrementID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for closing parenthesis
+		if (iter.GetKind() != TokenKind::close_paren)
+		{
+			unexpectedToken(iter, { ")" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "statement" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse statement
+		NodeID statementID = parse<STATEMENT>(nodeBuffers, iter);
+
+		if (statementID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::FOR_LOOP_STATEMENT,
+				.ForLoopStatement = FOR_LOOP_STATEMENT
+				{
+					.InitExpressionID = initializerID,
+					.ConditionExpressionID = conditionID,
+					.IncrementExpressionID = incrementID,
+					.BodyID = statementID
+				}
+			}
+		);
 	}
 
-	/// <summary>
-	/// WHILE_LOOP: 'while' ENCLOSED_EXPRESSION STATEMENT ;
-	/// </summary>
-	inline static NodeID parseWhileLoop(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<WHILE_LOOP_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		logError(iter, "Not implemented!");
+		// check for while keyword
+		if (iter.GetKind() != TokenKind::while_keyword)
+		{
+			unexpectedToken(iter, { "while" });
+			return ERROR_NODE_ID;
+		}
 
-		return ERROR_NODE_ID;
+		// consume while keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening parenthesis
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse condition
+		NodeID conditionID = parse<EXPRESSION>(nodeBuffers, iter);
+
+		if (conditionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for closing parenthesis
+		if (iter.GetKind() != TokenKind::close_paren)
+		{
+			unexpectedToken(iter, { ")" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "statement" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse statement
+		NodeID statementID = parse<STATEMENT>(nodeBuffers, iter);
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::WHILE_LOOP_STATEMENT,
+				.WhileLoopStatement = WHILE_LOOP_STATEMENT
+				{
+					.ConditionExpressionID = conditionID,
+					.BodyID = statementID
+				}
+			}
+		);
 	}
 
-	/// <summary>
-	/// IF_STATEMENT: 'if' ENCLOSED_EXPRESSION STATEMENT ['else' STATEMENT] ;
-	/// </summary>
-	inline static NodeID parseIfStatement(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<IF_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		logError(iter, "Not implemented!");
+		// check for if keyword
+		if (iter.GetKind() != TokenKind::if_keyword)
+		{
+			unexpectedToken(iter, { "if" });
+			return ERROR_NODE_ID;
+		}
 
-		return ERROR_NODE_ID;
+		// consume if keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening parenthesis
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse condition
+		NodeID conditionID = parse<EXPRESSION>(nodeBuffers, iter);
+
+		if (conditionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for closing parenthesis
+		if (iter.GetKind() != TokenKind::close_paren)
+		{
+			unexpectedToken(iter, { ")" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "statement" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse statement
+		NodeID statementID = parse<STATEMENT>(nodeBuffers, iter);
+
+		if (statementID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for else keyword
+		NodeID elseStatementID = ERROR_NODE_ID;
+
+		if (iter.GetKind() == TokenKind::else_keyword)
+		{
+			// consume else keyword
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "statement" });
+				return ERROR_NODE_ID;
+			}
+
+			// parse else statement
+			elseStatementID = parse<STATEMENT>(nodeBuffers, iter);
+
+			if (elseStatementID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::IF_STATEMENT,
+				.IfStatement = IF_STATEMENT
+				{
+					.ConditionExpressionID = conditionID,
+					.BodyID = statementID,
+					.ElseID = elseStatementID
+				}
+			}
+		);
+
 	}
 
-	/// <summary>
-	/// MATCH_STATEMENT: 'match' ENCLOSED_EXPRESSION '{' { EXPRESSION '=>' STATEMENT } '}' ;
-	/// </summary>
-	inline static NodeID parseMatchStatement(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		logError(iter, "Not implemented!");
-
-		return ERROR_NODE_ID;
-	}
-
-	/// <summary>
-	/// STATEMENT_BLOCK: '{' {STATEMENT} '}' ;
-	/// </summary>
-	inline static NodeID parseStatementBlock(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<BLOCK_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		// check for opening brace
-		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
+		if (iter.GetKind() != TokenKind::open_brace)
 		{
-			logError(iter, "Expected a '{0}'! Got '{1}' instead.", "{", iter.CurrentSourceView());
+			unexpectedToken(iter, { "{" });
 			return ERROR_NODE_ID;
 		}
 
-		// consume the opening brace
+		// consume opening brace
 		if (!iter.Next())
 		{
-			logError(iter, "Unexpected end of file! Expected a statement or '}'.");
+			unexpectedEndOfFile(iter, { "statement" });
 			return ERROR_NODE_ID;
 		}
 
-		// parse all statements
-		auto& statementIDs = nodeBuffers.CreateNodeIDList();
+		// parse statements
+		VectorRef<NodeID> statementIDs = nodeBuffers.CreateNodeIDVector();
 
-		while (iter.CurrentToken().Value != TokenValue::CloseBrace)
+		while (iter.GetKind() != TokenKind::close_brace)
 		{
-			// parse the statement
-			NodeID statementID = parseStatement(iter, nodeBuffers);
+			NodeID statementID = parse<STATEMENT>(nodeBuffers, iter);
 
-			// check if the statement was valid
 			if (statementID == ERROR_NODE_ID)
 			{
 				return ERROR_NODE_ID;
 			}
 
-			// add the statement to the list
 			statementIDs.push_back(statementID);
 		}
 
-		// consume the closing brace
-		(void)iter.Next();
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::StatementBlock, .StatementBlock = StatementBlock{ std::move(statementIDs) } });
-	}
-
-	/// <summary>
-	/// RETURN_STATEMENT: 'return' [ EXPRESSION ] ';' ;
-	/// </summary>
-	inline static NodeID parseReturnStatement(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert we have a return keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Return, "Expected 'return'!");
-
-		// consume the return keyword
+		// consume closing brace
 		if (!iter.Next())
 		{
-			logError(iter, "Unexpected end of file! Expected an expression or ';' after 'return'.");
+			unexpectedEndOfFile(iter, { "}" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::BLOCK_STATEMENT,
+				.BlockStatement = BLOCK_STATEMENT
+				{
+					.StatementIDs = statementIDs
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<RETURN_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		if (iter.GetKind() != TokenKind::return_keyword)
+		{
+			unexpectedToken(iter, { "return" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume return keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
 			return ERROR_NODE_ID;
 		}
 
 		NodeID expressionID = ERROR_NODE_ID;
 
-		// check for expression
-		if (iter.CurrentToken().Value != TokenValue::Semicolon)
+		if (iter.GetKind() != TokenKind::semicolon)
 		{
-			// parse the expression
-			expressionID = parseExpression(iter, nodeBuffers);
+			// parse expression
+			expressionID = parse<EXPRESSION>(nodeBuffers, iter);
 
-			// check if the expression was valid
 			if (expressionID == ERROR_NODE_ID)
 			{
 				return ERROR_NODE_ID;
@@ -902,353 +1215,56 @@ namespace AlloyCompiler::Parser
 		}
 
 		// check for semicolon
-		if (iter.CurrentToken().Value != TokenValue::Semicolon)
+		if (iter.GetKind() != TokenKind::semicolon)
 		{
-			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
+			unexpectedToken(iter, { ";" });
+			return ERROR_NODE_ID;
 		}
 
-		// consume the semicolon
+		// consume semicolon
 		if (!iter.Next())
 		{
-			logError(iter, "Unexpected end of file!");
+			unexpectedEndOfFile(iter, { "}" });
 			return ERROR_NODE_ID;
 		}
 
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Return, .Return = Return{ expressionID } });
-	}
-
-	/// <summary>
-	/// STATEMENT: DEFINITION 
-	///		| FN_CALL ';' 
-	///		| VARIABLE_ASSIGNMENT 
-	///		| FOR_LOOP 
-	///		| WHILE_LOOP 
-	///		| IF_STATEMENT 
-	///		| MATCH_STATEMENT 
-	///		| STATEMENT_BLOCK
-	///		| RETURN_STATEMENT ;
-	/// </summary>
-	inline static NodeID parseStatement(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		switch (iter.CurrentToken().Value)
-		{
-		case TokenValue::For:
-			return parseForLoop(iter, nodeBuffers);
-
-		case TokenValue::While:
-			return parseWhileLoop(iter, nodeBuffers);
-
-		case TokenValue::If:
-			return parseIfStatement(iter, nodeBuffers);
-
-		case TokenValue::Match:
-			return parseMatchStatement(iter, nodeBuffers);
-
-		case TokenValue::OpenBrace:
-			return parseStatementBlock(iter, nodeBuffers);
-
-		case TokenValue::Return:
-			return parseReturnStatement(iter, nodeBuffers);
-
-		default:
-			logError(iter, "Expected a statement! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-	}
-
-#pragma endregion
-
-#pragma region Declarations
-
-	// forward declaration
-	inline static NodeID parseTypeDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers);
-
-	/// <summary>
-	/// TUPLE_TYPE_DECLARATION: '(' TYPE_DECLARATION ',' TYPE_DECLARATION { ',' TYPE_DECLARATION } ')' ;
-	/// </summary>
-	inline static NodeID parseTupleTypeDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert we have an opening parenthesis
-		ASSERT(iter.CurrentToken().Value == TokenValue::OpenParen, "Expected '('!");
-
-		// consume the opening parenthesis
-		if (!iter.Next())
-		{
-			logError(iter, "Expected a type identifier after '('!");
-			return ERROR_NODE_ID;
-		}
-
-		// parse all type identifiers
-		auto& typeDeclarationIDs = nodeBuffers.CreateNodeIDList();
-
-		while (iter.CurrentToken().Value != TokenValue::CloseParen)
-		{
-			// parse the type declaration
-			NodeID typeDeclarationID = parseTypeDeclaration(iter, nodeBuffers);
-
-			// check if the type declaration was valid
-			if (typeDeclarationID == ERROR_NODE_ID)
+		return nodeBuffers.CreateNode(
+			Node
 			{
-				return ERROR_NODE_ID;
-			}
-
-			// add the type declaration to the list
-			typeDeclarationIDs.push_back(typeDeclarationID);
-
-			// check for comma
-			if (iter.CurrentToken().Value == TokenValue::Comma)
-			{
-				// consume the comma
-				if (!iter.Next())
+				.Kind = NodeKind::RETURN_STATEMENT,
+				.ReturnStatement = RETURN_STATEMENT
 				{
-					logError(iter, "Unexpected end of file! Expected a type declaration or ')' instead of ','.");
-					return ERROR_NODE_ID;
+					.ExpressionID = expressionID
 				}
 			}
-
-			// othwerwise we must have a closing parenthesis
-			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
-			{
-				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
-				return ERROR_NODE_ID;
-			}
-		}
-
-		// consume the closing parenthesis
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected a type identifier after ')'!");
-			return ERROR_NODE_ID;
-		}
-
-		// check we have more than one type declaration
-		if (typeDeclarationIDs.size() < 2)
-		{
-			logError(iter, "Single type tuples are not supported! Remove the '(' and ')'.");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::TupleTypeDeclaration, .TupleTypeDeclaration = TupleTypeDeclaration{ std::move(typeDeclarationIDs) } });
+		);
 	}
 
-	/// <summary>
-	/// CONST_TYPE_DECLARATION: 'const' TYPE_IDENTIFIER ;
-	/// </summary>
-	inline static NodeID parseConstantTypeDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		// assert we have a const keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
-
-		// consume the const keyword
-		if (!iter.Next())
+		switch (iter.GetKind())
 		{
-			logError(iter, "Expected a type identifier after 'const'!");
-			return ERROR_NODE_ID;
-		}
+		case TokenKind::identifier:
+			return parse<ASSIGNMENT_STATEMENT>(nodeBuffers, iter);
 
-		// parse the type identifier
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, nodeBuffers);
+		case TokenKind::for_keyword:
+			return parse<FOR_LOOP_STATEMENT>(nodeBuffers, iter);
 
-		if (typeIdentifierID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
+		case TokenKind::while_keyword:
+			return parse<WHILE_LOOP_STATEMENT>(nodeBuffers, iter);
 
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::ConstantTypeDeclaration, .ConstantTypeDeclaration = ConstantTypeDeclaration{ typeIdentifierID } });
-	}
+		case TokenKind::if_keyword:
+			return parse<IF_STATEMENT>(nodeBuffers, iter);
 
-	/// <summary>
-	/// VAR_TYPE_DECLARATION: 'var' TYPE_IDENTIFIER ;
-	/// </summary>
-	inline static NodeID parseVariableTypeDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert we have a var keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
+		case TokenKind::open_brace:
+			return parse<BLOCK_STATEMENT>(nodeBuffers, iter);
 
-		// consume the var keyword
-		if (!iter.Next())
-		{
-			logError(iter, "Expected a type identifier after 'var'!");
-			return ERROR_NODE_ID;
-		}
-
-		// parse the type identifier
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, nodeBuffers);
-
-		if (typeIdentifierID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::VariableTypeDeclaration, .VariableTypeDeclaration = VariableTypeDeclaration{ typeIdentifierID } });
-	}
-
-	/// <summary>
-	/// VALUE_TYPE_DECLARATION: TYPE_IDENTIFIER ;
-	/// </summary>
-	inline static NodeID parseValueTypeDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// parse the type identifiers
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, nodeBuffers);
-
-		if (typeIdentifierID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::ValueTypeDeclaration, .ValueTypeDeclaration = ValueTypeDeclaration{ typeIdentifierID } });
-	}
-
-	/// <summary>
-	/// TYPE_DECLARATION: VALUE_TYPE_DECLARATION | VAR_TYPE_DECLARATION | CONST_TYPE_DECLARATION | TUPLE_TYPE_DECLARATION ;
-	/// </summary>
-	inline static NodeID parseTypeDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		switch (iter.CurrentToken().Value)
-		{
-		case TokenValue::OpenParen:
-			return parseTupleTypeDeclaration(iter, nodeBuffers);
-
-		case TokenValue::Const:
-			return parseConstantTypeDeclaration(iter, nodeBuffers);
-
-		case TokenValue::Var:
-			return parseVariableTypeDeclaration(iter, nodeBuffers);
+		case TokenKind::return_keyword:
+			return parse<RETURN_STATEMENT>(nodeBuffers, iter);
 
 		default:
-			return parseValueTypeDeclaration(iter, nodeBuffers);
-		}
-	}
-
-	/// <summary>
-	/// VAR_DECLARATION: 'var' VAR_NAME ':' TYPE_IDENTIFIER ;
-	/// </summary>
-	inline static NodeID parseVariableDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert we have a var keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
-
-		// consume the var keyword
-		if (!iter.Next())
-		{
-			logError(iter, "Expected an identifier after 'var'!");
-			return ERROR_NODE_ID;
-		}
-
-		// check for identifier
-		if (iter.CurrentToken().Kind != TokenKind::Identifier)
-		{
-			logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		NodeID identifier = parseIdentifier(iter, nodeBuffers);
-
-		// check for colon
-		if (iter.CurrentToken().Value != TokenValue::Colon)
-		{
-			logError(iter, "Expected a ':'! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the colon
-		if (!iter.Next())
-		{
-			logError(iter, "Expected a type identifier after ':'!");
-			return ERROR_NODE_ID;
-		}
-
-		// parse the type identifier
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, nodeBuffers);
-
-		// check if the type identifier was valid
-		if (typeIdentifierID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::VariableDeclaration, .VariableDeclaration = VariableDeclaration{ identifier, typeIdentifierID } });
-	}
-
-	/// <summary>
-	/// CONST_DECLARATION: 'const' CONST_NAME ':' TYPE_IDENTIFIER ;
-	/// </summary>
-	inline static NodeID parseConstantDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert we have a const keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
-
-		// consume the const keyword
-		if (!iter.Next())
-		{
-			logError(iter, "Expected an identifier after 'const'!");
-			return ERROR_NODE_ID;
-		}
-
-		// check for identifier
-		if (iter.CurrentToken().Kind != TokenKind::Identifier)
-		{
-			logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		NodeID identifier = parseIdentifier(iter, nodeBuffers);
-
-		// check for colon
-		if (iter.CurrentToken().Value != TokenValue::Colon)
-		{
-			logError(iter, "Expected a ':'! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the colon
-		if (!iter.Next())
-		{
-			logError(iter, "Expected a type identifier after ':'!");
-			return ERROR_NODE_ID;
-		}
-
-		// parse the type identifier
-		NodeID typeIdentifierID = parseTypeIdentifier(iter, nodeBuffers);
-
-		// check if the type identifier was valid
-		if (typeIdentifierID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::ConstantDeclaration, .ConstantDeclaration = ConstantDeclaration{ identifier, typeIdentifierID } });
-	}
-
-	/// <summary>
-	/// DECLARATION: VAR_DECLARATION | CONST_DECLARATION ;
-	/// </summary>
-	inline static NodeID parseDeclaration(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// quick exit if token kind is not valid
-		if (iter.CurrentToken().Kind != TokenKind::Declaration)
-		{
-			logError(iter, "Expected a declaration! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		switch (iter.CurrentToken().Value)
-		{
-		case TokenValue::Var:
-			return parseVariableDeclaration(iter, nodeBuffers);
-
-		case TokenValue::Const:
-			return parseConstantDeclaration(iter, nodeBuffers);
-
-		default:
-			logError(iter, "Expected a declaration! Got '{0}' instead.", iter.CurrentSourceView());
+			unexpectedToken(iter, { "assignment", "for", "while", "if", "{", "return" });
 			return ERROR_NODE_ID;
 		}
 	}
@@ -1257,510 +1273,481 @@ namespace AlloyCompiler::Parser
 
 #pragma region Definitions
 
-	/// <summary>
-	/// FN_DEFINITION: 'fn' FN_NAME '(' [ DECLARATION { ',' DECLARATION } ] ')' [':' TYPE_DECLARATION] STATEMENT_BLOCK ;
-	/// </summary>
-	inline static NodeID parseFunctionDefinition(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<VALUE_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		// assert we have a fn keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Fn, "Expected 'fn'!");
+		// parse value declaration
+		NodeID valueDeclarationID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
 
-		// consume the fn keyword
+		if (valueDeclarationID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for assignment operator
+		if (iter.GetKind() != TokenKind::assignment_operator)
+		{
+			unexpectedToken(iter, { "=" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume assignment operator
 		if (!iter.Next())
 		{
-			logError(iter, "Unexpected end of file! Expected an identifier after 'fn'.");
+			unexpectedEndOfFile(iter, { "expression" });
 			return ERROR_NODE_ID;
 		}
 
-		// get the function name
-		NodeID functionName = parseIdentifier(iter, nodeBuffers);
+		// parse expression
+		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
 
-		// check for opening parenthesis
-		if (iter.CurrentToken().Value != TokenValue::OpenParen)
+		if (expressionID == ERROR_NODE_ID)
 		{
-			logError(iter, "Expected a '('! Got '{0}' instead.", iter.CurrentSourceView());
 			return ERROR_NODE_ID;
 		}
 
-		// consume the opening parenthesis
+		// check for semicolon
+		if (iter.GetKind() != TokenKind::semicolon)
+		{
+			unexpectedToken(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume semicolon
+		(void)iter.Next();
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::VALUE_DEFINITION,
+				.ValueDefinition = VALUE_DEFINITION
+				{
+					.ValueDeclarationID = valueDeclarationID,
+					.ValueID = expressionID
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<STRUCT_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		if (iter.GetKind() != TokenKind::struct_keyword)
+		{
+			unexpectedToken(iter, { "struct" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume struct keyword
 		if (!iter.Next())
 		{
-			logError(iter, "Unexpected end of file! Expected a parameter declaration.");
+			unexpectedEndOfFile(iter, { "struct name" });
 			return ERROR_NODE_ID;
 		}
 
-		// parse the parameter declarations
-		auto& parameterDeclarationIDs = nodeBuffers.CreateNodeIDList();
+		// parse struct name
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
 
-		while (iter.CurrentToken().Value != TokenValue::CloseParen)
+		if (identifierID == ERROR_NODE_ID)
 		{
-			// parse the declaration
-			NodeID declarationID = parseDeclaration(iter, nodeBuffers);
+			return ERROR_NODE_ID;
+		}
 
-			// check if the declaration was valid
-			if (declarationID == ERROR_NODE_ID)
+		// check for opening brace
+		if (iter.GetKind() != TokenKind::open_brace)
+		{
+			unexpectedToken(iter, { "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "struct member" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse members
+		VectorRef<NodeID> memberIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_brace)
+		{
+			NodeID memberID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
+
+			if (memberID == ERROR_NODE_ID)
 			{
 				return ERROR_NODE_ID;
 			}
 
-			// add the declaration to the list
-			parameterDeclarationIDs.push_back(declarationID);
-
-			// check for comma
-			if (iter.CurrentToken().Value == TokenValue::Comma)
+			// check for semicolon
+			if (iter.GetKind() != TokenKind::semicolon)
 			{
-				// consume the comma
+				unexpectedToken(iter, { ";" });
+				return ERROR_NODE_ID;
+			}
+
+			// consume semicolon
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "struct member" });
+				return ERROR_NODE_ID;
+			}
+
+			memberIDs.push_back(memberID);
+		}
+
+		// consume closing brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "}" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::STRUCT_DEFINITION,
+				.StructDefinition = STRUCT_DEFINITION
+				{
+					.IdentifierID = identifierID,
+					.MemberIDs = memberIDs
+				}
+			}
+		);
+	}
+
+	template <>
+	NodeID parse<ENUM_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		if (iter.GetKind() != TokenKind::enum_keyword)
+		{
+			unexpectedToken(iter, { "enum" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume enum keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "enum name" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse enum name
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening brace
+		if (iter.GetKind() != TokenKind::open_brace)
+		{
+			unexpectedToken(iter, { "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "enum member" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse members
+		VectorRef<NodeID> memberIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_brace)
+		{
+			NodeID memberID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+			if (memberID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			memberIDs.push_back(memberID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
 				if (!iter.Next())
 				{
-					logError(iter, "Unexpected end of file! Expected a parameter declaration or ')' instead of ','.");
+					unexpectedEndOfFile(iter, { "identifier" });
 					return ERROR_NODE_ID;
 				}
 			}
-
-			// othwerwise we must have a closing parenthesis
-			else if (iter.CurrentToken().Value != TokenValue::CloseParen)
+			else if (iter.GetKind() != TokenKind::close_brace)
 			{
-				logError(iter, "Expected a ')'! Got '{0}' instead.", iter.CurrentSourceView());
+				unexpectedToken(iter, { ",", "}" });
 				return ERROR_NODE_ID;
 			}
 		}
 
-		// consume the closing parenthesis
+		// consume closing brace
 		if (!iter.Next())
 		{
-			logError(iter, "Unexpected end of file! Expected a '->' or '{'.");
+			unexpectedEndOfFile(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::ENUM_DEFINITION,
+				.EnumDefinition = ENUM_DEFINITION
+				{
+					.IdentifierID = identifierID,
+					.MemberIDs = memberIDs
+				}
+			}
+		);
+
+	}
+
+	template <>
+	NodeID parse<FUNCTION_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		if (iter.GetKind() != TokenKind::function_keyword)
+		{
+			unexpectedToken(iter, { "fn" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume fn keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "function name" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse function name
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening parenthesis
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "function parameter" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse parameters
+		VectorRef<NodeID> parameterIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_paren)
+		{
+			NodeID parameterID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
+
+			if (parameterID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			parameterIDs.push_back(parameterID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "function parameter" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_paren)
+			{
+				unexpectedToken(iter, { ",", ")" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "->", "{" });
 			return ERROR_NODE_ID;
 		}
 
 		// check for return type
 		NodeID returnTypeID = ERROR_NODE_ID;
-
-		if (iter.CurrentToken().Value == TokenValue::Arrow)
+		if (iter.GetKind() == TokenKind::arrow)
 		{
-			// consume the arrow
+			// consume arrow
 			if (!iter.Next())
 			{
-				logError(iter, "Unexpected end of file! Expected a return type.");
+				unexpectedEndOfFile(iter, { "function body" });
 				return ERROR_NODE_ID;
 			}
 
-			// parse the return type
-			returnTypeID = parseTypeDeclaration(iter, nodeBuffers);
+			// parse return type
+			returnTypeID = parse<TYPE_DECLARATION>(nodeBuffers, iter);
 
-			// check if the return type was valid
 			if (returnTypeID == ERROR_NODE_ID)
 			{
 				return ERROR_NODE_ID;
 			}
 		}
 
-		// parse the statement block
-		NodeID statementBlockID = parseStatementBlock(iter, nodeBuffers);
+		// parse body
+		NodeID bodyID = parse<BLOCK_STATEMENT>(nodeBuffers, iter);
 
-		// check if the statement block was valid
-		if (statementBlockID == ERROR_NODE_ID)
+		if (bodyID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
 
-		FunctionDefinition functionDefinition{ functionName, std::move(parameterDeclarationIDs), returnTypeID, statementBlockID };
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::FunctionDefinition, .FunctionDefinition = FunctionDefinition { functionName, parameterDeclarationIDs, returnTypeID, statementBlockID } });
-	}
-
-	/// <summary>
-	/// ENUM_DEFINITION: 'enum' ENUM_NAME '{' { IDENTIFIER } '}' ;
-	/// </summary>
-	inline static NodeID parseEnumDefinition(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert we have an enum keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Enum, "Expected 'enum'!");
-
-		// consume the enum keyword
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected an identifier after 'enum'.");
-			return ERROR_NODE_ID;
-		}
-
-		// get the enum name
-		NodeID enumName = parseIdentifier(iter, nodeBuffers);
-
-		// check for opening brace
-		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
-		{
-			logError(iter, "Expected a '{0}'! Got '{1}' instead.", "{", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the opening brace
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected an identifier.");
-			return ERROR_NODE_ID;
-		}
-
-		// parse all identifiers
-		auto& identifierIDs = nodeBuffers.CreateNodeIDList();
-
-		while (iter.CurrentToken().Value != TokenValue::CloseBrace)
-		{
-			// check for identifier
-			if (iter.CurrentToken().Kind != TokenKind::Identifier)
+		return nodeBuffers.CreateNode(
+			Node
 			{
-				logError(iter, "Expected an identifier! Got '{0}' instead.", iter.CurrentSourceView());
-				return ERROR_NODE_ID;
-			}
-
-			NodeID identifier = parseIdentifier(iter, nodeBuffers);
-
-			// add the identifier to the list
-			identifierIDs.push_back(nodeBuffers.CreateNode(Node{ .Kind = NodeKind::EnumMember, .EnumMember = EnumMember{ identifier } }));
-
-			// check for comma
-			if (iter.CurrentToken().Value == TokenValue::Comma)
-			{
-				// consume the comma
-				if (!iter.Next())
+				.Kind = NodeKind::FUNCTION_DEFINITION,
+				.FunctionDefinition = FUNCTION_DEFINITION
 				{
-					logError(iter, "Unexpected end of file! Expected an identifier or '}'.");
-					return ERROR_NODE_ID;
+					.IdentifierID = identifierID,
+					.ParameterIDs = parameterIDs,
+					.ReturnTypeID = returnTypeID,
+					.BodyID = bodyID
 				}
 			}
-
-			// othwerwise we must have a closing brace
-			else if (iter.CurrentToken().Value != TokenValue::CloseBrace)
-			{
-				logError(iter, "Expected a '}'! Got '{0}' instead.", iter.CurrentSourceView());
-				return ERROR_NODE_ID;
-			}
-		}
-
-		// consume the closing brace
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected a ';' or '}'.");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::EnumDefinition, .EnumDefinition = EnumDefinition{ enumName, std::move(identifierIDs) } });
+		);
 	}
 
-	/// <summary>
-	/// STRUCT_DEFINITION: 'struct' STRUCT_NAME '{' { DECLARATION ';' } '}' ;
-	/// </summary>
-	inline static NodeID parseStructDefinition(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		// assert we have a struct keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Struct, "Expected 'struct'!");
-
-		// consume the struct keyword
-		if (!iter.Next())
+		switch (iter.GetKind())
 		{
-			logError(iter, "Unexpected end of file! Expected an identifier after 'struct'.");
+		case TokenKind::constant_keyword:
+		case TokenKind::variable_keyword:
+			return parse<VALUE_DEFINITION>(nodeBuffers, iter);
+
+		case TokenKind::struct_keyword:
+			return parse<STRUCT_DEFINITION>(nodeBuffers, iter);
+
+		case TokenKind::enum_keyword:
+			return parse<ENUM_DEFINITION>(nodeBuffers, iter);
+
+		case TokenKind::function_keyword:
+			return parse<FUNCTION_DEFINITION>(nodeBuffers, iter);
+
+		default:
+			unexpectedToken(iter, { "const", "var", "struct", "enum", "fn" });
 			return ERROR_NODE_ID;
 		}
+	}
 
-		// get the struct name
-		NodeID structName = parseIdentifier(iter, nodeBuffers);
+	template <>
+	NodeID parse<QUALIFIED_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		// check for qualifier
+		QUALIFIED_DEFINITION::Qualifier visibility = QUALIFIED_DEFINITION::Qualifier::Default;
 
-		// check for opening brace
-		if (iter.CurrentToken().Value != TokenValue::OpenBrace)
+		if (iter.GetKind() == TokenKind::export_label || iter.GetKind() == TokenKind::public_label)
 		{
-			logError(iter, "Expected a '{0}'! Got '{1}' instead.", "{", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the opening brace
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected a declaration.");
-			return ERROR_NODE_ID;
-		}
-
-		// parse the declarations
-		auto& declarationIDs = nodeBuffers.CreateNodeIDList();
-
-		while (iter.CurrentToken().Value != TokenValue::CloseBrace)
-		{
-			// parse the declaration
-			NodeID declarationID = parseDeclaration(iter, nodeBuffers);
-
-			// check if the declaration was valid
-			if (declarationID == ERROR_NODE_ID)
+			if (iter.GetKind() == TokenKind::export_label)
 			{
-				return ERROR_NODE_ID;
+				visibility = QUALIFIED_DEFINITION::Qualifier::Export;
+			}
+			else if (iter.GetKind() == TokenKind::public_label)
+			{
+				visibility = QUALIFIED_DEFINITION::Qualifier::Public;
 			}
 
-			// check for semicolon
-			if (iter.CurrentToken().Value != TokenValue::Semicolon)
-			{
-				logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
-				return ERROR_NODE_ID;
-			}
-
-			// consume the semicolon
 			if (!iter.Next())
 			{
-				logError(iter, "Unexpected end of file! Expected a declaration or '}'.");
-				return ERROR_NODE_ID;
-			}
-
-			// add the declaration to the list
-			declarationIDs.push_back(declarationID);
-		}
-
-		// consume the closing brace
-		if (!iter.Next())
-		{
-			logError(iter, "Unexpected end of file! Expected a ';' or '}'.");
-			return ERROR_NODE_ID;
-		}
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::StructDefinition, .StructDefinition = StructDefinition{ structName, std::move(declarationIDs) } });
-	}
-
-	/// <summary>
-	/// CONST_DEFINITION: CONST_DECLARATION '=' EXPRESSION ';' ;
-	/// </summary>
-	inline static NodeID parseConstantDefinition(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert we have a const keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Const, "Expected 'const'!");
-
-		// parse the declaration
-		NodeID declarationID = parseConstantDeclaration(iter, nodeBuffers);
-
-		// check if the declaration was valid
-		if (declarationID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for assignment operator
-		if (iter.CurrentToken().Value != TokenValue::Assign)
-		{
-			logError(iter, "Expected a '='! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the assignment operator
-		if (!iter.Next())
-		{
-			logError(iter, "Expected an expression after '{0}'!", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// parse the expression
-		NodeID expressionID = parseExpression(iter, nodeBuffers);
-
-		// check if the expression was valid
-		if (expressionID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for semicolon
-		if (iter.CurrentToken().Value != TokenValue::Semicolon)
-		{
-			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the semicolon
-		(void)iter.Next();
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::ConstantDefinition, .ConstantDefinition = ConstantDefinition{ declarationID, expressionID } });
-	}
-
-	/// <summary>
-	/// VAR_DEFINITION: VAR_DECLARATION '=' EXPRESSION ';' ;
-	/// </summary>
-	inline static NodeID parseVariableDefinition(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// assert we have a var keyword
-		ASSERT(iter.CurrentToken().Value == TokenValue::Var, "Expected 'var'!");
-
-		// parse the declaration
-		NodeID declarationID = parseVariableDeclaration(iter, nodeBuffers);
-
-		// check if the declaration was valid
-		if (declarationID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for assignment operator
-		if (iter.CurrentToken().Value != TokenValue::Assign)
-		{
-			logError(iter, "Expected a '='! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the assignment operator
-		if (!iter.Next())
-		{
-			logError(iter, "Expected an expression after '{0}'!", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// parse the expression
-		NodeID expressionID = parseExpression(iter, nodeBuffers);
-
-		// check if the expression was valid
-		if (expressionID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for semicolon
-		if (iter.CurrentToken().Value != TokenValue::Semicolon)
-		{
-			logError(iter, "Expected a ';'! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		// consume the semicolon
-		(void)iter.Next();
-
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::VariableDefinition, .VariableDefinition = VariableDefinition{ declarationID, expressionID } });
-	}
-
-	/// <summary>
-	/// DEFINITION: VAR_DEFINITION 
-	///		| CONST_DEFINITION 
-	///		| STRUCT_DEFINITION 
-	///		| ENUM_DEFINITION 
-	///		| FN_DEFINITION ;
-	/// </summary>
-	inline static NodeID parseDefinition(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// quick exit if token kind is not valid
-		if (iter.CurrentToken().Kind != TokenKind::Declaration)
-		{
-			logError(iter, "Expected a definition! Got '{0}' instead.", iter.CurrentSourceView());
-			return ERROR_NODE_ID;
-		}
-
-		switch (iter.CurrentToken().Value)
-		{
-		case TokenValue::Var:
-			return parseVariableDefinition(iter, nodeBuffers);
-
-		case TokenValue::Const:
-			return parseConstantDefinition(iter, nodeBuffers);
-
-		case TokenValue::Struct:
-			return parseStructDefinition(iter, nodeBuffers);
-
-		case TokenValue::Enum:
-			return parseEnumDefinition(iter, nodeBuffers);
-
-		case TokenValue::Fn:
-			return parseFunctionDefinition(iter, nodeBuffers);
-		}
-
-		logError(iter, "Expected a definition! Got '{0}' instead.", iter.CurrentSourceView());
-		return ERROR_NODE_ID;
-	}
-
-	/// <summary>
-	/// QUALIFIED_DEFINITION: VISIBILITY_QUALIFIER DEFINITION ;
-	/// </summary>
-	inline static NodeID parseQualifiedDefinition(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
-	{
-		// check for qualifier, default is private
-		QualifiedDefinition::Qualifier visibility = QualifiedDefinition::Qualifier::Private;
-
-		if (iter.CurrentToken().Kind == TokenKind::Qualifier)
-		{
-			if (iter.CurrentToken().Value == TokenValue::Pub)
-			{
-				visibility = QualifiedDefinition::Qualifier::Public;
-			}
-			else if (iter.CurrentToken().Value == TokenValue::Exp)
-			{
-				visibility = QualifiedDefinition::Qualifier::Export;
-			}
-			else
-			{
-				ASSERT(false, "Unknown qualifier {0}!", iter.CurrentSourceView());
-				return ERROR_NODE_ID;
-			}
-
-			// check for next token
-			if (!iter.Next())
-			{
-				logError(iter, "Unexpected end of file! Expected a definition.");
+				logErrorAtPosition(iter, "Expected a definition after {0}!", iter.GetValue().ToStringView());
 				return ERROR_NODE_ID;
 			}
 		}
 
 		// parse definition
-		NodeID definitionID = parseDefinition(iter, nodeBuffers);
+		NodeID definitionID = parse<DEFINITION>(nodeBuffers, iter);
 
 		if (definitionID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
 
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::QualifiedDefinition, .QualifiedDefinition = QualifiedDefinition{ visibility, definitionID } });
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::QUALIFIED_DEFINITION,
+				.QualifiedDefinition = QUALIFIED_DEFINITION
+				{
+					.Visibility = visibility,
+					.DefinitionID = definitionID
+				}
+			}
+		);
 	}
 
 #pragma endregion
 
-	/// <summary>
-	/// MODULE: { QUALIFIED_DEFINITION } ;
-	/// </summary>
-	inline static NodeID parseModule(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<MODULE>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		auto& qualifiedDefinitionIDs = nodeBuffers.CreateNodeIDList();
+		VectorRef<NodeID> qualifiedDefinitionIDs = nodeBuffers.CreateNodeIDVector();
 
 		do
 		{
-			NodeID definitionID = parseQualifiedDefinition(iter, nodeBuffers);
+			NodeID qualifiedDefinitionID = parse<QUALIFIED_DEFINITION>(nodeBuffers, iter);
 
-			if (definitionID == ERROR_NODE_ID)
+			if (qualifiedDefinitionID == ERROR_NODE_ID)
 			{
 				return ERROR_NODE_ID;
 			}
 
-			qualifiedDefinitionIDs.push_back(definitionID);
+			qualifiedDefinitionIDs.push_back(qualifiedDefinitionID);
 		} while (iter.HasNext());
 
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Module, .Module = Module{ std::move(qualifiedDefinitionIDs) } });
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::MODULE,
+				.Module = MODULE
+				{
+					.QualifiedDefinitionIDs = qualifiedDefinitionIDs
+				}
+			}
+		);
 	}
 
-	/// <summary>
-	/// PROGRAM: { MODULE } ;
-	/// </summary>
-	inline static NodeID parseProgram(TokenIterator& iter, NodeDataBuffers& nodeBuffers)
+	template <>
+	NodeID parse<PROGRAM>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		auto& moduleIDs = nodeBuffers.CreateNodeIDList();
+		VectorRef<NodeID> moduleIDs = nodeBuffers.CreateNodeIDVector();
 
-		moduleIDs.push_back(parseModule(iter, nodeBuffers));
+		// TODO: add support for mutliple modules
 
-		// create the node
-		return nodeBuffers.CreateNode(Node{ .Kind = NodeKind::Program, .Program = Program{ std::move(moduleIDs) } });
+		moduleIDs.push_back(parse<MODULE>(nodeBuffers, iter));
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::PROGRAM,
+				.Program = PROGRAM
+				{
+					.ModuleIDs = moduleIDs
+				}
+			}
+		);
 	}
 
-	NodeDataBuffers Parse(const Tokenizer::TokenDataBuffers& tokenBuffers)
+	NodeBuffers Parse(const TokenBuffers& tokenBuffers)
 	{
-		TokenIterator iter(tokenBuffers);
-		NodeDataBuffers nodeBuffers(tokenBuffers);
+		NodeBuffers nodeBuffers;
+		TokenBuffers::Iterator tokenIter = tokenBuffers.GetIterator();
 
-
-		// parse the program
-		NodeID programID = parseProgram(iter, nodeBuffers);
-
-		nodeBuffers.SetRootNodeID(programID);
+		nodeBuffers.SetRootNodeID(parse<PROGRAM>(nodeBuffers, tokenIter));
 
 		return nodeBuffers;
 	}

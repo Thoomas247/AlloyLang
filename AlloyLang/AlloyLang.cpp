@@ -8,6 +8,8 @@
 
 #include <chrono>
 
+using namespace AlloyCompiler;
+
 int main()
 {
 	const size_t n = 0;// 0'000;
@@ -19,23 +21,30 @@ int main()
 		str += TestSrc;
 	}
 
+	Source source(str);
+
 	const uint64_t numBytes = str.size();
 	const uint64_t numKilobytes = std::max(numBytes / 1000, 1ull);
 
-	AlloyCompiler::Log::Print("Compiling {0} kB...", numKilobytes);
+	Log::Print("Compiling {0} kB...", numKilobytes);
 
 	auto start = std::chrono::high_resolution_clock::now();
-	auto tokenBuffers = AlloyCompiler::Tokenizer::Tokenize(str);
+	TokenBuffers tokenBuffers = Tokenize(source);
+	//PrintTokens(tokenBuffers);
 	auto end = std::chrono::high_resolution_clock::now();
 
-	const uint64_t tokenizeTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	const uint64_t tokenizeTime = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), 1ll);
+
+	Log::Print("Tokenize: {0}ms", tokenizeTime);
 
 	start = std::chrono::high_resolution_clock::now();
-	auto nodeBuffers = AlloyCompiler::Parser::Parse(tokenBuffers);
+	auto nodeBuffers = Parse(tokenBuffers);
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-	AlloyCompiler::Parser::PrintTree(tokenBuffers, nodeBuffers);
+	Log::Print("Parse: {0}ms", parseTime);
+
+	PrintTree(tokenBuffers, nodeBuffers);
 
 	start = std::chrono::high_resolution_clock::now();
 	LLVMCodeGenerator* codegen = new LLVMCodeGenerator(tokenBuffers, nodeBuffers);
@@ -43,12 +52,11 @@ int main()
 	delete codegen;
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+  
+  AlloyCompiler::Log::Print("Codegen: {0}ms", codegenTime);
 
-	AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime);
-	AlloyCompiler::Log::Print("Tokenize: {0}ms", tokenizeTime);
-	AlloyCompiler::Log::Print("Parse: {0}ms", parseTime);
-	AlloyCompiler::Log::Print("Codegen: {0}ms", codegenTime);
+	AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime + codegenTime);
 	AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime + codegenTime) / numKilobytes);
 
-	AlloyCompiler::Log::Print("");
+	Log::Print("");
 }
