@@ -88,6 +88,12 @@ namespace AlloyCompiler
 
 #pragma region Expressions
 
+	struct VALUE_DEFINITION_EXPRESSION
+	{
+		NodeID ValueDeclarationID;
+		NodeID ValueID;
+	};
+
 	struct FUNCTION_CALL_EXPRESSION
 	{
 		NodeID IdentifierID;
@@ -116,6 +122,7 @@ namespace AlloyCompiler
 	{
 		IDENTIFIER Identifier;
 		LITERAL Literal;
+		VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
 		FUNCTION_CALL_EXPRESSION FunctionCallExpression;
 		ENCLOSED_EXPRESSION EnclosedExpression;
 	};
@@ -138,6 +145,11 @@ namespace AlloyCompiler
 #pragma endregion
 
 #pragma region Statements
+
+	struct VALUE_DEFINITION_STATEMENT
+	{
+		NodeID ValueDefinitionExpressionID;
+	};
 
 	struct ASSIGNMENT_STATEMENT
 	{
@@ -177,6 +189,7 @@ namespace AlloyCompiler
 
 	union STATEMENT
 	{
+		VALUE_DEFINITION_STATEMENT ValueDefinitionStatement;
 		ASSIGNMENT_STATEMENT AssignmentStatement;
 		FOR_LOOP_STATEMENT ForLoopStatement;
 		WHILE_LOOP_STATEMENT WhileLoopStatement;
@@ -191,8 +204,7 @@ namespace AlloyCompiler
 
 	struct VALUE_DEFINITION
 	{
-		NodeID ValueDeclarationID;
-		NodeID ValueID;
+		NodeID ValueDefinitionExpressionID;
 	};
 
 	struct STRUCT_DEFINITION
@@ -261,6 +273,7 @@ namespace AlloyCompiler
 		TYPE_DECLARATION,
 		VALUE_DECLARATION,
 
+		VALUE_DEFINITION_EXPRESSION,
 		FUNCTION_CALL_EXPRESSION,
 		ENCLOSED_EXPRESSION,
 
@@ -273,6 +286,7 @@ namespace AlloyCompiler
 
 		//EXPRESSION,
 
+		VALUE_DEFINITION_STATEMENT,
 		ASSIGNMENT_STATEMENT,
 		FOR_LOOP_STATEMENT,
 		WHILE_LOOP_STATEMENT,
@@ -308,6 +322,7 @@ namespace AlloyCompiler
 			TYPE_DECLARATION TypeDeclaration;
 			VALUE_DECLARATION ValueDeclaration;
 
+			VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
 			FUNCTION_CALL_EXPRESSION FunctionCallExpression;
 			ENCLOSED_EXPRESSION EnclosedExpression;
 
@@ -320,6 +335,7 @@ namespace AlloyCompiler
 
 			//EXPRESSION Expression;
 
+			VALUE_DEFINITION_STATEMENT ValueDefinitionStatement;
 			ASSIGNMENT_STATEMENT AssignmentStatement;
 			FOR_LOOP_STATEMENT ForLoopStatement;
 			WHILE_LOOP_STATEMENT WhileLoopStatement;

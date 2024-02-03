@@ -126,6 +126,19 @@ namespace AlloyCompiler
 	json print<EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID);
 
 	template <>
+	json print<VALUE_DEFINITION_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& valueDefinitionExpressionNode = nodeBuffers.GetNode(nodeID).ValueDefinitionExpression;
+
+		json j;
+		j["kind"] = "VALUE_DEFINITION_EXPRESSION";
+		j["declaration"] = print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, valueDefinitionExpressionNode.ValueDeclarationID);
+		j["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, valueDefinitionExpressionNode.ValueID);
+
+		return j;
+	}
+
+	template <>
 	json print<FUNCTION_CALL_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& functionCallExpressionNode = nodeBuffers.GetNode(nodeID).FunctionCallExpression;
@@ -194,6 +207,9 @@ namespace AlloyCompiler
 		case NodeKind::LITERAL:
 			return print<LITERAL>(tokenBuffers, nodeBuffers, nodeID);
 
+		case NodeKind::VALUE_DEFINITION_EXPRESSION:
+			return print<VALUE_DEFINITION_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 			return print<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
@@ -234,6 +250,7 @@ namespace AlloyCompiler
 
 		case NodeKind::IDENTIFIER:
 		case NodeKind::LITERAL:
+		case NodeKind::VALUE_DEFINITION_EXPRESSION:
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 		case NodeKind::ENCLOSED_EXPRESSION:
 			return print<PRIMARY_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
@@ -249,6 +266,18 @@ namespace AlloyCompiler
 
 	template <>
 	json print<STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID);
+
+	template <>
+	json print<VALUE_DEFINITION_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& valueDefinitionStatementNode = nodeBuffers.GetNode(nodeID).ValueDefinitionStatement;
+
+		json j;
+		j["kind"] = "VALUE_DEFINITION_STATEMENT";
+		j["definition_expression"] = print<VALUE_DEFINITION_EXPRESSION>(tokenBuffers, nodeBuffers, valueDefinitionStatementNode.ValueDefinitionExpressionID);
+
+		return j;
+	}
 
 	template <>
 	json print<ASSIGNMENT_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
@@ -269,9 +298,9 @@ namespace AlloyCompiler
 
 		json j;
 		j["kind"] = "FOR_LOOP_STATEMENT";
-		j["initializer"] = print<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, forLoopNode.InitExpressionID);
-		j["condition"] = print<ENCLOSED_EXPRESSION>(tokenBuffers, nodeBuffers, forLoopNode.ConditionExpressionID);
-		j["increment"] = print<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, forLoopNode.IncrementExpressionID);
+		j["initializer"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, forLoopNode.InitExpressionID);
+		j["condition"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, forLoopNode.ConditionExpressionID);
+		j["increment"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, forLoopNode.IncrementExpressionID);
 		j["body"] = print<STATEMENT>(tokenBuffers, nodeBuffers, forLoopNode.BodyID);
 
 		return j;
@@ -343,6 +372,9 @@ namespace AlloyCompiler
 
 		switch (statementNode.Kind)
 		{
+		case NodeKind::VALUE_DEFINITION_STATEMENT:
+			return print<VALUE_DEFINITION_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::ASSIGNMENT_STATEMENT:
 			return print<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
 
@@ -374,8 +406,7 @@ namespace AlloyCompiler
 
 		json j;
 		j["kind"] = "VALUE_DEFINITION";
-		j["declaration"] = print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, valueDefinitionNode.ValueDeclarationID);
-		j["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, valueDefinitionNode.ValueID);
+		j["definition_expression"] = print<VALUE_DEFINITION_EXPRESSION>(tokenBuffers, nodeBuffers, valueDefinitionNode.ValueDefinitionExpressionID);
 
 		return j;
 	}

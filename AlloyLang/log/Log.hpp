@@ -42,7 +42,7 @@ namespace AlloyCompiler
 
 	}
 
-#ifdef DEBUG
+#ifdef _DEBUG
 
 	template <typename... Args>
 	constexpr void ASSERT(bool condition, const std::string& format, Args&&... args)

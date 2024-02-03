@@ -3,96 +3,97 @@
 
 (* -- TOKEN DEFINITIONS -- *)
 
-identifier:					( letter | '_' ) { letter | digit | '_' } ;
+identifier:						( letter | '_' ) { letter | digit | '_' } ;
 
-export_label:				'exp' ;
-public_label:				'pub' ;
+export_label:					'exp' ;
+public_label:					'pub' ;
 
-struct_keyword:				'struct' ;
-enum_keyword:				'enum' ;
-function_keyword:			'fn' ;
+struct_keyword:					'struct' ;
+enum_keyword:					'enum' ;
+function_keyword:				'fn' ;
 
-variable_keyword:			'var' ;
-constant_keyword:			'const' ;
+variable_keyword:				'var' ;
+constant_keyword:				'const' ;
 
-for_keyword:				'for' ;
-while_keyword:				'while' ;
-if_keyword:					'if' ;
-else_keyword:				'else' ;
-return_keyword:				'return' ;
+for_keyword:					'for' ;
+while_keyword:					'while' ;
+if_keyword:						'if' ;
+else_keyword:					'else' ;
+return_keyword:					'return' ;
 
-reference:					'&' ;
-pointer:					'*' ;
+reference:						'&' ;
+pointer:						'*' ;
 
-comma:						',' ;
-colon:						':' ;
-semicolon:					';' ;
-arrow:						'->' ;
+comma:							',' ;
+colon:							':' ;
+semicolon:						';' ;
+arrow:							'->' ;
 
-open_paren:					'(' ;
-close_paren:				')' ;
-open_brace:					'{' ;
-close_brace:				'}' ;
+open_paren:						'(' ;
+close_paren:					')' ;
+open_brace:						'{' ;
+close_brace:					'}' ;
 
-assignment_operator:		'=' ;
+assignment_operator:			'=' ;
 
-logical_operator:			'&&' | '||' ;
-relational_operator:		'==' | '!=' | '>' | '<' | '>=' | '<=' ;
-additive_operator:			'+' | '-' ;
-multiplicative_operator:	'*' | '/' | '%' ;
+logical_operator:				'&&' | '||' ;
+relational_operator:			'==' | '!=' | '>' | '<' | '>=' | '<=' ;
+additive_operator:				'+' | '-' ;
+multiplicative_operator:		'*' | '/' | '%' ;
 
-unary_operator:				'!' | '-' | '@' ;
+unary_operator:					'!' | '-' | '@' ;
 
-integer_literal:			(* digit regex *) { (* digit regex *) } ;
-float_literal:				(* digit regex *) { (* digit regex *) } '.' (* digit regex *) { (* digit regex *) } ;
-boolean_literal:			'true' | 'false' ;
-string_literal:				'"' { (* character regex *) } '"' ;
-character_literal:			'\'' [ (* character regex *) ] '\'' ;
+integer_literal:				(* digit regex *) { (* digit regex *) } ;
+float_literal:					(* digit regex *) { (* digit regex *) } '.' (* digit regex *) { (* digit regex *) } ;
+boolean_literal:				'true' | 'false' ;
+string_literal:					'"' { (* character regex *) } '"' ;
+character_literal:				'\'' [ (* character regex *) ] '\'' ;
 
 (* -- AST NODE DEFINITIONS -- *)
 
-LITERAL:					integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
+LITERAL:						integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
 
-IDENTIFIER:					identifier ;
-TYPE_IDENTIFIER:			[ reference | pointer ] IDENTIFIER ;
-
-
-TYPE_DECLARATION:			[ variable | constant ] TYPE_IDENTIFIER ;
-VALUE_DECLARATION:			( variable | constant ) IDENTIFIER colon TYPE_IDENTIFIER ;
+IDENTIFIER:						identifier ;
+TYPE_IDENTIFIER:				[ reference | pointer ] IDENTIFIER ;
 
 
-FUNCTION_CALL_EXPRESSION:	IDENTIFIER open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
-ENCLOSED_EXPRESSION:		open_paren EXPRESSION close_paren ;
-
-BINARY_EXPRESSION:			EXPRESSION binary_operator EXPRESSION ;
-UNARY_EXPRESSION:			unary_operator PRIMARY_EXPRESSION ;
-
-PRIMARY_EXPRESSION:			IDENTIFIER | LITERAL | FUNCTION_CALL_EXPRESSION | ENCLOSED_EXPRESSION ;
-
-ASSIGNMENT_EXPRESSION:		IDENTIFIER assignment_operator EXPRESSION ;
-
-EXPRESSION:					BINARY_EXPRESSION | UNARY_EXPRESSION | PRIMARY_EXPRESSION | ASSIGNMENT_EXPRESSION ;
+TYPE_DECLARATION:				[ variable | constant ] TYPE_IDENTIFIER ;
+VALUE_DECLARATION:				( variable | constant ) IDENTIFIER colon TYPE_IDENTIFIER ;
 
 
-ASSIGNMENT_STATEMENT:		ASSIGNMENT_EXPRESSION semicolon ;
-FOR_LOOP_STATEMENT:			for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT ;
-WHILE_LOOP_STATEMENT:		while ENCLOSED_EXPRESSION STATEMENT ;
-IF_STATEMENT:				if ENCLOSED_EXPRESSION STATEMENT [ else STATEMENT ] ;
-BLOCK_STATEMENT:			open_brace { STATEMENT } close_brace ;
-RETURN_STATEMENT:			return [ EXPRESSION ] semicolon ;
+VALUE_DEFINITION_EXPRESSION:	VALUE_DECLARATION assignment_operator EXPRESSION ;
+FUNCTION_CALL_EXPRESSION:		IDENTIFIER open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
+ENCLOSED_EXPRESSION:			open_paren EXPRESSION close_paren ;
 
-STATEMENT:					ASSIGNMENT_STATEMENT | FOR_LOOP_STATEMENT | WHILE_LOOP_STATEMENT | IF_STATEMENT | BLOCK_STATEMENT | RETURN_STATEMENT ;
+BINARY_EXPRESSION:				EXPRESSION binary_operator EXPRESSION ;
+UNARY_EXPRESSION:				unary_operator PRIMARY_EXPRESSION ;
+
+PRIMARY_EXPRESSION:				IDENTIFIER | LITERAL | VALUE_DEFINITION_EXPRESSION | FUNCTION_CALL_EXPRESSION | ENCLOSED_EXPRESSION ;
+
+ASSIGNMENT_EXPRESSION:			IDENTIFIER assignment_operator EXPRESSION ;
+
+EXPRESSION:						BINARY_EXPRESSION | UNARY_EXPRESSION | PRIMARY_EXPRESSION | ASSIGNMENT_EXPRESSION ;
+
+VALUE_DEFINITION_STATEMENT:		VALUE_DEFINITION_EXPRESSION semicolon ;
+ASSIGNMENT_STATEMENT:			ASSIGNMENT_EXPRESSION semicolon ;
+FOR_LOOP_STATEMENT:				for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT ;
+WHILE_LOOP_STATEMENT:			while ENCLOSED_EXPRESSION STATEMENT ;
+IF_STATEMENT:					if ENCLOSED_EXPRESSION STATEMENT [ else STATEMENT ] ;
+BLOCK_STATEMENT:				open_brace { STATEMENT } close_brace ;
+RETURN_STATEMENT:				return [ EXPRESSION ] semicolon ;
+
+STATEMENT:						VALUE_DEFINITION_STATEMENT | ASSIGNMENT_STATEMENT | FOR_LOOP_STATEMENT | WHILE_LOOP_STATEMENT | IF_STATEMENT | BLOCK_STATEMENT | RETURN_STATEMENT ;
 
 
-VALUE_DEFINITION:			VALUE_DECLARATION assignment_operator EXPRESSION semicolon ;
-STRUCT_DEFINITION:			struct IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
-ENUM_DEFINITION:			enum IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
-FUNCTION_DEFINITION:		function IDENTIFIER open_paren [ VALUE_DECLARATION { comma VALUE_DECLARATION } ] close_paren [ arrow TYPE_DECLARATION ] BLOCK_STATEMENT ;
+VALUE_DEFINITION:				VALUE_DEFINITION_EXPRESSION semicolon ;
+STRUCT_DEFINITION:				struct IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
+ENUM_DEFINITION:				enum IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
+FUNCTION_DEFINITION:			function IDENTIFIER open_paren [ VALUE_DECLARATION { comma VALUE_DECLARATION } ] close_paren [ arrow TYPE_DECLARATION ] BLOCK_STATEMENT ;
 
-DEFINITION:					VALUE_DECLARATION | STRUCT_DEFINITION | ENUM_DEFINITION | FUNCTION_DEFINITION ;
-QUALIFIED_DEFINITION:		[ export | public ] DEFINITION ;
+DEFINITION:						VALUE_DEFINITION | STRUCT_DEFINITION | ENUM_DEFINITION | FUNCTION_DEFINITION ;
+QUALIFIED_DEFINITION:			[ export | public ] DEFINITION ;
 
 
-MODULE:						{ QUALIFIED_DEFINITION } ;
+MODULE:							{ QUALIFIED_DEFINITION } ;
 
-PROGRAM:					{ MODULE } ;
+PROGRAM:						{ MODULE } ;

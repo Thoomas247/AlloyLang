@@ -397,6 +397,55 @@ namespace AlloyCompiler
 	NodeID parse<PRIMARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
 
 	template <>
+	NodeID parse<VALUE_DEFINITION_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		// parse value declaration
+		NodeID valueDeclarationID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
+
+		if (valueDeclarationID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for assignment operator
+		if (iter.GetKind() != TokenKind::assignment_operator)
+		{
+			unexpectedToken(iter, { "=" });
+			return ERROR_NODE_ID;
+		}
+
+		TokenID operatorTokenID = iter.GetCurrentID();
+
+		// consume assignment operator
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "expression" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse expression
+		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
+
+		if (expressionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::VALUE_DEFINITION_EXPRESSION,
+				.ValueDefinitionExpression = VALUE_DEFINITION_EXPRESSION
+				{
+					.ValueDeclarationID = valueDeclarationID,
+					.ValueID = expressionID
+				}
+			},
+			operatorTokenID
+		);
+	}
+
+	template <>
 	NodeID parse<FUNCTION_CALL_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		TokenID errorInfo = iter.GetCurrentID();
@@ -691,7 +740,48 @@ namespace AlloyCompiler
 				return left;
 			};
 
-		return tryParseLogicalExpression(iter);
+		// handles =
+		auto tryParseAssignmentExpression = [&](TokenBuffers::Iterator& iter) -> NodeID
+			{
+				NodeID left = tryParseLogicalExpression(iter);
+
+				if (left == ERROR_NODE_ID)
+					return ERROR_NODE_ID;
+
+				if (iter.GetKind() == TokenKind::assignment_operator)
+				{
+					TokenID opTokenID = iter.GetCurrentID();
+
+					// consume operator
+					if (!iter.Next())
+					{
+						unexpectedEndOfFile(iter, { "expression" });
+						return ERROR_NODE_ID;
+					}
+
+					NodeID right = tryParseLogicalExpression(iter);
+
+					if (right == ERROR_NODE_ID)
+						return ERROR_NODE_ID;
+
+					left = nodeBuffers.CreateNode(
+						Node{
+							.Kind = NodeKind::BINARY_EXPRESSION,
+							.BinaryExpression = BINARY_EXPRESSION
+							{
+								.OperatorTokenID = opTokenID,
+								.LeftID = left,
+								.RightID = right
+							}
+						},
+						opTokenID
+					);
+				}
+
+				return left;
+			};
+
+		return tryParseAssignmentExpression(iter);
 	}
 
 	template <>
@@ -740,6 +830,10 @@ namespace AlloyCompiler
 	{
 		switch (iter.GetKind())
 		{
+		case TokenKind::constant_keyword:
+		case TokenKind::variable_keyword:
+			return parse<VALUE_DEFINITION_EXPRESSION>(nodeBuffers, iter);
+
 		case TokenKind::identifier:
 		{
 			// check if next token is opening parenthesis
@@ -831,6 +925,44 @@ namespace AlloyCompiler
 
 	template <>
 	NodeID parse<STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
+	NodeID parse<VALUE_DEFINITION_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+		NodeID valueDefinitionExpressionID = parse<VALUE_DEFINITION_EXPRESSION>(nodeBuffers, iter);
+
+		if (valueDefinitionExpressionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for semicolon
+		if (iter.GetKind() != TokenKind::semicolon)
+		{
+			unexpectedToken(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume semicolon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "}" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::VALUE_DEFINITION_STATEMENT,
+				.ValueDefinitionStatement = VALUE_DEFINITION_STATEMENT
+				{
+					.ValueDefinitionExpressionID = valueDefinitionExpressionID
+				}
+			},
+			errorInfo
+		);
+	}
 
 	template <>
 	NodeID parse<ASSIGNMENT_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
@@ -1227,6 +1359,10 @@ namespace AlloyCompiler
 	{
 		switch (iter.GetKind())
 		{
+		case TokenKind::constant_keyword:
+		case TokenKind::variable_keyword:
+			return parse<VALUE_DEFINITION_STATEMENT>(nodeBuffers, iter);
+
 		case TokenKind::identifier:
 			return parse<ASSIGNMENT_STATEMENT>(nodeBuffers, iter);
 
@@ -1258,34 +1394,10 @@ namespace AlloyCompiler
 	template <>
 	NodeID parse<VALUE_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		// parse value declaration
-		NodeID valueDeclarationID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
-
-		if (valueDeclarationID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for assignment operator
-		if (iter.GetKind() != TokenKind::assignment_operator)
-		{
-			unexpectedToken(iter, { "=" });
-			return ERROR_NODE_ID;
-		}
-
 		TokenID errorInfo = iter.GetCurrentID();
+		NodeID valueDefinitionExpressionID = parse<VALUE_DEFINITION_EXPRESSION>(nodeBuffers, iter);
 
-		// consume assignment operator
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "expression" });
-			return ERROR_NODE_ID;
-		}
-
-		// parse expression
-		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
-
-		if (expressionID == ERROR_NODE_ID)
+		if (valueDefinitionExpressionID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
@@ -1306,8 +1418,7 @@ namespace AlloyCompiler
 				.Kind = NodeKind::VALUE_DEFINITION,
 				.ValueDefinition = VALUE_DEFINITION
 				{
-					.ValueDeclarationID = valueDeclarationID,
-					.ValueID = expressionID
+					.ValueDefinitionExpressionID = valueDefinitionExpressionID
 				}
 			},
 			errorInfo

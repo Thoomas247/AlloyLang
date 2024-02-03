@@ -13,7 +13,7 @@ using namespace AlloyCompiler;
 int main()
 {
 	const size_t n = 0;// 0'000;
-	std::string str = "const res : i64 = 1+2;var e : f32 = res + 1.01;"; // TestSrc;
+	std::string str = TestSrc; //"const res : i64 = 1+2;var e : f32 = res + 1.01;"; // TestSrc;
 	str.reserve(str.size() * (n + 1));
 
 	for (size_t i = 0; i < n; i++)
