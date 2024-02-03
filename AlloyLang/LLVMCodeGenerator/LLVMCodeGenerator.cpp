@@ -4,11 +4,9 @@
 using namespace llvm;
 using namespace AlloyCompiler;
 
-#define NAME_OF_NODE(x) TokenBuffers.GetSourceView(NodeBuffers.GetNode(x.IdentifierID).Identifier.Token)
-
-LLVMCodeGenerator::LLVMCodeGenerator(const Tokenizer::TokenDataBuffers& tokenBuffers, 
-                const Parser::NodeDataBuffers& nodeDataBuffers)
-    : NodeBuffers(nodeDataBuffers), TokenBuffers(tokenBuffers) {
+LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuffers,
+                const AlloyCompiler::NodeBuffers& nodeBuffers)
+    : NodeBuffers(nodeBuffers), TokenBuffers(tokenBuffers) {
 
     // Open a new context and module.
     TheContext = std::make_unique<LLVMContext>();
@@ -131,49 +129,44 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
     Value* result = nullptr;
 
     switch (node.Kind) {
-    case NodeKind::Program:
+    case NodeKind::PROGRAM:
     {
-        std::vector<NodeID>::const_iterator iter = node.Program.Modules.List.begin();
-        for (iter; iter < node.Program.Modules.List.end(); iter++) {
+        std::vector<NodeID>::const_iterator iter = node.Program.ModuleIDs.begin();
+        for (iter; iter < node.Program.ModuleIDs.end(); iter++) {
             codegen(*iter);
         }
         break;
     }
 
-    case NodeKind::Module:
+    case NodeKind::MODULE:
     {
-        std::vector<NodeID>::const_iterator iter = node.Module.QualifiedDefinitions.List.begin();
-        for (iter; iter < node.Module.QualifiedDefinitions.List.end(); iter++) {
+        std::vector<NodeID>::const_iterator iter = node.Module.QualifiedDefinitionIDs.begin();
+        for (iter; iter < node.Module.QualifiedDefinitionIDs.end(); iter++) {
             codegen(*iter);
         }
         break;
     }
 
-    case NodeKind::QualifiedDefinition:
-        codegen(node.QualifiedDefinition.Definition);
+    case NodeKind::QUALIFIED_DEFINITION:
+        codegen(node.QualifiedDefinition.DefinitionID);
         break;
 
-    case NodeKind::ConstantDefinition:
-    case NodeKind::VariableDefinition:
-        codegen(node.VariableDefinition);
+    case NodeKind::VALUE_DEFINITION:
+        codegen(node.ValueDefinition);
+        break;
+ 
+    case NodeKind::LITERAL:
+        result = codegen(node.Literal);
         break;
 
-    case NodeKind::IntegerLiteral:
-        result = codegen(node.IntegerLiteral);
+    case NodeKind::BINARY_EXPRESSION:
+        result = codegen(node.BinaryExpression);
         break;
-
-    case NodeKind::FloatLiteral:
-        result = codegen(node.FloatLiteral);
-        break;
-
-    case NodeKind::Binary:
-        result = codegen(node.Binary);
-        break;
-
+/*
     case NodeKind::MemoryAccess:
         result = codegen(node.MemoryAccess);
         break;
-
+*/
     default:
         assert(false);
         break;
@@ -181,7 +174,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
     return result;
 }
 
-Value* LLVMCodeGenerator::codegen(uint32_t nodeID) {
+Value* LLVMCodeGenerator::codegen(NodeID nodeID) {
     Value* result = nullptr;
 
     // TBD: how do we know if nodeID actually exists?
@@ -193,21 +186,27 @@ Value* LLVMCodeGenerator::codegen(uint32_t nodeID) {
     return result;
 }
 
-Value* LLVMCodeGenerator::codegen(const VariableDefinition& node) {
-    const Node& declaration(NodeBuffers.GetNode(node.Declaration));
-    assert(declaration.Kind == NodeKind::VariableDeclaration || declaration.Kind == NodeKind::ConstantDeclaration);
+Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
 
-    std::string VarName(NAME_OF_NODE(declaration.VariableDeclaration));
-    AllocaInst* A = Builder->CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
-    NamedValues[VarName] = A;
+    // get the identifier of the variable or constant
+    const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(node.ValueDeclarationID).ValueDeclaration;
+    const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
+    std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
-    return Builder->CreateLoad(A->getAllocatedType(), A, VarName.c_str());
+    // now get the value by recursively calling codegen
+    Value* value = HandleTopLevelExpression(NodeBuffers.GetNode(node.ValueID));
+
+    //AllocaInst* A = Builder->CreateAlloca(Type::getFloatTy(*TheContext), nullptr, Name);
+    //NamedValues[Name] = A;
+
+    return value;
 }
 
-Value* LLVMCodeGenerator::codegen(const AlloyCompiler::MemoryAccess& node) {
+/*
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::VALUE_DEFINITION& node) {
 
     // Look this variable up in the function.
-    std::string Name(NAME_OF_NODE(node));
+    const std::string Name(TokenBuffers.GetValue(node.OperatorTokenID).ToStringView());
     AllocaInst* A = NamedValues[Name];
     if (A) {
         // Load the value.
@@ -219,39 +218,38 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::MemoryAccess& node) {
     return nullptr;
 
 }
-
-Value* LLVMCodeGenerator::codegen(const Binary& node) {
+*/
+Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
     Value* result = nullptr;
-    Value* L = codegen(node.Left);
-    Value* R = codegen(node.Right);
+    Value* L = codegen(node.LeftID);
+    Value* R = codegen(node.RightID);
+
+    const std::string op(TokenBuffers.GetValue(node.OperatorTokenID).ToStringView());
+
 
     if (L && R) {
-        switch (node.Op) {
-        case TokenValue::Plus:
-            return Builder->CreateFAdd(L, R, "addtmp");
-        case TokenValue::Minus:
-            return Builder->CreateFSub(L, R, "subtmp");
-        case TokenValue::Multiply:
-            return Builder->CreateFMul(L, R, "multmp");
-        case TokenValue::LessThan:
+        if (op == "+")
+            result = Builder->CreateFAdd(L, R, "addtmp");
+        else if (op == "-")
+            result = Builder->CreateFSub(L, R, "subtmp");
+        else if (op == "*")
+            result = Builder->CreateFMul(L, R, "multmp");
+        else if (op == "<") {
             L = Builder->CreateFCmpULT(L, R, "cmptmp");
             // Convert bool 0/1 to double 0.0 or 1.0
-            return Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
-        default:
+            result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
+        }
+        else {
             // TBD
             printf("invalid binary operator\n");
-            return 0;
         }
     }
     return result;
 }
 
-Value* LLVMCodeGenerator::codegen(const IntegerLiteral& node) {
+Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
     // TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
     //    return ConstantInt::get(*TheContext, APInt(64, node.Value));
-    return ConstantFP::get(*TheContext, APFloat((double)node.Value));
-}
-
-Value* LLVMCodeGenerator::codegen(const FloatLiteral& node) {
-    return ConstantFP::get(*TheContext, APFloat(node.Value));
+    const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
+    return ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
 }

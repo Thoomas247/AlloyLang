@@ -15,7 +15,6 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 
-#include "../parser/ASTNodes.hpp"
 #include "../parser/Parser.hpp"
 
 using namespace llvm;
@@ -55,8 +54,8 @@ public:
 class LLVMCodeGenerator
 {
 public:
-	LLVMCodeGenerator(const AlloyCompiler::Tokenizer::TokenDataBuffers& tokenBuffers, 
-		const AlloyCompiler::Parser::NodeDataBuffers& nodeDataBuffers);
+	LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuffers, 
+		const AlloyCompiler::NodeBuffers& nodeDataBuffers);
 	~LLVMCodeGenerator();
 
 	int Process();
@@ -69,8 +68,8 @@ private:
 	std::unique_ptr<IRBuilder<>> Builder;
 	std::unique_ptr<llvm::Module> TheModule;
 	std::map<std::string, AllocaInst*> NamedValues;
-	const AlloyCompiler::Parser::NodeDataBuffers& NodeBuffers;
-	const AlloyCompiler::Tokenizer::TokenDataBuffers& TokenBuffers;
+	const AlloyCompiler::NodeBuffers& NodeBuffers;
+	const AlloyCompiler::TokenBuffers& TokenBuffers;
 
 	// support for mutable variables
 	AllocaInst* CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName);
@@ -80,14 +79,13 @@ private:
 
 	// recursively process all nodes
 	Value* codegen(const AlloyCompiler::Node& node);
-	Value* codegen(uint32_t nodeID);
+	Value* codegen(AlloyCompiler::NodeID nodeID);
 
 	Function* codegen(FunctionAST& function);
 	Function* codegen(PrototypeAST& prototype);
-	Value* codegen(const AlloyCompiler::IntegerLiteral& node);
-	Value* codegen(const AlloyCompiler::FloatLiteral& node);
-	Value* codegen(const AlloyCompiler::Binary& node);
-	Value* codegen(const AlloyCompiler::VariableDefinition& node);
-	Value* codegen(const AlloyCompiler::MemoryAccess& node);
+	Value* codegen(const AlloyCompiler::LITERAL& node);
+	Value* codegen(const AlloyCompiler::BINARY_EXPRESSION& node);
+	Value* codegen(const AlloyCompiler::VALUE_DEFINITION& node);
+//	Value* codegen(const AlloyCompiler::MemoryAccess& node);
 };
 

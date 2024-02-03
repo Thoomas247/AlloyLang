@@ -72,7 +72,7 @@ namespace AlloyCompiler
 
 		case NodeKind::BINARY_EXPRESSION:
 		{
-			Log::Print("{0}BINARY_EXPRESSION:", indentStr);
+			Log::Print("{0}BINARY_EXPRESSION {1}:", indentStr, tokenBuffers.GetValue(currentNode.BinaryExpression.OperatorTokenID).ToStringView());
 			printNode(tokenBuffers, nodeBuffers, currentNode.BinaryExpression.LeftID, indent + 1);
 			printNode(tokenBuffers, nodeBuffers, currentNode.BinaryExpression.RightID, indent + 1);
 			break;
