@@ -44,20 +44,11 @@ namespace AlloyCompiler
 
 #ifdef _DEBUG
 
-	template <typename... Args>
-	constexpr void ASSERT(bool condition, const std::string& format, Args&&... args)
-	{
-		if (!condition)
-		{
-			Log::Fatal(format, args...);
-			__debugbreak();
-		}
-	}
+#define ASSERT(condition, fmt, ...) if (!(condition)) { Log::Fatal(fmt, __VA_ARGS__); __debugbreak(); }
 
 #else
 
-	template <typename... Args>
-	constexpr void ASSERT(bool condition, const std::string& format, Args&&... args) {}
+#define ASSERT(condition, fmt, ...)
 
 #endif // DEBUG
 

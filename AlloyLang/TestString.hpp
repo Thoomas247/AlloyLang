@@ -65,6 +65,25 @@ fn loop (const a : &i64) -> i64
 	return res;
 }
 
+fn while_loop (const a : &i64) -> i64
+{
+	var res : i64 = 0;
+	var i : i64 = 0;
+	while (i < a)
+	{
+		res = res + i;
+		i = i + 1;
+	}
+	return res;
+}
+
+fn anon_block (const a : &i64) -> i64
+{
+	{
+		return a;
+	}
+}
+
 exp var a : i64 = 2;
 pub var c : char = 'A';
 
