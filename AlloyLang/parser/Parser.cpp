@@ -985,39 +985,11 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
-		// check for opening parenthesis
-		if (iter.GetKind() != TokenKind::open_paren)
-		{
-			unexpectedToken(iter, { "(" });
-			return ERROR_NODE_ID;
-		}
-
-		// consume opening parenthesis
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "expression" });
-			return ERROR_NODE_ID;
-		}
-
 		// parse condition
-		NodeID conditionID = parse<EXPRESSION>(nodeBuffers, iter);
+		NodeID conditionID = parse<ENCLOSED_EXPRESSION>(nodeBuffers, iter);
 
 		if (conditionID == ERROR_NODE_ID)
 		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for closing parenthesis
-		if (iter.GetKind() != TokenKind::close_paren)
-		{
-			unexpectedToken(iter, { ")" });
-			return ERROR_NODE_ID;
-		}
-
-		// consume closing parenthesis
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "statement" });
 			return ERROR_NODE_ID;
 		}
 
@@ -1054,39 +1026,11 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
-		// check for opening parenthesis
-		if (iter.GetKind() != TokenKind::open_paren)
-		{
-			unexpectedToken(iter, { "(" });
-			return ERROR_NODE_ID;
-		}
-
-		// consume opening parenthesis
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "expression" });
-			return ERROR_NODE_ID;
-		}
-
 		// parse condition
-		NodeID conditionID = parse<EXPRESSION>(nodeBuffers, iter);
+		NodeID conditionID = parse<ENCLOSED_EXPRESSION>(nodeBuffers, iter);
 
 		if (conditionID == ERROR_NODE_ID)
 		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for closing parenthesis
-		if (iter.GetKind() != TokenKind::close_paren)
-		{
-			unexpectedToken(iter, { ")" });
-			return ERROR_NODE_ID;
-		}
-
-		// consume closing parenthesis
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "statement" });
 			return ERROR_NODE_ID;
 		}
 

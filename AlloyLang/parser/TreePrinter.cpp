@@ -1,212 +1,519 @@
 #include "TreePrinter.hpp"
 
 #include "../log/Log.hpp"
+#include "../json/json.hpp"
+
+using json = nlohmann::json;
 
 namespace AlloyCompiler
 {
-	constexpr auto INDENT_SIZE = 2;
 
-	inline static void printNode(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID, size_t indent)
+	template <typename T>
+	json print(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID) = delete;
+
+	template <>
+	json print<LITERAL>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
-		std::string indentStr = std::string(indent * INDENT_SIZE, ' ');
+		const auto& literalNode = nodeBuffers.GetNode(nodeID).Literal;
 
-		if (nodeID == ERROR_NODE_ID)
+		std::string literalType = "NONE";
+
+		if (literalNode.Kind == LITERAL::Type::Integer)
 		{
-			Log::Print("{0}ERROR_NODE_ID", indentStr);
-			return;
+			literalType = "INTEGER";
+		}
+		else if (literalNode.Kind == LITERAL::Type::Float)
+		{
+			literalType = "FLOAT";
+		}
+		else if (literalNode.Kind == LITERAL::Type::String)
+		{
+			literalType = "STRING";
+		}
+		else if (literalNode.Kind == LITERAL::Type::Boolean)
+		{
+			literalType = "BOOLEAN";
+		}
+		else if (literalNode.Kind == LITERAL::Type::Character)
+		{
+			literalType = "CHARACTER";
 		}
 
-		const auto& currentNode = nodeBuffers.GetNode(nodeID);
+		json j;
+		j["kind"] = "LITERAL";
+		j["type"] = literalType;
+		j["value"] = tokenBuffers.GetValue(literalNode.InfoTokenID).ToStringView();
 
-		switch (currentNode.Kind)
+		return j;
+	}
+
+	template <>
+	json print<IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& identifierNode = nodeBuffers.GetNode(nodeID).Identifier;
+
+		json j;
+		j["kind"] = "IDENTIFIER";
+		j["value"] = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+
+		return j;
+	}
+
+	template <>
+	json print<TYPE_IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
+
+		std::string modifierString = "NONE";
+
+		if (typeIdentifierNode.Mod == TYPE_IDENTIFIER::Modifier::Reference)
 		{
-		case NodeKind::LITERAL:
-		{
-			const auto& value = tokenBuffers.GetValue(currentNode.Literal.InfoTokenID).ToStringView();
-			Log::Print("{0}LITERAL: {1}", indentStr, value);
-			break;
+			modifierString = "REFERENCE";
 		}
 
+		else if (typeIdentifierNode.Mod == TYPE_IDENTIFIER::Modifier::Pointer)
+		{
+			modifierString = "POINTER";
+		}
+
+		json j;
+		j["kind"] = "TYPE_IDENTIFIER";
+		j["modifier"] = modifierString;
+		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, typeIdentifierNode.IdentifierID);
+
+		return j;
+	}
+
+	template <>
+	json print<TYPE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& typeDeclarationNode = nodeBuffers.GetNode(nodeID).TypeDeclaration;
+
+		std::string typeString = "COPY";
+
+		if (typeDeclarationNode.Kind == TYPE_DECLARATION::Type::Constant)
+		{
+			typeString = "CONSTANT";
+		}
+		else if (typeDeclarationNode.Kind == TYPE_DECLARATION::Type::Variable)
+		{
+			typeString = "VARIABLE";
+		}
+
+		json j;
+		j["kind"] = "TYPE_DECLARATION";
+		j["type"] = typeString;
+		j["identifier"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, typeDeclarationNode.TypeIdentifierID);
+
+		return j;
+	}
+
+	template <>
+	json print<VALUE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& valueDeclarationNode = nodeBuffers.GetNode(nodeID).ValueDeclaration;
+
+		json j;
+		j["kind"] = "VALUE_DECLARATION";
+		j["type"] = valueDeclarationNode.Kind == VALUE_DECLARATION::Type::Variable ? "VARIABLE" : "CONSTANT";
+		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.IdentifierID);
+		j["type"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.TypeIdentifierID);
+
+		return j;
+	}
+
+	template <>
+	json print<EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID);
+
+	template <>
+	json print<FUNCTION_CALL_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& functionCallExpressionNode = nodeBuffers.GetNode(nodeID).FunctionCallExpression;
+
+		json j;
+		j["kind"] = "FUNCTION_CALL_EXPRESSION";
+		j["function_name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, functionCallExpressionNode.IdentifierID);
+
+		for (const auto& argumentID : functionCallExpressionNode.ArgumentIDs)
+		{
+			j["arguments"].push_back(print<EXPRESSION>(tokenBuffers, nodeBuffers, argumentID));
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<ENCLOSED_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& enclosedExpressionNode = nodeBuffers.GetNode(nodeID).EnclosedExpression;
+
+		json j;
+		j["kind"] = "ENCLOSED_EXPRESSION";
+		j["expression"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, enclosedExpressionNode.ExpressionID);
+
+		return j;
+	}
+
+	template <>
+	json print<BINARY_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& binaryExpressionNode = nodeBuffers.GetNode(nodeID).BinaryExpression;
+
+		json j;
+		j["kind"] = "BINARY_EXPRESSION";
+		j["operator"] = tokenBuffers.GetValue(binaryExpressionNode.OperatorTokenID).ToStringView();
+		j["left"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, binaryExpressionNode.LeftID);
+		j["right"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, binaryExpressionNode.RightID);
+
+		return j;
+	}
+
+	template <>
+	json print<UNARY_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& unaryExpressionNode = nodeBuffers.GetNode(nodeID).UnaryExpression;
+
+		json j;
+		j["kind"] = "UNARY_EXPRESSION";
+		j["operator"] = tokenBuffers.GetValue(unaryExpressionNode.OperatorTokenID).ToStringView();
+		j["operand"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, unaryExpressionNode.OperandID);
+
+		return j;
+	}
+
+	template <>
+	json print<PRIMARY_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& primaryExpressionNode = nodeBuffers.GetNode(nodeID);
+
+		switch (primaryExpressionNode.Kind)
+		{
 		case NodeKind::IDENTIFIER:
-		{
-			const auto& value = tokenBuffers.GetValue(currentNode.Identifier.IdentifierTokenID).ToStringView();
-			Log::Print("{0}IDENTIFIER: {1}", indentStr, value);
-			break;
-		}
+			return print<IDENTIFIER>(tokenBuffers, nodeBuffers, nodeID);
 
-		case NodeKind::TYPE_IDENTIFIER:
-		{
-			const auto& identifierNode = nodeBuffers.GetNode(currentNode.TypeIdentifier.IdentifierID).Identifier;
-			const auto& value = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
-			Log::Print("{0}TYPE_IDENTIFIER: {1}", indentStr, value);
-			break;
-		}
-
-		case NodeKind::TYPE_DECLARATION:
-		{
-			Log::Print("{0}TYPE_DECLARATION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.TypeDeclaration.TypeIdentifierID, indent + 1);
-			break;
-		}
-
-		case NodeKind::VALUE_DECLARATION:
-		{
-			Log::Print("{0}VALUE_DECLARATION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.ValueDeclaration.TypeIdentifierID, indent + 1);
-			break;
-		}
+		case NodeKind::LITERAL:
+			return print<LITERAL>(tokenBuffers, nodeBuffers, nodeID);
 
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
-		{
-			Log::Print("{0}FUNCTION_CALL_EXPRESSION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.FunctionCallExpression.IdentifierID, indent + 1);
-			break;
-		}
+			return print<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
 		case NodeKind::ENCLOSED_EXPRESSION:
-		{
-			Log::Print("{0}ENCLOSED_EXPRESSION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.EnclosedExpression.ExpressionID, indent + 1);
-			break;
-		}
-
-		case NodeKind::BINARY_EXPRESSION:
-		{
-			Log::Print("{0}BINARY_EXPRESSION {1}:", indentStr, tokenBuffers.GetValue(currentNode.BinaryExpression.OperatorTokenID).ToStringView());
-			printNode(tokenBuffers, nodeBuffers, currentNode.BinaryExpression.LeftID, indent + 1);
-			printNode(tokenBuffers, nodeBuffers, currentNode.BinaryExpression.RightID, indent + 1);
-			break;
-		}
-
-		case NodeKind::UNARY_EXPRESSION:
-		{
-			Log::Print("{0}UNARY_EXPRESSION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.UnaryExpression.OperandID, indent + 1);
-			break;
-		}
-
-		case NodeKind::ASSIGNMENT_EXPRESSION:
-		{
-			Log::Print("{0}ASSIGNMENT_EXPRESSION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.AssignmentExpression.IdentifierID, indent + 1);
-			printNode(tokenBuffers, nodeBuffers, currentNode.AssignmentExpression.ValueID, indent + 1);
-			break;
-		}
-
-		case NodeKind::ASSIGNMENT_STATEMENT:
-		{
-			Log::Print("{0}ASSIGNMENT_STATEMENT:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.AssignmentStatement.AssignmentExpressionID, indent + 1);
-			break;
-		}
-
-		case NodeKind::FOR_LOOP_STATEMENT:
-		{
-			Log::Print("{0}FOR_LOOP_STATEMENT:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.ForLoopStatement.InitExpressionID, indent + 1);
-			printNode(tokenBuffers, nodeBuffers, currentNode.ForLoopStatement.ConditionExpressionID, indent + 1);
-			printNode(tokenBuffers, nodeBuffers, currentNode.ForLoopStatement.IncrementExpressionID, indent + 1);
-			printNode(tokenBuffers, nodeBuffers, currentNode.ForLoopStatement.BodyID, indent + 1);
-			break;
-		}
-
-		case NodeKind::WHILE_LOOP_STATEMENT:
-		{
-			Log::Print("{0}WHILE_LOOP_STATEMENT:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.WhileLoopStatement.ConditionExpressionID, indent + 1);
-			break;
-		}
-
-		case NodeKind::IF_STATEMENT:
-		{
-			Log::Print("{0}IF_STATEMENT:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.IfStatement.ConditionExpressionID, indent + 1);
-			break;
-		}
-
-		case NodeKind::BLOCK_STATEMENT:
-		{
-			Log::Print("{0}BLOCK_STATEMENT:", indentStr);
-			for (const auto& statementID : currentNode.BlockStatement.StatementIDs)
-			{
-				printNode(tokenBuffers, nodeBuffers, statementID, indent + 1);
-			}
-			break;
-		}
-
-		case NodeKind::RETURN_STATEMENT:
-		{
-			Log::Print("{0}RETURN_STATEMENT:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.ReturnStatement.ExpressionID, indent + 1);
-			break;
-		}
-
-		case NodeKind::VALUE_DEFINITION:
-		{
-			Log::Print("{0}VALUE_DEFINITION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.ValueDefinition.ValueDeclarationID, indent + 1);
-			break;
-		}
-
-		case NodeKind::STRUCT_DEFINITION:
-		{
-			Log::Print("{0}STRUCT_DEFINITION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.StructDefinition.IdentifierID, indent + 1);
-			break;
-		}
-
-		case NodeKind::ENUM_DEFINITION:
-		{
-			Log::Print("{0}ENUM_DEFINITION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.EnumDefinition.IdentifierID, indent + 1);
-			break;
-		}
-
-		case NodeKind::FUNCTION_DEFINITION:
-		{
-			Log::Print("{0}FUNCTION_DEFINITION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.FunctionDefinition.IdentifierID, indent + 1);
-			break;
-		}
-
-		case NodeKind::QUALIFIED_DEFINITION:
-		{
-			Log::Print("{0}QUALIFIED_DEFINITION:", indentStr);
-			printNode(tokenBuffers, nodeBuffers, currentNode.QualifiedDefinition.DefinitionID, indent + 1);
-			break;
-		}
-
-		case NodeKind::MODULE:
-		{
-			Log::Print("{0}MODULE:", indentStr);
-			for (const auto& definitionID : currentNode.Module.QualifiedDefinitionIDs)
-			{
-				printNode(tokenBuffers, nodeBuffers, definitionID, indent + 1);
-			}
-			break;
-		}
-
-		case NodeKind::PROGRAM:
-		{
-			Log::Print("{0}PROGRAM:", indentStr);
-			for (const auto& moduleID : currentNode.Program.ModuleIDs)
-			{
-				printNode(tokenBuffers, nodeBuffers, moduleID, indent + 1);
-			}
-			break;
-		}
-
+			return print<ENCLOSED_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
 		default:
-			Log::Print("{0}Unknown node kind: {1}", indentStr, (size_t)currentNode.Kind);
-			break;
-
+			ASSERT(false, "Unknown primary expression kind");
+			return json();
 		}
+	}
+
+	template <>
+	json print<ASSIGNMENT_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& assignmentExpressionNode = nodeBuffers.GetNode(nodeID).AssignmentExpression;
+
+		json j;
+		j["kind"] = "ASSIGNMENT_EXPRESSION";
+		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, assignmentExpressionNode.IdentifierID);
+		j["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, assignmentExpressionNode.ValueID);
+
+		return j;
+	}
+
+	template <>
+	json print<EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& expressionNode = nodeBuffers.GetNode(nodeID);
+
+		switch (expressionNode.Kind)
+		{
+		case NodeKind::BINARY_EXPRESSION:
+			return print<BINARY_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::UNARY_EXPRESSION:
+			return print<UNARY_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::IDENTIFIER:
+		case NodeKind::LITERAL:
+		case NodeKind::FUNCTION_CALL_EXPRESSION:
+		case NodeKind::ENCLOSED_EXPRESSION:
+			return print<PRIMARY_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::ASSIGNMENT_EXPRESSION:
+			return print<ASSIGNMENT_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
+		default:
+			ASSERT(false, "Unknown expression kind");
+			return json();
+		}
+	}
+
+	template <>
+	json print<STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID);
+
+	template <>
+	json print<ASSIGNMENT_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& assignmentNode = nodeBuffers.GetNode(nodeID).AssignmentStatement;
+
+		json j;
+		j["kind"] = "ASSIGNMENT_STATEMENT";
+		j["assignment_expression"] = print<ASSIGNMENT_EXPRESSION>(tokenBuffers, nodeBuffers, assignmentNode.AssignmentExpressionID);
+
+		return j;
+	}
+
+	template <>
+	json print<FOR_LOOP_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& forLoopNode = nodeBuffers.GetNode(nodeID).ForLoopStatement;
+
+		json j;
+		j["kind"] = "FOR_LOOP_STATEMENT";
+		j["initializer"] = print<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, forLoopNode.InitExpressionID);
+		j["condition"] = print<ENCLOSED_EXPRESSION>(tokenBuffers, nodeBuffers, forLoopNode.ConditionExpressionID);
+		j["increment"] = print<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, forLoopNode.IncrementExpressionID);
+		j["body"] = print<STATEMENT>(tokenBuffers, nodeBuffers, forLoopNode.BodyID);
+
+		return j;
+	}
+
+	template <>
+	json print<WHILE_LOOP_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& whileLoopNode = nodeBuffers.GetNode(nodeID).WhileLoopStatement;
+
+		json j;
+		j["kind"] = "WHILE_LOOP_STATEMENT";
+		j["condition"] = print<ENCLOSED_EXPRESSION>(tokenBuffers, nodeBuffers, whileLoopNode.ConditionExpressionID);
+		j["body"] = print<STATEMENT>(tokenBuffers, nodeBuffers, whileLoopNode.BodyID);
+
+		return j;
+	}
+
+	template <>
+	json print<IF_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& ifStatementNode = nodeBuffers.GetNode(nodeID).IfStatement;
+
+		json j;
+		j["kind"] = "IF_STATEMENT";
+		j["condition"] = print<ENCLOSED_EXPRESSION>(tokenBuffers, nodeBuffers, ifStatementNode.ConditionExpressionID);
+		j["body"] = print<STATEMENT>(tokenBuffers, nodeBuffers, ifStatementNode.BodyID);
+
+		if (ifStatementNode.ElseID != ERROR_NODE_ID)
+		{
+			j["else"] = print<STATEMENT>(tokenBuffers, nodeBuffers, ifStatementNode.ElseID);
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<BLOCK_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& blockStatementNode = nodeBuffers.GetNode(nodeID).BlockStatement;
+
+		json j;
+		j["kind"] = "BLOCK_STATEMENT";
+
+		for (const auto& statementID : blockStatementNode.StatementIDs)
+		{
+			j["statements"].push_back(print<STATEMENT>(tokenBuffers, nodeBuffers, statementID));
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<RETURN_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& returnStatementNode = nodeBuffers.GetNode(nodeID).ReturnStatement;
+
+		json j;
+		j["kind"] = "RETURN_STATEMENT";
+		j["expression"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, returnStatementNode.ExpressionID);
+
+		return j;
+	}
+
+	template <>
+	json print<STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& statementNode = nodeBuffers.GetNode(nodeID);
+
+		switch (statementNode.Kind)
+		{
+		case NodeKind::ASSIGNMENT_STATEMENT:
+			return print<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::FOR_LOOP_STATEMENT:
+			return print<FOR_LOOP_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::WHILE_LOOP_STATEMENT:
+			return print<WHILE_LOOP_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::IF_STATEMENT:
+			return print<IF_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::BLOCK_STATEMENT:
+			return print<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::RETURN_STATEMENT:
+			return print<RETURN_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
+		default:
+			ASSERT(false, "Unknown statement kind");
+			return json();
+		}
+	}
+
+	template <>
+	json print<VALUE_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& valueDefinitionNode = nodeBuffers.GetNode(nodeID).ValueDefinition;
+
+		json j;
+		j["kind"] = "VALUE_DEFINITION";
+		j["declaration"] = print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, valueDefinitionNode.ValueDeclarationID);
+		j["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, valueDefinitionNode.ValueID);
+
+		return j;
+	}
+
+	template <>
+	json print<STRUCT_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& structDefinitionNode = nodeBuffers.GetNode(nodeID).StructDefinition;
+
+		json j;
+		j["kind"] = "STRUCT_DEFINITION";
+		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, structDefinitionNode.IdentifierID);
+
+		for (const auto& memberID : structDefinitionNode.MemberIDs)
+		{
+			j["members"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, memberID));
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<ENUM_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& enumDefinitionNode = nodeBuffers.GetNode(nodeID).EnumDefinition;
+
+		json j;
+		j["kind"] = "ENUM_DEFINITION";
+		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, enumDefinitionNode.IdentifierID);
+
+		for (const auto& memberID : enumDefinitionNode.MemberIDs)
+		{
+			j["members"].push_back(print<IDENTIFIER>(tokenBuffers, nodeBuffers, memberID));
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<FUNCTION_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& functionDefinitionNode = nodeBuffers.GetNode(nodeID).FunctionDefinition;
+
+		json j;
+		j["kind"] = "FUNCTION_DEFINITION";
+		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, functionDefinitionNode.IdentifierID);
+
+		for (const auto& parameterID : functionDefinitionNode.ParameterIDs)
+		{
+			j["parameters"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, parameterID));
+		}
+
+		if (functionDefinitionNode.ReturnTypeID != ERROR_NODE_ID)
+		{
+			j["return_type"] = print<TYPE_DECLARATION>(tokenBuffers, nodeBuffers, functionDefinitionNode.ReturnTypeID);
+		}
+
+		j["body"] = print<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, functionDefinitionNode.BodyID);
+
+		return j;
+	}
+
+	template <>
+	json print<DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& definitionNode = nodeBuffers.GetNode(nodeID);
+
+		switch (definitionNode.Kind)
+		{
+		case NodeKind::VALUE_DEFINITION:
+			return print<VALUE_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::STRUCT_DEFINITION:
+			return print<STRUCT_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::ENUM_DEFINITION:
+			return print<ENUM_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::FUNCTION_DEFINITION:
+			return print<FUNCTION_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
+		default:
+			ASSERT(false, "Unknown definition kind");
+			return json();
+		}
+	}
+
+	template <>
+	json print<QUALIFIED_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& qualifiedDefinitionNode = nodeBuffers.GetNode(nodeID).QualifiedDefinition;
+
+		json j;
+		j["kind"] = "QUALIFIED_DEFINITION";
+		j["qualifier"] = (size_t)qualifiedDefinitionNode.Visibility;
+
+		j["definition"] = print<DEFINITION>(tokenBuffers, nodeBuffers, qualifiedDefinitionNode.DefinitionID);
+
+		return j;
+	}
+
+	template <>
+	json print<MODULE>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& moduleNode = nodeBuffers.GetNode(nodeID).Module;
+
+		json j;
+		j["kind"] = "MODULE";
+
+		for (const auto& qualifiedDefinitionID : moduleNode.QualifiedDefinitionIDs)
+		{
+			j["qualified_definitions"].push_back(print<QUALIFIED_DEFINITION>(tokenBuffers, nodeBuffers, qualifiedDefinitionID));
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<PROGRAM>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& programNode = nodeBuffers.GetNode(nodeID).Program;
+
+		json j;
+		j["kind"] = "PROGRAM";
+
+		for (const auto& moduleID : programNode.ModuleIDs)
+		{
+			j["modules"].push_back(print<MODULE>(tokenBuffers, nodeBuffers, moduleID));
+		}
+
+		return j;
 	}
 
 	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers)
 	{
-		printNode(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID(), 0);
+		json j = print<PROGRAM>(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
+
+		Log::Print("{0}", j.dump(NUM_SPACES_PER_TAB));
 	}
 }
 
