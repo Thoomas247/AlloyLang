@@ -342,22 +342,23 @@ namespace AlloyCompiler
 		};
 	};
 
-
 	class NodeBuffers
 	{
 	public:
-		NodeID CreateNode(const Node& node);
+		NodeID CreateNode(const Node& node, TokenID errorInfo);
 
 		VectorRef<NodeID> CreateNodeIDVector();
 		VectorRef<TokenID> CreateTokenIDVector();
 
 		const Node& GetNode(NodeID id) const;
+		TokenID GetErrorInfo(NodeID id) const;
 
 		void SetRootNodeID(NodeID id);
 		NodeID GetRootNodeID() const;
 
 	private:
 		std::vector<Node> m_Nodes;
+		std::vector<TokenID> m_ErrorInfos;
 
 		std::vector<std::unique_ptr<std::vector<NodeID>>> m_NodeIDVectors;
 		std::vector<std::unique_ptr<std::vector<TokenID>>> m_TokenIDVectors;

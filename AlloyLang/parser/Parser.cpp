@@ -157,7 +157,8 @@ namespace AlloyCompiler
 					.Kind = kind,
 					.InfoTokenID = literalTokenID
 				}
-			}
+			},
+			literalTokenID
 		);
 	}
 
@@ -185,7 +186,8 @@ namespace AlloyCompiler
 				{
 					.IdentifierTokenID = identifierTokenID
 				}
-			}
+			},
+			identifierTokenID
 		);
 	}
 
@@ -220,6 +222,7 @@ namespace AlloyCompiler
 		}
 
 		// parse identifier
+		TokenID errorInfo = iter.GetCurrentID();
 		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
 
 		if (identifierID == ERROR_NODE_ID)
@@ -236,7 +239,8 @@ namespace AlloyCompiler
 					.Mod = modifier,
 					.IdentifierID = identifierID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -281,6 +285,7 @@ namespace AlloyCompiler
 		}
 
 		// parse identifier
+		TokenID errorInfo = iter.GetCurrentID();
 		NodeID identifierID = parse<TYPE_IDENTIFIER>(nodeBuffers, iter);
 
 		if (identifierID == ERROR_NODE_ID)
@@ -297,7 +302,8 @@ namespace AlloyCompiler
 					.Kind = type,
 					.TypeIdentifierID = identifierID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -332,6 +338,7 @@ namespace AlloyCompiler
 		}
 
 		// parse identifier
+		TokenID errorInfo = iter.GetCurrentID();
 		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
 
 		if (identifierID == ERROR_NODE_ID)
@@ -371,7 +378,8 @@ namespace AlloyCompiler
 					.IdentifierID = identifierID,
 					.TypeIdentifierID = typeID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -391,6 +399,7 @@ namespace AlloyCompiler
 	template <>
 	NodeID parse<FUNCTION_CALL_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
+		TokenID errorInfo = iter.GetCurrentID();
 		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
 
 		if (identifierID == ERROR_NODE_ID)
@@ -457,7 +466,8 @@ namespace AlloyCompiler
 					.IdentifierID = identifierID,
 					.ArgumentIDs = argumentIDs
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -469,6 +479,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "(" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume opening parenthesis
 		if (!iter.Next())
@@ -507,7 +519,8 @@ namespace AlloyCompiler
 				{
 					.ExpressionID = expressionID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -547,7 +560,8 @@ namespace AlloyCompiler
 								.LeftID = left,
 								.RightID = right
 							}
-						}
+						},
+						opTokenID
 					);
 				}
 
@@ -587,7 +601,8 @@ namespace AlloyCompiler
 								.LeftID = left,
 								.RightID = right
 							}
-						}
+						},
+						opTokenID
 					);
 				}
 
@@ -627,7 +642,8 @@ namespace AlloyCompiler
 								.LeftID = left,
 								.RightID = right
 							}
-						}
+						},
+						opTokenID
 					);
 				}
 
@@ -667,7 +683,8 @@ namespace AlloyCompiler
 								.LeftID = left,
 								.RightID = right
 							}
-						}
+						},
+						opTokenID
 					);
 				}
 
@@ -680,6 +697,8 @@ namespace AlloyCompiler
 	template <>
 	NodeID parse<UNARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
+		TokenID errorInfo = iter.GetCurrentID();
+
 		// check for unary operator
 		if (iter.GetKind() != TokenKind::unary_operator)
 		{
@@ -711,7 +730,8 @@ namespace AlloyCompiler
 					.OperatorTokenID = iter.GetCurrentID(),
 					.OperandID = primaryExpressionID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -794,7 +814,8 @@ namespace AlloyCompiler
 					.OperatorTokenID = operatorTokenID,
 					.ValueID = expressionID
 				}
-			}
+			},
+			operatorTokenID
 		);
 	}
 
@@ -814,6 +835,8 @@ namespace AlloyCompiler
 	template <>
 	NodeID parse<ASSIGNMENT_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
+		TokenID errorInfo = iter.GetCurrentID();
+
 		// parse assignment expression
 		NodeID assignmentExpressionID = parse<ASSIGNMENT_EXPRESSION>(nodeBuffers, iter);
 
@@ -844,7 +867,8 @@ namespace AlloyCompiler
 				{
 					.AssignmentExpressionID = assignmentExpressionID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -857,6 +881,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "for" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume for keyword
 		if (!iter.Next())
@@ -964,7 +990,8 @@ namespace AlloyCompiler
 					.IncrementExpressionID = incrementID,
 					.BodyID = statementID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -977,6 +1004,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "while" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume while keyword
 		if (!iter.Next())
@@ -1005,7 +1034,8 @@ namespace AlloyCompiler
 					.ConditionExpressionID = conditionID,
 					.BodyID = statementID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -1018,6 +1048,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "if" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume if keyword
 		if (!iter.Next())
@@ -1073,9 +1105,9 @@ namespace AlloyCompiler
 					.BodyID = statementID,
 					.ElseID = elseStatementID
 				}
-			}
+			},
+			errorInfo
 		);
-
 	}
 
 	template <>
@@ -1087,6 +1119,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "{" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume opening brace
 		if (!iter.Next())
@@ -1125,7 +1159,8 @@ namespace AlloyCompiler
 				{
 					.StatementIDs = statementIDs
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -1137,6 +1172,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "return" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume return keyword
 		if (!iter.Next())
@@ -1180,7 +1217,8 @@ namespace AlloyCompiler
 				{
 					.ExpressionID = expressionID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -1235,6 +1273,8 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
+		TokenID errorInfo = iter.GetCurrentID();
+
 		// consume assignment operator
 		if (!iter.Next())
 		{
@@ -1269,7 +1309,8 @@ namespace AlloyCompiler
 					.ValueDeclarationID = valueDeclarationID,
 					.ValueID = expressionID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -1281,6 +1322,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "struct" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume struct keyword
 		if (!iter.Next())
@@ -1356,7 +1399,8 @@ namespace AlloyCompiler
 					.IdentifierID = identifierID,
 					.MemberIDs = memberIDs
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -1368,6 +1412,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "enum" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume enum keyword
 		if (!iter.Next())
@@ -1443,7 +1489,8 @@ namespace AlloyCompiler
 					.IdentifierID = identifierID,
 					.MemberIDs = memberIDs
 				}
-			}
+			},
+			errorInfo
 		);
 
 	}
@@ -1456,6 +1503,8 @@ namespace AlloyCompiler
 			unexpectedToken(iter, { "fn" });
 			return ERROR_NODE_ID;
 		}
+
+		TokenID errorInfo = iter.GetCurrentID();
 
 		// consume fn keyword
 		if (!iter.Next())
@@ -1561,7 +1610,8 @@ namespace AlloyCompiler
 					.ReturnTypeID = returnTypeID,
 					.BodyID = bodyID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -1614,6 +1664,7 @@ namespace AlloyCompiler
 		}
 
 		// parse definition
+		TokenID errorInfo = iter.GetCurrentID();
 		NodeID definitionID = parse<DEFINITION>(nodeBuffers, iter);
 
 		if (definitionID == ERROR_NODE_ID)
@@ -1630,7 +1681,8 @@ namespace AlloyCompiler
 					.Visibility = visibility,
 					.DefinitionID = definitionID
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
@@ -1639,6 +1691,8 @@ namespace AlloyCompiler
 	template <>
 	NodeID parse<MODULE>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
+		TokenID errorInfo = iter.GetCurrentID();
+
 		VectorRef<NodeID> qualifiedDefinitionIDs = nodeBuffers.CreateNodeIDVector();
 
 		do
@@ -1661,13 +1715,16 @@ namespace AlloyCompiler
 				{
 					.QualifiedDefinitionIDs = qualifiedDefinitionIDs
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
 	template <>
 	NodeID parse<PROGRAM>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
+		TokenID errorInfo = iter.GetCurrentID();
+
 		VectorRef<NodeID> moduleIDs = nodeBuffers.CreateNodeIDVector();
 
 		// TODO: add support for mutliple modules
@@ -1682,7 +1739,8 @@ namespace AlloyCompiler
 				{
 					.ModuleIDs = moduleIDs
 				}
-			}
+			},
+			errorInfo
 		);
 	}
 
