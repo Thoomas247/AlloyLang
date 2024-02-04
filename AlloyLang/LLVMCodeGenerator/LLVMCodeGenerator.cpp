@@ -25,6 +25,7 @@ int LLVMCodeGenerator::Process() {
     NodeID root = NodeBuffers.GetRootNodeID();
     if (ERROR_NODE_ID == root) {
         // TBD: implement error handling
+        assert(false);
         return -1;
     }
 
@@ -162,11 +163,11 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
     case NodeKind::BINARY_EXPRESSION:
         result = codegen(node.BinaryExpression);
         break;
-/*
-    case NodeKind::MemoryAccess:
-        result = codegen(node.MemoryAccess);
+
+    case NodeKind::IDENTIFIER:
+        result = codegen(node.Identifier);
         break;
-*/
+
     default:
         assert(false);
         break;
@@ -187,38 +188,74 @@ Value* LLVMCodeGenerator::codegen(NodeID nodeID) {
 }
 
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
-
-    // get the identifier of the variable or constant
+    //
+    // Expression of type: [const] identifier = value
+    // The identifier can be either global or local to the current function
+    // 
+    // get the name of the identifier
     const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(node.ValueDeclarationID).ValueDeclaration;
     const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
     std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
     // now get the value by recursively calling codegen
-    Value* value = HandleTopLevelExpression(NodeBuffers.GetNode(node.ValueID));
+    Value* value = codegen(node.ValueID);
 
-    //AllocaInst* A = Builder->CreateAlloca(Type::getFloatTy(*TheContext), nullptr, Name);
-    //NamedValues[Name] = A;
+    if (Builder->GetInsertBlock() == nullptr) {
+        // If no insertion block, we are creating global variables
+        GlobalVariable* gv = new GlobalVariable(*TheModule,
+            Type::getDoubleTy(*TheContext),
+            (declaration.Kind == VALUE_DECLARATION::Type::Constant),   // isConstant
+            GlobalValue::CommonLinkage,
+            nullptr,                        // initializer specified below
+            Name
+        );
+        gv->setAlignment(Align(sizeof(double)));
+
+        // currently assuming the initializer is constant
+        ConstantFP* ptr_2 = (ConstantFP *)value;
+        gv->setInitializer(ptr_2);
+    }
+    else {
+        // add the variable to the end of the insertion block (e.g. function local variables)
+        IRBuilder<> TmpB(Builder->GetInsertBlock(), Builder->GetInsertBlock()->end());
+        // create a mutable variable
+        AllocaInst* A = TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, Name);
+        // set the value
+        Builder->CreateStore(value, A);
+        // store in the local variables map
+        NamedValues[Name] = A;
+    }
 
     return value;
 }
 
-/*
-Value* LLVMCodeGenerator::codegen(const AlloyCompiler::VALUE_DEFINITION& node) {
-
-    // Look this variable up in the function.
-    const std::string Name(TokenBuffers.GetValue(node.OperatorTokenID).ToStringView());
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IDENTIFIER& node) {
+    //
+    // return the value of a local or global variable
+    // 
+    // Lookup this variable in the current function
+    const std::string Name(TokenBuffers.GetValue(node.IdentifierTokenID).ToStringView());
+    Value* value = nullptr;
     AllocaInst* A = NamedValues[Name];
     if (A) {
-        // Load the value.
-        return Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
+        // Found in the local variables, load the value
+        value = Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
     }
-    
-    // TBD: LogErrorV("Unknown variable name");
-    assert(false);
-    return nullptr;
+    else {
+        // not a local variable, check the globals
+        GlobalVariable* gv = TheModule->getGlobalVariable(Name);
+        if (gv) {
+            value = gv->getInitializer();
+        }
+        else {
+            // TBD: LogErrorV("Unknown variable name");
+            assert(false);
+        }
+    }
 
+    return value;
 }
-*/
+
 Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
     Value* result = nullptr;
     Value* L = codegen(node.LeftID);
@@ -242,6 +279,7 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
         else {
             // TBD
             printf("invalid binary operator\n");
+            assert(false);
         }
     }
     return result;
