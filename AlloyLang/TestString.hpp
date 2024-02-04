@@ -53,6 +53,47 @@ fn div (const a : &i64, const b : &i64) -> i64
 	return a / b;
 }
 
+fn factorial (const a : &i64) -> i64
+{
+	if (a <= 1)
+	{
+		return 1;
+	}
+	else
+	{
+		return a * factorial(a - 1);
+	}
+}
+
+fn loop (const a : &i64) -> i64
+{
+	var res : i64 = 0;
+	for (var i : i64 = 0; i < a; i = i + 1)
+	{
+		res = res + i;
+	}
+	return res;
+}
+
+fn while_loop (const a : &i64) -> i64
+{
+	var res : i64 = 0;
+	var i : i64 = 0;
+	while (i < a)
+	{
+		res = res + i;
+		i = i + 1;
+	}
+	return res;
+}
+
+fn anon_block (const a : &i64) -> i64
+{
+	{
+		return a;
+	}
+}
+
 exp var a : i64 = 2;
 pub var c : char = 'A';
 
