@@ -156,7 +156,11 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		codegen(node.ValueDefinition);
 		break;
 
-    case NodeKind::BINARY_EXPRESSION:
+	case NodeKind::VALUE_DEFINITION_EXPRESSION:
+		codegen(node.ValueDefinition);
+		break;
+	
+	case NodeKind::BINARY_EXPRESSION:
         result = codegen(node.BinaryExpression);
         break;
 
@@ -168,9 +172,6 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		result = codegen(node.Literal);
 		break;
 
-	case NodeKind::BINARY_EXPRESSION:
-		result = codegen(node.BinaryExpression);
-		break;
 	default:
 		assert(false);
 		break;
@@ -196,12 +197,12 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
     // The identifier can be either global or local to the current function
     // 
     // get the name of the identifier
-    const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(node.ValueDeclarationID).ValueDeclaration;
+    const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(node.ValueDefinitionExpressionID).ValueDeclaration;
     const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
     std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
     // now get the value by recursively calling codegen
-    Value* value = codegen(node.ValueID);
+    Value* value = codegen(node.ValueDefinitionExpressionID);
 
     if (Builder->GetInsertBlock() == nullptr) {
         // If no insertion block, we are creating global variables

@@ -4,10 +4,6 @@ constexpr auto TestSrc2 = R"(
 const res : i64 = 1+2;
 var e : f32 = res + 1.01;
 
-fn add (const a : &i64, const b : &i64) -> i64
-{
-	return a + b;
-};
 )";
 
 constexpr auto TestSrc1 = R"(
