@@ -36,95 +36,6 @@ int LLVMCodeGenerator::Process() {
 	return result;
 }
 
-// called when top level expression is encountered
-Value* LLVMCodeGenerator::HandleTopLevelExpression(const AlloyCompiler::Node& node) {
-	std::unique_ptr<PrototypeAST> Proto = std::make_unique<PrototypeAST>("__anon_expr", std::vector<std::string>());
-	std::unique_ptr<FunctionAST> Function = std::make_unique<FunctionAST>(std::move(Proto), node);
-
-	// Evaluate a top-level expression into an anonymous function.
-	if (auto* FnIR = codegen(*Function)) {
-		FnIR->print(errs());
-		fprintf(stderr, "\n");
-
-		// Remove the anonymous expression.
-		FnIR->eraseFromParent();
-	}
-
-	return nullptr;
-}
-
-/// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
-/// the function.  This is used for mutable variables etc.
-/// TBD: only works for doubles, need to implement other types
-AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName) {
-	IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-		TheFunction->getEntryBlock().begin());
-	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr,
-		VarName);
-}
-
-Function* LLVMCodeGenerator::codegen(PrototypeAST& prototype) {
-
-	// Make the function type:  double(double,double) etc.
-	std::vector<Type*> Doubles(prototype.getArgs().size(), Type::getDoubleTy(*TheContext));
-	FunctionType* FT =
-		FunctionType::get(Type::getDoubleTy(*TheContext), Doubles, false);
-
-	Function* F =
-		Function::Create(FT, Function::ExternalLinkage, prototype.getName(), *TheModule);
-
-	// Set names for all arguments.
-	unsigned Idx = 0;
-	for (auto& Arg : F->args())
-		Arg.setName(prototype.getArgs()[Idx++]);
-
-	return F;
-}
-
-Function* LLVMCodeGenerator::codegen(FunctionAST& function) {
-
-	// First, check for an existing function from a previous 'extern' declaration.
-	Function* F = TheModule->getFunction(function.getPrototype()->getName());
-
-	if (!F)
-		F = codegen(*function.getPrototype());
-
-	if (!F)
-		return nullptr;
-
-	// Create a new basic block to start insertion into.
-	BasicBlock* BB = BasicBlock::Create(*TheContext, "entry", F);
-	Builder->SetInsertPoint(BB);
-
-	// Record the function arguments in the NamedValues map.
-	NamedValues.clear();
-	for (auto& Arg : F->args()) {
-		// Create an alloca for this variable.
-		AllocaInst* Alloca = CreateEntryBlockAlloca(F, std::string(Arg.getName()));
-
-		// Store the initial value into the alloca.
-		Builder->CreateStore(&Arg, Alloca);
-
-		// Add arguments to variable symbol table.
-		NamedValues[std::string(Arg.getName())] = Alloca;
-	}
-
-	if (Value* RetVal = codegen(function.getBody())) {
-		// Finish off the function.
-		Builder->CreateRet(RetVal);
-
-		// Validate the generated code, checking for consistency.
-		verifyFunction(*F);
-
-		return F;
-	}
-
-
-	// Error reading body, remove function.
-	F->eraseFromParent();
-	return nullptr;
-}
-
 Value* LLVMCodeGenerator::codegen(const Node& node) {
 
 	Value* result = nullptr;
@@ -155,8 +66,11 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 
 	case NodeKind::FUNCTION_CALL_EXPRESSION:		// IDENTIFIER open_paren[EXPRESSION{ comma EXPRESSION }] close_paren;
+		result = codegen(node.FunctionCallExpression);
+		break;
+
 	case NodeKind::ENCLOSED_EXPRESSION:				// open_paren EXPRESSION close_paren;
-		assert(false);	// To be implemented
+		result = codegen(node.EnclosedExpression);
 		break;
 
 	case NodeKind::BINARY_EXPRESSION:				// EXPRESSION binary_operator EXPRESSION;
@@ -177,9 +91,15 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 	case NodeKind::FOR_LOOP_STATEMENT:				// for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT;
 	case NodeKind::WHILE_LOOP_STATEMENT:			// while ENCLOSED_EXPRESSION STATEMENT;
 	case NodeKind::IF_STATEMENT:					// if ENCLOSED_EXPRESSION STATEMENT[else STATEMENT];
-	case NodeKind::BLOCK_STATEMENT:					// open_brace{ STATEMENT } close_brace;
-	case NodeKind::RETURN_STATEMENT:				// return[EXPRESSION] semicolon;
 		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::BLOCK_STATEMENT:					// open_brace{ STATEMENT } close_brace;
+		result = codegen(node.BlockStatement);
+		break;
+
+	case NodeKind::RETURN_STATEMENT:				// return[EXPRESSION] semicolon;
+		result = codegen(node.ReturnStatement);
 		break;
 
 	/// End of NodeKind::STATEMENT group
@@ -199,7 +119,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 
 	case NodeKind::FUNCTION_DEFINITION:				// function IDENTIFIER open_paren[VALUE_DECLARATION{ comma VALUE_DECLARATION }] close_paren[arrow TYPE_DECLARATION] BLOCK_STATEMENT;
-		assert(false);	// To be implemented
+		codegen(node.FunctionDefinition);
 		break;
 
 	case NodeKind::QUALIFIED_DEFINITION:
@@ -258,6 +178,7 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 	// The identifier can be either global or local to the current function
 	// 
 	// get the name of the identifier
+	assert(NodeBuffers.GetNode(node.ValueDeclarationID).Kind == NodeKind::VALUE_DECLARATION);
 	const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(node.ValueDeclarationID).ValueDeclaration;
 	const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
 	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
@@ -355,4 +276,147 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 	//    return ConstantInt::get(*TheContext, APInt(64, node.Value));
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
 	return ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
+}
+
+/* called when top level expression is encountered
+Value* LLVMCodeGenerator::HandleTopLevelExpression(const AlloyCompiler::Node& node) {
+	std::unique_ptr<PrototypeAST> Proto = std::make_unique<PrototypeAST>("__anon_expr", std::vector<std::string>());
+	std::unique_ptr<FunctionAST> Function = std::make_unique<FunctionAST>(std::move(Proto), node);
+
+	// Evaluate a top-level expression into an anonymous function.
+	if (auto* FnIR = codegen(*Function)) {
+		FnIR->print(errs());
+		fprintf(stderr, "\n");
+
+		// Remove the anonymous expression.
+		FnIR->eraseFromParent();
+	}
+
+	return nullptr;
+}
+*/
+
+/// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
+/// the function.  This is used for mutable variables etc.
+/// TBD: only works for doubles, need to implement other types
+AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName) {
+	IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
+		TheFunction->getEntryBlock().begin());
+	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr,
+		VarName);
+}
+
+Function* LLVMCodeGenerator::createFunctionPrototype(const std::string & Name, const AlloyCompiler::FUNCTION_DEFINITION & node) {
+	//
+	// Helper method to create the protoype of a function
+	//
+
+	// Make the function type: double(double,double) etc.
+	std::vector<Type*> Doubles(node.ParameterIDs.size(), Type::getDoubleTy(*TheContext));
+	FunctionType* FT = FunctionType::get(Type::getDoubleTy(*TheContext), Doubles, false);
+
+	Function* F = Function::Create(FT, Function::ExternalLinkage, Name, *TheModule);
+
+	// Set names for all arguments.
+	unsigned Idx = 0;
+	for (auto& Arg : F->args()) {
+		assert(NodeBuffers.GetNode(node.ParameterIDs[Idx]).Kind == NodeKind::VALUE_DECLARATION);		// make sure we are getting back the right node type
+		const VALUE_DECLARATION& temp = NodeBuffers.GetNode(node.ParameterIDs[Idx]).ValueDeclaration;
+		const IDENTIFIER& identifier = NodeBuffers.GetNode(temp.IdentifierID).Identifier;
+		std::string argName(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
+		Arg.setName(argName);
+		Idx++;
+	}
+
+	return F;
+}
+
+Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& node) {
+	//
+	// Function definition in the form of fn function( prarameter, parameter, ... ) ->  type { statements }
+	//
+
+	// retrieve the function name
+	assert(NodeBuffers.GetNode(node.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
+	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
+
+	// First, check for an existing function from a previous declaration
+	Function* F = TheModule->getFunction(Name);
+
+	if (F) {
+		// TBD check for function signature
+		// devise a way to have multiple function with same name but different parameters
+		assert(false);
+		return nullptr;
+	}
+
+	// create the llvm function prototype
+	F = createFunctionPrototype(Name, node);
+	if (!F) {
+		// Error creating the prototype
+		assert(false);
+		return nullptr;
+	}
+
+	// Create a new basic block to start insertion into.
+	BasicBlock* BB = BasicBlock::Create(*TheContext, "entry", F);
+	Builder->SetInsertPoint(BB);
+
+	// Record the function arguments in the NamedValues map.
+	NamedValues.clear();
+	for (auto& Arg : F->args()) {
+		// Create an alloca for this variable.
+		AllocaInst* Alloca = CreateEntryBlockAlloca(F, std::string(Arg.getName()));
+
+		// Store the initial value into the alloca.
+		Builder->CreateStore(&Arg, Alloca);
+
+		// Add arguments to variable symbol table.
+		NamedValues[std::string(Arg.getName())] = Alloca;
+	}
+
+	if (Value* RetVal = codegen(node.BodyID)) {
+		// Finish off the function.
+		Builder->CreateRet(RetVal);
+
+		// Validate the generated code, checking for consistency.
+		verifyFunction(*F);
+
+		return F;
+	}
+
+
+	// Error reading body, remove function.
+	F->eraseFromParent();
+	return nullptr;
+}
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
+	//
+	// Block of code statements { statement; statement; ... }
+	//
+	Value* result = nullptr;
+
+	for (auto& S : node.StatementIDs) {
+		result = codegen(S);
+	}
+
+	return result;
+}
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION& node) {
+	//
+	// Function call: identifier(expression, expressoin, ...)
+	//
+	assert(NodeBuffers.GetNode(node.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
+	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
+
+	/*
+	Builder->CreateCall(FunctionCallee(Name))
+	*/
+	assert(false);
+	return nullptr;	
+
 }
