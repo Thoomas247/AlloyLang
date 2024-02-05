@@ -130,14 +130,80 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 	Value* result = nullptr;
 
 	switch (node.Kind) {
-	case NodeKind::PROGRAM:
-	{
-		std::vector<NodeID>::const_iterator iter = node.Program.ModuleIDs.begin();
-		for (iter; iter < node.Program.ModuleIDs.end(); iter++) {
-			codegen(*iter);
-		}
+
+	case NodeKind::LITERAL:							// integer_literal | float_literal | boolean_literal | string_literal | character_literal;
+		result = codegen(node.Literal);
 		break;
-	}
+
+	case NodeKind::IDENTIFIER:						// identifier;
+		result = codegen(node.Identifier);
+		break;
+
+	case NodeKind::TYPE_IDENTIFIER:					// [reference | pointer] IDENTIFIER;
+	case NodeKind::TYPE_DECLARATION:				// [variable | constant] TYPE_IDENTIFIER;
+	case NodeKind::VALUE_DECLARATION:				// (variable | constant) IDENTIFIER colon TYPE_IDENTIFIER;
+		assert(false);	// To be implemented
+		break;
+
+	/// NodeKind::EXPRESSION group
+
+	case NodeKind::VALUE_DEFINITION_EXPRESSION:		// VALUE_DECLARATION assignment_operator EXPRESSION;
+		result = codegen(node.ValueDefinition);
+		break;
+
+	case NodeKind::FUNCTION_CALL_EXPRESSION:		// IDENTIFIER open_paren[EXPRESSION{ comma EXPRESSION }] close_paren;
+	case NodeKind::ENCLOSED_EXPRESSION:				// open_paren EXPRESSION close_paren;
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::BINARY_EXPRESSION:				// EXPRESSION binary_operator EXPRESSION;
+		result = codegen(node.BinaryExpression);
+		break;
+
+	case NodeKind::UNARY_EXPRESSION:				// unary_operator PRIMARY_EXPRESSION;
+	case NodeKind::ASSIGNMENT_EXPRESSION:			// IDENTIFIER assignment_operator EXPRESSION;
+		assert(false);	// To be implemented
+		break;
+
+	/// End of NodeKind::EXPRESSION group
+
+	/// NodeKind::STATEMENT group
+
+	case NodeKind::VALUE_DEFINITION_STATEMENT:		// VALUE_DEFINITION_EXPRESSION semicolon;
+	case NodeKind::ASSIGNMENT_STATEMENT:			// ASSIGNMENT_EXPRESSION semicolon;
+	case NodeKind::FOR_LOOP_STATEMENT:				// for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT;
+	case NodeKind::WHILE_LOOP_STATEMENT:			// while ENCLOSED_EXPRESSION STATEMENT;
+	case NodeKind::IF_STATEMENT:					// if ENCLOSED_EXPRESSION STATEMENT[else STATEMENT];
+	case NodeKind::BLOCK_STATEMENT:					// open_brace{ STATEMENT } close_brace;
+	case NodeKind::RETURN_STATEMENT:				// return[EXPRESSION] semicolon;
+		assert(false);	// To be implemented
+		break;
+
+	/// End of NodeKind::STATEMENT group
+
+	/// NodeKind::DEFINITION group
+
+	case NodeKind::VALUE_DEFINITION:		// VALUE_DEFINITION_EXPRESSION semicolon ;
+		result = codegen(node.ValueDefinition);
+		break;
+
+	case NodeKind::STRUCT_DEFINITION:		// struct IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::ENUM_DEFINITION:			// enum IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::FUNCTION_DEFINITION:		// function IDENTIFIER open_paren[VALUE_DECLARATION{ comma VALUE_DECLARATION }] close_paren[arrow TYPE_DECLARATION] BLOCK_STATEMENT;
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::QUALIFIED_DEFINITION:
+		result = codegen(node.QualifiedDefinition.DefinitionID);
+		break;
+
+	/// End of NodeKind::DEFINITION group
 
 	case NodeKind::MODULE:
 	{
@@ -148,29 +214,14 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 	}
 
-	case NodeKind::QUALIFIED_DEFINITION:
-		codegen(node.QualifiedDefinition.DefinitionID);
+	case NodeKind::PROGRAM:
+	{
+		std::vector<NodeID>::const_iterator iter = node.Program.ModuleIDs.begin();
+		for (iter; iter < node.Program.ModuleIDs.end(); iter++) {
+			codegen(*iter);
+		}
 		break;
-
-	case NodeKind::VALUE_DEFINITION:
-		codegen(node.ValueDefinition);
-		break;
-
-	case NodeKind::VALUE_DEFINITION_EXPRESSION:
-		codegen(node.ValueDefinition);
-		break;
-	
-	case NodeKind::BINARY_EXPRESSION:
-        result = codegen(node.BinaryExpression);
-        break;
-
-    case NodeKind::IDENTIFIER:
-        result = codegen(node.Identifier);
-        break;
-
-	case NodeKind::LITERAL:
-		result = codegen(node.Literal);
-		break;
+	}
 
 	default:
 		assert(false);
