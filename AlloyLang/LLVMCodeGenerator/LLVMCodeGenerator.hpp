@@ -86,6 +86,7 @@ private:
 	Value* codegen(const AlloyCompiler::LITERAL& node);
 	Value* codegen(const AlloyCompiler::BINARY_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::VALUE_DEFINITION& node);
+	Value* codegen(const AlloyCompiler::VALUE_DEFINITION_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::IDENTIFIER& node);
 };
 

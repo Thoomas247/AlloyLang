@@ -141,14 +141,17 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 
 	case NodeKind::TYPE_IDENTIFIER:					// [reference | pointer] IDENTIFIER;
 	case NodeKind::TYPE_DECLARATION:				// [variable | constant] TYPE_IDENTIFIER;
-	case NodeKind::VALUE_DECLARATION:				// (variable | constant) IDENTIFIER colon TYPE_IDENTIFIER;
 		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::VALUE_DECLARATION:				// (variable | constant) IDENTIFIER colon TYPE_IDENTIFIER;
+		// nothing to do, handled by VALUE_DEFINITION_EXPRESSION, STRUCT_DEFINITION or FUNCTION_DEFINITION
 		break;
 
 	/// NodeKind::EXPRESSION group
 
 	case NodeKind::VALUE_DEFINITION_EXPRESSION:		// VALUE_DECLARATION assignment_operator EXPRESSION;
-		result = codegen(node.ValueDefinition);
+		result = codegen(node.ValueDefinitionExpression);
 		break;
 
 	case NodeKind::FUNCTION_CALL_EXPRESSION:		// IDENTIFIER open_paren[EXPRESSION{ comma EXPRESSION }] close_paren;
@@ -183,19 +186,19 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 
 	/// NodeKind::DEFINITION group
 
-	case NodeKind::VALUE_DEFINITION:		// VALUE_DEFINITION_EXPRESSION semicolon ;
+	case NodeKind::VALUE_DEFINITION:				// VALUE_DEFINITION_EXPRESSION semicolon ;
 		result = codegen(node.ValueDefinition);
 		break;
 
-	case NodeKind::STRUCT_DEFINITION:		// struct IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
+	case NodeKind::STRUCT_DEFINITION:				// struct IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
 		assert(false);	// To be implemented
 		break;
 
-	case NodeKind::ENUM_DEFINITION:			// enum IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
+	case NodeKind::ENUM_DEFINITION:					// enum IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
 		assert(false);	// To be implemented
 		break;
 
-	case NodeKind::FUNCTION_DEFINITION:		// function IDENTIFIER open_paren[VALUE_DECLARATION{ comma VALUE_DECLARATION }] close_paren[arrow TYPE_DECLARATION] BLOCK_STATEMENT;
+	case NodeKind::FUNCTION_DEFINITION:				// function IDENTIFIER open_paren[VALUE_DECLARATION{ comma VALUE_DECLARATION }] close_paren[arrow TYPE_DECLARATION] BLOCK_STATEMENT;
 		assert(false);	// To be implemented
 		break;
 
@@ -244,42 +247,49 @@ Value* LLVMCodeGenerator::codegen(NodeID nodeID) {
 
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
     //
-    // Expression of type: [const] identifier = value
-    // The identifier can be either global or local to the current function
-    // 
-    // get the name of the identifier
-    const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(node.ValueDefinitionExpressionID).ValueDeclaration;
-    const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
-    std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
+    // Expression of type: [const] identifier = value;	(with the semi-colon at the end)
+    //
+	return codegen(node.ValueDefinitionExpressionID);
+}
 
-    // now get the value by recursively calling codegen
-    Value* value = codegen(node.ValueDefinitionExpressionID);
+Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
+	//
+	// Expression of type: [const] identifier = value
+	// The identifier can be either global or local to the current function
+	// 
+	// get the name of the identifier
+	const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(node.ValueDeclarationID).ValueDeclaration;
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
+	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
-    if (Builder->GetInsertBlock() == nullptr) {
-        // If no insertion block, we are creating global variables
-        GlobalVariable* gv = new GlobalVariable(*TheModule,
-            Type::getDoubleTy(*TheContext),
-            (declaration.Kind == VALUE_DECLARATION::Type::Constant),   // isConstant
-            GlobalValue::CommonLinkage,
-            nullptr,                        // initializer specified below
-            Name
-        );
-        gv->setAlignment(Align(sizeof(double)));
+	// now get the value by recursively calling codegen
+	Value* value = codegen(node.ValueID);
 
-        // currently assuming the initializer is constant
-        ConstantFP* ptr_2 = (ConstantFP *)value;
-        gv->setInitializer(ptr_2);
-    }
-    else {
-        // add the variable to the end of the insertion block (e.g. function local variables)
-        IRBuilder<> TmpB(Builder->GetInsertBlock(), Builder->GetInsertBlock()->end());
-        // create a mutable variable
-        AllocaInst* A = TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, Name);
-        // set the value
-        Builder->CreateStore(value, A);
-        // store in the local variables map
-        NamedValues[Name] = A;
-    }
+	if (Builder->GetInsertBlock() == nullptr) {
+		// If no insertion block, we are creating global variables
+		GlobalVariable* gv = new GlobalVariable(*TheModule,
+			Type::getDoubleTy(*TheContext),
+			(declaration.Kind == VALUE_DECLARATION::Type::Constant),   // isConstant
+			GlobalValue::CommonLinkage,
+			nullptr,                        // initializer specified below
+			Name
+		);
+		gv->setAlignment(Align(sizeof(double)));
+
+		// currently assuming the initializer is constant
+		ConstantFP* ptr_2 = (ConstantFP*)value;
+		gv->setInitializer(ptr_2);
+	}
+	else {
+		// add the variable to the end of the insertion block (e.g. function local variables)
+		IRBuilder<> TmpB(Builder->GetInsertBlock(), Builder->GetInsertBlock()->end());
+		// create a mutable variable
+		AllocaInst* A = TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, Name);
+		// set the value
+		Builder->CreateStore(value, A);
+		// store in the local variables map
+		NamedValues[Name] = A;
+	}
 
 	return value;
 }
