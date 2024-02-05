@@ -5,6 +5,8 @@
 
 identifier:						( letter | '_' ) { letter | digit | '_' } ;
 
+comment:						('//' { character } '\n') | ('/*' { character } '*/') ;
+
 export_label:					'exp' ;
 public_label:					'pub' ;
 
