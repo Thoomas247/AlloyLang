@@ -21,12 +21,13 @@ LLVMCodeGenerator::~LLVMCodeGenerator() {
 }
 
 int LLVMCodeGenerator::Process() {
-	int result = 0;
-	NodeID root = NodeBuffers.GetRootNodeID();
-	if (ERROR_NODE_ID == root) {
-		// TBD: implement error handling
-		return -1;
-	}
+    int result = 0;
+    NodeID root = NodeBuffers.GetRootNodeID();
+    if (ERROR_NODE_ID == root) {
+        // TBD: implement error handling
+        assert(false);
+        return -1;
+    }
 
 	const Node& rootNode = NodeBuffers.GetNode(root);
 
@@ -129,14 +130,83 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 	Value* result = nullptr;
 
 	switch (node.Kind) {
-	case NodeKind::PROGRAM:
-	{
-		std::vector<NodeID>::const_iterator iter = node.Program.ModuleIDs.begin();
-		for (iter; iter < node.Program.ModuleIDs.end(); iter++) {
-			codegen(*iter);
-		}
+
+	case NodeKind::LITERAL:							// integer_literal | float_literal | boolean_literal | string_literal | character_literal;
+		result = codegen(node.Literal);
 		break;
-	}
+
+	case NodeKind::IDENTIFIER:						// identifier;
+		result = codegen(node.Identifier);
+		break;
+
+	case NodeKind::TYPE_IDENTIFIER:					// [reference | pointer] IDENTIFIER;
+	case NodeKind::TYPE_DECLARATION:				// [variable | constant] TYPE_IDENTIFIER;
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::VALUE_DECLARATION:				// (variable | constant) IDENTIFIER colon TYPE_IDENTIFIER;
+		// nothing to do, handled by VALUE_DEFINITION_EXPRESSION, STRUCT_DEFINITION or FUNCTION_DEFINITION
+		break;
+
+	/// NodeKind::EXPRESSION group
+
+	case NodeKind::VALUE_DEFINITION_EXPRESSION:		// VALUE_DECLARATION assignment_operator EXPRESSION;
+		result = codegen(node.ValueDefinitionExpression);
+		break;
+
+	case NodeKind::FUNCTION_CALL_EXPRESSION:		// IDENTIFIER open_paren[EXPRESSION{ comma EXPRESSION }] close_paren;
+	case NodeKind::ENCLOSED_EXPRESSION:				// open_paren EXPRESSION close_paren;
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::BINARY_EXPRESSION:				// EXPRESSION binary_operator EXPRESSION;
+		result = codegen(node.BinaryExpression);
+		break;
+
+	case NodeKind::UNARY_EXPRESSION:				// unary_operator PRIMARY_EXPRESSION;
+	case NodeKind::ASSIGNMENT_EXPRESSION:			// IDENTIFIER assignment_operator EXPRESSION;
+		assert(false);	// To be implemented
+		break;
+
+	/// End of NodeKind::EXPRESSION group
+
+	/// NodeKind::STATEMENT group
+
+	case NodeKind::VALUE_DEFINITION_STATEMENT:		// VALUE_DEFINITION_EXPRESSION semicolon;
+	case NodeKind::ASSIGNMENT_STATEMENT:			// ASSIGNMENT_EXPRESSION semicolon;
+	case NodeKind::FOR_LOOP_STATEMENT:				// for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT;
+	case NodeKind::WHILE_LOOP_STATEMENT:			// while ENCLOSED_EXPRESSION STATEMENT;
+	case NodeKind::IF_STATEMENT:					// if ENCLOSED_EXPRESSION STATEMENT[else STATEMENT];
+	case NodeKind::BLOCK_STATEMENT:					// open_brace{ STATEMENT } close_brace;
+	case NodeKind::RETURN_STATEMENT:				// return[EXPRESSION] semicolon;
+		assert(false);	// To be implemented
+		break;
+
+	/// End of NodeKind::STATEMENT group
+
+	/// NodeKind::DEFINITION group
+
+	case NodeKind::VALUE_DEFINITION:				// VALUE_DEFINITION_EXPRESSION semicolon ;
+		result = codegen(node.ValueDefinition);
+		break;
+
+	case NodeKind::STRUCT_DEFINITION:				// struct IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::ENUM_DEFINITION:					// enum IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::FUNCTION_DEFINITION:				// function IDENTIFIER open_paren[VALUE_DECLARATION{ comma VALUE_DECLARATION }] close_paren[arrow TYPE_DECLARATION] BLOCK_STATEMENT;
+		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::QUALIFIED_DEFINITION:
+		result = codegen(node.QualifiedDefinition.DefinitionID);
+		break;
+
+	/// End of NodeKind::DEFINITION group
 
 	case NodeKind::MODULE:
 	{
@@ -147,26 +217,15 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 	}
 
-	case NodeKind::QUALIFIED_DEFINITION:
-		codegen(node.QualifiedDefinition.DefinitionID);
+	case NodeKind::PROGRAM:
+	{
+		std::vector<NodeID>::const_iterator iter = node.Program.ModuleIDs.begin();
+		for (iter; iter < node.Program.ModuleIDs.end(); iter++) {
+			codegen(*iter);
+		}
 		break;
+	}
 
-	case NodeKind::VALUE_DEFINITION:
-		codegen(node.ValueDefinition);
-		break;
-
-	case NodeKind::LITERAL:
-		result = codegen(node.Literal);
-		break;
-
-	case NodeKind::BINARY_EXPRESSION:
-		result = codegen(node.BinaryExpression);
-		break;
-		/*
-			case NodeKind::MemoryAccess:
-				result = codegen(node.MemoryAccess);
-				break;
-		*/
 	default:
 		assert(false);
 		break;
@@ -187,39 +246,81 @@ Value* LLVMCodeGenerator::codegen(NodeID nodeID) {
 }
 
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
+    //
+    // Expression of type: [const] identifier = value;	(with the semi-colon at the end)
+    //
+	return codegen(node.ValueDefinitionExpressionID);
+}
 
-	// get the identifier of the variable or constant
-	const VALUE_DEFINITION_EXPRESSION& valueDefinitionExpression = NodeBuffers.GetNode(node.ValueDefinitionExpressionID).ValueDefinitionExpression;
-	const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(valueDefinitionExpression.ValueDeclarationID).ValueDeclaration;
+Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
+	//
+	// Expression of type: [const] identifier = value
+	// The identifier can be either global or local to the current function
+	// 
+	// get the name of the identifier
+	const VALUE_DECLARATION& declaration = NodeBuffers.GetNode(node.ValueDeclarationID).ValueDeclaration;
 	const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
 	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
 	// now get the value by recursively calling codegen
-	Value* value = HandleTopLevelExpression(NodeBuffers.GetNode(valueDefinitionExpression.ValueID));
+	Value* value = codegen(node.ValueID);
 
-	//AllocaInst* A = Builder->CreateAlloca(Type::getFloatTy(*TheContext), nullptr, Name);
-	//NamedValues[Name] = A;
+	if (Builder->GetInsertBlock() == nullptr) {
+		// If no insertion block, we are creating global variables
+		GlobalVariable* gv = new GlobalVariable(*TheModule,
+			Type::getDoubleTy(*TheContext),
+			(declaration.Kind == VALUE_DECLARATION::Type::Constant),   // isConstant
+			GlobalValue::CommonLinkage,
+			nullptr,                        // initializer specified below
+			Name
+		);
+		gv->setAlignment(Align(sizeof(double)));
+
+		// currently assuming the initializer is constant
+		ConstantFP* ptr_2 = (ConstantFP*)value;
+		gv->setInitializer(ptr_2);
+	}
+	else {
+		// add the variable to the end of the insertion block (e.g. function local variables)
+		IRBuilder<> TmpB(Builder->GetInsertBlock(), Builder->GetInsertBlock()->end());
+		// create a mutable variable
+		AllocaInst* A = TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, Name);
+		// set the value
+		Builder->CreateStore(value, A);
+		// store in the local variables map
+		NamedValues[Name] = A;
+	}
 
 	return value;
 }
 
-/*
-Value* LLVMCodeGenerator::codegen(const AlloyCompiler::VALUE_DEFINITION& node) {
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IDENTIFIER& node) {
+    //
+    // return the value of a local or global variable
+    // 
+    // Lookup this variable in the current function
+    const std::string Name(TokenBuffers.GetValue(node.IdentifierTokenID).ToStringView());
+    Value* value = nullptr;
+    AllocaInst* A = NamedValues[Name];
+    if (A) {
+        // Found in the local variables, load the value
+        value = Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
+    }
+    else {
+        // not a local variable, check the globals
+        GlobalVariable* gv = TheModule->getGlobalVariable(Name);
+        if (gv) {
+            value = gv->getInitializer();
+        }
+        else {
+            // TBD: LogErrorV("Unknown variable name");
+            assert(false);
+        }
+    }
 
-	// Look this variable up in the function.
-	const std::string Name(TokenBuffers.GetValue(node.OperatorTokenID).ToStringView());
-	AllocaInst* A = NamedValues[Name];
-	if (A) {
-		// Load the value.
-		return Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
-	}
-
-	// TBD: LogErrorV("Unknown variable name");
-	assert(false);
-	return nullptr;
-
+    return value;
 }
-*/
+
 Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 	Value* result = nullptr;
 	Value* L = codegen(node.LeftID);
@@ -228,24 +329,25 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 	const std::string op(TokenBuffers.GetValue(node.OperatorTokenID).ToStringView());
 
 
-	if (L && R) {
-		if (op == "+")
-			result = Builder->CreateFAdd(L, R, "addtmp");
-		else if (op == "-")
-			result = Builder->CreateFSub(L, R, "subtmp");
-		else if (op == "*")
-			result = Builder->CreateFMul(L, R, "multmp");
-		else if (op == "<") {
-			L = Builder->CreateFCmpULT(L, R, "cmptmp");
-			// Convert bool 0/1 to double 0.0 or 1.0
-			result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
-		}
-		else {
-			// TBD
-			printf("invalid binary operator\n");
-		}
-	}
-	return result;
+    if (L && R) {
+        if (op == "+")
+            result = Builder->CreateFAdd(L, R, "addtmp");
+        else if (op == "-")
+            result = Builder->CreateFSub(L, R, "subtmp");
+        else if (op == "*")
+            result = Builder->CreateFMul(L, R, "multmp");
+        else if (op == "<") {
+            L = Builder->CreateFCmpULT(L, R, "cmptmp");
+            // Convert bool 0/1 to double 0.0 or 1.0
+            result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
+        }
+        else {
+            // TBD
+            printf("invalid binary operator\n");
+            assert(false);
+        }
+    }
+    return result;
 }
 
 Value* LLVMCodeGenerator::codegen(const LITERAL& node) {

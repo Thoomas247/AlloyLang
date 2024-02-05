@@ -1,6 +1,12 @@
 #pragma once
 
-constexpr auto TestSrc = R"(
+constexpr auto TestSrc2 = R"(
+const res : i64 = 1+2;
+var e : f32 = res + 1.01;
+
+)";
+
+constexpr auto TestSrc1 = R"(
 struct Vector3
 {
 	var x : f32;
