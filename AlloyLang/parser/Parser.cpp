@@ -1277,11 +1277,7 @@ namespace AlloyCompiler
 		}
 
 		// consume closing brace
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "}" });
-			return ERROR_NODE_ID;
-		}
+		(void)iter.Next();
 
 		return nodeBuffers.CreateNode(
 			Node
@@ -1495,11 +1491,7 @@ namespace AlloyCompiler
 		}
 
 		// consume closing brace
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "}" });
-			return ERROR_NODE_ID;
-		}
+		(void)iter.Next();
 
 		return nodeBuffers.CreateNode(
 			Node
@@ -1585,11 +1577,7 @@ namespace AlloyCompiler
 		}
 
 		// consume closing brace
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { ";" });
-			return ERROR_NODE_ID;
-		}
+		(void)iter.Next();
 
 		return nodeBuffers.CreateNode(
 			Node
