@@ -70,7 +70,8 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>X:\\llvm\\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib"</AdditionalDependencies>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib";"LLVMPasses.lib";"LLVMInstCombine.lib";"LLVMipo.lib";"LLVMAggressiveInstCombine.lib";"LLVMCoroutines.lib";"LLVMMC.lib";"LLVMBitWriter.lib";"LLVMInstrumentation.lib";"LLVMVectorize.lib";"LLVMIRPrinter.lib";"LLVMCFGuard.lib";"LLVMHipStdPar.lib";"LLVMObjCARCOpts.lib";"LLVMFrontendOpenMP.lib";"LLVMProfileData.lib";"LLVMObject.lib";"LLVMCodeGenTypes.lib";"LLVMDebugInfoDWARF.lib";"LLVMLinker.lib";"LLVMFrontendOffloading.lib";"LLVMIRReader.lib";"LLVMMCParser.lib";"LLVMTextAPI.lib"</AdditionalDependencies>
+      <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -91,7 +92,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\\llvm\\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib"</AdditionalDependencies>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib";"LLVMPasses.lib";"LLVMInstCombine.lib";"LLVMipo.lib";"LLVMAggressiveInstCombine.lib";"LLVMCoroutines.lib";"LLVMMC.lib";"LLVMBitWriter.lib";"LLVMInstrumentation.lib";"LLVMVectorize.lib";"LLVMIRPrinter.lib";"LLVMCFGuard.lib";"LLVMHipStdPar.lib";"LLVMObjCARCOpts.lib";"LLVMFrontendOpenMP.lib";"LLVMProfileData.lib";"LLVMObject.lib";"LLVMCodeGenTypes.lib";"LLVMDebugInfoDWARF.lib";"LLVMLinker.lib";"LLVMFrontendOffloading.lib";"LLVMIRReader.lib";"LLVMMCParser.lib";"LLVMTextAPI.lib"</AdditionalDependencies>
+      <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
@@ -113,7 +115,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <Profile>true</Profile>
       <AdditionalLibraryDirectories>C:\\llvm\\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib"</AdditionalDependencies>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib";"LLVMPasses.lib";"LLVMInstCombine.lib";"LLVMipo.lib";"LLVMAggressiveInstCombine.lib";"LLVMCoroutines.lib";"LLVMMC.lib";"LLVMBitWriter.lib";"LLVMInstrumentation.lib";"LLVMVectorize.lib";"LLVMIRPrinter.lib";"LLVMCFGuard.lib";"LLVMHipStdPar.lib";"LLVMObjCARCOpts.lib";"LLVMFrontendOpenMP.lib";"LLVMProfileData.lib";"LLVMObject.lib";"LLVMCodeGenTypes.lib";"LLVMDebugInfoDWARF.lib";"LLVMLinker.lib";"LLVMFrontendOffloading.lib";"LLVMIRReader.lib";"LLVMMCParser.lib";"LLVMTextAPI.lib"</AdditionalDependencies>
+      <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

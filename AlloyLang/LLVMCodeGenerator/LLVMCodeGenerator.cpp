@@ -14,6 +14,36 @@ LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuf
 
 	// Create a new builder for the module.
 	Builder = std::make_unique<IRBuilder<>>(*TheContext);
+
+#ifndef NO_CODE_OPTIMIZATION
+	// Check the LLVM tutorial for details about these optimizations
+	// Create new pass and analysis managers.
+	TheFPM = std::make_unique<FunctionPassManager>();
+	TheLAM = std::make_unique<LoopAnalysisManager>();
+	TheFAM = std::make_unique<FunctionAnalysisManager>();
+	TheCGAM = std::make_unique<CGSCCAnalysisManager>();
+	TheMAM = std::make_unique<ModuleAnalysisManager>();
+	ThePIC = std::make_unique<PassInstrumentationCallbacks>();
+	TheSI = std::make_unique<StandardInstrumentations>(*TheContext,
+														/*DebugLogging*/ true);
+	TheSI->registerCallbacks(*ThePIC, TheMAM.get());
+
+	// Add transform passes.
+	// Do simple "peephole" optimizations and bit-twiddling optzns.
+	TheFPM->addPass(InstCombinePass());
+	// Reassociate expressions.
+	TheFPM->addPass(ReassociatePass());
+	// Eliminate Common SubExpressions.
+	TheFPM->addPass(GVNPass());
+	// Simplify the control flow graph (deleting unreachable blocks, etc).
+	TheFPM->addPass(SimplifyCFGPass());
+
+	// Register analysis passes used in these transform passes.
+	PassBuilder PB;
+	PB.registerModuleAnalyses(*TheMAM);
+	PB.registerFunctionAnalyses(*TheFAM);
+	PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
+#endif	// NO_CODE_OPTIMIZATION
 }
 
 LLVMCodeGenerator::~LLVMCodeGenerator() {
@@ -383,6 +413,11 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 		// Validate the generated code, checking for consistency.
 		verifyFunction(*F);
 
+#ifndef NO_CODE_OPTIMIZATION
+		// Run the optimizer on the function.
+		TheFPM->run(*F, *TheFAM);
+#endif  // NO_CODE_OPTIMIZATION
+
 		return F;
 	}
 
@@ -407,16 +442,34 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION& node) {
 	//
-	// Function call: identifier(expression, expressoin, ...)
+	// Function call: identifier(expression, expression, ...)
 	//
 	assert(NodeBuffers.GetNode(node.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
 	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
 	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
-	/*
-	Builder->CreateCall(FunctionCallee(Name))
-	*/
-	assert(false);
-	return nullptr;	
+	// Look up the name in the global module table.
+	Function* CalleeF = TheModule->getFunction(Name);
+	if (!CalleeF) {
+		// Unknown function referenced
+		assert(false);
+		return nullptr;
+	}
 
+	// If argument mismatch error.
+	if (CalleeF->arg_size() != node.ArgumentIDs.size()) {
+		// Incorrect # arguments passed
+		assert(false);
+		return nullptr;
+	}
+
+	// evaluate all arguments by calling codegen on each expression
+	std::vector<Value*> ArgsV;
+	for (unsigned i = 0, e = node.ArgumentIDs.size(); i != e; ++i) {
+		ArgsV.push_back(codegen(node.ArgumentIDs[i]));
+		if (!ArgsV.back())
+			return nullptr;
+	}
+
+	return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
 }
