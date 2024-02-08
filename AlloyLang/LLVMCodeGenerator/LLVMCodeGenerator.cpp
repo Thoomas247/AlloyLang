@@ -120,8 +120,11 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 	case NodeKind::ASSIGNMENT_STATEMENT:			// ASSIGNMENT_EXPRESSION semicolon;
 	case NodeKind::FOR_LOOP_STATEMENT:				// for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT;
 	case NodeKind::WHILE_LOOP_STATEMENT:			// while ENCLOSED_EXPRESSION STATEMENT;
-	case NodeKind::IF_STATEMENT:					// if ENCLOSED_EXPRESSION STATEMENT[else STATEMENT];
 		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::IF_STATEMENT:					// if ENCLOSED_EXPRESSION STATEMENT[else STATEMENT];
+		result = codegen(node.IfStatement);
 		break;
 
 	case NodeKind::BLOCK_STATEMENT:					// open_brace{ STATEMENT } close_brace;
@@ -287,7 +290,12 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
             result = Builder->CreateFSub(L, R, "subtmp");
         else if (op == "*")
             result = Builder->CreateFMul(L, R, "multmp");
-        else if (op == "<") {
+		else if (op == "==") {
+			L = Builder->CreateFCmpOEQ(L, R, "equtmp");
+			// Convert bool 0/1 to double 0.0 or 1.0
+			result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
+		}
+		else if (op == "<") {
             L = Builder->CreateFCmpULT(L, R, "cmptmp");
             // Convert bool 0/1 to double 0.0 or 1.0
             result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
@@ -330,10 +338,8 @@ Value* LLVMCodeGenerator::HandleTopLevelExpression(const AlloyCompiler::Node& no
 /// the function.  This is used for mutable variables etc.
 /// TBD: only works for doubles, need to implement other types
 AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName) {
-	IRBuilder<> TmpB(&TheFunction->getEntryBlock(),
-		TheFunction->getEntryBlock().begin());
-	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr,
-		VarName);
+	IRBuilder<> TmpB(&TheFunction->getEntryBlock(),	TheFunction->getEntryBlock().begin());
+	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
 }
 
 Function* LLVMCodeGenerator::createFunctionPrototype(const std::string & Name, const AlloyCompiler::FUNCTION_DEFINITION & node) {
@@ -472,4 +478,86 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION&
 	}
 
 	return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
+}
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
+	//
+	// if (expression) statements [else statements]
+	//
+	Value* result = nullptr;
+
+	Value* CondV = codegen(node.ConditionExpressionID);
+	if (!CondV) {
+		// error evaluating condition
+		assert(false);
+		return nullptr;
+	}
+
+	// Convert condition to a bool by comparing non-equal to 0.0.
+	CondV = Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
+
+	// we are supposed to be inside a function, otherwise this is going to fail
+	Function* TheFunction = Builder->GetInsertBlock()->getParent();
+	if (!TheFunction) {
+		// not inside a function or something missing in the codegen of the function
+		assert(false);
+		return nullptr;
+	}
+
+	// Create blocks for the then and else cases
+	// Insert the 'then' block at the end of the function
+	BasicBlock* ThenBB = BasicBlock::Create(*TheContext, "then", TheFunction);
+	// the else block is optional but we still need an empty else statement otherwise the optimizer crashes
+	BasicBlock* ElseBB = BasicBlock::Create(*TheContext, "else");
+	BasicBlock* MergeBB = BasicBlock::Create(*TheContext, "ifcont");
+	Builder->CreateCondBr(CondV, ThenBB, ElseBB);
+
+	// Emit then value.
+	Builder->SetInsertPoint(ThenBB);
+	Value* ThenV = codegen(node.BodyID);
+	if (!ThenV) {
+		assert(false);
+		return nullptr;
+	}
+
+	Builder->CreateBr(MergeBB);
+	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+	ThenBB = Builder->GetInsertBlock();
+
+	// Emit else block if any
+	Value* ElseV = nullptr;
+	if (ElseBB) {
+		TheFunction->insert(TheFunction->end(), ElseBB);
+		Builder->SetInsertPoint(ElseBB);
+		if (ERROR_NODE_ID == node.ElseID) {
+			// no else statement, assume a null value for the PHINode object
+			ElseV = Constant::getNullValue(Type::getDoubleTy(*TheContext));
+		}
+		else {
+			ElseV = codegen(node.ElseID);
+			if (!ElseV) {
+				assert(false);
+				return nullptr;
+			}
+		}
+	}
+
+	Builder->CreateBr(MergeBB);
+	
+	// codegen of 'Else' can change the current block, update ElseBB for the PHI.
+	ElseBB = Builder->GetInsertBlock();
+
+	// Emit merge block.
+	TheFunction->insert(TheFunction->end(), MergeBB);
+	Builder->SetInsertPoint(MergeBB);
+
+	// Note: This call will assert if SDL checks are enabled in Visual Studio as per this article:
+	// https://stackoverflow.com/questions/34892732/error-when-call-createphi-in-llvm
+	// Need to disable SDL checks for this code to run
+	PHINode* PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
+
+	PN->addIncoming(ThenV, ThenBB);
+	PN->addIncoming(ElseV, ElseBB);
+	return PN;
+
 }

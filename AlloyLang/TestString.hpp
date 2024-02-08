@@ -9,9 +9,12 @@ fn add (const a : &i64, const b : &i64) -> i64
 	return (a + b);
 }
 
-fn mul (const a : &i64, const b : &i64) -> i64
+fn mul (const c : &i64, const d : &i64) -> i64
 {
-	return add(a, b);
+	if (c == 1)
+		return d;
+	else
+		return add(c, d);
 };
 
 )";

@@ -27,13 +27,14 @@
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/Transforms/Utils.h"
 #endif // NO_CODE_OPTIMIZATION
 
 #include "../parser/Parser.hpp"
 
 #include <memory>
 #include <map>
-
+#include <utility>
 
 using namespace llvm;
 
@@ -86,6 +87,7 @@ private:
 	Function* codegen(const AlloyCompiler::FUNCTION_DEFINITION& node);
 	Value* codegen(const AlloyCompiler::BLOCK_STATEMENT& node);
 	Value* codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION& node);
+	Value* codegen(const AlloyCompiler::IF_STATEMENT& node);
 
 	// straight-forward cases
 
