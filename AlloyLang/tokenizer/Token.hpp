@@ -27,6 +27,7 @@ namespace AlloyCompiler
 		export_label,
 		public_label,
 
+		extern_keyword,
 		struct_keyword,
 		enum_keyword,
 		function_keyword,
@@ -81,6 +82,7 @@ namespace AlloyCompiler
 		{ TokenKind::export_label, "export_label" },
 		{ TokenKind::public_label, "public_label" },
 
+		{ TokenKind::extern_keyword, "extern_keyword"},
 		{ TokenKind::struct_keyword, "struct_keyword" },
 		{ TokenKind::enum_keyword, "enum_keyword" },
 		{ TokenKind::function_keyword, "function_keyword" },
@@ -132,6 +134,7 @@ namespace AlloyCompiler
 		{ "exp", TokenKind::export_label },
 		{ "pub", TokenKind::public_label },
 
+		{ "extern", TokenKind::extern_keyword },
 		{ "struct", TokenKind::struct_keyword },
 		{ "enum", TokenKind::enum_keyword },
 		{ "fn", TokenKind::function_keyword },

@@ -20,6 +20,8 @@ fn mul (const c : &i64, const d : &i64) -> i64
 )";
 
 constexpr auto TestSrc1 = R"(
+extern fn test (var a : i64);
+
 // this is a sinlge line comment
 struct Vector3
 {

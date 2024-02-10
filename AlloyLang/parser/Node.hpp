@@ -84,6 +84,13 @@ namespace AlloyCompiler
 		NodeID TypeIdentifierID;
 	};
 
+	struct FUNCTION_DECLARATION
+	{
+		NodeID IdentifierID;
+		VectorRef<NodeID> ParameterIDs;
+		NodeID ReturnTypeID;
+	};
+
 #pragma endregion
 
 #pragma region Expressions
@@ -208,6 +215,11 @@ namespace AlloyCompiler
 
 #pragma region Definitions
 
+	struct EXTERN_DEFINITION
+	{
+		NodeID FunctionDeclarationID;
+	};
+
 	struct VALUE_DEFINITION
 	{
 		NodeID ValueDefinitionExpressionID;
@@ -227,14 +239,13 @@ namespace AlloyCompiler
 
 	struct FUNCTION_DEFINITION
 	{
-		NodeID IdentifierID;
-		VectorRef<NodeID> ParameterIDs;
-		NodeID ReturnTypeID;
+		NodeID FunctionDeclarationID;
 		NodeID BodyID;
 	};
 
 	union DEFINITION
 	{
+		EXTERN_DEFINITION ExternDefinition;
 		VALUE_DEFINITION ValueDefinition;
 		STRUCT_DEFINITION StructDefinition;
 		ENUM_DEFINITION EnumDefinition;
@@ -278,6 +289,7 @@ namespace AlloyCompiler
 
 		TYPE_DECLARATION,
 		VALUE_DECLARATION,
+		FUNCTION_DECLARATION,
 
 		VALUE_DEFINITION_EXPRESSION,
 		FUNCTION_CALL_EXPRESSION,
@@ -303,6 +315,7 @@ namespace AlloyCompiler
 
 		//STATEMENT,
 
+		EXTERN_DEFINITION,
 		VALUE_DEFINITION,
 		STRUCT_DEFINITION,
 		ENUM_DEFINITION,
@@ -328,6 +341,7 @@ namespace AlloyCompiler
 
 			TYPE_DECLARATION TypeDeclaration;
 			VALUE_DECLARATION ValueDeclaration;
+			FUNCTION_DECLARATION FunctionDeclaration;
 
 			VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
 			FUNCTION_CALL_EXPRESSION FunctionCallExpression;
@@ -353,6 +367,7 @@ namespace AlloyCompiler
 
 			//STATEMENT Statement;
 
+			EXTERN_DEFINITION ExternDefinition;
 			VALUE_DEFINITION ValueDefinition;
 			STRUCT_DEFINITION StructDefinition;
 			ENUM_DEFINITION EnumDefinition;

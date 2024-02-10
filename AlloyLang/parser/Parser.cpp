@@ -383,6 +383,117 @@ namespace AlloyCompiler
 		);
 	}
 
+	template <>
+	NodeID parse<FUNCTION_DECLARATION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		if (iter.GetKind() != TokenKind::function_keyword)
+		{
+			unexpectedToken(iter, { "fn" });
+			return ERROR_NODE_ID;
+		}
+
+		TokenID errorInfo = iter.GetCurrentID();
+
+		// consume fn keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "function name" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse function name
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening parenthesis
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "function parameter" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse parameters
+		VectorRef<NodeID> parameterIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_paren)
+		{
+			NodeID parameterID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
+
+			if (parameterID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			parameterIDs.push_back(parameterID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "function parameter" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_paren)
+			{
+				unexpectedToken(iter, { ",", ")" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "->", "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// check for return type
+		NodeID returnTypeID = ERROR_NODE_ID;
+		if (iter.GetKind() == TokenKind::arrow)
+		{
+			// consume arrow
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "function body" });
+				return ERROR_NODE_ID;
+			}
+
+			// parse return type
+			returnTypeID = parse<TYPE_DECLARATION>(nodeBuffers, iter);
+
+			if (returnTypeID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::FUNCTION_DECLARATION,
+				.FunctionDeclaration = FUNCTION_DECLARATION
+				{
+					.IdentifierID = identifierID,
+					.ParameterIDs = parameterIDs,
+					.ReturnTypeID = returnTypeID
+				}
+			},
+			errorInfo
+		);
+	}
+
 #pragma endregion
 
 #pragma region Expressions
@@ -1438,6 +1549,60 @@ namespace AlloyCompiler
 #pragma region Definitions
 
 	template <>
+	NodeID parse<EXTERN_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		// check for extern keyword
+		if (iter.GetKind() != TokenKind::extern_keyword)
+		{
+			unexpectedToken(iter, { "extern" });
+			return ERROR_NODE_ID;
+		}
+
+		TokenID errorInfo = iter.GetCurrentID();
+
+		// consume extern keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "function declaration" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse function declaration
+		NodeID functionDeclarationID = parse<FUNCTION_DECLARATION>(nodeBuffers, iter);
+
+		if (functionDeclarationID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for semicolon
+		if (iter.GetKind() != TokenKind::semicolon)
+		{
+			unexpectedToken(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume semicolon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::EXTERN_DEFINITION,
+				.ExternDefinition = EXTERN_DEFINITION
+				{
+					.FunctionDeclarationID = functionDeclarationID
+				}
+			},
+			errorInfo
+		);
+	}
+
+	template <>
 	NodeID parse<VALUE_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		TokenID errorInfo = iter.GetCurrentID();
@@ -1647,97 +1812,13 @@ namespace AlloyCompiler
 	template <>
 	NodeID parse<FUNCTION_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		if (iter.GetKind() != TokenKind::function_keyword)
-		{
-			unexpectedToken(iter, { "fn" });
-			return ERROR_NODE_ID;
-		}
-
 		TokenID errorInfo = iter.GetCurrentID();
 
-		// consume fn keyword
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "function name" });
-			return ERROR_NODE_ID;
-		}
+		NodeID declarationID = parse<FUNCTION_DECLARATION>(nodeBuffers, iter);
 
-		// parse function name
-		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
-
-		if (identifierID == ERROR_NODE_ID)
+		if (declarationID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
-		}
-
-		// check for opening parenthesis
-		if (iter.GetKind() != TokenKind::open_paren)
-		{
-			unexpectedToken(iter, { "(" });
-			return ERROR_NODE_ID;
-		}
-
-		// consume opening parenthesis
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "function parameter" });
-			return ERROR_NODE_ID;
-		}
-
-		// parse parameters
-		VectorRef<NodeID> parameterIDs = nodeBuffers.CreateNodeIDVector();
-
-		while (iter.GetKind() != TokenKind::close_paren)
-		{
-			NodeID parameterID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
-
-			if (parameterID == ERROR_NODE_ID)
-			{
-				return ERROR_NODE_ID;
-			}
-
-			parameterIDs.push_back(parameterID);
-
-			if (iter.GetKind() == TokenKind::comma)
-			{
-				if (!iter.Next())
-				{
-					unexpectedEndOfFile(iter, { "function parameter" });
-					return ERROR_NODE_ID;
-				}
-			}
-			else if (iter.GetKind() != TokenKind::close_paren)
-			{
-				unexpectedToken(iter, { ",", ")" });
-				return ERROR_NODE_ID;
-			}
-		}
-
-		// consume closing parenthesis
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "->", "{" });
-			return ERROR_NODE_ID;
-		}
-
-		// check for return type
-		NodeID returnTypeID = ERROR_NODE_ID;
-		if (iter.GetKind() == TokenKind::arrow)
-		{
-			// consume arrow
-			if (!iter.Next())
-			{
-				unexpectedEndOfFile(iter, { "function body" });
-				return ERROR_NODE_ID;
-			}
-
-			// parse return type
-			returnTypeID = parse<TYPE_DECLARATION>(nodeBuffers, iter);
-
-			if (returnTypeID == ERROR_NODE_ID)
-			{
-				return ERROR_NODE_ID;
-			}
 		}
 
 		// parse body
@@ -1754,9 +1835,7 @@ namespace AlloyCompiler
 				.Kind = NodeKind::FUNCTION_DEFINITION,
 				.FunctionDefinition = FUNCTION_DEFINITION
 				{
-					.IdentifierID = identifierID,
-					.ParameterIDs = parameterIDs,
-					.ReturnTypeID = returnTypeID,
+					.FunctionDeclarationID = declarationID,
 					.BodyID = bodyID
 				}
 			},
@@ -1769,6 +1848,9 @@ namespace AlloyCompiler
 	{
 		switch (iter.GetKind())
 		{
+		case TokenKind::extern_keyword:
+			return parse<EXTERN_DEFINITION>(nodeBuffers, iter);
+
 		case TokenKind::constant_keyword:
 		case TokenKind::variable_keyword:
 			return parse<VALUE_DEFINITION>(nodeBuffers, iter);

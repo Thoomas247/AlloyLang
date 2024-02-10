@@ -92,6 +92,8 @@ namespace AlloyCompiler
 
 	const SmallStringView& TokenBuffers::GetValue(TokenID id) const
 	{
+		ASSERT((size_t)id < m_Values.size(), "Invalid ID!")
+
 		return m_Values[(size_t)id];
 	}
 
