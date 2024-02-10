@@ -14,6 +14,83 @@ namespace AlloyCompiler
 		Log::Error("\t{0}", std::vformat(format, std::make_format_args(args...)));
 	}
 
+	bool trySkipWhitespace(Source::Iterator& iter)
+	{
+		// check if we have a whitespace
+		if (!isspace(iter.CurrentChar()))
+			return false;
+
+		do
+		{
+			if (!iter.NextChar())
+			{
+				break;
+			}
+		} while (isspace(iter.CurrentChar()));
+
+		return true;
+	}
+
+	bool trySkipComment(Source::Iterator& iter)
+	{
+		if (iter.CurrentChar() != '/' || !iter.HasNext())
+		{
+			return false;
+		}
+
+		// check if we have a single line comment
+		if (iter.PeekNext() == '/')
+		{
+			// consume first two characters
+			iter.NextChar();
+			iter.NextChar();
+
+			// consume characters until the end of the line
+			while (iter.HasNext() && iter.CurrentChar() != '\n')
+			{
+				iter.NextChar();
+			}
+
+			return true;
+		}
+
+		// check if we have a multi line comment
+		else if (iter.PeekNext() == '*')
+		{
+			// consume the first two characters
+			iter.NextChar();
+			iter.NextChar();
+
+			size_t depth = 1;
+			while (iter.HasNext() && depth > 0)
+			{
+				if (iter.CurrentChar() == '/' && iter.PeekNext() == '*')
+				{
+					++depth;
+					iter.NextChar();
+				}
+				else if (iter.CurrentChar() == '*' && iter.PeekNext() == '/')
+				{
+					--depth;
+					iter.NextChar();
+				}
+
+				iter.NextChar();
+			}
+
+			if (depth > 0)
+			{
+				logError(iter, "Unexpected end of file! Missing '*/'.");
+			}
+
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
 	bool tryGetOperator(Source::Iterator& iter, TokenBuffers& tokenBuffers)
 	{
 		// look for the current character in the operators map
@@ -25,12 +102,8 @@ namespace AlloyCompiler
 		size_t start = iter.CurrentIndex();
 		const Location& location = iter.CurrentLocation();
 
-		// get the next character
-		if (!iter.NextChar())
-		{
-			logError(iter, "Unexpected end of file!");
-			return false;
-		}
+		// consume the first character
+		iter.NextChar();
 
 		// check the next character to see if it's also part of the operator
 		bool found = false;
@@ -40,12 +113,15 @@ namespace AlloyCompiler
 				found = true;
 		}
 
-		// if the next character is not part of the operator, go back one character
-		if (!found)
-			iter.PreviousChar();
+		// if we found the next character in the map, consume it
+		if (found)
+			iter.NextChar();
 
 		// get the operator string
-		auto tokenString = iter.CreateSmallStringView(start, iter.CurrentIndex() + 1);
+		auto tokenString = iter.CreateSmallStringView(start, iter.CurrentIndex());
+
+		// check if the operator is in the known symbols map
+		ASSERT(KNOWN_SYMBOLS.contains(tokenString.ToStringView()), "Unknown operator: {0}", tokenString.ToStringView());
 
 		tokenBuffers.AddToken(KNOWN_SYMBOLS.at(tokenString.ToStringView()), tokenString, location);
 
@@ -61,6 +137,10 @@ namespace AlloyCompiler
 			return false;
 
 		tokenBuffers.AddToken(it->second, iter.CreateSmallStringView(iter.CurrentIndex(), iter.CurrentIndex() + 1), iter.CurrentLocation());
+
+		// consume the delimiter
+		iter.NextChar();
+
 		return true;
 	}
 
@@ -73,15 +153,14 @@ namespace AlloyCompiler
 		size_t start = iter.CurrentIndex();
 		const Location& location = iter.CurrentLocation();
 
+		// consume the first character
+		iter.NextChar();
+
 		// keep going until the end of the word
-		do
+		while (isalnum(iter.CurrentChar()) || iter.CurrentChar() == '_')
 		{
-			if (!iter.NextChar())
-			{
-				logError(iter, "Unexpected end of file!");
-				return false;
-			}
-		} while (isalnum(iter.CurrentChar()) || iter.CurrentChar() == '_');	// after the first character, can also be a number
+			iter.NextChar();
+		}
 
 		// store the word
 		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
@@ -94,9 +173,6 @@ namespace AlloyCompiler
 		// otherwise, it's an identifier
 		else
 			tokenBuffers.AddToken(TokenKind::identifier, value, location);
-
-		// go back one character so the next loop can check it
-		iter.PreviousChar();
 
 		return true;
 	}
@@ -134,6 +210,9 @@ namespace AlloyCompiler
 		// store the string
 		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
 
+		// consume the ending quote
+		iter.NextChar();
+
 		tokenBuffers.AddToken(TokenKind::string_literal, value, location);
 		return true;
 	}
@@ -166,7 +245,7 @@ namespace AlloyCompiler
 			}
 		}
 
-		// consume ending quote
+		// consume the character
 		if (!iter.NextChar())
 		{
 			logError(iter, "Unexpected end of file!");
@@ -175,6 +254,14 @@ namespace AlloyCompiler
 
 		// store the character
 		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
+
+		// consume ending quote
+		if (!iter.NextChar())
+		{
+			logError(iter, "Unexpected end of file!");
+			return false;
+		}
+
 		tokenBuffers.AddToken(TokenKind::character_literal, value, location);
 
 		return true;
@@ -192,33 +279,24 @@ namespace AlloyCompiler
 		bool hasDot = false;
 
 		// keep going until the end of the number
-		do
+		while (isdigit(iter.CurrentChar()) || iter.CurrentChar() == '.')
 		{
-			if (!iter.NextChar())
-			{
-				logError(iter, "Unexpected end of file!");
-				return false;
-			}
-
 			if (iter.CurrentChar() == '.')
 			{
 				if (hasDot)
 				{
 					logError(iter,
-						"Invalid float literal: {0}\nExpected only one decimal point in float literal.",
+						"Invalid float literal: {0}. Expected only one decimal point in float literal.",
 						iter.CreateSmallStringView(start, iter.CurrentIndex()).ToStringView());
 					return false;
 				}
 
 				hasDot = true;
-				if (!iter.NextChar())
-				{
-					logError(iter, "Unexpected end of file!");
-					return false;
-				}
 			}
 
-		} while (isdigit(iter.CurrentChar()));
+			// consume the digit or dot
+			iter.NextChar();
+		}
 
 		// store the number
 		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
@@ -229,21 +307,22 @@ namespace AlloyCompiler
 		else
 			tokenBuffers.AddToken(TokenKind::integer_literal, value, location);
 
-		// go back one character so the next loop can check it
-		iter.PreviousChar();
-
 		return true;
 	}
 
 	TokenBuffers Tokenize(const Source& source)
 	{
 		Source::Iterator iter = source.GetIterator();
-		TokenBuffers tokenBuffers;
+		TokenBuffers tokenBuffers(source);
 
 		do
 		{
 			// skip whitespace
-			if (isspace(iter.CurrentChar()))
+			if (trySkipWhitespace(iter))
+				continue;
+
+			// skip comments
+			if (trySkipComment(iter))
 				continue;
 
 			// check for any operators
@@ -272,7 +351,7 @@ namespace AlloyCompiler
 
 			logError(iter, "Unexpected symbol '{0}'!", iter.CurrentChar());
 
-		} while (iter.NextChar());
+		} while (iter.HasNext());
 
 		return tokenBuffers;
 	}
@@ -281,10 +360,10 @@ namespace AlloyCompiler
 	{
 		TokenBuffers::Iterator iter(tokenBuffers);
 
-		while (iter.Next())
+		do
 		{
 			Log::Print("{0} ({1})", TOKEN_KIND_NAMES.at(iter.GetKind()), iter.GetValue().ToStringView());
-		}
+		} while (iter.Next());
 	}
 }
 

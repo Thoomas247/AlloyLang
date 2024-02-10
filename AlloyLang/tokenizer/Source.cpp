@@ -36,35 +36,21 @@ namespace AlloyCompiler
 		return true;
 	}
 
+	bool Source::Iterator::HasNext() const
+	{
+		return m_CharIndex < m_Source.GetSize() - 1;
+	}
+
 	char Source::Iterator::CurrentChar() const
 	{
 		return m_Source.GetChar(m_CharIndex);
 	}
 
-	void Source::Iterator::PreviousChar()
+	char Source::Iterator::PeekNext() const
 	{
-		ASSERT(m_CharIndex > 0, "Tokenizer::lastChar() called when current char position is 0!");
+		ASSERT(HasNext(), "Tokenizer::peekNext() called when there is no next character!");
 
-		--m_CharIndex;
-
-		// if current character is a new line, go back one line
-		if (CurrentChar() == '\n')
-		{
-			m_LineStarts.pop();
-			--m_Line;
-			m_Column = 1;
-		}
-
-		// if current character is a tab, go back four columns
-		else if (CurrentChar() == '\t')
-		{
-			m_Column -= NUM_SPACES_PER_TAB;
-		}
-
-		else
-		{
-			--m_Column;
-		}
+		return m_Source.GetChar((size_t)m_CharIndex + 1);
 	}
 
 	size_t Source::Iterator::CurrentIndex() const { return m_CharIndex; }
@@ -96,6 +82,18 @@ namespace AlloyCompiler
 	size_t Source::GetSize() const
 	{
 		return m_SourceView.size();
+	}
+
+	std::string_view Source::GetLine(size_t startIndex) const
+	{
+		// walk forward to find the end of the line
+		size_t end = startIndex;
+		while (end < m_SourceView.size() && m_SourceView[end] != '\n')
+		{
+			++end;
+		}
+
+		return m_SourceView.substr(startIndex, end - startIndex);
 	}
 
 	SmallStringView Source::CreateSmallStringView(size_t start, size_t end) const

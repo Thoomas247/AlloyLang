@@ -84,6 +84,13 @@ namespace AlloyCompiler
 		NodeID TypeIdentifierID;
 	};
 
+	struct FUNCTION_DECLARATION
+	{
+		NodeID IdentifierID;
+		VectorRef<NodeID> ParameterIDs;
+		NodeID ReturnTypeID;
+	};
+
 #pragma endregion
 
 #pragma region Expressions
@@ -151,6 +158,11 @@ namespace AlloyCompiler
 		NodeID ValueDefinitionExpressionID;
 	};
 
+	struct FUNCTION_CALL_STATEMENT
+	{
+		NodeID FunctionCallExpressionID;
+	};
+
 	struct ASSIGNMENT_STATEMENT
 	{
 		NodeID AssignmentExpressionID;
@@ -190,6 +202,7 @@ namespace AlloyCompiler
 	union STATEMENT
 	{
 		VALUE_DEFINITION_STATEMENT ValueDefinitionStatement;
+		FUNCTION_CALL_STATEMENT FunctionCallStatement;
 		ASSIGNMENT_STATEMENT AssignmentStatement;
 		FOR_LOOP_STATEMENT ForLoopStatement;
 		WHILE_LOOP_STATEMENT WhileLoopStatement;
@@ -201,6 +214,11 @@ namespace AlloyCompiler
 #pragma endregion
 
 #pragma region Definitions
+
+	struct EXTERN_DEFINITION
+	{
+		NodeID FunctionDeclarationID;
+	};
 
 	struct VALUE_DEFINITION
 	{
@@ -221,14 +239,13 @@ namespace AlloyCompiler
 
 	struct FUNCTION_DEFINITION
 	{
-		NodeID IdentifierID;
-		VectorRef<NodeID> ParameterIDs;
-		NodeID ReturnTypeID;
+		NodeID FunctionDeclarationID;
 		NodeID BodyID;
 	};
 
 	union DEFINITION
 	{
+		EXTERN_DEFINITION ExternDefinition;
 		VALUE_DEFINITION ValueDefinition;
 		STRUCT_DEFINITION StructDefinition;
 		ENUM_DEFINITION EnumDefinition;
@@ -272,6 +289,7 @@ namespace AlloyCompiler
 
 		TYPE_DECLARATION,
 		VALUE_DECLARATION,
+		FUNCTION_DECLARATION,
 
 		VALUE_DEFINITION_EXPRESSION,
 		FUNCTION_CALL_EXPRESSION,
@@ -287,6 +305,7 @@ namespace AlloyCompiler
 		//EXPRESSION,
 
 		VALUE_DEFINITION_STATEMENT,
+		FUNCTION_CALL_STATEMENT,
 		ASSIGNMENT_STATEMENT,
 		FOR_LOOP_STATEMENT,
 		WHILE_LOOP_STATEMENT,
@@ -296,6 +315,7 @@ namespace AlloyCompiler
 
 		//STATEMENT,
 
+		EXTERN_DEFINITION,
 		VALUE_DEFINITION,
 		STRUCT_DEFINITION,
 		ENUM_DEFINITION,
@@ -321,6 +341,7 @@ namespace AlloyCompiler
 
 			TYPE_DECLARATION TypeDeclaration;
 			VALUE_DECLARATION ValueDeclaration;
+			FUNCTION_DECLARATION FunctionDeclaration;
 
 			VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
 			FUNCTION_CALL_EXPRESSION FunctionCallExpression;
@@ -336,6 +357,7 @@ namespace AlloyCompiler
 			//EXPRESSION Expression;
 
 			VALUE_DEFINITION_STATEMENT ValueDefinitionStatement;
+			FUNCTION_CALL_STATEMENT FunctionCallStatement;
 			ASSIGNMENT_STATEMENT AssignmentStatement;
 			FOR_LOOP_STATEMENT ForLoopStatement;
 			WHILE_LOOP_STATEMENT WhileLoopStatement;
@@ -345,6 +367,7 @@ namespace AlloyCompiler
 
 			//STATEMENT Statement;
 
+			EXTERN_DEFINITION ExternDefinition;
 			VALUE_DEFINITION ValueDefinition;
 			STRUCT_DEFINITION StructDefinition;
 			ENUM_DEFINITION EnumDefinition;

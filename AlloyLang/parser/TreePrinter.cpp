@@ -3,7 +3,7 @@
 #include "../log/Log.hpp"
 #include "../json/json.hpp"
 
-using json = nlohmann::json;
+using json = nlohmann::ordered_json;
 
 namespace AlloyCompiler
 {
@@ -118,6 +118,28 @@ namespace AlloyCompiler
 		j["type"] = valueDeclarationNode.Kind == VALUE_DECLARATION::Type::Variable ? "VARIABLE" : "CONSTANT";
 		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.IdentifierID);
 		j["type"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.TypeIdentifierID);
+
+		return j;
+	}
+
+	template <>
+	json print<FUNCTION_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& functionDeclarationNode = nodeBuffers.GetNode(nodeID).FunctionDeclaration;
+
+		json j;
+		j["kind"] = "FUNCTION_DECLARATION";
+		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, functionDeclarationNode.IdentifierID);
+
+		for (const auto& parameterID : functionDeclarationNode.ParameterIDs)
+		{
+			j["parameters"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, parameterID));
+		}
+
+		if (functionDeclarationNode.ReturnTypeID != ERROR_NODE_ID)
+		{
+			j["return_type"] = print<TYPE_DECLARATION>(tokenBuffers, nodeBuffers, functionDeclarationNode.ReturnTypeID);
+		}
 
 		return j;
 	}
@@ -280,6 +302,18 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<FUNCTION_CALL_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& functionCallStatementNode = nodeBuffers.GetNode(nodeID).FunctionCallStatement;
+
+		json j;
+		j["kind"] = "FUNCTION_CALL_STATEMENT";
+		j["function_call_expression"] = print<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, functionCallStatementNode.FunctionCallExpressionID);
+
+		return j;
+	}
+
+	template <>
 	json print<ASSIGNMENT_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& assignmentNode = nodeBuffers.GetNode(nodeID).AssignmentStatement;
@@ -375,6 +409,9 @@ namespace AlloyCompiler
 		case NodeKind::VALUE_DEFINITION_STATEMENT:
 			return print<VALUE_DEFINITION_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
 
+		case NodeKind::FUNCTION_CALL_STATEMENT:
+			return print<FUNCTION_CALL_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::ASSIGNMENT_STATEMENT:
 			return print<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
 
@@ -397,6 +434,18 @@ namespace AlloyCompiler
 			ASSERT(false, "Unknown statement kind");
 			return json();
 		}
+	}
+
+	template <>
+	json print<EXTERN_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& externDefinitionNode = nodeBuffers.GetNode(nodeID).ExternDefinition;
+
+		json j;
+		j["kind"] = "EXTERN_DEFINITION";
+		j["declaration"] = print<FUNCTION_DECLARATION>(tokenBuffers, nodeBuffers, externDefinitionNode.FunctionDeclarationID);
+
+		return j;
 	}
 
 	template <>
@@ -452,18 +501,7 @@ namespace AlloyCompiler
 
 		json j;
 		j["kind"] = "FUNCTION_DEFINITION";
-		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, functionDefinitionNode.IdentifierID);
-
-		for (const auto& parameterID : functionDefinitionNode.ParameterIDs)
-		{
-			j["parameters"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, parameterID));
-		}
-
-		if (functionDefinitionNode.ReturnTypeID != ERROR_NODE_ID)
-		{
-			j["return_type"] = print<TYPE_DECLARATION>(tokenBuffers, nodeBuffers, functionDefinitionNode.ReturnTypeID);
-		}
-
+		j["declaration"] = print<FUNCTION_DECLARATION>(tokenBuffers, nodeBuffers, functionDefinitionNode.FunctionDeclarationID);
 		j["body"] = print<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, functionDefinitionNode.BodyID);
 
 		return j;
@@ -476,6 +514,9 @@ namespace AlloyCompiler
 
 		switch (definitionNode.Kind)
 		{
+		case NodeKind::EXTERN_DEFINITION:
+			return print<EXTERN_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::VALUE_DEFINITION:
 			return print<VALUE_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
 
@@ -540,11 +581,13 @@ namespace AlloyCompiler
 		return j;
 	}
 
-	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers)
+	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID rootNode)
 	{
-		json j = print<PROGRAM>(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
+		json j = print<PROGRAM>(tokenBuffers, nodeBuffers, rootNode);
 
 		Log::Print("{0}", j.dump(NUM_SPACES_PER_TAB));
+
+		
 	}
 }
 

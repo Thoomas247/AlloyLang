@@ -39,14 +39,19 @@ namespace AlloyCompiler
 			bool NextChar();
 
 			/// <summary>
+			/// Returns true if there is a next character, otherwise returns false.
+			/// </summary>
+			bool HasNext() const;
+
+			/// <summary>
 			/// Returns the current character.
 			/// </summary>
 			char CurrentChar() const;
 
 			/// <summary>
-			/// Moves back to the previous character.
+			/// Returns the character after the current character.
 			/// </summary>
-			void PreviousChar();
+			char PeekNext() const;
 
 			/// <summary>
 			/// Returns the current index of the character in the source.
@@ -89,6 +94,11 @@ namespace AlloyCompiler
 		/// Returns the size of the source.
 		/// </summary>
 		size_t GetSize() const;
+
+		/// <summary>
+		/// Returns the line that the character at the given index is on.
+		/// </summary>
+		std::string_view GetLine(size_t startIndex) const;
 
 		/// <summary>
 		/// Creates a SmallStringView from the given start and end indices.
