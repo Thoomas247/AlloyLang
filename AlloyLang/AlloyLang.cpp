@@ -30,29 +30,28 @@ int main()
 
 	auto start = std::chrono::high_resolution_clock::now();
 	TokenBuffers tokenBuffers = Tokenize(source);
-	//PrintTokens(tokenBuffers);
 	auto end = std::chrono::high_resolution_clock::now();
 
 	const uint64_t tokenizeTime = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), 1ll);
 
-	Log::Print("Tokenize: {0}ms", tokenizeTime);
+	//PrintTokens(tokenBuffers);
 
 	start = std::chrono::high_resolution_clock::now();
 	auto nodeBuffers = Parse(tokenBuffers);
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-	Log::Print("Parse: {0}ms", parseTime);
-
 	PrintTree(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
 
 	start = std::chrono::high_resolution_clock::now();
-	LLVMCodeGenerator* codegen = new LLVMCodeGenerator(tokenBuffers, nodeBuffers);
-	codegen->Process();	// TBD: implement error handling
-	delete codegen;
+	//LLVMCodeGenerator* codegen = new LLVMCodeGenerator(tokenBuffers, nodeBuffers);
+	//codegen->Process();	// TBD: implement error handling
+	//delete codegen;
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
+	Log::Print("Tokenize: {0}ms", tokenizeTime);
+	Log::Print("Parse: {0}ms", parseTime);
 	AlloyCompiler::Log::Print("Codegen: {0}ms", codegenTime);
 
 	AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime + codegenTime);

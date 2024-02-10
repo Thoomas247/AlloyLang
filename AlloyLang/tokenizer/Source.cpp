@@ -36,35 +36,21 @@ namespace AlloyCompiler
 		return true;
 	}
 
+	bool Source::Iterator::HasNext() const
+	{
+		return m_CharIndex < m_Source.GetSize() - 1;
+	}
+
 	char Source::Iterator::CurrentChar() const
 	{
 		return m_Source.GetChar(m_CharIndex);
 	}
 
-	void Source::Iterator::PreviousChar()
+	char Source::Iterator::PeekNext() const
 	{
-		ASSERT(m_CharIndex > 0, "Tokenizer::lastChar() called when current char position is 0!");
+		ASSERT(HasNext(), "Tokenizer::peekNext() called when there is no next character!");
 
-		--m_CharIndex;
-
-		// if current character is a new line, go back one line
-		if (CurrentChar() == '\n')
-		{
-			m_LineStarts.pop();
-			--m_Line;
-			m_Column = 1;
-		}
-
-		// if current character is a tab, go back four columns
-		else if (CurrentChar() == '\t')
-		{
-			m_Column -= NUM_SPACES_PER_TAB;
-		}
-
-		else
-		{
-			--m_Column;
-		}
+		return m_Source.GetChar((size_t)m_CharIndex + 1);
 	}
 
 	size_t Source::Iterator::CurrentIndex() const { return m_CharIndex; }

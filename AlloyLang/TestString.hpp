@@ -20,6 +20,7 @@ fn mul (const c : &i64, const d : &i64) -> i64
 )";
 
 constexpr auto TestSrc1 = R"(
+// this is a sinlge line comment
 struct Vector3
 {
 	var x : f32;
@@ -27,6 +28,10 @@ struct Vector3
 	var z : f32;
 }
 
+/*
+* This is a multi line comment.
+/* Nested multi line comment. */
+*/
 enum TokenTypes
 {
 	Identifier,
