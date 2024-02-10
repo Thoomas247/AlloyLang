@@ -3,38 +3,13 @@
 #ifndef LLVMCODEGENERATOR_INCLUDE
 #define LLVMCODEGENERATOR_INCLUDE
 
-#include <llvm/ADT/APFloat.h>
-#include <llvm/ADT/STLExtras.h>
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Verifier.h"
-
-#ifndef NO_CODE_OPTIMIZATION
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/StandardInstrumentations.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/InstCombine/InstCombine.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Scalar/GVN.h"
-#include "llvm/Transforms/Scalar/Reassociate.h"
-#include "llvm/Transforms/Scalar/SimplifyCFG.h"
-#include "llvm/Transforms/Utils.h"
-#endif // NO_CODE_OPTIMIZATION
-
 #include "../parser/Parser.hpp"
+#include "NamedValues.hpp"
 
 #include <memory>
 #include <map>
 #include <utility>
+#include <vector>
 
 using namespace llvm;
 
@@ -54,7 +29,8 @@ private:
 	std::unique_ptr<LLVMContext> TheContext;
 	std::unique_ptr<IRBuilder<>> Builder;
 	std::unique_ptr<llvm::Module> TheModule;
-	std::map<std::string, AllocaInst*> NamedValues;
+	std::unique_ptr<CGNamedValues> RootNamedValues;
+	std::unique_ptr<CGNamedValues> NamedValues;
 
 #ifndef NO_CODE_OPTIMIZATION
 	// handling llvm copde optimizations passes
@@ -88,8 +64,16 @@ private:
 	Value* codegen(const AlloyCompiler::BLOCK_STATEMENT& node);
 	Value* codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::IF_STATEMENT& node);
+	Value* codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node);
+	Value* codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& node);
 
 	// straight-forward cases
+
+	// assignment statement
+	Value* codegen(const AlloyCompiler::ASSIGNMENT_STATEMENT& node) { return codegen(node.AssignmentExpressionID); }
+
+	// value definition statement
+	Value* codegen(const AlloyCompiler::VALUE_DEFINITION_STATEMENT& node) { return codegen(node.ValueDefinitionExpressionID); }
 
 	// return expression;
 	Value* codegen(const AlloyCompiler::RETURN_STATEMENT& node) { return codegen(node.ExpressionID); }
@@ -100,7 +84,7 @@ private:
 
 	// helper methods used by the codegen methods
 	Function* createFunctionPrototype(const std::string& Name, const AlloyCompiler::FUNCTION_DEFINITION& node);
-
+	bool updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value);
 };
 
 #endif		// LLVMCODEGENERATOR_INCLUDE

@@ -1,5 +1,6 @@
-#include <vector>
+#include "llvm.hpp"
 #include "LLVMCodeGenerator.hpp"
+#include "NamedValues.hpp"
 
 using namespace llvm;
 using namespace AlloyCompiler;
@@ -14,6 +15,10 @@ LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuf
 
 	// Create a new builder for the module.
 	Builder = std::make_unique<IRBuilder<>>(*TheContext);
+
+	// tree of named values that is passed around the code generator
+	RootNamedValues = std::make_unique<CGNamedValues>();
+	NamedValues = std::move(RootNamedValues);
 
 #ifndef NO_CODE_OPTIMIZATION
 	// Check the LLVM tutorial for details about these optimizations
@@ -62,7 +67,9 @@ int LLVMCodeGenerator::Process() {
 	const Node& rootNode = NodeBuffers.GetNode(root);
 
 	result = (codegen(rootNode) ? 0 : -1);
-	TheModule->print(errs(), nullptr);
+	std::error_code EC;
+	raw_fd_ostream out("out.ll", EC);
+	TheModule->print(out, nullptr);
 	return result;
 }
 
@@ -108,19 +115,31 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 
 	case NodeKind::UNARY_EXPRESSION:				// unary_operator PRIMARY_EXPRESSION;
-	case NodeKind::ASSIGNMENT_EXPRESSION:			// IDENTIFIER assignment_operator EXPRESSION;
 		assert(false);	// To be implemented
 		break;
 
-	/// End of NodeKind::EXPRESSION group
+	case NodeKind::ASSIGNMENT_EXPRESSION:			// IDENTIFIER assignment_operator EXPRESSION;
+		result = codegen(node.AssignmentExpression);
+		break;
+
+		/// End of NodeKind::EXPRESSION group
 
 	/// NodeKind::STATEMENT group
 
-	case NodeKind::VALUE_DEFINITION_STATEMENT:		// VALUE_DEFINITION_EXPRESSION semicolon;
 	case NodeKind::ASSIGNMENT_STATEMENT:			// ASSIGNMENT_EXPRESSION semicolon;
-	case NodeKind::FOR_LOOP_STATEMENT:				// for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT;
+		result = codegen(node.AssignmentStatement);
+		break;
+
 	case NodeKind::WHILE_LOOP_STATEMENT:			// while ENCLOSED_EXPRESSION STATEMENT;
 		assert(false);	// To be implemented
+		break;
+
+	case NodeKind::VALUE_DEFINITION_STATEMENT:		// VALUE_DEFINITION_EXPRESSION semicolon;
+		result = codegen(node.ValueDefinitionStatement);
+		break;
+
+	case NodeKind::FOR_LOOP_STATEMENT:				// for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT;
+		result = codegen(node.ForLoopStatement);
 		break;
 
 	case NodeKind::IF_STATEMENT:					// if ENCLOSED_EXPRESSION STATEMENT[else STATEMENT];
@@ -223,12 +242,14 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 		// If no insertion block, we are creating global variables
 		GlobalVariable* gv = new GlobalVariable(*TheModule,
 			Type::getDoubleTy(*TheContext),
-			(declaration.Kind == VALUE_DECLARATION::Type::Constant),   // isConstant
-			GlobalValue::CommonLinkage,
+			// (declaration.Kind == VALUE_DECLARATION::Type::Constant),   // TBD: Making the global constant generates a runtime error : 'common' global may not be marked constant!
+			false,							// isConstant
+			GlobalValue::InternalLinkage,
 			nullptr,                        // initializer specified below
 			Name
 		);
 		gv->setAlignment(Align(sizeof(double)));
+		gv->setDSOLocal(true);
 
 		// currently assuming the initializer is constant
 		ConstantFP* ptr_2 = (ConstantFP*)value;
@@ -242,7 +263,7 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 		// set the value
 		Builder->CreateStore(value, A);
 		// store in the local variables map
-		NamedValues[Name] = A;
+		NamedValues->insert(Name, A);
 	}
 
 	return value;
@@ -255,8 +276,8 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IDENTIFIER& node) {
     // Lookup this variable in the current function
     const std::string Name(TokenBuffers.GetValue(node.IdentifierTokenID).ToStringView());
     Value* value = nullptr;
-    AllocaInst* A = NamedValues[Name];
-    if (A) {
+	AllocaInst* A = NamedValues->contains(Name, true);
+	if (A) {
         // Found in the local variables, load the value
         value = Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
     }
@@ -275,38 +296,74 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IDENTIFIER& node) {
     return value;
 }
 
+bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value) {
+	//
+	// update the value of a local or global variable
+	//
+	bool result = false;
+
+	// Lookup this variable in the current function
+	AllocaInst* A = NamedValues->contains(Name, true);
+	if (A) {
+		// Found in the local variables, save the value
+		result = (Builder->CreateStore(Value, A) != nullptr);
+	}
+	else {
+		// not a local variable, check the globals
+		GlobalVariable* gv = TheModule->getGlobalVariable(Name);
+		if (gv) {
+			gv->setInitializer((llvm::Constant*)Value);
+			result = true;
+		}
+		else {
+			// TBD: LogErrorV("Unknown variable name");
+			assert(false);
+		}
+	}
+
+	return result;
+}
+
 Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 	Value* result = nullptr;
-	Value* L = codegen(node.LeftID);
-	Value* R = codegen(node.RightID);
-
 	const std::string op(TokenBuffers.GetValue(node.OperatorTokenID).ToStringView());
 
+	if (op == "=") {
+		// special case for the assignment operator
+		// we encounter this in cases such as the last expression of: for (var i : i64 = 0; i < c; i = i + 1)
+		ASSIGNMENT_EXPRESSION expr = { node.LeftID, node.OperatorTokenID, node.RightID };
+		result = codegen(expr);
+	}
+	else {
 
-    if (L && R) {
-        if (op == "+")
-            result = Builder->CreateFAdd(L, R, "addtmp");
-        else if (op == "-")
-            result = Builder->CreateFSub(L, R, "subtmp");
-        else if (op == "*")
-            result = Builder->CreateFMul(L, R, "multmp");
-		else if (op == "==") {
-			L = Builder->CreateFCmpOEQ(L, R, "equtmp");
-			// Convert bool 0/1 to double 0.0 or 1.0
-			result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
+		Value* L = codegen(node.LeftID);
+		Value* R = codegen(node.RightID);
+
+		if (L && R) {
+			if (op == "+")
+				result = Builder->CreateFAdd(L, R, "addtmp");
+			else if (op == "-")
+				result = Builder->CreateFSub(L, R, "subtmp");
+			else if (op == "*")
+				result = Builder->CreateFMul(L, R, "multmp");
+			else if (op == "==") {
+				L = Builder->CreateFCmpOEQ(L, R, "equtmp");
+				// Convert bool 0/1 to double 0.0 or 1.0
+				result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
+			}
+			else if (op == "<") {
+				L = Builder->CreateFCmpULT(L, R, "cmptmp");
+				// Convert bool 0/1 to double 0.0 or 1.0
+				result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
+			}
+			else {
+				// TBD
+				printf("invalid binary operator\n");
+				assert(false);
+			}
 		}
-		else if (op == "<") {
-            L = Builder->CreateFCmpULT(L, R, "cmptmp");
-            // Convert bool 0/1 to double 0.0 or 1.0
-            result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
-        }
-        else {
-            // TBD
-            printf("invalid binary operator\n");
-            assert(false);
-        }
-    }
-    return result;
+	}
+	return result;
 }
 
 Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
@@ -400,7 +457,7 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	Builder->SetInsertPoint(BB);
 
 	// Record the function arguments in the NamedValues map.
-	NamedValues.clear();
+	NamedValues->clear();
 	for (auto& Arg : F->args()) {
 		// Create an alloca for this variable.
 		AllocaInst* Alloca = CreateEntryBlockAlloca(F, std::string(Arg.getName()));
@@ -409,8 +466,11 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 		Builder->CreateStore(&Arg, Alloca);
 
 		// Add arguments to variable symbol table.
-		NamedValues[std::string(Arg.getName())] = Alloca;
+		NamedValues->insert(std::string(Arg.getName()), Alloca);
 	}
+
+	// create a new local names map for the function body
+	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
 
 	if (Value* RetVal = codegen(node.BodyID)) {
 		// Finish off the function.
@@ -424,12 +484,18 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 		TheFPM->run(*F, *TheFAM);
 #endif  // NO_CODE_OPTIMIZATION
 
+		// restore the named values of the higher level
+		NamedValues = std::move(NamedValues->getParent());
+
 		return F;
 	}
 
 
 	// Error reading body, remove function.
 	F->eraseFromParent();
+
+	// restore the named values of the higher level
+	NamedValues = std::move(NamedValues->getParent());
 	return nullptr;
 }
 
@@ -439,8 +505,36 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 	//
 	Value* result = nullptr;
 
+	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
+	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
+
 	for (auto& S : node.StatementIDs) {
 		result = codegen(S);
+	}
+
+	// restore the named values of the higher level
+	NamedValues = std::move(NamedValues->getParent());
+
+	return result;
+}
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& node) {
+	//
+	// identifier = expression
+	//
+	// TBD: what is ASSIGNMENT_EXPRESSION.OperatorTokenID for?
+	Value* result = nullptr;
+
+	assert(NodeBuffers.GetNode(node.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
+	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
+
+	// now get the value by recursively calling codegen
+	result = codegen(node.ValueID);
+
+	if (!updateValueOfLocalOrGlobalVariable(Name, result)) {
+		// error updating the value of local or global variable
+		assert(false);
 	}
 
 	return result;
@@ -471,7 +565,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION&
 
 	// evaluate all arguments by calling codegen on each expression
 	std::vector<Value*> ArgsV;
-	for (unsigned i = 0, e = node.ArgumentIDs.size(); i != e; ++i) {
+	for (size_t i = 0, e = node.ArgumentIDs.size(); i != e; ++i) {
 		ArgsV.push_back(codegen(node.ArgumentIDs[i]));
 		if (!ArgsV.back())
 			return nullptr;
@@ -559,5 +653,113 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	PN->addIncoming(ThenV, ThenBB);
 	PN->addIncoming(ElseV, ElseBB);
 	return PN;
+}
 
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node) {
+	// 
+	// for ( EXPRESSION; EXPRESSION; EXPRESSION ) STATEMENT 
+	// 
+	// Output for-loop as:
+	//   var = alloca double
+	//   ...
+	//   start = startexpr
+	//   store start -> var
+	//   goto loop
+	// loop:
+	//   ...
+	//   bodyexpr
+	//   ...
+	// loopend:
+	//   step = stepexpr
+	//   endcond = endexpr
+	//
+	//   curvar = load var
+	//   nextvar = curvar + step
+	//   store nextvar -> var
+	//   br endcond, loop, endloop
+	// outloop:
+
+	// we are supposed to be inside a function, otherwise this is going to fail
+	Function* TheFunction = Builder->GetInsertBlock()->getParent();
+	if (!TheFunction) {
+		// not inside a function or something missing in the codegen of the function
+		assert(false);
+		return nullptr;
+	}
+
+	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
+	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
+
+	// Emit the start code first if any.
+	if (ERROR_NODE_ID != node.InitExpressionID) {
+		if (!codegen(node.InitExpressionID)) {
+			// error evaluating start expression
+			assert(false);
+
+			// restore the named values of the higher level
+			NamedValues = std::move(NamedValues->getParent());
+
+			return nullptr;
+		}
+	}
+
+	// Make the new basic block for the loop header, inserting after current block.
+	BasicBlock* LoopBB = BasicBlock::Create(*TheContext, "loop", TheFunction);
+
+	// Insert an explicit fall through from the current block to the LoopBB.
+	Builder->CreateBr(LoopBB);
+
+	// Start insertion in LoopBB.
+	Builder->SetInsertPoint(LoopBB);
+
+	// Emit the body of the loop.  This, like any other expr, can change the
+	// current BB.  Note that we ignore the value computed by the body, but don't
+	// allow an error.
+	if (!codegen(node.BodyID)) {
+		// error evaluating statement
+		assert(false);
+		return nullptr;
+	}
+
+	// Emit the (optional) step value.
+	Value* StepVal = nullptr;
+	if (ERROR_NODE_ID != node.IncrementExpressionID) {
+		StepVal = codegen(node.IncrementExpressionID);
+		if (!StepVal) {
+			// error evaluating statement
+			assert(false);
+
+			// restore the named values of the higher level
+			NamedValues = std::move(NamedValues->getParent());
+
+			return nullptr;
+		}
+	}
+
+	// Compute the end condition.
+	Value* EndCond = codegen(node.ConditionExpressionID);
+	if (!EndCond) {
+		// error evaluating end expression
+		assert(false);
+
+		// restore the named values of the higher level
+		NamedValues = std::move(NamedValues->getParent());
+
+		return nullptr;
+	}
+
+	// Convert condition to a bool by comparing non-equal to 0.0.
+	EndCond = Builder->CreateFCmpONE(EndCond, ConstantFP::get(*TheContext, APFloat(0.0)), "loopcond");
+
+	// Create the "after loop" block and insert it.
+	BasicBlock* AfterBB = BasicBlock::Create(*TheContext, "afterloop", TheFunction);
+
+	// Insert the conditional branch into the end of LoopEndBB.
+	Builder->CreateCondBr(EndCond, LoopBB, AfterBB);
+
+	// Any new code will be inserted in AfterBB.
+	Builder->SetInsertPoint(AfterBB);
+
+	// for expr always returns 0.0.
+	return Constant::getNullValue(Type::getDoubleTy(*TheContext));
 }

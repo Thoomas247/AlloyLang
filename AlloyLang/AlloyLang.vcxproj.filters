@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\LLVMCodeGenerator">
+      <UniqueIdentifier>{edee05a5-7e05-4199-8d1c-db95cc3a5c7b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\LLVMCodeGenerator">
+      <UniqueIdentifier>{3c52c5d8-1fff-4027-a319-6af2d2a6e4c0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AlloyLang.cpp">
@@ -36,8 +42,11 @@
     <ClCompile Include="parser\TreePrinter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LLVMCodeGenerator\llvm.cpp">
+      <Filter>Source Files\LLVMCodeGenerator</Filter>
+    </ClCompile>
     <ClCompile Include="LLVMCodeGenerator\LLVMCodeGenerator.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\LLVMCodeGenerator</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -69,7 +78,13 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="LLVMCodeGenerator\LLVMCodeGenerator.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\LLVMCodeGenerator</Filter>
+    </ClInclude>
+    <ClInclude Include="LLVMCodeGenerator\llvm.hpp">
+      <Filter>Header Files\LLVMCodeGenerator</Filter>
+    </ClInclude>
+    <ClInclude Include="LLVMCodeGenerator\NamedValues.hpp">
+      <Filter>Header Files\LLVMCodeGenerator</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,3 +1,5 @@
+#include "LLVMCodeGenerator/llvm.hpp"
+
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
 #include "parser/TreePrinter.hpp"
@@ -44,7 +46,7 @@ int main()
 
 	Log::Print("Parse: {0}ms", parseTime);
 
-	PrintTree(tokenBuffers, nodeBuffers);
+	// PrintTree(tokenBuffers, nodeBuffers);
 
 	start = std::chrono::high_resolution_clock::now();
 	LLVMCodeGenerator* codegen = new LLVMCodeGenerator(tokenBuffers, nodeBuffers);

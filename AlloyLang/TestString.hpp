@@ -1,8 +1,8 @@
 #pragma once
 
 constexpr auto TestSrc2 = R"(
-const res : i64 = 1+2;
-var e : f32 = res + 1.01;
+const res : i64 = 0;
+var e : f32 = 1.0;
 
 fn add (const a : &i64, const b : &i64) -> i64
 {
@@ -13,8 +13,18 @@ fn mul (const c : &i64, const d : &i64) -> i64
 {
 	if (c == 1)
 		return d;
-	else
-		return add(c, d);
+	else {
+		var val : i64 = 0;
+		for (var i : i64 = 0; i < c; i = i + 1) {
+			val = val + d;
+		}	
+		return val;
+	}
+}
+
+fn main () -> i64
+{
+	return mul(3, 5);
 };
 
 )";

@@ -120,8 +120,30 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AlloyLang.cpp" />
-    <ClCompile Include="LLVMCodeGenerator\LLVMCodeGenerator.cpp" />
+    <ClCompile Include="AlloyLang.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="LLVMCodeGenerator\llvm.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">llvm.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">llvm.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">llvm.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="LLVMCodeGenerator\LLVMCodeGenerator.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">llvm.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">llvm.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">llvm.hpp</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="parser\Node.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="parser\TreePrinter.cpp" />
@@ -130,7 +152,9 @@
     <ClCompile Include="tokenizer\Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="LLVMCodeGenerator\llvm.hpp" />
     <ClInclude Include="LLVMCodeGenerator\LLVMCodeGenerator.hpp" />
+    <ClInclude Include="LLVMCodeGenerator\NamedValues.hpp" />
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
