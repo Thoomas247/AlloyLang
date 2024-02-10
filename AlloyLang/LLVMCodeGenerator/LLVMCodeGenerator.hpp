@@ -1,7 +1,7 @@
 #pragma once
 
-#include <memory>
-#include <map>
+#ifndef LLVMCODEGENERATOR_INCLUDE
+#define LLVMCODEGENERATOR_INCLUDE
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/ADT/STLExtras.h>
@@ -10,51 +10,38 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 
+#ifndef NO_CODE_OPTIMIZATION
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/Reassociate.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/Transforms/Utils.h"
+#endif // NO_CODE_OPTIMIZATION
+
 #include "../parser/Parser.hpp"
 
+#include <memory>
+#include <map>
+#include <utility>
+
 using namespace llvm;
-
-/// PrototypeAST - This class represents the "prototype" for a function,
-/// which captures its name, and its argument names (thus implicitly the number
-/// of arguments the function takes).
-class PrototypeAST {
-protected:
-	std::string Name;
-	std::vector<std::string> Args;
-
-public:
-	PrototypeAST(const std::string& Name, std::vector<std::string> Args)
-		: Name(Name), Args(std::move(Args)) {}
-
-	const std::string& getName() const { return Name; }
-	const std::vector<std::string>& getArgs() const { return Args; }
-};
-
-/// FunctionAST - This class represents a function definition itself.
-class FunctionAST {
-
-protected:
-	std::unique_ptr<PrototypeAST> Proto;
-	AlloyCompiler::Node Body;
-
-public:
-	FunctionAST(std::unique_ptr<PrototypeAST> Proto,
-		const AlloyCompiler::Node& Body)
-		: Proto(std::move(Proto)), Body(Body) {}
-
-	const std::unique_ptr<PrototypeAST>& getPrototype() { return Proto; }
-	const AlloyCompiler::Node& getBody() { return Body; }
-};
 
 class LLVMCodeGenerator
 {
 public:
-	LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuffers, 
+	LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuffers,
 		const AlloyCompiler::NodeBuffers& nodeDataBuffers);
 	~LLVMCodeGenerator();
 
@@ -68,25 +55,52 @@ private:
 	std::unique_ptr<IRBuilder<>> Builder;
 	std::unique_ptr<llvm::Module> TheModule;
 	std::map<std::string, AllocaInst*> NamedValues;
+
+#ifndef NO_CODE_OPTIMIZATION
+	// handling llvm copde optimizations passes
+	std::unique_ptr<FunctionPassManager> TheFPM;
+	std::unique_ptr<LoopAnalysisManager> TheLAM;
+	std::unique_ptr<FunctionAnalysisManager> TheFAM;
+	std::unique_ptr<CGSCCAnalysisManager> TheCGAM;
+	std::unique_ptr<ModuleAnalysisManager> TheMAM;
+	std::unique_ptr<PassInstrumentationCallbacks> ThePIC;
+	std::unique_ptr<StandardInstrumentations> TheSI;
+#endif // NO_CODE_OPTIMIZATION
+
+
+	// buffers returned by lexer and parser
 	const AlloyCompiler::NodeBuffers& NodeBuffers;
 	const AlloyCompiler::TokenBuffers& TokenBuffers;
 
 	// support for mutable variables
 	AllocaInst* CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName);
 
-	// called when top level expression is encountered
-	Value* HandleTopLevelExpression(const AlloyCompiler::Node& node);
-
 	// recursively process all nodes
 	Value* codegen(const AlloyCompiler::Node& node);
 	Value* codegen(AlloyCompiler::NodeID nodeID);
 
-	Function* codegen(FunctionAST& function);
-	Function* codegen(PrototypeAST& prototype);
 	Value* codegen(const AlloyCompiler::LITERAL& node);
 	Value* codegen(const AlloyCompiler::BINARY_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::VALUE_DEFINITION& node);
 	Value* codegen(const AlloyCompiler::VALUE_DEFINITION_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::IDENTIFIER& node);
+	Function* codegen(const AlloyCompiler::FUNCTION_DEFINITION& node);
+	Value* codegen(const AlloyCompiler::BLOCK_STATEMENT& node);
+	Value* codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION& node);
+	Value* codegen(const AlloyCompiler::IF_STATEMENT& node);
+
+	// straight-forward cases
+
+	// return expression;
+	Value* codegen(const AlloyCompiler::RETURN_STATEMENT& node) { return codegen(node.ExpressionID); }
+
+	// (expression)
+	Value* codegen(const AlloyCompiler::ENCLOSED_EXPRESSION& node) { return codegen(node.ExpressionID); }
+
+
+	// helper methods used by the codegen methods
+	Function* createFunctionPrototype(const std::string& Name, const AlloyCompiler::FUNCTION_DEFINITION& node);
+
 };
 
+#endif		// LLVMCODEGENERATOR_INCLUDE
