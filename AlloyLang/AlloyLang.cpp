@@ -3,7 +3,7 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
 #include "parser/TreePrinter.hpp"
-//#include "LLVMCodeGenerator/LLVMCodeGenerator.hpp"
+#include "LLVMCodeGenerator/LLVMCodeGenerator.hpp"
 
 #include "log/Log.hpp"
 #include "TestString.hpp"
@@ -15,12 +15,12 @@ using namespace AlloyCompiler;
 int main()
 {
 	const size_t n = 0;// 0'000;
-	std::string str = TestSrc1;
+	std::string str = TestSrc2;
 	str.reserve(str.size() * (n + 1));
 
 	for (size_t i = 0; i < n; i++)
 	{
-		str += TestSrc1;
+		str += TestSrc2;
 	}
 
 	Source source(str);
@@ -46,9 +46,9 @@ int main()
 	PrintTree(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
 
 	start = std::chrono::high_resolution_clock::now();
-	//LLVMCodeGenerator* codegen = new LLVMCodeGenerator(tokenBuffers, nodeBuffers);
-	//codegen->Process();	// TBD: implement error handling
-	//delete codegen;
+	LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
+	codegen.Process();	// TBD: implement error handling
+
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 

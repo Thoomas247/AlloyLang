@@ -399,7 +399,7 @@ AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, con
 	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
 }
 
-Function* LLVMCodeGenerator::createFunctionPrototype(const std::string & Name, const AlloyCompiler::FUNCTION_DEFINITION & node) {
+Function* LLVMCodeGenerator::createFunctionPrototype(const std::string & Name, const AlloyCompiler::FUNCTION_DECLARATION & node) {
 	//
 	// Helper method to create the protoype of a function
 	//
@@ -429,9 +429,12 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	// Function definition in the form of fn function( prarameter, parameter, ... ) ->  type { statements }
 	//
 
+	// retrieve the function declaration
+	const FUNCTION_DECLARATION& declaration = NodeBuffers.GetNode(node.FunctionDeclarationID).FunctionDeclaration;
+
 	// retrieve the function name
-	assert(NodeBuffers.GetNode(node.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
-	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
+	assert(NodeBuffers.GetNode(declaration.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
 	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
 	// First, check for an existing function from a previous declaration
@@ -445,7 +448,7 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	}
 
 	// create the llvm function prototype
-	F = createFunctionPrototype(Name, node);
+	F = createFunctionPrototype(Name, declaration);
 	if (!F) {
 		// Error creating the prototype
 		assert(false);
