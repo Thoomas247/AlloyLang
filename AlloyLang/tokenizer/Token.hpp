@@ -250,7 +250,7 @@ namespace AlloyCompiler
 			/// <summary>
 			/// Returns the string value of the line the current token is on.
 			/// </summary>
-			std::string_view GetLine();
+			std::string_view GetLine() const;
 
 			/// <summary>
 			/// Returns the ID of the current token.
@@ -263,6 +263,8 @@ namespace AlloyCompiler
 		};
 
 	public:
+		TokenBuffers(const Source& source);
+
 		Iterator GetIterator() const;
 
 		/// <summary>
@@ -291,6 +293,8 @@ namespace AlloyCompiler
 		const Location& GetLocation(TokenID id) const;
 
 	private:
+		const Source& m_Source;
+
 		std::vector<TokenKind> m_Kinds;
 		std::vector<SmallStringView> m_Values;
 		std::vector<Location> m_Locations;

@@ -64,12 +64,12 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_SILENCE_CXX23_ALIGNED_STORAGE_DEPRECATION_WARNING;_SILENCE_ALL_CXX23_DEPRECATION_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>X:\\llvm\\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\\llvm\\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>X:\\llvm\\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\\llvm\\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib"</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

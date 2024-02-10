@@ -98,6 +98,18 @@ namespace AlloyCompiler
 		return m_SourceView.size();
 	}
 
+	std::string_view Source::GetLine(size_t startIndex) const
+	{
+		// walk forward to find the end of the line
+		size_t end = startIndex;
+		while (end < m_SourceView.size() && m_SourceView[end] != '\n')
+		{
+			++end;
+		}
+
+		return m_SourceView.substr(startIndex, end - startIndex);
+	}
+
 	SmallStringView Source::CreateSmallStringView(size_t start, size_t end) const
 	{
 		return m_SourceView.substr(start, end - start);

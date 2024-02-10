@@ -151,6 +151,11 @@ namespace AlloyCompiler
 		NodeID ValueDefinitionExpressionID;
 	};
 
+	struct FUNCTION_CALL_STATEMENT
+	{
+		NodeID FunctionCallExpressionID;
+	};
+
 	struct ASSIGNMENT_STATEMENT
 	{
 		NodeID AssignmentExpressionID;
@@ -190,6 +195,7 @@ namespace AlloyCompiler
 	union STATEMENT
 	{
 		VALUE_DEFINITION_STATEMENT ValueDefinitionStatement;
+		FUNCTION_CALL_STATEMENT FunctionCallStatement;
 		ASSIGNMENT_STATEMENT AssignmentStatement;
 		FOR_LOOP_STATEMENT ForLoopStatement;
 		WHILE_LOOP_STATEMENT WhileLoopStatement;
@@ -287,6 +293,7 @@ namespace AlloyCompiler
 		//EXPRESSION,
 
 		VALUE_DEFINITION_STATEMENT,
+		FUNCTION_CALL_STATEMENT,
 		ASSIGNMENT_STATEMENT,
 		FOR_LOOP_STATEMENT,
 		WHILE_LOOP_STATEMENT,
@@ -336,6 +343,7 @@ namespace AlloyCompiler
 			//EXPRESSION Expression;
 
 			VALUE_DEFINITION_STATEMENT ValueDefinitionStatement;
+			FUNCTION_CALL_STATEMENT FunctionCallStatement;
 			ASSIGNMENT_STATEMENT AssignmentStatement;
 			FOR_LOOP_STATEMENT ForLoopStatement;
 			WHILE_LOOP_STATEMENT WhileLoopStatement;

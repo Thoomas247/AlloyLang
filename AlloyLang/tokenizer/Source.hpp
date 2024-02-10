@@ -91,6 +91,11 @@ namespace AlloyCompiler
 		size_t GetSize() const;
 
 		/// <summary>
+		/// Returns the line that the character at the given index is on.
+		/// </summary>
+		std::string_view GetLine(size_t startIndex) const;
+
+		/// <summary>
 		/// Creates a SmallStringView from the given start and end indices.
 		/// </summary>
 		SmallStringView CreateSmallStringView(size_t start, size_t end) const;

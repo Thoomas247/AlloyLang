@@ -790,7 +790,7 @@ namespace AlloyCompiler
 		TokenID errorInfo = iter.GetCurrentID();
 
 		// check for unary operator
-		if (iter.GetKind() != TokenKind::unary_operator)
+		if (iter.GetKind() != TokenKind::unary_operator && iter.GetKind() != TokenKind::additive_operator)
 		{
 			// try to parse primary expression
 			return parse<PRIMARY_EXPRESSION>(nodeBuffers, iter);
@@ -998,6 +998,44 @@ namespace AlloyCompiler
 				.AssignmentStatement = ASSIGNMENT_STATEMENT
 				{
 					.AssignmentExpressionID = assignmentExpressionID
+				}
+			},
+			errorInfo
+		);
+	}
+
+	template <>
+	NodeID parse<FUNCTION_CALL_STATEMENT>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+		NodeID functionCallExpressionID = parse<FUNCTION_CALL_EXPRESSION>(nodeBuffers, iter);
+
+		if (functionCallExpressionID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for semicolon
+		if (iter.GetKind() != TokenKind::semicolon)
+		{
+			unexpectedToken(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume semicolon
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "}" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::FUNCTION_CALL_STATEMENT,
+				.FunctionCallStatement = FUNCTION_CALL_STATEMENT
+				{
+					.FunctionCallExpressionID = functionCallExpressionID
 				}
 			},
 			errorInfo
@@ -1360,7 +1398,19 @@ namespace AlloyCompiler
 			return parse<VALUE_DEFINITION_STATEMENT>(nodeBuffers, iter);
 
 		case TokenKind::identifier:
+		{
+			// check if next token is opening parenthesis
+			if (iter.Next() && iter.GetKind() == TokenKind::open_paren)
+			{
+				iter.Previous();
+
+				return parse<FUNCTION_CALL_STATEMENT>(nodeBuffers, iter);
+			}
+
+			iter.Previous();
+
 			return parse<ASSIGNMENT_STATEMENT>(nodeBuffers, iter);
+		}
 
 		case TokenKind::for_keyword:
 			return parse<FOR_LOOP_STATEMENT>(nodeBuffers, iter);

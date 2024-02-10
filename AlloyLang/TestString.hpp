@@ -90,6 +90,32 @@ fn anon_block (const a : &i64) -> i64
 	}
 }
 
+fn if_else (const a : &i64) -> i64
+{
+	if (a < 0)
+	{
+		return -1;
+	}
+	else if (a == 0)
+	{
+		return 0;
+	}
+	else
+	{
+		return 1;
+	}
+}
+
+fn fn_call (const a : &i64) -> i64
+{
+	return add(a, 1);
+}
+
+fn void_fn_call (const a : &i64)
+{
+	do_nothing(a, true);
+}
+
 exp var a : i64 = 2;
 pub var c : char = 'A';
 

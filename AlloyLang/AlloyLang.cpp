@@ -13,12 +13,12 @@ using namespace AlloyCompiler;
 int main()
 {
 	const size_t n = 0;// 0'000;
-	std::string str = TestSrc2;
+	std::string str = TestSrc1;
 	str.reserve(str.size() * (n + 1));
 
 	for (size_t i = 0; i < n; i++)
 	{
-		str += TestSrc2;
+		str += TestSrc1;
 	}
 
 	Source source(str);
@@ -44,7 +44,7 @@ int main()
 
 	Log::Print("Parse: {0}ms", parseTime);
 
-	PrintTree(tokenBuffers, nodeBuffers);
+	PrintTree(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
 
 	start = std::chrono::high_resolution_clock::now();
 	LLVMCodeGenerator* codegen = new LLVMCodeGenerator(tokenBuffers, nodeBuffers);

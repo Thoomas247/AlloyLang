@@ -238,7 +238,7 @@ namespace AlloyCompiler
 	TokenBuffers Tokenize(const Source& source)
 	{
 		Source::Iterator iter = source.GetIterator();
-		TokenBuffers tokenBuffers;
+		TokenBuffers tokenBuffers(source);
 
 		do
 		{

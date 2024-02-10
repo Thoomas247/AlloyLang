@@ -51,28 +51,9 @@ namespace AlloyCompiler
 		return m_TokenBuffers.GetLocation(m_CurrentID);
 	}
 
-	std::string_view TokenBuffers::Iterator::GetLine()
+	std::string_view TokenBuffers::Iterator::GetLine() const
 	{
-		// find first token of line
-		TokenID firstTokenID = m_CurrentID;
-
-		while (firstTokenID != (TokenID)0 && m_TokenBuffers.GetLocation(firstTokenID).Line == m_TokenBuffers.GetLocation(m_CurrentID).Line)
-		{
-			decrement(firstTokenID);
-		}
-
-		increment(firstTokenID);
-
-		// find token after last token of line
-		TokenID lastTokenID = m_CurrentID;
-
-		while (lastTokenID != m_TokenBuffers.LastTokenID() && m_TokenBuffers.GetLocation(lastTokenID).Line == m_TokenBuffers.GetLocation(m_CurrentID).Line)
-		{
-			increment(lastTokenID);
-		}
-
-		return std::string_view(m_TokenBuffers.GetValue(firstTokenID).Data(),
-			(m_TokenBuffers.GetLocation(lastTokenID).LineStart - m_TokenBuffers.GetLocation(firstTokenID).LineStart) - 1);
+		return m_TokenBuffers.m_Source.GetLine(GetLocation().LineStart);
 	}
 
 	TokenID TokenBuffers::Iterator::GetCurrentID() const
@@ -83,6 +64,11 @@ namespace AlloyCompiler
 	TokenBuffers::Iterator TokenBuffers::GetIterator() const
 	{
 		return Iterator(*this);
+	}
+
+	TokenBuffers::TokenBuffers(const Source& source)
+		: m_Source(source)
+	{
 	}
 
 	TokenID TokenBuffers::AddToken(TokenKind kind, const SmallStringView& value, const Location& location)

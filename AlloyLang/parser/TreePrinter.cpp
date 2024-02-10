@@ -280,6 +280,18 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<FUNCTION_CALL_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& functionCallStatementNode = nodeBuffers.GetNode(nodeID).FunctionCallStatement;
+
+		json j;
+		j["kind"] = "FUNCTION_CALL_STATEMENT";
+		j["function_call_expression"] = print<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, functionCallStatementNode.FunctionCallExpressionID);
+
+		return j;
+	}
+
+	template <>
 	json print<ASSIGNMENT_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& assignmentNode = nodeBuffers.GetNode(nodeID).AssignmentStatement;
@@ -374,6 +386,9 @@ namespace AlloyCompiler
 		{
 		case NodeKind::VALUE_DEFINITION_STATEMENT:
 			return print<VALUE_DEFINITION_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::FUNCTION_CALL_STATEMENT:
+			return print<FUNCTION_CALL_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
 
 		case NodeKind::ASSIGNMENT_STATEMENT:
 			return print<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, nodeID);
@@ -540,9 +555,9 @@ namespace AlloyCompiler
 		return j;
 	}
 
-	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers)
+	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID rootNode)
 	{
-		json j = print<PROGRAM>(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
+		json j = print<PROGRAM>(tokenBuffers, nodeBuffers, rootNode);
 
 		Log::Print("{0}", j.dump(NUM_SPACES_PER_TAB));
 	}

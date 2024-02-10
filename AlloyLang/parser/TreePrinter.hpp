@@ -4,5 +4,5 @@
 
 namespace AlloyCompiler
 {
-	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers);
+	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID rootNode);
 }
