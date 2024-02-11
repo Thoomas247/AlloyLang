@@ -12,15 +12,17 @@
 
 using namespace AlloyCompiler;
 
+constexpr auto SOURCE = TestSrc1;
+
 int main()
 {
 	const size_t n = 0;// 0'000;
-	std::string str = TestSrc2;
+	std::string str = SOURCE;
 	str.reserve(str.size() * (n + 1));
 
 	for (size_t i = 0; i < n; i++)
 	{
-		str += TestSrc2;
+		str += SOURCE;
 	}
 
 	Source source(str);
@@ -36,7 +38,7 @@ int main()
 
 	const uint64_t tokenizeTime = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), 1ll);
 
-	//PrintTokens(tokenBuffers);
+	PrintTokens(tokenBuffers);
 
 	start = std::chrono::high_resolution_clock::now();
 	auto nodeBuffers = Parse(tokenBuffers);

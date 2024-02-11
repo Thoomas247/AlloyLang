@@ -12,6 +12,9 @@ namespace AlloyCompiler
 	json print(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID) = delete;
 
 	template <>
+	json print<EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID);
+
+	template <>
 	json print<LITERAL>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& literalNode = nodeBuffers.GetNode(nodeID).Literal;
@@ -48,6 +51,39 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<POINTER_INITIALIZER_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& pointerInitializerExpressionNode = nodeBuffers.GetNode(nodeID).PointerInitializerExpression;
+
+		json j;
+		j["kind"] = "POINTER_INITIALIZER_EXPRESSION";
+		j["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, pointerInitializerExpressionNode.ValueID);
+
+		if (pointerInitializerExpressionNode.CountID != ERROR_NODE_ID)
+		{
+			j["array_size"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, pointerInitializerExpressionNode.CountID);
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<INITIALIZER_LIST_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& initializerListExpressionNode = nodeBuffers.GetNode(nodeID).InitializerListExpression;
+
+		json j;
+		j["kind"] = "INITIALIZER_LIST_EXPRESSION";
+
+		for (const auto& expressionID : initializerListExpressionNode.ValueIDs)
+		{
+			j["values"].push_back(print<EXPRESSION>(tokenBuffers, nodeBuffers, expressionID));
+		}
+
+		return j;
+	}
+
+	template <>
 	json print<IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& identifierNode = nodeBuffers.GetNode(nodeID).Identifier;
@@ -55,6 +91,19 @@ namespace AlloyCompiler
 		json j;
 		j["kind"] = "IDENTIFIER";
 		j["value"] = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+
+		return j;
+	}
+
+	template <>
+	json print<ARRAY_ACCESS_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& arrayAccessExpressionNode = nodeBuffers.GetNode(nodeID).ArrayAccessExpression;
+
+		json j;
+		j["kind"] = "ARRAY_ACCESS_EXPRESSION";
+		j["array"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, arrayAccessExpressionNode.ArrayIdentifierID);
+		j["index"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, arrayAccessExpressionNode.IndexExpressionID);
 
 		return j;
 	}
@@ -79,7 +128,20 @@ namespace AlloyCompiler
 		json j;
 		j["kind"] = "TYPE_IDENTIFIER";
 		j["modifier"] = modifierString;
-		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, typeIdentifierNode.IdentifierID);
+
+		if (nodeBuffers.GetNode(typeIdentifierNode.TypeIdentifierID).Kind == NodeKind::IDENTIFIER)
+		{
+			j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, typeIdentifierNode.TypeIdentifierID);
+		}
+		else
+		{
+			j["type_identifier"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, typeIdentifierNode.TypeIdentifierID);
+		}
+
+		if (typeIdentifierNode.ArraySizeID != ERROR_NODE_ID)
+		{
+			j["array_size"] = print<LITERAL>(tokenBuffers, nodeBuffers, typeIdentifierNode.ArraySizeID);
+		}
 
 		return j;
 	}
@@ -143,9 +205,6 @@ namespace AlloyCompiler
 
 		return j;
 	}
-
-	template <>
-	json print<EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID);
 
 	template <>
 	json print<VALUE_DEFINITION_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
@@ -229,8 +288,17 @@ namespace AlloyCompiler
 		case NodeKind::LITERAL:
 			return print<LITERAL>(tokenBuffers, nodeBuffers, nodeID);
 
+		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
+			return print<POINTER_INITIALIZER_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::INITIALIZER_LIST_EXPRESSION:
+			return print<INITIALIZER_LIST_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
 			return print<VALUE_DEFINITION_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::ARRAY_ACCESS_EXPRESSION:
+			return print<ARRAY_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 			return print<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
@@ -272,7 +340,10 @@ namespace AlloyCompiler
 
 		case NodeKind::IDENTIFIER:
 		case NodeKind::LITERAL:
+		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
+		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
+		case NodeKind::ARRAY_ACCESS_EXPRESSION:
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 		case NodeKind::ENCLOSED_EXPRESSION:
 			return print<PRIMARY_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
@@ -587,7 +658,7 @@ namespace AlloyCompiler
 
 		Log::Print("{0}", j.dump(NUM_SPACES_PER_TAB));
 
-		
+
 	}
 }
 

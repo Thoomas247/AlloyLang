@@ -41,6 +41,8 @@ namespace AlloyCompiler
 		else_keyword,
 		return_keyword,
 
+		new_keyword,
+
 		reference,
 		//pointer,
 
@@ -53,6 +55,8 @@ namespace AlloyCompiler
 		close_paren,
 		open_brace,
 		close_brace,
+		open_bracket,
+		close_bracket,
 
 		assignment_operator,
 
@@ -96,6 +100,8 @@ namespace AlloyCompiler
 		{ TokenKind::else_keyword, "else_keyword" },
 		{ TokenKind::return_keyword, "return_keyword" },
 
+		{ TokenKind::new_keyword, "new_keyword" },
+
 		{ TokenKind::reference, "reference" },
 		//{ TokenKind::pointer, "pointer" },
 
@@ -108,6 +114,8 @@ namespace AlloyCompiler
 		{ TokenKind::close_paren, "close_paren" },
 		{ TokenKind::open_brace, "open_brace" },
 		{ TokenKind::close_brace, "close_brace" },
+		{ TokenKind::open_bracket, "open_bracket" },
+		{ TokenKind::close_bracket, "close_bracket" },
 
 		{ TokenKind::assignment_operator, "assignment_operator" },
 
@@ -148,6 +156,8 @@ namespace AlloyCompiler
 		{ "else", TokenKind::else_keyword },
 		{ "return", TokenKind::return_keyword },
 
+		{ "new", TokenKind::new_keyword },
+
 		{ "&", TokenKind::reference },
 		//{ "*", TokenKind::pointer },
 
@@ -160,6 +170,8 @@ namespace AlloyCompiler
 		{ ")", TokenKind::close_paren },
 		{ "{", TokenKind::open_brace },
 		{ "}", TokenKind::close_brace },
+		{ "[", TokenKind::open_bracket },
+		{ "]", TokenKind::close_bracket },
 
 		{ "=", TokenKind::assignment_operator },
 
