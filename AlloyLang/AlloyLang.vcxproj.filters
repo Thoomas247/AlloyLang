@@ -87,4 +87,7 @@
       <Filter>Header Files\LLVMCodeGenerator</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="CGTest.ecs" />
+  </ItemGroup>
 </Project>

@@ -8,19 +8,43 @@
 #include "log/Log.hpp"
 #include "TestString.hpp"
 
+#include <iostream>
+#include <fstream>
 #include <chrono>
 
 using namespace AlloyCompiler;
 
-int main()
+int main(int argc, char* argv[])
 {
-	const size_t n = 0;// 0'000;
-	std::string str = TestSrc2;
-	str.reserve(str.size() * (n + 1));
+	std::string str;
+	if (argc > 1) {
+		// read test file provided on the command line
+		std::ifstream file(argv[1]);
+		if (file) {
+			std::string line;
+			while(std::getline(file, line)) {
+				str += line;
+				str += "\r\n";
+			}
+			file.close();
+		}
+		else {
+			ASSERT(false, "Cannot read input file");
+		}
+	}
+	else {
+		str = TestSrc1;
+	}
 
-	for (size_t i = 0; i < n; i++)
-	{
-		str += TestSrc2;
+	// duplicate the test file or string 2^n times
+	const size_t n = 0;// 0'000;
+	if (n > 0) {
+		str.reserve(str.size() * pow(2, n));
+
+		for (size_t i = 0; i < n; i++)
+		{
+			str += str;
+		}
 	}
 
 	Source source(str);

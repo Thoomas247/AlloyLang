@@ -61,6 +61,7 @@ private:
 	Value* codegen(const AlloyCompiler::VALUE_DEFINITION_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::IDENTIFIER& node);
 	Function* codegen(const AlloyCompiler::FUNCTION_DEFINITION& node);
+	Function* codegen(const AlloyCompiler::FUNCTION_DECLARATION& node);
 	Value* codegen(const AlloyCompiler::BLOCK_STATEMENT& node);
 	Value* codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::IF_STATEMENT& node);
@@ -75,16 +76,22 @@ private:
 	// value definition statement
 	Value* codegen(const AlloyCompiler::VALUE_DEFINITION_STATEMENT& node) { return codegen(node.ValueDefinitionExpressionID); }
 
+	// external function definition
+	Function* codegen(const AlloyCompiler::EXTERN_DEFINITION& node) { return static_cast<llvm::Function *>(codegen(node.FunctionDeclarationID)); }
+		
+	// function call statement
+	Value* codegen(const AlloyCompiler::FUNCTION_CALL_STATEMENT& node) { return codegen(node.FunctionCallExpressionID); }
+
 	// return expression;
 	Value* codegen(const AlloyCompiler::RETURN_STATEMENT& node) { return codegen(node.ExpressionID); }
 
 	// (expression)
 	Value* codegen(const AlloyCompiler::ENCLOSED_EXPRESSION& node) { return codegen(node.ExpressionID); }
 
-
 	// helper methods used by the codegen methods
 	Function* createFunctionPrototype(const std::string& Name, const AlloyCompiler::FUNCTION_DECLARATION& node);
 	bool updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value);
+	llvm::Type* AlloyToLLVMType(AlloyCompiler::NodeID id);
 };
 
 #endif		// LLVMCODEGENERATOR_INCLUDE

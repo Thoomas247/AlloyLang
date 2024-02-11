@@ -96,6 +96,10 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		// nothing to do, handled by VALUE_DEFINITION_EXPRESSION, STRUCT_DEFINITION or FUNCTION_DEFINITION
 		break;
 
+	case NodeKind::FUNCTION_DECLARATION:			// function IDENTIFIER open_paren [ VALUE_DECLARATION { comma VALUE_DECLARATION } ] close_paren [ arrow TYPE_DECLARATION ] ;
+		result = codegen(node.FunctionDeclaration);
+		break;
+
 	/// NodeKind::EXPRESSION group
 
 	case NodeKind::VALUE_DEFINITION_EXPRESSION:		// VALUE_DECLARATION assignment_operator EXPRESSION;
@@ -138,6 +142,10 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		result = codegen(node.ValueDefinitionStatement);
 		break;
 
+	case NodeKind::FUNCTION_CALL_STATEMENT:			// FUNCTION_CALL_EXPRESSION semicolon
+		result = codegen(node.FunctionCallStatement);
+		break;
+
 	case NodeKind::FOR_LOOP_STATEMENT:				// for open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT;
 		result = codegen(node.ForLoopStatement);
 		break;
@@ -158,6 +166,10 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 
 	/// NodeKind::DEFINITION group
 
+	case NodeKind::EXTERN_DEFINITION:				// extern_keyword FUNCTION_DECLARATION semicolon ;
+		result = codegen(node.ExternDefinition);
+		break;
+
 	case NodeKind::VALUE_DEFINITION:				// VALUE_DEFINITION_EXPRESSION semicolon ;
 		result = codegen(node.ValueDefinition);
 		break;
@@ -171,7 +183,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 
 	case NodeKind::FUNCTION_DEFINITION:				// function IDENTIFIER open_paren[VALUE_DECLARATION{ comma VALUE_DECLARATION }] close_paren[arrow TYPE_DECLARATION] BLOCK_STATEMENT;
-		codegen(node.FunctionDefinition);
+		result = codegen(node.FunctionDefinition);
 		break;
 
 	case NodeKind::QUALIFIED_DEFINITION:
@@ -242,9 +254,8 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 		// If no insertion block, we are creating global variables
 		GlobalVariable* gv = new GlobalVariable(*TheModule,
 			Type::getDoubleTy(*TheContext),
-			// (declaration.Kind == VALUE_DECLARATION::Type::Constant),   // TBD: Making the global constant generates a runtime error : 'common' global may not be marked constant!
-			false,							// isConstant
-			GlobalValue::InternalLinkage,
+			(declaration.Kind == VALUE_DECLARATION::Type::Constant),   // isConstant
+			GlobalValue::InternalLinkage,	// TBD: check CLang source-code the proper options for creating globals
 			nullptr,                        // initializer specified below
 			Name
 		);
@@ -367,29 +378,26 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 }
 
 Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
-	// TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
-	//    return ConstantInt::get(*TheContext, APInt(64, node.Value));
+	//
+	// Convert a literal to an LLVM Value
+	//
+	Value* result = nullptr;
+
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
-	return ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
-}
+	switch (node.Kind) {
+		case LITERAL::Type::String:
+			result = llvm::ConstantDataArray::getString(*TheContext, val);
+			break;
 
-/* called when top level expression is encountered
-Value* LLVMCodeGenerator::HandleTopLevelExpression(const AlloyCompiler::Node& node) {
-	std::unique_ptr<PrototypeAST> Proto = std::make_unique<PrototypeAST>("__anon_expr", std::vector<std::string>());
-	std::unique_ptr<FunctionAST> Function = std::make_unique<FunctionAST>(std::move(Proto), node);
+		// TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
+		default:
+			result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
+			break;
 
-	// Evaluate a top-level expression into an anonymous function.
-	if (auto* FnIR = codegen(*Function)) {
-		FnIR->print(errs());
-		fprintf(stderr, "\n");
-
-		// Remove the anonymous expression.
-		FnIR->eraseFromParent();
 	}
 
-	return nullptr;
+	return result;
 }
-*/
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
@@ -399,14 +407,57 @@ AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, con
 	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
 }
 
+llvm::Type* LLVMCodeGenerator::AlloyToLLVMType(AlloyCompiler::NodeID id) {
+	//
+	// get llvm type from AlloyLang types
+	// the input node ID should be of type TYPE_IDENTIFIER
+	//
+	//
+	// TBD: convert this to a static map for faster lookup
+	const char* AlloyTypes[] = { "i64" };
+	const llvm::Type::TypeID LLVMTypes[] = { llvm::Type::TypeID::DoubleTyID };
+	llvm::Type::TypeID llvmType = llvm::Type::TypeID::VoidTyID;
+
+	assert(NodeBuffers.GetNode(id).Kind == NodeKind::TYPE_IDENTIFIER);
+	const TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
+	const IDENTIFIER& i = NodeBuffers.GetNode(ti.IdentifierID).Identifier;
+	std::string AlloyType(TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView());
+	
+	if (AlloyType == "String") {
+		ArrayType* stringType = ArrayType::get(IntegerType::get(*TheContext, 8), 0);
+		return stringType;
+	}
+	else {
+		for (int t = 0; t < sizeof(AlloyTypes) / sizeof(AlloyTypes[0]); t++) {
+			if (AlloyType == AlloyTypes[t]) {
+				llvmType = LLVMTypes[t];
+				break;
+			}
+		}
+		return Type::getPrimitiveType(*TheContext, llvmType);
+	}
+}
+
 Function* LLVMCodeGenerator::createFunctionPrototype(const std::string & Name, const AlloyCompiler::FUNCTION_DECLARATION & node) {
 	//
 	// Helper method to create the protoype of a function
 	//
 
-	// Make the function type: double(double,double) etc.
-	std::vector<Type*> Doubles(node.ParameterIDs.size(), Type::getDoubleTy(*TheContext));
-	FunctionType* FT = FunctionType::get(Type::getDoubleTy(*TheContext), Doubles, false);
+	// convert each of the parameter types into llvm types
+	std::vector<Type*> ParamTypes;
+	for (auto id : node.ParameterIDs) {
+		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
+		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
+		llvm::Type* type = AlloyToLLVMType(vd.TypeIdentifierID);
+		ParamTypes.push_back(type);
+	}
+
+	// now convert the return type to llvm
+	const TYPE_DECLARATION& td = NodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
+	Type* returnType = AlloyToLLVMType(td.TypeIdentifierID);
+
+	// Make the function type: return type(param type, param type, ...)
+	FunctionType* FT = FunctionType::get(returnType, ParamTypes, false);
 
 	Function* F = Function::Create(FT, Function::ExternalLinkage, Name, *TheModule);
 
@@ -424,17 +475,13 @@ Function* LLVMCodeGenerator::createFunctionPrototype(const std::string & Name, c
 	return F;
 }
 
-Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& node) {
+Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DECLARATION& node) {
 	//
-	// Function definition in the form of fn function( prarameter, parameter, ... ) ->  type { statements }
+	// function declaration in the form of fn IDENTIFIER ( parameter, parameter, ... ) -> return type;
 	//
-
-	// retrieve the function declaration
-	const FUNCTION_DECLARATION& declaration = NodeBuffers.GetNode(node.FunctionDeclarationID).FunctionDeclaration;
-
 	// retrieve the function name
-	assert(NodeBuffers.GetNode(declaration.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
-	const IDENTIFIER& identifier = NodeBuffers.GetNode(declaration.IdentifierID).Identifier;
+	assert(NodeBuffers.GetNode(node.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
 	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
 	// First, check for an existing function from a previous declaration
@@ -448,12 +495,22 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	}
 
 	// create the llvm function prototype
-	F = createFunctionPrototype(Name, declaration);
+	F = createFunctionPrototype(Name, node);
 	if (!F) {
 		// Error creating the prototype
 		assert(false);
 		return nullptr;
 	}
+
+	return F;
+}
+
+Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& node) {
+	//
+	// Function definition in the form of fn function( prarameter, parameter, ... ) ->  type { statements }
+	//
+
+	Function* F = static_cast<llvm::Function*>(codegen(node.FunctionDeclarationID));
 
 	// Create a new basic block to start insertion into.
 	BasicBlock* BB = BasicBlock::Create(*TheContext, "entry", F);
