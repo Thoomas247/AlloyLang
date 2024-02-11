@@ -8,10 +8,12 @@ namespace AlloyCompiler
 {
 
 	template <typename... Args>
-	inline constexpr void logError(const Source::Iterator& iter, const std::string& format, Args&&... args)
+	inline constexpr void logError(Source::Iterator& iter, const std::string& format, Args&&... args)
 	{
 		Log::Error("Error at location ({0} : {1}):", iter.CurrentLocation().Line, iter.CurrentLocation().Column);
 		Log::Error("\t{0}", std::vformat(format, std::make_format_args(args...)));
+
+		iter.NextChar();
 	}
 
 	bool trySkipWhitespace(Source::Iterator& iter)

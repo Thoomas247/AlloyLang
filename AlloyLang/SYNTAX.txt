@@ -24,6 +24,8 @@ if_keyword:						'if' ;
 else_keyword:					'else' ;
 return_keyword:					'return' ;
 
+new_keyword:					'new' ;
+
 reference:						'&' ;
 pointer:						'*' ;
 
@@ -36,6 +38,8 @@ open_paren:						'(' ;
 close_paren:					')' ;
 open_brace:						'{' ;
 close_brace:					'}' ;
+open_bracket:					'[' ;
+close_bracket:					']' ;
 
 assignment_operator:			'=' ;
 
@@ -57,22 +61,31 @@ character_literal:				'\'' [ (* character regex *) ] '\'' ;
 LITERAL:						integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
 
 IDENTIFIER:						identifier ;
-TYPE_IDENTIFIER:				[ reference | pointer ] IDENTIFIER ;
-
+TYPE_IDENTIFIER:				[ reference | pointer ] ( IDENTIFIER | ( open_bracket TYPE_IDENTIFIER [ semicolon integer_literal ] close_bracket ) ) ;
 
 TYPE_DECLARATION:				[ variable | constant ] TYPE_IDENTIFIER ;
 VALUE_DECLARATION:				( variable | constant ) IDENTIFIER colon TYPE_IDENTIFIER ;
 FUNCTION_DECLARATION:			function IDENTIFIER open_paren [ VALUE_DECLARATION { comma VALUE_DECLARATION } ] close_paren [ arrow TYPE_DECLARATION ] ;
 
-
+POINTER_INITIALIZER_EXPRESSION:	new_keyword ( EXPRESSION | ( open_bracket EXPRESSION semicolon EXPRESSION close_bracket ) ) ;
+INITIALIZER_LIST_EXPRESSION:	open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
 VALUE_DEFINITION_EXPRESSION:	VALUE_DECLARATION assignment_operator EXPRESSION ;
+ARRAY_ACCESS_EXPRESSION:		IDENTIFIER open_bracket EXPRESSION close_bracket ;
 FUNCTION_CALL_EXPRESSION:		IDENTIFIER open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
 ENCLOSED_EXPRESSION:			open_paren EXPRESSION close_paren ;
 
 BINARY_EXPRESSION:				EXPRESSION binary_operator EXPRESSION ;
 UNARY_EXPRESSION:				unary_operator PRIMARY_EXPRESSION ;
 
-PRIMARY_EXPRESSION:				IDENTIFIER | LITERAL | VALUE_DEFINITION_EXPRESSION | FUNCTION_CALL_EXPRESSION | ENCLOSED_EXPRESSION ;
+PRIMARY_EXPRESSION:				IDENTIFIER 
+								| LITERAL 
+								| POINTER_INITIALIZER_EXPRESSION 
+								| INITIALIZER_LIST_EXPRESSION 
+								| VALUE_DEFINITION_EXPRESSION 
+								| ARRAY_ACCESS_EXPRESSION 
+								| FUNCTION_CALL_EXPRESSION 
+								| ENCLOSED_EXPRESSION 
+								;
 
 ASSIGNMENT_EXPRESSION:			IDENTIFIER assignment_operator EXPRESSION ;
 

@@ -3,6 +3,27 @@
 constexpr auto TestSrc1 = R"(
 extern fn test (var a : i64);
 
+// array of i64
+exp var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+
+// array of references to i64
+pub var refArray : [&i64; 3] = { &array[0], &array[1], &array[2] };
+
+// array of pointers to i64
+const ptrArray : [*i64; 3] = { new array[0], new 0, new 0 };
+
+// array of i64 from ptrArray
+const arr : [i64; 3] = { @ptrArray[0], @ptrArray[1], @ptrArray[2] };
+
+// pointer to array of i64
+const ptr : *[i64; 3] = new { 1, 2, 3 };
+
+// reference to array of i64
+const ref : &[i64; 3] = &array;
+
+// pointer to array of dynamic size, initialized to 0 (has to be pointer)
+const dynArray : *[i64] = new [0; array[4]];
+
 // this is a sinlge line comment
 struct Vector3
 {

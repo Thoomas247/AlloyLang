@@ -47,11 +47,12 @@ namespace AlloyCompiler
 		{
 			None,
 			Reference,
-			Pointer
+			Pointer,
 		};
 
 		Modifier Mod;
-		NodeID IdentifierID;
+		NodeID ArraySizeID;			// ERROR_NODE_ID if not an array
+		NodeID TypeIdentifierID;	// can be ID of IDENTIFIER or TYPE_IDENTIFIER
 	};
 
 #pragma endregion
@@ -95,10 +96,27 @@ namespace AlloyCompiler
 
 #pragma region Expressions
 
+	struct POINTER_INITIALIZER_EXPRESSION
+	{
+		NodeID ValueID;
+		NodeID CountID;	// ERROR_NODE_ID if not an array
+	};
+
+	struct INITIALIZER_LIST_EXPRESSION
+	{
+		VectorRef<NodeID> ValueIDs;
+	};
+
 	struct VALUE_DEFINITION_EXPRESSION
 	{
 		NodeID ValueDeclarationID;
 		NodeID ValueID;
+	};
+
+	struct ARRAY_ACCESS_EXPRESSION
+	{
+		NodeID ArrayIdentifierID;
+		NodeID IndexExpressionID;
 	};
 
 	struct FUNCTION_CALL_EXPRESSION
@@ -129,7 +147,10 @@ namespace AlloyCompiler
 	{
 		IDENTIFIER Identifier;
 		LITERAL Literal;
+		POINTER_INITIALIZER_EXPRESSION PointerInitializerExpression;
+		INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 		VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
+		ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;
 		FUNCTION_CALL_EXPRESSION FunctionCallExpression;
 		ENCLOSED_EXPRESSION EnclosedExpression;
 	};
@@ -291,7 +312,10 @@ namespace AlloyCompiler
 		VALUE_DECLARATION,
 		FUNCTION_DECLARATION,
 
+		POINTER_INITIALIZER_EXPRESSION,
+		INITIALIZER_LIST_EXPRESSION,
 		VALUE_DEFINITION_EXPRESSION,
+		ARRAY_ACCESS_EXPRESSION,
 		FUNCTION_CALL_EXPRESSION,
 		ENCLOSED_EXPRESSION,
 
@@ -343,7 +367,10 @@ namespace AlloyCompiler
 			VALUE_DECLARATION ValueDeclaration;
 			FUNCTION_DECLARATION FunctionDeclaration;
 
+			POINTER_INITIALIZER_EXPRESSION PointerInitializerExpression;
+			INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 			VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
+			ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;
 			FUNCTION_CALL_EXPRESSION FunctionCallExpression;
 			ENCLOSED_EXPRESSION EnclosedExpression;
 
