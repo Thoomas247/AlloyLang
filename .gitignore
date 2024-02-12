@@ -362,3 +362,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 AlloyLang/out.ll
+AlloyLang/CGTest.ecs.bak
+AlloyLang/LLVM Compile Instructions.txt.bak
+AlloyLang/CGTest.ecs.bak

@@ -30,7 +30,7 @@ private:
 	std::unique_ptr<IRBuilder<>> Builder;
 	std::unique_ptr<llvm::Module> TheModule;
 	std::unique_ptr<CGNamedValues> RootNamedValues;
-	std::unique_ptr<CGNamedValues> NamedValues;
+	std::shared_ptr<CGNamedValues> NamedValues;
 
 #ifndef NO_CODE_OPTIMIZATION
 	// handling llvm copde optimizations passes
@@ -67,6 +67,7 @@ private:
 	Value* codegen(const AlloyCompiler::IF_STATEMENT& node);
 	Value* codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node);
 	Value* codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& node);
+	Value* codegen(const AlloyCompiler::RETURN_STATEMENT& node);
 
 	// straight-forward cases
 
@@ -81,9 +82,6 @@ private:
 		
 	// function call statement
 	Value* codegen(const AlloyCompiler::FUNCTION_CALL_STATEMENT& node) { return codegen(node.FunctionCallExpressionID); }
-
-	// return expression;
-	Value* codegen(const AlloyCompiler::RETURN_STATEMENT& node) { return codegen(node.ExpressionID); }
 
 	// (expression)
 	Value* codegen(const AlloyCompiler::ENCLOSED_EXPRESSION& node) { return codegen(node.ExpressionID); }

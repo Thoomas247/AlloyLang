@@ -386,7 +386,7 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
 	switch (node.Kind) {
 		case LITERAL::Type::String:
-			result = llvm::ConstantDataArray::getString(*TheContext, val);
+			result = Builder->CreateGlobalStringPtr(val);
 			break;
 
 		// TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
@@ -420,11 +420,11 @@ llvm::Type* LLVMCodeGenerator::AlloyToLLVMType(AlloyCompiler::NodeID id) {
 
 	assert(NodeBuffers.GetNode(id).Kind == NodeKind::TYPE_IDENTIFIER);
 	const TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
-	const IDENTIFIER& i = NodeBuffers.GetNode(ti.IdentifierID).Identifier;
+	const IDENTIFIER& i = NodeBuffers.GetNode(ti.TypeIdentifierID).Identifier;
 	std::string AlloyType(TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView());
 	
 	if (AlloyType == "String") {
-		ArrayType* stringType = ArrayType::get(IntegerType::get(*TheContext, 8), 0);
+		PointerType* stringType = PointerType::get(IntegerType::get(*TheContext, 8), 0);
 		return stringType;
 	}
 	else {
@@ -533,8 +533,6 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
 
 	if (Value* RetVal = codegen(node.BodyID)) {
-		// Finish off the function.
-		Builder->CreateRet(RetVal);
 
 		// Validate the generated code, checking for consistency.
 		verifyFunction(*F);
@@ -823,3 +821,13 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	// for expr always returns 0.0.
 	return Constant::getNullValue(Type::getDoubleTy(*TheContext));
 }
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::RETURN_STATEMENT& node) { 
+	//
+	// return expression;
+	//
+	Value* result = codegen(node.ExpressionID);
+	Builder->CreateRet(result);
+	return result;
+}
+
