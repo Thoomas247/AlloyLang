@@ -82,27 +82,100 @@ namespace AlloyCompiler
 	llvm::Value* generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID) = delete;
 
 	template <>
+	llvm::Value* generate<EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
+
+	template <>
 	llvm::Value* generate<LITERAL>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
+		const LITERAL& literalNode = nodeBuffers.GetNode(nodeID).Literal;
 
+		const std::string_view literalStr = tokenBuffers.GetValue(literalNode.InfoTokenID).ToStringView();
+
+		switch (literalNode.Kind)
+		{
+		case LITERAL::Type::Integer:
+		{
+			// TODO: allow negative values
+			uint64_t uintValue;
+			std::from_chars_result result = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), uintValue);
+			return llvm::ConstantInt::get(*state.Context, llvm::APInt(64, uintValue));
+		}
+
+		case LITERAL::Type::Float:
+		{
+			double floatValue;
+			std::from_chars_result result = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), floatValue);
+			return llvm::ConstantFP::get(*state.Context, llvm::APFloat(floatValue));
+		}
+
+		case LITERAL::Type::Boolean:
+		{
+			if (literalStr == "true")
+			{
+				return llvm::ConstantInt::getTrue(*state.Context);
+			}
+
+			if (literalStr == "false")
+			{
+				return llvm::ConstantInt::getFalse(*state.Context);
+			}
+
+			ASSERT(false, "Unknown boolean literal '{0}'!", literalStr);
+			return nullptr;
+		}
+
+		case LITERAL::Type::String:
+			return llvm::ConstantDataArray::getString(*state.Context, literalStr);
+
+		case LITERAL::Type::Character:
+			return llvm::ConstantInt::get(*state.Context, llvm::APInt(64, literalStr[0]));
+
+		default:
+			ASSERT(false, "Unknown literal type!");
+			return nullptr;
+		}
 	}
 
 	template <>
 	llvm::Value* generate<IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
+		const IDENTIFIER& identifierNode = nodeBuffers.GetNode(nodeID).Identifier;
 
+		const std::string_view name = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+
+		// look up the name in the function
+		llvm::Value* value = state.NamedValues.Get(name);
+
+		if (value)
+		{
+			return value;
+		}
+
+		// look up the name in the global module table
+		value = state.Module->getGlobalVariable(name);
+
+		if (value)
+		{
+			return value;
+		}
+
+		// TODO: log error
+
+		return nullptr;
 	}
 
 	template <>
 	llvm::Value* generate<TYPE_IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
-
+		ASSERT(false, "Not yet implemented!");
+		return nullptr;
 	}
 
 	template <>
 	llvm::Value* generate<TYPE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
-
+		ASSERT(false, "Not yet implemented!");
+		return nullptr;
 	}
 
 	template <>
@@ -467,6 +540,15 @@ namespace AlloyCompiler
 
 		}
 	}
+
+	template <>
+	llvm::Value* generate<VALUE_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
+
+	template <>
+	llvm::Value* generate<STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
+
+	template <>
+	llvm::Value* generate<BLOCK_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
 
 	template <>
 	llvm::Value* generate<VALUE_DEFINITION_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)

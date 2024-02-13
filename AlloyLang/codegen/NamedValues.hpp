@@ -30,7 +30,7 @@ namespace AlloyCompiler
 			std::string_view Name;
 			std::unordered_map<std::string_view, llvm::AllocaInst*> Values;
 
-			Scope(const std::string& name)
+			Scope(const std::string_view& name)
 				: Name(name)
 			{}
 		};
