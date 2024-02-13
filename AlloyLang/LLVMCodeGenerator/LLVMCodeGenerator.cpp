@@ -534,20 +534,23 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	// create a new local names map for the function body
 	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
 
-	Value* RetVal = codegen(node.BodyID);
-
-	if (nullptr == RetVal) {
-		// no return statement, insert a void return
-		Builder->CreateRet(Constant::getNullValue(Type::getDoubleTy(*TheContext)));
-	}
-
-	// Validate the generated code, checking for consistency.
-	verifyFunction(*F);
+	ConstantInt* retval = static_cast<ConstantInt *>(codegen(node.BodyID));
+	
+	if (retval && retval->isOne()) {
+		// Validate the generated code, checking for consistency.
+		verifyFunction(*F);
 
 #ifndef NO_CODE_OPTIMIZATION
-	// Run the optimizer on the function.
-	TheFPM->run(*F, *TheFAM);
+		// Run the optimizer on the function.
+		TheFPM->run(*F, *TheFAM);
 #endif  // NO_CODE_OPTIMIZATION
+	}
+	else {
+		// Error reading body, remove function
+		assert(false);
+		F->eraseFromParent();
+		F = nullptr;
+	}
 
 	// restore the named values of the higher level
 	NamedValues = std::move(NamedValues->getParent());
@@ -558,24 +561,27 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 	//
 	// Block of code statements { statement; statement; ... }
+	// returns ConstantInt True or False depending on success or failure
 	//
-	Value* result = nullptr;
+	Value* result = ConstantInt::getTrue(*TheContext);
 
 	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
 	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
 
 	for (const NodeID& S : node.StatementIDs) {
 
-		Value* stmtResult = codegen(S);
+		ConstantInt* stmtResult = static_cast<ConstantInt *>(codegen(S));
+		if (stmtResult == nullptr || stmtResult->isZero()) {
+			assert(false);
+			result = ConstantInt::getFalse(*TheContext);
+			break;
+		}
 		
-		// only return statements should return a result
-		assert(nullptr == stmtResult || (NodeKind::RETURN_STATEMENT == NodeBuffers.GetNode(S).Kind));
-
-		if (nullptr != stmtResult) {
-			result = stmtResult;
+		if (NodeKind::RETURN_STATEMENT == NodeBuffers.GetNode(S).Kind) {
 			// TBD: generate a warning that we encountered unreachable statements
 			break;			// ignore any statements after return
-		}
+
+		} 
 	}
 
 	// restore the named values of the higher level
@@ -643,14 +649,15 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_CALL_EXPRESSION&
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	//
 	// if (expression) statements [else statements]
+	// returns ConstantInt True or False depending on success or failure
 	//
-	Value* result = nullptr;
+	Value* result = ConstantInt::getFalse(*TheContext);
 
 	Value* CondV = codegen(node.ConditionExpressionID);
 	if (!CondV) {
 		// error evaluating condition
 		assert(false);
-		return nullptr;
+		return result;
 	}
 
 	// Convert condition to a bool by comparing non-equal to 0.0.
@@ -661,7 +668,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	if (!TheFunction) {
 		// not inside a function or something missing in the codegen of the function
 		assert(false);
-		return nullptr;
+		return result;
 	}
 
 	// Create blocks for the then and else cases
@@ -672,12 +679,12 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	BasicBlock* MergeBB = BasicBlock::Create(*TheContext, "ifcont");
 	Builder->CreateCondBr(CondV, ThenBB, ElseBB);
 
-	// Emit then value.
+	// Emit then statements
 	Builder->SetInsertPoint(ThenBB);
-	Value* ThenV = codegen(node.BodyID);
-	if (!ThenV) {
+	ConstantInt* ThenV = static_cast<ConstantInt *>(codegen(node.BodyID));
+	if (ThenV == nullptr || ThenV->isZero()) {
 		assert(false);
-		return nullptr;
+		return result;
 	}
 
 	Builder->CreateBr(MergeBB);
@@ -685,19 +692,19 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	ThenBB = Builder->GetInsertBlock();
 
 	// Emit else block if any
-	Value* ElseV = nullptr;
+	ConstantInt* ElseV = nullptr;
 	if (ElseBB) {
 		TheFunction->insert(TheFunction->end(), ElseBB);
 		Builder->SetInsertPoint(ElseBB);
 		if (ERROR_NODE_ID == node.ElseID) {
-			// no else statement, assume a null value for the PHINode object
-			ElseV = Constant::getNullValue(Type::getDoubleTy(*TheContext));
+			// no else statement, return success
+			result = ConstantInt::getTrue(*TheContext);;
 		}
 		else {
-			ElseV = codegen(node.ElseID);
-			if (!ElseV) {
+			ElseV = static_cast<ConstantInt*>(codegen(node.ElseID));
+			if (ElseV == nullptr || ElseV->isZero()) {
 				assert(false);
-				return nullptr;
+				return result;
 			}
 		}
 	}
@@ -711,19 +718,22 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	TheFunction->insert(TheFunction->end(), MergeBB);
 	Builder->SetInsertPoint(MergeBB);
 
-	// Note: This call will assert if SDL checks are enabled in Visual Studio as per this article:
+	/* Note: This call will assert if SDL checks are enabled in Visual Studio as per this article :
 	// https://stackoverflow.com/questions/34892732/error-when-call-createphi-in-llvm
 	// Need to disable SDL checks for this code to run
 	PHINode* PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
 
 	PN->addIncoming(ThenV, ThenBB);
 	PN->addIncoming(ElseV, ElseBB);
-	return nullptr;
+	*/
+	result = ConstantInt::getTrue(*TheContext);
+	return result;
 }
 
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node) {
 	// 
 	// for ( EXPRESSION; EXPRESSION; EXPRESSION ) STATEMENT 
+	// returns ConstantInt True or False depending on success or failure
 	// 
 	// Output for-loop as:
 	//   var = alloca double
@@ -745,12 +755,14 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	//   br endcond, loop, endloop
 	// outloop:
 
+	ConstantInt* result = ConstantInt::getFalse(*TheContext);
+
 	// we are supposed to be inside a function, otherwise this is going to fail
 	Function* TheFunction = Builder->GetInsertBlock()->getParent();
 	if (!TheFunction) {
 		// not inside a function or something missing in the codegen of the function
 		assert(false);
-		return nullptr;
+		return result;
 	}
 
 	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
@@ -765,7 +777,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 			// restore the named values of the higher level
 			NamedValues = std::move(NamedValues->getParent());
 
-			return nullptr;
+			return result;
 		}
 	}
 
@@ -781,20 +793,24 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	// Emit the body of the loop.  This, like any other expr, can change the
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
-	codegen(node.BodyID);
+	result = static_cast<ConstantInt *>(codegen(node.BodyID));
+	if (nullptr == result || result->isZero()) {
+		assert(false);
+		return result;
+	}
 
 	// Emit the (optional) step value.
 	Value* StepVal = nullptr;
 	if (ERROR_NODE_ID != node.IncrementExpressionID) {
 		StepVal = codegen(node.IncrementExpressionID);
 		if (!StepVal) {
-			// error evaluating statement
+			// error evaluating expression
 			assert(false);
 
 			// restore the named values of the higher level
 			NamedValues = std::move(NamedValues->getParent());
 
-			return nullptr;
+			return result;
 		}
 	}
 
@@ -807,7 +823,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 		// restore the named values of the higher level
 		NamedValues = std::move(NamedValues->getParent());
 
-		return nullptr;
+		return result;
 	}
 
 	// Convert condition to a bool by comparing non-equal to 0.0.
@@ -823,15 +839,26 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	Builder->SetInsertPoint(AfterBB);
 
 	// for expr always returns nullptr
-	return nullptr;
+	return result;
 }
 
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::RETURN_STATEMENT& node) { 
 	//
 	// return expression;
+	// returns ConstantInt True or False depending on success or failure
 	//
-	Value* result = codegen(node.ExpressionID);
-	Builder->CreateRet(result);
+	Value* result = ConstantInt::getFalse(*TheContext);
+	if (ERROR_NODE_ID == node.ExpressionID) {
+		Builder->CreateRetVoid();
+		result = ConstantInt::getTrue(*TheContext);
+	}
+	else {
+		result = codegen(node.ExpressionID);
+		if (result != nullptr) {
+			Builder->CreateRet(result);
+			result = ConstantInt::getTrue(*TheContext);
+		}
+	}
 	return result;
 }
 
