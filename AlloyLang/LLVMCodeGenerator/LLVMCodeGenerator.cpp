@@ -94,6 +94,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 
 	case NodeKind::VALUE_DECLARATION:				// (variable | constant) IDENTIFIER colon TYPE_IDENTIFIER;
 		// nothing to do, handled by VALUE_DEFINITION_EXPRESSION, STRUCT_DEFINITION or FUNCTION_DEFINITION
+		result = nullptr;
 		break;
 
 	case NodeKind::FUNCTION_DECLARATION:			// function IDENTIFIER open_paren [ VALUE_DECLARATION { comma VALUE_DECLARATION } ] close_paren [ arrow TYPE_DECLARATION ] ;
@@ -457,7 +458,8 @@ Function* LLVMCodeGenerator::createFunctionPrototype(const std::string & Name, c
 	Type* returnType = AlloyToLLVMType(td.TypeIdentifierID);
 
 	// Make the function type: return type(param type, param type, ...)
-	FunctionType* FT = FunctionType::get(returnType, ParamTypes, false);
+	// TBD: the last parameter should be true only for variable number of parmeters (e.g. printf), currently assuming all functions are variable parameters
+	FunctionType* FT = FunctionType::get(returnType, ParamTypes, true);
 
 	Function* F = Function::Create(FT, Function::ExternalLinkage, Name, *TheModule);
 
@@ -532,29 +534,25 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	// create a new local names map for the function body
 	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
 
-	if (Value* RetVal = codegen(node.BodyID)) {
+	Value* RetVal = codegen(node.BodyID);
 
-		// Validate the generated code, checking for consistency.
-		verifyFunction(*F);
-
-#ifndef NO_CODE_OPTIMIZATION
-		// Run the optimizer on the function.
-		TheFPM->run(*F, *TheFAM);
-#endif  // NO_CODE_OPTIMIZATION
-
-		// restore the named values of the higher level
-		NamedValues = std::move(NamedValues->getParent());
-
-		return F;
+	if (nullptr == RetVal) {
+		// no return statement, insert a void return
+		Builder->CreateRet(Constant::getNullValue(Type::getDoubleTy(*TheContext)));
 	}
 
+	// Validate the generated code, checking for consistency.
+	verifyFunction(*F);
 
-	// Error reading body, remove function.
-	F->eraseFromParent();
+#ifndef NO_CODE_OPTIMIZATION
+	// Run the optimizer on the function.
+	TheFPM->run(*F, *TheFAM);
+#endif  // NO_CODE_OPTIMIZATION
 
 	// restore the named values of the higher level
 	NamedValues = std::move(NamedValues->getParent());
-	return nullptr;
+
+	return F;
 }
 
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
@@ -566,8 +564,18 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
 	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
 
-	for (auto& S : node.StatementIDs) {
-		result = codegen(S);
+	for (const NodeID& S : node.StatementIDs) {
+
+		Value* stmtResult = codegen(S);
+		
+		// only return statements should return a result
+		assert(nullptr == stmtResult || (NodeKind::RETURN_STATEMENT == NodeBuffers.GetNode(S).Kind));
+
+		if (nullptr != stmtResult) {
+			result = stmtResult;
+			// TBD: generate a warning that we encountered unreachable statements
+			break;			// ignore any statements after return
+		}
 	}
 
 	// restore the named values of the higher level
@@ -710,7 +718,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 
 	PN->addIncoming(ThenV, ThenBB);
 	PN->addIncoming(ElseV, ElseBB);
-	return PN;
+	return nullptr;
 }
 
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node) {
@@ -773,11 +781,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	// Emit the body of the loop.  This, like any other expr, can change the
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
-	if (!codegen(node.BodyID)) {
-		// error evaluating statement
-		assert(false);
-		return nullptr;
-	}
+	codegen(node.BodyID);
 
 	// Emit the (optional) step value.
 	Value* StepVal = nullptr;
@@ -818,8 +822,8 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	// Any new code will be inserted in AfterBB.
 	Builder->SetInsertPoint(AfterBB);
 
-	// for expr always returns 0.0.
-	return Constant::getNullValue(Type::getDoubleTy(*TheContext));
+	// for expr always returns nullptr
+	return nullptr;
 }
 
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::RETURN_STATEMENT& node) { 

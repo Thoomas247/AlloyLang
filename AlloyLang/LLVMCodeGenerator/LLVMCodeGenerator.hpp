@@ -72,16 +72,19 @@ private:
 	// straight-forward cases
 
 	// assignment statement
-	Value* codegen(const AlloyCompiler::ASSIGNMENT_STATEMENT& node) { return codegen(node.AssignmentExpressionID); }
+	// statements should not return a result
+	Value* codegen(const AlloyCompiler::ASSIGNMENT_STATEMENT& node) { codegen(node.AssignmentExpressionID); return nullptr; }
 
 	// value definition statement
-	Value* codegen(const AlloyCompiler::VALUE_DEFINITION_STATEMENT& node) { return codegen(node.ValueDefinitionExpressionID); }
+	// statements should not return a result
+	Value* codegen(const AlloyCompiler::VALUE_DEFINITION_STATEMENT& node) { codegen(node.ValueDefinitionExpressionID); return nullptr; }
 
 	// external function definition
 	Function* codegen(const AlloyCompiler::EXTERN_DEFINITION& node) { return static_cast<llvm::Function *>(codegen(node.FunctionDeclarationID)); }
 		
 	// function call statement
-	Value* codegen(const AlloyCompiler::FUNCTION_CALL_STATEMENT& node) { return codegen(node.FunctionCallExpressionID); }
+	// statements should not return a result
+	Value* codegen(const AlloyCompiler::FUNCTION_CALL_STATEMENT& node) { codegen(node.FunctionCallExpressionID); return nullptr; }
 
 	// (expression)
 	Value* codegen(const AlloyCompiler::ENCLOSED_EXPRESSION& node) { return codegen(node.ExpressionID); }

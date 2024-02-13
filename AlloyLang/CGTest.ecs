@@ -16,9 +16,8 @@ fn mul (const a : &i64, const b : &i64) -> i64
 	else {
 		for (var i : i64 = 0; i < a; i = i + 1) {
 			ret = add(ret, b);
-		}	
+		}
 	}
-
 	return ret;
 }
 

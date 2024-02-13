@@ -11,8 +11,8 @@ class CGNamedValues
 {
 public:
 
-	CGNamedValues(std::shared_ptr<CGNamedValues> Parent = nullptr) : parent(Parent) { objects_created++; printf_s("Number of CGNamedValues : %d\n", objects_created); }
-	~CGNamedValues() { objects_created--; printf_s("Number of CGNamedValues : %d\n", objects_created); }
+	CGNamedValues(std::shared_ptr<CGNamedValues> Parent = nullptr) : parent(Parent) { /*objects_created++; printf_s("Number of CGNamedValues : %d\n", objects_created);*/ }
+	~CGNamedValues() { /*objects_created--; printf_s("Number of CGNamedValues : %d\n", objects_created);*/ }
 
 	llvm::AllocaInst* contains(const std::string& Name, bool checkParents = false) {
 		llvm::AllocaInst* value = nullptr;
