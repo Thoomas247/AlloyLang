@@ -32,6 +32,7 @@ pointer:						'*' ;
 comma:							',' ;
 colon:							':' ;
 semicolon:						';' ;
+dot:							'.' ;
 arrow:							'->' ;
 
 open_paren:						'(' ;
@@ -71,6 +72,7 @@ POINTER_INITIALIZER_EXPRESSION:	new_keyword ( EXPRESSION | ( open_bracket EXPRES
 INITIALIZER_LIST_EXPRESSION:	open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
 VALUE_DEFINITION_EXPRESSION:	VALUE_DECLARATION assignment_operator EXPRESSION ;
 ARRAY_ACCESS_EXPRESSION:		IDENTIFIER open_bracket EXPRESSION close_bracket ;
+MEMBER_ACCESS_EXPRESSION:		IDENTIFIER dot IDENTIFIER ;
 FUNCTION_CALL_EXPRESSION:		IDENTIFIER open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
 ENCLOSED_EXPRESSION:			open_paren EXPRESSION close_paren ;
 
@@ -83,6 +85,7 @@ PRIMARY_EXPRESSION:				IDENTIFIER
 								| INITIALIZER_LIST_EXPRESSION 
 								| VALUE_DEFINITION_EXPRESSION 
 								| ARRAY_ACCESS_EXPRESSION 
+								| MEMBER_ACCESS_EXPRESSION
 								| FUNCTION_CALL_EXPRESSION 
 								| ENCLOSED_EXPRESSION 
 								;
