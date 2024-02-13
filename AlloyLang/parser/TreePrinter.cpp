@@ -465,7 +465,11 @@ namespace AlloyCompiler
 
 		json j;
 		j["kind"] = "RETURN_STATEMENT";
-		j["expression"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, returnStatementNode.ExpressionID);
+
+		if (returnStatementNode.ExpressionID != ERROR_NODE_ID)
+		{
+			j["expression"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, returnStatementNode.ExpressionID);
+		}
 
 		return j;
 	}
