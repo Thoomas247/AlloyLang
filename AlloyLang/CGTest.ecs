@@ -1,4 +1,4 @@
-extern fn printf (const str : String) -> i64;
+extern fn printf (const str : String, const param : i64) -> i64;
 
 const res : i64 = 0;
 var e : f32 = 1.0;
@@ -8,22 +8,22 @@ fn add (const a : &i64, const b : &i64) -> i64
 	return (a + b);
 }
 
-fn mul (const c : &i64, const d : &i64) -> i64
+fn mul (const a : &i64, const b : &i64) -> i64
 {
-	printf("Hello !");
-
-	if (c == 1)
-		return d;
+	var ret : i64 = 0;
+	if (a == 1)
+		ret = b;
 	else {
-		var val : i64 = 0;
-		for (var i : i64 = 0; i < c; i = i + 1) {
-			val = val + d;
-		}	
-		return val;
+		for (var i : i64 = 0; i < a; i = i + 1) {
+			ret = add(ret, b);
+		}
 	}
+	return ret;
 }
 
 fn main () -> i64
 {
-	return mul(3, 5);
+	printf("1 x 5 = %f\n", mul(1, 5));
+	printf("3 x 5 = %f\n", mul(3, 5));
+	return 0;
 }
