@@ -131,9 +131,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="codegen\CodeGenerator.cpp" />
-    <ClCompile Include="codegen\llvm\llvm.cpp" />
-    <ClCompile Include="codegen\NamedValues.cpp" />
     <ClCompile Include="LLVMCodeGenerator\llvm.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">llvm.hpp</PrecompiledHeaderFile>
@@ -161,9 +158,6 @@
     <ClCompile Include="tokenizer\Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="codegen\CodeGenerator.hpp" />
-    <ClInclude Include="codegen\llvm\llvm.hpp" />
-    <ClInclude Include="codegen\NamedValues.hpp" />
     <ClInclude Include="LLVMCodeGenerator\llvm.hpp" />
     <ClInclude Include="LLVMCodeGenerator\LLVMCodeGenerator.hpp" />
     <ClInclude Include="LLVMCodeGenerator\NamedValues.hpp" />

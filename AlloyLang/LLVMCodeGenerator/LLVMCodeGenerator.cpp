@@ -78,6 +78,27 @@ int LLVMCodeGenerator::Process(llvm::raw_ostream* llvmOutput /*= nullptr*/) {
 	return result;
 }
 
+int LLVMCodeGenerator::Execute() {
+	//
+	// execute generated code
+	//
+#ifndef NO_CODE_EXECUTION
+	InitializeNativeTarget();
+	ExecutionEngine* executionEngine = EngineBuilder(std::move(TheModule)).setEngineKind(llvm::EngineKind::Interpreter).create();
+	if (executionEngine) {
+		executionEngine->DisableLazyCompilation();
+		Function* main = executionEngine->FindFunctionNamed(StringRef("main"));
+		auto result = executionEngine->runFunction(main, {});
+		delete executionEngine;
+	}
+	else {
+		assert(false);	// could not instantiate execution engine
+	}
+
+#endif // NO_CODE_EXECUTION
+	return 0;
+}
+
 Value* LLVMCodeGenerator::codegen(const Node& node) {
 
 	Value* result = nullptr;

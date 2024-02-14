@@ -90,4 +90,7 @@
   <ItemGroup>
     <None Include="CGTest.ecs" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="Parser Issues.txt" />
+  </ItemGroup>
 </Project>
