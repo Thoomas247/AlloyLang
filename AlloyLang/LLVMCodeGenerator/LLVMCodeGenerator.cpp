@@ -377,6 +377,9 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 		Value* L = codegen(node.LeftID);
 		Value* R = codegen(node.RightID);
 
+		// we need the 2 operands to be of the same type, if not convert to same
+		Type* operandType = CGNamedValues::MakeCompatible(L, R);
+
 		if (L && R) {
 			if (op == "+")
 				result = Builder->CreateFAdd(L, R, "addtmp");
@@ -413,7 +416,7 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
 	switch (node.Kind) {
 		case LITERAL::Type::String:
-			result = llvm::ConstantDataArray::getString(*TheContext, val);
+			result = Builder->CreateGlobalStringPtr(val, "stringval");
 			break;
 
 		// TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
@@ -434,36 +437,6 @@ AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, con
 	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
 }
 
-llvm::Type* LLVMCodeGenerator::AlloyToLLVMType(AlloyCompiler::NodeID id) {
-	//
-	// get llvm type from AlloyLang types
-	// the input node ID should be of type TYPE_IDENTIFIER
-	//
-	//
-	// TBD: convert this to a static map for faster lookup
-	const char* AlloyTypes[] = { "i64" };
-	const llvm::Type::TypeID LLVMTypes[] = { llvm::Type::TypeID::DoubleTyID };
-	llvm::Type::TypeID llvmType = llvm::Type::TypeID::VoidTyID;
-
-	assert(NodeBuffers.GetNode(id).Kind == NodeKind::TYPE_IDENTIFIER);
-	const TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
-	const IDENTIFIER& i = NodeBuffers.GetNode(ti.TypeIdentifierID).Identifier;
-	std::string AlloyType(TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView());
-
-	if (AlloyType == "String") {
-		PointerType* stringType = PointerType::get(IntegerType::get(*TheContext, 8), 0);
-		return stringType;
-	}
-	else {
-		for (int t = 0; t < sizeof(AlloyTypes) / sizeof(AlloyTypes[0]); t++) {
-			if (AlloyType == AlloyTypes[t]) {
-				llvmType = LLVMTypes[t];
-				break;
-			}
-		}
-		return Type::getPrimitiveType(*TheContext, llvmType);
-	}
-}
 
 Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, const AlloyCompiler::FUNCTION_DECLARATION& node) {
 	//
@@ -475,13 +448,13 @@ Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, co
 	for (auto id : node.ParameterIDs) {
 		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
 		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
-		llvm::Type* type = AlloyToLLVMType(vd.TypeIdentifierID);
+		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
 		ParamTypes.push_back(type);
 	}
 
 	// now convert the return type to llvm
 	const TYPE_DECLARATION& td = NodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
-	Type* returnType = AlloyToLLVMType(td.TypeIdentifierID);
+	Type* returnType = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, td.TypeIdentifierID);
 
 	// Make the function type: return type(param type, param type, ...)
 	// TBD: the last parameter should be true only for variable number of parmeters (e.g. printf), currently assuming all functions are variable parameters

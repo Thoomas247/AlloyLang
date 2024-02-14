@@ -21,11 +21,6 @@ fn mul (const a : &i64, const b : &i64) -> i64
 	return ret;
 }
 
-fn process(const a : &i64) {
-	printf("a = %f\n", a);
-	return;
-}
-
 fn main () -> i64
 {
 	printf("1 x 5 = %f\n", mul(1, 5));

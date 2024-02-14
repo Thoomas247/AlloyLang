@@ -93,7 +93,6 @@ private:
 	// helper methods used by the codegen methods
 	Function* createFunctionPrototype(const std::string& Name, const AlloyCompiler::FUNCTION_DECLARATION& node);
 	bool updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value);
-	llvm::Type* AlloyToLLVMType(AlloyCompiler::NodeID id);
 };
 
 #endif		// LLVMCODEGENERATOR_INCLUDE
