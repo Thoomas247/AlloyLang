@@ -18,9 +18,12 @@ class LLVMCodeGenerator
 public:
 	LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuffers,
 		const AlloyCompiler::NodeBuffers& nodeDataBuffers);
-	~LLVMCodeGenerator();
+	virtual ~LLVMCodeGenerator();
 
-	int Process();
+	// generate the LLVM intermediate code (IR)
+	int Process(llvm::raw_ostream* llvmOutput = nullptr);
+	// execute generated code
+	int Execute();
 
 	LLVMContext& getContext() { return *TheContext; }
 	llvm::Module& getModule() { return *TheModule; }

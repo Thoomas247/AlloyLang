@@ -55,7 +55,7 @@ LLVMCodeGenerator::~LLVMCodeGenerator() {
 
 }
 
-int LLVMCodeGenerator::Process() {
+int LLVMCodeGenerator::Process(llvm::raw_ostream* llvmOutput /*= nullptr*/) {
     int result = 0;
     NodeID root = NodeBuffers.GetRootNodeID();
     if (ERROR_NODE_ID == root) {
@@ -67,11 +67,38 @@ int LLVMCodeGenerator::Process() {
 	const Node& rootNode = NodeBuffers.GetNode(root);
 
 	result = (codegen(rootNode) ? 0 : -1);
-	std::error_code EC;
-	raw_fd_ostream out("out.ll", EC);
-	TheModule->print(out, nullptr);
+	if (llvmOutput) {
+		TheModule->print(*llvmOutput, nullptr);
+	}
+	else {
+		std::error_code EC;
+		raw_fd_ostream out("out.ll", EC);
+		TheModule->print(out, nullptr);
+	}
 	return result;
 }
+
+int LLVMCodeGenerator::Execute() {
+	//
+	// execute generated code
+	//
+#ifndef NO_CODE_EXECUTION
+	InitializeNativeTarget();
+	ExecutionEngine* executionEngine = EngineBuilder(std::move(TheModule)).setEngineKind(llvm::EngineKind::Interpreter).create();
+	if (executionEngine) {
+		executionEngine->DisableLazyCompilation();
+		Function* main = executionEngine->FindFunctionNamed(StringRef("main"));
+		auto result = executionEngine->runFunction(main, {});
+		delete executionEngine;
+	}
+	else {
+		assert(false);	// could not instantiate execution engine
+	}
+
+#endif // NO_CODE_EXECUTION
+	return 0;
+}
+
 
 Value* LLVMCodeGenerator::codegen(const Node& node) {
 
@@ -387,7 +414,7 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
 	switch (node.Kind) {
 		case LITERAL::Type::String:
-			result = Builder->CreateGlobalStringPtr(val);
+			result = Builder->CreateGlobalStringPtr(val, "stringval");
 			break;
 
 		// TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
