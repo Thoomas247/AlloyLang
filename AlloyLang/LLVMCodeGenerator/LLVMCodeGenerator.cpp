@@ -55,7 +55,7 @@ LLVMCodeGenerator::~LLVMCodeGenerator() {
 
 }
 
-int LLVMCodeGenerator::Process() {
+int LLVMCodeGenerator::Process(llvm::raw_ostream* llvmOutput /*= nullptr*/) {
 	int result = 0;
 	NodeID root = NodeBuffers.GetRootNodeID();
 	if (ERROR_NODE_ID == root) {
@@ -67,9 +67,14 @@ int LLVMCodeGenerator::Process() {
 	const Node& rootNode = NodeBuffers.GetNode(root);
 
 	result = (codegen(rootNode) ? 0 : -1);
-	std::error_code EC;
-	raw_fd_ostream out("out.ll", EC);
-	TheModule->print(out, nullptr);
+	if (llvmOutput) {
+		TheModule->print(*llvmOutput, nullptr);
+	}
+	else {
+		std::error_code EC;
+		raw_fd_ostream out("out.ll", EC);
+		TheModule->print(out, nullptr);
+	}
 	return result;
 }
 
