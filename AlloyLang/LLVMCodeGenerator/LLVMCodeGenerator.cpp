@@ -280,7 +280,7 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 	if (Builder->GetInsertBlock() == nullptr) {
 		// If no insertion block, we are creating global variables
 		GlobalVariable* gv = new GlobalVariable(*TheModule,
-			Type::getDoubleTy(*TheContext),
+			value->getType(),
 			(declaration.Kind == VALUE_DECLARATION::Type::Constant),   // isConstant
 			GlobalValue::InternalLinkage,	// TBD: check CLang source-code the proper options for creating globals
 			nullptr,                        // initializer specified below
@@ -290,14 +290,14 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 		gv->setDSOLocal(true);
 
 		// currently assuming the initializer is constant
-		ConstantFP* ptr_2 = (ConstantFP*)value;
+		Constant* ptr_2 = static_cast<Constant*>(value);
 		gv->setInitializer(ptr_2);
 	}
 	else {
 		// add the variable to the end of the insertion block (e.g. function local variables)
 		IRBuilder<> TmpB(Builder->GetInsertBlock(), Builder->GetInsertBlock()->end());
 		// create a mutable variable
-		AllocaInst* A = TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, Name);
+		AllocaInst* A = TmpB.CreateAlloca(value->getType(), nullptr, Name);
 		// set the value
 		Builder->CreateStore(value, A);
 		// store in the local variables map
@@ -363,6 +363,10 @@ bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Na
 }
 
 Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
+	//
+	// TBD: This needs to be written properly for various operation and value types
+	//
+
 	Value* result = nullptr;
 	const std::string op(TokenBuffers.GetValue(node.OperatorTokenID).ToStringView());
 
@@ -373,7 +377,6 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 		result = codegen(expr);
 	}
 	else {
-
 		Value* L = codegen(node.LeftID);
 		Value* R = codegen(node.RightID);
 
@@ -382,18 +385,22 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 
 		if (L && R) {
 			if (op == "+")
-				result = Builder->CreateFAdd(L, R, "addtmp");
+				// example for handling both integer and floating additions
+				result = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateAdd(L, R, "addtmp") : Builder->CreateFAdd(L, R, "addtmp"));
 			else if (op == "-")
 				result = Builder->CreateFSub(L, R, "subtmp");
 			else if (op == "*")
-				result = Builder->CreateFMul(L, R, "multmp");
+				// example for handling both integer and floating multiplications
+				result = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateMul(L, R, "multmp") : Builder->CreateFMul(L, R, "multmp"));
 			else if (op == "==") {
-				L = Builder->CreateFCmpOEQ(L, R, "equtmp");
+				// example for handling both integer and floating comparisons
+				L = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateICmpEQ(L, R, "equtmp") : Builder->CreateFCmpOEQ(L, R, "equtmp"));
 				// Convert bool 0/1 to double 0.0 or 1.0
 				result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
 			}
 			else if (op == "<") {
-				L = Builder->CreateFCmpULT(L, R, "cmptmp");
+				// example for handling both integer and floating comparisons
+				L = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateICmpSLT(L, R, "cmptmp") : Builder->CreateFCmpULT(L, R, "cmptmp"));
 				// Convert bool 0/1 to double 0.0 or 1.0
 				result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
 			}
@@ -415,15 +422,24 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
 	switch (node.Kind) {
+		case LITERAL::Type::Integer:
+			// TBD: assuming all integers are 64 bit and base 10 encoded
+			result = ConstantInt::get(*TheContext, APInt(64, val, 10));
+			break;
+
+		case LITERAL::Type::Float:
+			result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
+			break;
+
 		case LITERAL::Type::String:
 			result = Builder->CreateGlobalStringPtr(val, "stringval");
 			break;
-
-		// TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
-	default:
-		result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
-		break;
-
+		
+		case LITERAL::Type::Boolean:
+		case LITERAL::Type::Character:
+		default:
+			// TBD: implement other case
+			break;
 	}
 
 	return result;
@@ -431,10 +447,9 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
-/// TBD: only works for doubles, need to implement other types
-AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName) {
+AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName, llvm::Type* type) {
 	IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
+	return TmpB.CreateAlloca(type, nullptr, VarName);
 }
 
 
@@ -521,7 +536,7 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	NamedValues->clear();
 	for (auto& Arg : F->args()) {
 		// Create an alloca for this variable.
-		AllocaInst* Alloca = CreateEntryBlockAlloca(F, std::string(Arg.getName()));
+		AllocaInst* Alloca = CreateEntryBlockAlloca(F, std::string(Arg.getName()), Arg.getType());
 
 		// Store the initial value into the alloca.
 		Builder->CreateStore(&Arg, Alloca);

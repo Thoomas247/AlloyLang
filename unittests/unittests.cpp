@@ -53,11 +53,11 @@ namespace unittests
 
 				fn main () -> i64
 				{
-					printf("3 x 5 = %f", mul(3, 5));
+					printf("3 x 5 = %d", mul(3, 5));
 					return 0;
 				}
 			)";
-			std::string expected = "3 x 5 = 15.000000";
+			std::string expected = "3 x 5 = 15";
 
 			Source	src(TestStr);
 			TokenBuffers tokenBuffers = Tokenize(src);
@@ -72,6 +72,44 @@ namespace unittests
 
 			// retrieve result and compare with expected data
 			std::string result = static_cast<redirect_stdout &>(llvm::outs()).buffer;
+			Assert::AreEqual(expected, result);
+		}
+
+		TEST_METHOD(ForLoop)
+		{
+			constexpr auto TestStr = R"(
+				extern fn printf (const str : String, const param : i64) -> i64;
+
+				fn mul (const a : &i64, const b : &i64) -> i64
+				{
+					var ret : i64 = 0;
+					for (var i : i64 = 0; i < a; i = i + 1) {
+						ret = ret + b;
+					}
+					return ret;
+				}
+
+				fn main () -> i64
+				{
+					printf("3 x 5 = %d", mul(3, 5));
+					return 0;
+				}
+			)";
+			std::string expected = "3 x 5 = 15";
+
+			Source	src(TestStr);
+			TokenBuffers tokenBuffers = Tokenize(src);
+			auto nodeBuffers = Parse(tokenBuffers);
+			LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
+
+			// suppress output to out.ll file
+			codegen.Process(&llvm::nulls());
+
+			// interpret and execute resulting code
+			codegen.Execute();
+
+			// retrieve result and compare with expected data
+			std::string result = static_cast<redirect_stdout&>(llvm::outs()).buffer;
 			Assert::AreEqual(expected, result);
 		}
 	};

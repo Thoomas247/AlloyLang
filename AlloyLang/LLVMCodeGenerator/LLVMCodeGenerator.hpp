@@ -52,7 +52,7 @@ private:
 	const AlloyCompiler::TokenBuffers& TokenBuffers;
 
 	// support for mutable variables
-	AllocaInst* CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName);
+	AllocaInst* CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName, llvm::Type* type);
 
 	// recursively process all nodes
 	Value* codegen(const AlloyCompiler::Node& node);

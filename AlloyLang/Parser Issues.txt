@@ -8,3 +8,5 @@
 		return;
 	}
 
+- Need support for hexadecimal, octal, binary ... integers
+

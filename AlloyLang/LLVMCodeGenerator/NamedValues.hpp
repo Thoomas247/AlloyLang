@@ -39,40 +39,39 @@ public:
 		// get llvm type from AlloyLang types
 		// the input node ID should be of type TYPE_IDENTIFIER
 		//
-		// TBD: this method is called frequently, we need to use a static map for faster lookups
+		// TBD: this method is called frequently, we need to use a map for faster lookups
 		//
-		const char* AlloyTypes[] = { "i64" };
-		const llvm::Type::TypeID LLVMTypes[] = { llvm::Type::TypeID::DoubleTyID };
-		llvm::Type::TypeID llvmType = llvm::Type::TypeID::VoidTyID;
+		const char* AlloyTypes[] = { "i64", "F32", "F64", "String" };
+		llvm::Type* LLVMTypes[] = {
+			llvm::Type::getInt64Ty(llvmContext),
+			llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::FloatTyID),
+			llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::DoubleTyID),
+			llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0)			// convert string to uint_8*
+		};
+		llvm::Type* llvmType = nullptr;
 
 		assert(NodeBuffers.GetNode(id).Kind == AlloyCompiler::NodeKind::TYPE_IDENTIFIER);
 		const AlloyCompiler::TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
 		const AlloyCompiler::IDENTIFIER& i = NodeBuffers.GetNode(ti.TypeIdentifierID).Identifier;
 		std::string AlloyType(TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView());
 
-		if (AlloyType == "String") {
-			// convert string to uint_8*
-			llvm::PointerType* stringType = llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0);
-			return stringType;
-		}
-		else {
-			for (int t = 0; t < sizeof(AlloyTypes) / sizeof(AlloyTypes[0]); t++) {
-				if (AlloyType == AlloyTypes[t]) {
-					llvmType = LLVMTypes[t];
-					break;
-				}
+		for (int t = 0; t < sizeof(AlloyTypes) / sizeof(AlloyTypes[0]); t++) {
+			if (AlloyType == AlloyTypes[t]) {
+				llvmType = LLVMTypes[t];
+				break;
 			}
-			return llvm::Type::getPrimitiveType(llvmContext, llvmType);
 		}
+
+		return llvmType;
 	}
 
 	static int CompareTypes(const llvm::Type* L, const llvm::Type* R) {
 		//
 		// given 2 LLVM types, we need to know which is higher, i.e. to which one we should convert the other type without losing precision
-		// return 0 if the types are equal, 1 if L is greater than R, -1 if L is less than R
-		// TBD: define return values as an enum other than 0, 1, 2
-		//
-		llvm::Type::TypeID llvmTypes[] = { llvm::Type::TypeID::IntegerTyID, llvm::Type::TypeID::FloatTyID };
+		// return 0 if the types are equal, 1 if L is greater than R, -1 if L is less than R, -2 if no conversion is possible (e.g. String)
+		// TBD: define return values as an enum other than -2, -1, 0, 1
+		// 
+		llvm::Type::TypeID llvmTypes[] = { llvm::Type::TypeID::IntegerTyID, llvm::Type::TypeID::FloatTyID, llvm::Type::TypeID::DoubleTyID };
 		llvm::Type::TypeID left = L->getTypeID();
 		llvm::Type::TypeID right = R->getTypeID();
 		if (left == right) {
@@ -90,8 +89,7 @@ public:
 				}
 			}
 			if (rankL == -1 || rankR == -1) {
-				// TBD: cannot determine rank
-				assert(false);
+				return -2;	// no conversion is possible
 			}
 			return (rankL > rankR ? 1 : -1);
 		}
@@ -104,14 +102,28 @@ public:
 		//
 		llvm::Type* result = L->getType();
 		if (L->getType() != R->getType()) {
-			if (CompareTypes(L->getType(), R->getType()) > 0) {
+			switch (CompareTypes(L->getType(), R->getType())) {
+
+			case 1:
 				// convert the 2 types to the type of the left operand
 				// TBD ...
-			}
-			else {
+				break;
+
+			case -1:
 				// convert the 2 types to the type of the right operand
 				result = R->getType();
 				// TBD ...
+				break;
+
+			case -2:
+				// cannot compare/convert the 2 types
+				result = nullptr;
+				break;
+
+			default:
+				assert(false);	// no other values are allowed
+				result = nullptr;
+				break;
 			}
 		}
 		return result;
