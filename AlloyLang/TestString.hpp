@@ -32,6 +32,13 @@ struct Vector3
 	var z : f32;
 }
 
+struct Transform
+{
+	var position : Vector3;
+	var rotation : Vector3;
+	var scale : Vector3;
+}
+
 /*
 * This is a multi line comment.
 /* Nested multi line comment. */
@@ -46,6 +53,11 @@ enum TokenTypes
 	Whitespace,
 	Newline,
 	Unknown
+}
+
+fn member_access (const t : &Transform) -> f32
+{
+	return t.rotation.x;
 }
 
 fn do_nothing (var a : i64, const b : &bool)

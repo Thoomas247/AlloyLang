@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
 		std::ifstream file(argv[1]);
 		if (file) {
 			std::string line;
-			while(std::getline(file, line)) {
+			while (std::getline(file, line)) {
 				str += line;
 				str += "\r\n";
 			}

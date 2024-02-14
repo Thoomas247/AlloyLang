@@ -49,6 +49,7 @@ namespace AlloyCompiler
 		comma,
 		colon,
 		semicolon,
+		dot,
 		arrow,
 
 		open_paren,
@@ -108,6 +109,7 @@ namespace AlloyCompiler
 		{ TokenKind::comma, "comma" },
 		{ TokenKind::colon, "colon" },
 		{ TokenKind::semicolon, "semicolon" },
+		{ TokenKind::dot, "dot" },
 		{ TokenKind::arrow, "arrow" },
 
 		{ TokenKind::open_paren, "open_paren" },
@@ -164,6 +166,7 @@ namespace AlloyCompiler
 		{ ",", TokenKind::comma },
 		{ ":", TokenKind::colon },
 		{ ";", TokenKind::semicolon },
+		{ ".", TokenKind::dot },
 		{ "->", TokenKind::arrow },
 
 		{ "(", TokenKind::open_paren },
@@ -213,7 +216,8 @@ namespace AlloyCompiler
 		{ '*', { } },		// *
 		{ '/', { } },		// /
 		{ '%', { } },		// %
-		{ '@', { } }		// @
+		{ '@', { } },		// @
+		{ '.', { } }		// .
 	};
 
 	/// <summary>

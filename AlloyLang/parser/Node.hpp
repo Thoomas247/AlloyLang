@@ -119,6 +119,12 @@ namespace AlloyCompiler
 		NodeID IndexExpressionID;
 	};
 
+	struct MEMBER_ACCESS_EXPRESSION
+	{
+		NodeID LeftID;
+		NodeID RightID;
+	};
+
 	struct FUNCTION_CALL_EXPRESSION
 	{
 		NodeID IdentifierID;
@@ -151,6 +157,7 @@ namespace AlloyCompiler
 		INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 		VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
 		ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;
+		MEMBER_ACCESS_EXPRESSION MemberAccessExpression;
 		FUNCTION_CALL_EXPRESSION FunctionCallExpression;
 		ENCLOSED_EXPRESSION EnclosedExpression;
 	};
@@ -316,6 +323,7 @@ namespace AlloyCompiler
 		INITIALIZER_LIST_EXPRESSION,
 		VALUE_DEFINITION_EXPRESSION,
 		ARRAY_ACCESS_EXPRESSION,
+		MEMBER_ACCESS_EXPRESSION,
 		FUNCTION_CALL_EXPRESSION,
 		ENCLOSED_EXPRESSION,
 
@@ -371,6 +379,7 @@ namespace AlloyCompiler
 			INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 			VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
 			ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;
+			MEMBER_ACCESS_EXPRESSION MemberAccessExpression;
 			FUNCTION_CALL_EXPRESSION FunctionCallExpression;
 			ENCLOSED_EXPRESSION EnclosedExpression;
 

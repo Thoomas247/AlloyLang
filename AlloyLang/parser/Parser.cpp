@@ -866,6 +866,51 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	NodeID parse<MEMBER_ACCESS_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		NodeID left = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (left == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		while (iter.GetKind() == TokenKind::dot)
+		{
+			TokenID opTokenID = iter.GetCurrentID();
+
+			// consume operator
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "identifier" });
+				return ERROR_NODE_ID;
+			}
+
+			// parse right identifier
+			NodeID right = parse<IDENTIFIER>(nodeBuffers, iter);
+
+			if (right == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			left = nodeBuffers.CreateNode(
+				Node{
+					.Kind = NodeKind::MEMBER_ACCESS_EXPRESSION,
+					.MemberAccessExpression = MEMBER_ACCESS_EXPRESSION
+					{
+						.LeftID = left,
+						.RightID = right
+					}
+				},
+				opTokenID
+			);
+		}
+
+		return left;
+	}
+
+	template <>
 	NodeID parse<FUNCTION_CALL_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		TokenID errorInfo = iter.GetCurrentID();
@@ -1278,6 +1323,14 @@ namespace AlloyCompiler
 				iter.Previous();
 
 				return parse<ARRAY_ACCESS_EXPRESSION>(nodeBuffers, iter);
+			}
+
+			// check if next token is dot operator
+			if (iter.GetKind() == TokenKind::dot)
+			{
+				iter.Previous();
+
+				return parse<MEMBER_ACCESS_EXPRESSION>(nodeBuffers, iter);
 			}
 
 			iter.Previous();

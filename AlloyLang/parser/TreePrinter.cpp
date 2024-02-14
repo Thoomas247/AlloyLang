@@ -109,6 +109,19 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<MEMBER_ACCESS_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& memberAccessExpressionNode = nodeBuffers.GetNode(nodeID).MemberAccessExpression;
+
+		json j;
+		j["kind"] = "MEMBER_ACCESS_EXPRESSION";
+		j["left"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, memberAccessExpressionNode.LeftID);
+		j["right"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, memberAccessExpressionNode.RightID);
+
+		return j;
+	}
+
+	template <>
 	json print<TYPE_IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
@@ -300,6 +313,9 @@ namespace AlloyCompiler
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
 			return print<ARRAY_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
+		case NodeKind::MEMBER_ACCESS_EXPRESSION:
+			return print<MEMBER_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 			return print<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
@@ -344,6 +360,7 @@ namespace AlloyCompiler
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
+		case NodeKind::MEMBER_ACCESS_EXPRESSION:
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 		case NodeKind::ENCLOSED_EXPRESSION:
 			return print<PRIMARY_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
@@ -465,7 +482,11 @@ namespace AlloyCompiler
 
 		json j;
 		j["kind"] = "RETURN_STATEMENT";
-		j["expression"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, returnStatementNode.ExpressionID);
+
+		if (returnStatementNode.ExpressionID != ERROR_NODE_ID)
+		{
+			j["expression"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, returnStatementNode.ExpressionID);
+		}
 
 		return j;
 	}

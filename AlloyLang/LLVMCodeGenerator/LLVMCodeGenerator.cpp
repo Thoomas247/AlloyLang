@@ -30,7 +30,7 @@ LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuf
 	TheMAM = std::make_unique<ModuleAnalysisManager>();
 	ThePIC = std::make_unique<PassInstrumentationCallbacks>();
 	TheSI = std::make_unique<StandardInstrumentations>(*TheContext,
-														/*DebugLogging*/ true);
+		/*DebugLogging*/ true);
 	TheSI->registerCallbacks(*ThePIC, TheMAM.get());
 
 	// Add transform passes.
@@ -55,50 +55,23 @@ LLVMCodeGenerator::~LLVMCodeGenerator() {
 
 }
 
-int LLVMCodeGenerator::Process(llvm::raw_ostream* llvmOutput /*= nullptr*/) {
-    int result = 0;
-    NodeID root = NodeBuffers.GetRootNodeID();
-    if (ERROR_NODE_ID == root) {
-        // TBD: implement error handling
-        assert(false);
-        return -1;
-    }
+int LLVMCodeGenerator::Process() {
+	int result = 0;
+	NodeID root = NodeBuffers.GetRootNodeID();
+	if (ERROR_NODE_ID == root) {
+		// TBD: implement error handling
+		assert(false);
+		return -1;
+	}
 
 	const Node& rootNode = NodeBuffers.GetNode(root);
 
 	result = (codegen(rootNode) ? 0 : -1);
-	if (llvmOutput) {
-		TheModule->print(*llvmOutput, nullptr);
-	}
-	else {
-		std::error_code EC;
-		raw_fd_ostream out("out.ll", EC);
-		TheModule->print(out, nullptr);
-	}
+	std::error_code EC;
+	raw_fd_ostream out("out.ll", EC);
+	TheModule->print(out, nullptr);
 	return result;
 }
-
-int LLVMCodeGenerator::Execute() {
-	//
-	// execute generated code
-	//
-#ifndef NO_CODE_EXECUTION
-	InitializeNativeTarget();
-	ExecutionEngine* executionEngine = EngineBuilder(std::move(TheModule)).setEngineKind(llvm::EngineKind::Interpreter).create();
-	if (executionEngine) {
-		executionEngine->DisableLazyCompilation();
-		Function* main = executionEngine->FindFunctionNamed(StringRef("main"));
-		auto result = executionEngine->runFunction(main, {});
-		delete executionEngine;
-	}
-	else {
-		assert(false);	// could not instantiate execution engine
-	}
-
-#endif // NO_CODE_EXECUTION
-	return 0;
-}
-
 
 Value* LLVMCodeGenerator::codegen(const Node& node) {
 
@@ -128,7 +101,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		result = codegen(node.FunctionDeclaration);
 		break;
 
-	/// NodeKind::EXPRESSION group
+		/// NodeKind::EXPRESSION group
 
 	case NodeKind::VALUE_DEFINITION_EXPRESSION:		// VALUE_DECLARATION assignment_operator EXPRESSION;
 		result = codegen(node.ValueDefinitionExpression);
@@ -190,9 +163,9 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		result = codegen(node.ReturnStatement);
 		break;
 
-	/// End of NodeKind::STATEMENT group
+		/// End of NodeKind::STATEMENT group
 
-	/// NodeKind::DEFINITION group
+		/// NodeKind::DEFINITION group
 
 	case NodeKind::EXTERN_DEFINITION:				// extern_keyword FUNCTION_DECLARATION semicolon ;
 		result = codegen(node.ExternDefinition);
@@ -218,7 +191,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		result = codegen(node.QualifiedDefinition.DefinitionID);
 		break;
 
-	/// End of NodeKind::DEFINITION group
+		/// End of NodeKind::DEFINITION group
 
 	case NodeKind::MODULE:
 	{
@@ -258,9 +231,9 @@ Value* LLVMCodeGenerator::codegen(NodeID nodeID) {
 }
 
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
-    //
-    // Expression of type: [const] identifier = value;	(with the semi-colon at the end)
-    //
+	//
+	// Expression of type: [const] identifier = value;	(with the semi-colon at the end)
+	//
 	return codegen(node.ValueDefinitionExpressionID);
 }
 
@@ -309,30 +282,30 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 }
 
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IDENTIFIER& node) {
-    //
-    // return the value of a local or global variable
-    // 
-    // Lookup this variable in the current function
-    const std::string Name(TokenBuffers.GetValue(node.IdentifierTokenID).ToStringView());
-    Value* value = nullptr;
+	//
+	// return the value of a local or global variable
+	// 
+	// Lookup this variable in the current function
+	const std::string Name(TokenBuffers.GetValue(node.IdentifierTokenID).ToStringView());
+	Value* value = nullptr;
 	AllocaInst* A = NamedValues->contains(Name, true);
 	if (A) {
-        // Found in the local variables, load the value
-        value = Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
-    }
-    else {
-        // not a local variable, check the globals
-        GlobalVariable* gv = TheModule->getGlobalVariable(Name);
-        if (gv) {
-            value = gv->getInitializer();
-        }
-        else {
-            // TBD: LogErrorV("Unknown variable name");
-            assert(false);
-        }
-    }
+		// Found in the local variables, load the value
+		value = Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
+	}
+	else {
+		// not a local variable, check the globals
+		GlobalVariable* gv = TheModule->getGlobalVariable(Name);
+		if (gv) {
+			value = gv->getInitializer();
+		}
+		else {
+			// TBD: LogErrorV("Unknown variable name");
+			assert(false);
+		}
+	}
 
-    return value;
+	return value;
 }
 
 bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value) {
@@ -414,13 +387,13 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
 	switch (node.Kind) {
 		case LITERAL::Type::String:
-			result = Builder->CreateGlobalStringPtr(val, "stringval");
+			result = llvm::ConstantDataArray::getString(*TheContext, val);
 			break;
 
 		// TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
-		default:
-			result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
-			break;
+	default:
+		result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
+		break;
 
 	}
 
@@ -431,7 +404,7 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 /// the function.  This is used for mutable variables etc.
 /// TBD: only works for doubles, need to implement other types
 AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName) {
-	IRBuilder<> TmpB(&TheFunction->getEntryBlock(),	TheFunction->getEntryBlock().begin());
+	IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
 	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
 }
 
@@ -450,7 +423,7 @@ llvm::Type* LLVMCodeGenerator::AlloyToLLVMType(AlloyCompiler::NodeID id) {
 	const TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
 	const IDENTIFIER& i = NodeBuffers.GetNode(ti.TypeIdentifierID).Identifier;
 	std::string AlloyType(TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView());
-	
+
 	if (AlloyType == "String") {
 		PointerType* stringType = PointerType::get(IntegerType::get(*TheContext, 8), 0);
 		return stringType;
@@ -466,7 +439,7 @@ llvm::Type* LLVMCodeGenerator::AlloyToLLVMType(AlloyCompiler::NodeID id) {
 	}
 }
 
-Function* LLVMCodeGenerator::createFunctionPrototype(const std::string & Name, const AlloyCompiler::FUNCTION_DECLARATION & node) {
+Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, const AlloyCompiler::FUNCTION_DECLARATION& node) {
 	//
 	// Helper method to create the protoype of a function
 	//
@@ -737,7 +710,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	}
 
 	Builder->CreateBr(MergeBB);
-	
+
 	// codegen of 'Else' can change the current block, update ElseBB for the PHI.
 	ElseBB = Builder->GetInsertBlock();
 

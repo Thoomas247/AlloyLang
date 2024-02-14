@@ -20,7 +20,11 @@ namespace AlloyCompiler
 		return *m_TokenIDVectors.emplace_back(std::make_unique<std::vector<TokenID>>());
 	}
 
-	const Node& NodeBuffers::GetNode(NodeID id) const { ASSERT((size_t)id < m_Nodes.size(), "Invalid ID!"); return m_Nodes[(size_t)id]; }
+	const Node& NodeBuffers::GetNode(NodeID id) const
+	{
+		ASSERT((size_t)id < m_Nodes.size(), "Invalid ID!");
+		return m_Nodes[(size_t)id];
+	}
 
 	TokenID NodeBuffers::GetErrorInfo(NodeID id) const
 	{
