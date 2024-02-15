@@ -78,6 +78,74 @@ namespace AlloyCompiler
 		return tempBuilder.CreateAlloca(type, nullptr, varName);
 	}
 
+	llvm::Type* typeIdentifierToLLVMType(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	{
+		const TYPE_IDENTIFIER& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
+
+		const Node& identifierOrTypeIdentifierNode = nodeBuffers.GetNode(typeIdentifierNode.TypeIdentifierID);
+
+		// handle array types
+		if (typeIdentifierNode.ArraySizeID != ERROR_NODE_ID)
+		{
+			const LITERAL& arraySizeNode = nodeBuffers.GetNode(typeIdentifierNode.ArraySizeID).Literal;
+			const SmallStringView& arraySizeStringView = tokenBuffers.GetValue(arraySizeNode.InfoTokenID);
+
+			uint64_t arraySize;
+			std::from_chars(arraySizeStringView.Data(), arraySizeStringView.Data() + arraySizeStringView.Size(), arraySize);
+
+			if (arraySize < 2)
+			{
+				// TODO: log error
+				return nullptr;
+			}
+
+			llvm::Type* elementType = nullptr;
+
+			// handle array within array
+			if (identifierOrTypeIdentifierNode.Kind == NodeKind::TYPE_IDENTIFIER)
+			{
+				elementType = typeIdentifierToLLVMType(tokenBuffers, nodeBuffers, state, typeIdentifierNode.TypeIdentifierID);
+			}
+
+			// handle other types
+			else if (identifierOrTypeIdentifierNode.Kind == NodeKind::IDENTIFIER)
+			{
+				const IDENTIFIER& identifierNode = identifierOrTypeIdentifierNode.Identifier;
+				const std::string_view typeName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+
+				elementType = state.NamedValues.GetType(typeName);
+			}
+
+			else
+			{
+				ASSERT(false, "Invalid TYPE_IDENTIFIER node! .TypeIdentifierID should be ID of TYPE_IDENTIFIER or IDENTIFIER.");
+				return nullptr;
+			}
+
+			llvm::ArrayType* arrayType = llvm::ArrayType::get(elementType, arraySize);
+
+			return arrayType;
+		}
+
+		// handle non-array types
+		else
+		{
+			ASSERT(identifierOrTypeIdentifierNode.Kind == NodeKind::IDENTIFIER, "Invalid TYPE_IDENTIFIER node! .TypeIdentifierID should be ID of IDENTIFIER for non-array types.");
+
+			const IDENTIFIER& identifierNode = identifierOrTypeIdentifierNode.Identifier;
+			const std::string_view typeName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+
+			llvm::Type* type = state.NamedValues.GetType(typeName);
+
+			if (type == nullptr)
+			{
+				// TODO: log error
+			}
+
+			return type;
+		}
+	}
+
 	template <typename T>
 	llvm::Value* generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID) = delete;
 
@@ -144,7 +212,7 @@ namespace AlloyCompiler
 		const std::string_view name = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
 
 		// look up the name in the function
-		llvm::Value* value = state.NamedValues.Get(name);
+		llvm::Value* value = state.NamedValues.GetValue(name);
 
 		if (value)
 		{
@@ -165,11 +233,7 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	llvm::Value* generate<TYPE_IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
-	{
-		ASSERT(false, "Not yet implemented!");
-		return nullptr;
-	}
+	llvm::Value* generate<TYPE_IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID) = delete;
 
 	template <>
 	llvm::Value* generate<TYPE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -205,7 +269,7 @@ namespace AlloyCompiler
 				);
 
 			// add the variable to the named values
-			state.NamedValues.Insert(name, allocaInst);
+			state.NamedValues.InsertValue(name, allocaInst);
 
 			return allocaInst;
 		}
@@ -497,7 +561,7 @@ namespace AlloyCompiler
 		}
 
 		// find the variable in the named values
-		llvm::AllocaInst* allocaInst = state.NamedValues.Get(identifierName);
+		llvm::AllocaInst* allocaInst = state.NamedValues.GetValue(identifierName);
 
 		if (allocaInst == nullptr)
 		{
@@ -880,7 +944,36 @@ namespace AlloyCompiler
 	template <>
 	llvm::Value* generate<STRUCT_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
-		ASSERT(false, "To be implemented.");
+		const STRUCT_DEFINITION& structDefinitionNode = nodeBuffers.GetNode(nodeID).StructDefinition;
+		const IDENTIFIER& identifierNode = nodeBuffers.GetNode(structDefinitionNode.IdentifierID).Identifier;
+
+		const std::string_view structName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+
+		// collect all the member types
+		std::vector<llvm::Type*> memberTypes;
+
+		for (const NodeID memberTypeID : structDefinitionNode.MemberIDs)
+		{
+			llvm::Type* memberType = typeIdentifierToLLVMType(tokenBuffers, nodeBuffers, state, memberTypeID);
+
+			if (memberType == nullptr)
+			{
+				return nullptr;
+			}
+
+			memberTypes.push_back(memberType);
+		}
+
+		llvm::StructType* structType = llvm::StructType::create(*state.Context, memberTypes, structName);
+
+		if (structType == nullptr)
+		{
+			// TODO: log error
+			return nullptr;
+		}
+
+		state.NamedValues.InsertType(structName, structType);
+
 		return nullptr;
 	}
 
@@ -915,7 +1008,7 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(&arg, allocaInst);
 
 			// check that we do not have a named value with the same name
-			if (state.NamedValues.Get(arg.getName().str()))
+			if (state.NamedValues.GetValue(arg.getName().str()))
 			{
 				// TODO: log error
 				func->removeFromParent();
@@ -924,7 +1017,7 @@ namespace AlloyCompiler
 			}
 
 			// add arguments to named values
-			state.NamedValues.Insert(arg.getName().str(), allocaInst);
+			state.NamedValues.InsertValue(arg.getName().str(), allocaInst);
 		}
 
 		llvm::Value* bodyVal = generate<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, state, functionDefinitionNode.BodyID);

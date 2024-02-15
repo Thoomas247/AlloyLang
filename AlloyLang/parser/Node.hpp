@@ -52,7 +52,7 @@ namespace AlloyCompiler
 
 		Modifier Mod;
 		NodeID ArraySizeID;			// ERROR_NODE_ID if not an array
-		NodeID TypeIdentifierID;	// can be ID of IDENTIFIER or TYPE_IDENTIFIER
+		NodeID TypeIdentifierID;	// can be ID of TYPE_IDENTIFIER for multi-dimensional arrays, or IDENTIFIER for basic types
 	};
 
 #pragma endregion
