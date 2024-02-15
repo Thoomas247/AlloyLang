@@ -2338,7 +2338,14 @@ namespace AlloyCompiler
 
 		// TODO: add support for mutliple modules
 
-		moduleIDs.push_back(parse<MODULE>(nodeBuffers, iter));
+		NodeID moduleID = parse<MODULE>(nodeBuffers, iter);
+
+		if (moduleID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		moduleIDs.push_back(moduleID);
 
 		return nodeBuffers.CreateNode(
 			Node

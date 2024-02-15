@@ -2,7 +2,7 @@
 
 - Need to add support for functions with variable arguments using ...
 
-- A return statement with no return value causes an "Invalid ID" error, e.g.:
+X A return statement with no return value causes an "Invalid ID" error, e.g.:
 	fn process(const a : &i64) {
 		printf("a = %f\n", a);
 		return;
@@ -10,6 +10,6 @@
 
 - Need support for hexadecimal, octal, binary ... integers
 
-- This statement is not parsed correctly: 
+X This statement is not parsed correctly: 
 	var test : i64;
 
