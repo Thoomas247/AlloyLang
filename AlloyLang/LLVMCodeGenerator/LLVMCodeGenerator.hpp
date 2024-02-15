@@ -5,6 +5,7 @@
 
 #include "../parser/Parser.hpp"
 #include "NamedValues.hpp"
+#include "../util/SmallStringView.hpp"
 
 #include <memory>
 #include <map>
@@ -51,6 +52,9 @@ private:
 	const AlloyCompiler::NodeBuffers& NodeBuffers;
 	const AlloyCompiler::TokenBuffers& TokenBuffers;
 
+	// convert escape sequences to their actual values
+	std::string UnescapeString(const AlloyCompiler::SmallStringView& str);
+
 	// support for mutable variables
 	AllocaInst* CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName, llvm::Type* type);
 
@@ -86,8 +90,8 @@ private:
 	Value* codegen(const AlloyCompiler::FUNCTION_CALL_STATEMENT& node) { return ConstantInt::getBool(*TheContext, codegen(node.FunctionCallExpressionID) != nullptr); }
 
 	// external function definition
-	Function* codegen(const AlloyCompiler::EXTERN_DEFINITION& node) { return static_cast<llvm::Function *>(codegen(node.FunctionDeclarationID)); }
-		
+	Function* codegen(const AlloyCompiler::EXTERN_DEFINITION& node) { return static_cast<llvm::Function*>(codegen(node.FunctionDeclarationID)); }
+
 	// (expression)
 	Value* codegen(const AlloyCompiler::ENCLOSED_EXPRESSION& node) { return codegen(node.ExpressionID); }
 

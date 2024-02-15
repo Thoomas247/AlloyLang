@@ -269,7 +269,7 @@ Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
 	// Expression of type: struct IDENTIFIER { VALUE_DECLARATION semicolon }
 	// Returns only True (1) or False (0)
 	//
-	
+
 	Value* result = nullptr;
 
 	// get the name of the structure
@@ -287,7 +287,7 @@ Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
 
 	// now create the structure type in llvm
 	llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);
-	
+
 	result = (structType != nullptr ? ConstantInt::getTrue(*TheContext) : ConstantInt::getFalse(*TheContext));
 
 	return result;
@@ -306,7 +306,7 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 
 	// now get the value by recursively calling codegen
 	Value* value = codegen(node.ValueID);
-	
+
 	if (Builder->GetInsertBlock() == nullptr) {
 		// If no insertion block, we are creating global variables
 		GlobalVariable* gv = new GlobalVariable(*TheModule,
@@ -453,24 +453,69 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
 	switch (node.Kind) {
-		case LITERAL::Type::Integer:
-			// TBD: assuming all integers are 64 bit and base 10 encoded
-			result = ConstantInt::get(*TheContext, APInt(64, val, 10));
-			break;
+	case LITERAL::Type::Integer:
+		// TBD: assuming all integers are 64 bit and base 10 encoded
+		result = ConstantInt::get(*TheContext, APInt(64, val, 10));
+		break;
 
-		case LITERAL::Type::Float:
-			result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
-			break;
+	case LITERAL::Type::Float:
+		result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
+		break;
 
-		case LITERAL::Type::String:
-			result = Builder->CreateGlobalStringPtr(val, "stringval");
-			break;
-		
-		case LITERAL::Type::Boolean:
-		case LITERAL::Type::Character:
-		default:
-			// TBD: implement other case
-			break;
+	case LITERAL::Type::String:
+		result = Builder->CreateGlobalStringPtr(val, "stringval");
+		break;
+
+	case LITERAL::Type::Boolean:
+	case LITERAL::Type::Character:
+	default:
+		// TBD: implement other case
+		break;
+	}
+
+	return result;
+}
+
+std::string LLVMCodeGenerator::UnescapeString(const AlloyCompiler::SmallStringView& str)
+{
+	static const std::unordered_map<char, char> escapeCharacterMap =
+	{
+		{ 'n',	'\n' },
+		{ 'r',	'\r' },
+		{ 't',	'\t' },
+		{ 'v',	'\v' },
+		{ '\\', '\\' },
+		{ '\'', '\'' },
+		{ '\"', '\"' },
+		{ '0',	'\0' },
+		{ 's',	' ' }
+	};
+
+	std::string result;
+	result.reserve(str.Size());
+
+	for (size_t i = 0; i < str.Size(); i++)
+	{
+		char c = str[i];
+
+		if (c == '\\' && i + 1 < str.Size())
+		{
+			i++;
+
+			auto it = escapeCharacterMap.find(str[i]);
+
+			if (it != escapeCharacterMap.end())
+			{
+				c = it->second;
+			}
+
+			else
+			{
+				continue;	// TODO: log error?
+			}
+		}
+
+		result.push_back(c);
 	}
 
 	return result;
@@ -579,8 +624,8 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	// create a new local names map for the function body
 	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
 
-	ConstantInt* retval = static_cast<ConstantInt *>(codegen(node.BodyID));
-	
+	ConstantInt* retval = static_cast<ConstantInt*>(codegen(node.BodyID));
+
 	if (retval && retval->isOne()) {
 		// Validate the generated code, checking for consistency.
 		verifyFunction(*F);
@@ -615,18 +660,18 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 
 	for (const NodeID& S : node.StatementIDs) {
 
-		ConstantInt* stmtResult = static_cast<ConstantInt *>(codegen(S));
+		ConstantInt* stmtResult = static_cast<ConstantInt*>(codegen(S));
 		if (stmtResult == nullptr || stmtResult->isZero()) {
 			assert(false);
 			result = ConstantInt::getFalse(*TheContext);
 			break;
 		}
-		
+
 		if (NodeKind::RETURN_STATEMENT == NodeBuffers.GetNode(S).Kind) {
 			// TBD: generate a warning that we encountered unreachable statements
 			break;			// ignore any statements after return
 
-		} 
+		}
 	}
 
 	// restore the named values of the higher level
@@ -726,7 +771,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 
 	// Emit then statements
 	Builder->SetInsertPoint(ThenBB);
-	ConstantInt* ThenV = static_cast<ConstantInt *>(codegen(node.BodyID));
+	ConstantInt* ThenV = static_cast<ConstantInt*>(codegen(node.BodyID));
 	if (ThenV == nullptr || ThenV->isZero()) {
 		assert(false);
 		return result;
@@ -838,7 +883,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	// Emit the body of the loop.  This, like any other expr, can change the
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
-	result = static_cast<ConstantInt *>(codegen(node.BodyID));
+	result = static_cast<ConstantInt*>(codegen(node.BodyID));
 	if (nullptr == result || result->isZero()) {
 		assert(false);
 		return result;
@@ -887,7 +932,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	return result;
 }
 
-Value* LLVMCodeGenerator::codegen(const AlloyCompiler::RETURN_STATEMENT& node) { 
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::RETURN_STATEMENT& node) {
 	//
 	// return expression;
 	// returns ConstantInt True or False depending on success or failure

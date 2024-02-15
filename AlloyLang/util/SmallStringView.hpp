@@ -38,6 +38,12 @@ namespace AlloyCompiler
 			return std::string_view(m_pData, m_Size);
 		}
 
+		char operator[](size_type index) const
+		{
+			ASSERT(index < m_Size, "Index out of range!");
+			return m_pData[index];
+		}
+
 		bool operator==(const SmallStringView& other) const
 		{
 			return ToStringView() == other.ToStringView();

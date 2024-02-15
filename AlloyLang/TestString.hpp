@@ -1,8 +1,6 @@
 #pragma once
 
 constexpr auto TestSrc1 = R"(
-var test : i64;
-
 extern fn test (var a : i64);
 
 // array of i64
