@@ -55,7 +55,7 @@ LLVMCodeGenerator::~LLVMCodeGenerator() {
 
 }
 
-int LLVMCodeGenerator::Process() {
+int LLVMCodeGenerator::Process(llvm::raw_ostream* llvmOutput /*= nullptr*/) {
 	int result = 0;
 	NodeID root = NodeBuffers.GetRootNodeID();
 	if (ERROR_NODE_ID == root) {
@@ -67,10 +67,36 @@ int LLVMCodeGenerator::Process() {
 	const Node& rootNode = NodeBuffers.GetNode(root);
 
 	result = (codegen(rootNode) ? 0 : -1);
-	std::error_code EC;
-	raw_fd_ostream out("out.ll", EC);
-	TheModule->print(out, nullptr);
+	if (llvmOutput) {
+		TheModule->print(*llvmOutput, nullptr);
+	}
+	else {
+		std::error_code EC;
+		raw_fd_ostream out("out.ll", EC);
+		TheModule->print(out, nullptr);
+	}
 	return result;
+}
+
+int LLVMCodeGenerator::Execute() {
+	//
+	// execute generated code
+	//
+#ifndef NO_CODE_EXECUTION
+	InitializeNativeTarget();
+	ExecutionEngine* executionEngine = EngineBuilder(std::move(TheModule)).setEngineKind(llvm::EngineKind::Interpreter).create();
+	if (executionEngine) {
+		executionEngine->DisableLazyCompilation();
+		Function* main = executionEngine->FindFunctionNamed(StringRef("main"));
+		auto result = executionEngine->runFunction(main, {});
+		delete executionEngine;
+	}
+	else {
+		assert(false);	// could not instantiate execution engine
+	}
+
+#endif // NO_CODE_EXECUTION
+	return 0;
 }
 
 Value* LLVMCodeGenerator::codegen(const Node& node) {
@@ -176,7 +202,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 
 	case NodeKind::STRUCT_DEFINITION:				// struct IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
-		assert(false);	// To be implemented
+		result = codegen(node.StructDefinition);
 		break;
 
 	case NodeKind::ENUM_DEFINITION:					// enum IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
@@ -233,8 +259,38 @@ Value* LLVMCodeGenerator::codegen(NodeID nodeID) {
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
 	//
 	// Expression of type: [const] identifier = value;	(with the semi-colon at the end)
+	// TBD: this should return True or False and not a value
 	//
 	return codegen(node.ValueDefinitionExpressionID);
+}
+
+Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
+	//
+	// Expression of type: struct IDENTIFIER { VALUE_DECLARATION semicolon }
+	// Returns only True (1) or False (0)
+	//
+	
+	Value* result = nullptr;
+
+	// get the name of the structure
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
+	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
+
+	// get a vector of member types
+	std::vector<Type*> MemberTypes;
+	for (auto id : node.MemberIDs) {
+		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
+		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
+		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
+		MemberTypes.push_back(type);
+	}
+
+	// now create the structure type in llvm
+	llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);
+	
+	result = (structType != nullptr ? ConstantInt::getTrue(*TheContext) : ConstantInt::getFalse(*TheContext));
+
+	return result;
 }
 
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
@@ -250,11 +306,11 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 
 	// now get the value by recursively calling codegen
 	Value* value = codegen(node.ValueID);
-
+	
 	if (Builder->GetInsertBlock() == nullptr) {
 		// If no insertion block, we are creating global variables
 		GlobalVariable* gv = new GlobalVariable(*TheModule,
-			Type::getDoubleTy(*TheContext),
+			value->getType(),
 			(declaration.Kind == VALUE_DECLARATION::Type::Constant),   // isConstant
 			GlobalValue::InternalLinkage,	// TBD: check CLang source-code the proper options for creating globals
 			nullptr,                        // initializer specified below
@@ -264,14 +320,14 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 		gv->setDSOLocal(true);
 
 		// currently assuming the initializer is constant
-		ConstantFP* ptr_2 = (ConstantFP*)value;
+		Constant* ptr_2 = static_cast<Constant*>(value);
 		gv->setInitializer(ptr_2);
 	}
 	else {
 		// add the variable to the end of the insertion block (e.g. function local variables)
 		IRBuilder<> TmpB(Builder->GetInsertBlock(), Builder->GetInsertBlock()->end());
 		// create a mutable variable
-		AllocaInst* A = TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, Name);
+		AllocaInst* A = TmpB.CreateAlloca(value->getType(), nullptr, Name);
 		// set the value
 		Builder->CreateStore(value, A);
 		// store in the local variables map
@@ -337,6 +393,11 @@ bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Na
 }
 
 Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
+	//
+	// TBD: This needs to be written properly for various operation and value types
+	// TBD: Use a map to map Alloy operator tokens to llvm Instruction::BinaryOps enum then call ConstantFoldBinaryInstruction or similar
+	//
+
 	Value* result = nullptr;
 	const std::string op(TokenBuffers.GetValue(node.OperatorTokenID).ToStringView());
 
@@ -347,24 +408,30 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 		result = codegen(expr);
 	}
 	else {
-
 		Value* L = codegen(node.LeftID);
 		Value* R = codegen(node.RightID);
 
+		// we need the 2 operands to be of the same type, if not convert to same
+		Type* operandType = CGNamedValues::MakeCompatible(L, R);
+
 		if (L && R) {
 			if (op == "+")
-				result = Builder->CreateFAdd(L, R, "addtmp");
+				// example for handling both integer and floating additions
+				result = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateAdd(L, R, "addtmp") : Builder->CreateFAdd(L, R, "addtmp"));
 			else if (op == "-")
 				result = Builder->CreateFSub(L, R, "subtmp");
 			else if (op == "*")
-				result = Builder->CreateFMul(L, R, "multmp");
+				// example for handling both integer and floating multiplications
+				result = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateMul(L, R, "multmp") : Builder->CreateFMul(L, R, "multmp"));
 			else if (op == "==") {
-				L = Builder->CreateFCmpOEQ(L, R, "equtmp");
+				// example for handling both integer and floating comparisons
+				L = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateICmpEQ(L, R, "equtmp") : Builder->CreateFCmpOEQ(L, R, "equtmp"));
 				// Convert bool 0/1 to double 0.0 or 1.0
 				result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
 			}
 			else if (op == "<") {
-				L = Builder->CreateFCmpULT(L, R, "cmptmp");
+				// example for handling both integer and floating comparisons
+				L = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateICmpSLT(L, R, "cmptmp") : Builder->CreateFCmpULT(L, R, "cmptmp"));
 				// Convert bool 0/1 to double 0.0 or 1.0
 				result = Builder->CreateUIToFP(L, Type::getDoubleTy(*TheContext), "booltmp");
 			}
@@ -386,15 +453,24 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 
 	const std::string val(TokenBuffers.GetValue(node.InfoTokenID).ToStringView());
 	switch (node.Kind) {
-		case LITERAL::Type::String:
-			result = llvm::ConstantDataArray::getString(*TheContext, val);
+		case LITERAL::Type::Integer:
+			// TBD: assuming all integers are 64 bit and base 10 encoded
+			result = ConstantInt::get(*TheContext, APInt(64, val, 10));
 			break;
 
-		// TBD: currently converting all numbers to float while we improve codegen(const Binary& node) 
-	default:
-		result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
-		break;
+		case LITERAL::Type::Float:
+			result = ConstantFP::get(*TheContext, APFloat(atof(val.c_str())));
+			break;
 
+		case LITERAL::Type::String:
+			result = Builder->CreateGlobalStringPtr(val, "stringval");
+			break;
+		
+		case LITERAL::Type::Boolean:
+		case LITERAL::Type::Character:
+		default:
+			// TBD: implement other case
+			break;
 	}
 
 	return result;
@@ -402,42 +478,11 @@ Value* LLVMCodeGenerator::codegen(const LITERAL& node) {
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
-/// TBD: only works for doubles, need to implement other types
-AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName) {
+AllocaInst* LLVMCodeGenerator::CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName, llvm::Type* type) {
 	IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-	return TmpB.CreateAlloca(Type::getDoubleTy(*TheContext), nullptr, VarName);
+	return TmpB.CreateAlloca(type, nullptr, VarName);
 }
 
-llvm::Type* LLVMCodeGenerator::AlloyToLLVMType(AlloyCompiler::NodeID id) {
-	//
-	// get llvm type from AlloyLang types
-	// the input node ID should be of type TYPE_IDENTIFIER
-	//
-	//
-	// TBD: convert this to a static map for faster lookup
-	const char* AlloyTypes[] = { "i64" };
-	const llvm::Type::TypeID LLVMTypes[] = { llvm::Type::TypeID::DoubleTyID };
-	llvm::Type::TypeID llvmType = llvm::Type::TypeID::VoidTyID;
-
-	assert(NodeBuffers.GetNode(id).Kind == NodeKind::TYPE_IDENTIFIER);
-	const TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
-	const IDENTIFIER& i = NodeBuffers.GetNode(ti.TypeIdentifierID).Identifier;
-	std::string AlloyType(TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView());
-
-	if (AlloyType == "String") {
-		PointerType* stringType = PointerType::get(IntegerType::get(*TheContext, 8), 0);
-		return stringType;
-	}
-	else {
-		for (int t = 0; t < sizeof(AlloyTypes) / sizeof(AlloyTypes[0]); t++) {
-			if (AlloyType == AlloyTypes[t]) {
-				llvmType = LLVMTypes[t];
-				break;
-			}
-		}
-		return Type::getPrimitiveType(*TheContext, llvmType);
-	}
-}
 
 Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, const AlloyCompiler::FUNCTION_DECLARATION& node) {
 	//
@@ -449,13 +494,13 @@ Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, co
 	for (auto id : node.ParameterIDs) {
 		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
 		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
-		llvm::Type* type = AlloyToLLVMType(vd.TypeIdentifierID);
+		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
 		ParamTypes.push_back(type);
 	}
 
 	// now convert the return type to llvm
 	const TYPE_DECLARATION& td = NodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
-	Type* returnType = AlloyToLLVMType(td.TypeIdentifierID);
+	Type* returnType = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, td.TypeIdentifierID);
 
 	// Make the function type: return type(param type, param type, ...)
 	// TBD: the last parameter should be true only for variable number of parmeters (e.g. printf), currently assuming all functions are variable parameters
@@ -522,7 +567,7 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	NamedValues->clear();
 	for (auto& Arg : F->args()) {
 		// Create an alloca for this variable.
-		AllocaInst* Alloca = CreateEntryBlockAlloca(F, std::string(Arg.getName()));
+		AllocaInst* Alloca = CreateEntryBlockAlloca(F, std::string(Arg.getName()), Arg.getType());
 
 		// Store the initial value into the alloca.
 		Builder->CreateStore(&Arg, Alloca);

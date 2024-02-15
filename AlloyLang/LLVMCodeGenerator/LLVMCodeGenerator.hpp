@@ -18,9 +18,12 @@ class LLVMCodeGenerator
 public:
 	LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuffers,
 		const AlloyCompiler::NodeBuffers& nodeDataBuffers);
-	~LLVMCodeGenerator();
+	virtual ~LLVMCodeGenerator();
 
-	int Process();
+	// generate the LLVM intermediate code (IR)
+	int Process(llvm::raw_ostream* llvmOutput = nullptr);
+	// execute generated code
+	int Execute();
 
 	LLVMContext& getContext() { return *TheContext; }
 	llvm::Module& getModule() { return *TheModule; }
@@ -49,7 +52,7 @@ private:
 	const AlloyCompiler::TokenBuffers& TokenBuffers;
 
 	// support for mutable variables
-	AllocaInst* CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName);
+	AllocaInst* CreateEntryBlockAlloca(Function* TheFunction, const std::string& VarName, llvm::Type* type);
 
 	// recursively process all nodes
 	Value* codegen(const AlloyCompiler::Node& node);
@@ -68,6 +71,7 @@ private:
 	Value* codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node);
 	Value* codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::RETURN_STATEMENT& node);
+	Value* codegen(const AlloyCompiler::STRUCT_DEFINITION& node);
 
 	// straight-forward cases
 
@@ -90,7 +94,6 @@ private:
 	// helper methods used by the codegen methods
 	Function* createFunctionPrototype(const std::string& Name, const AlloyCompiler::FUNCTION_DECLARATION& node);
 	bool updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value);
-	llvm::Type* AlloyToLLVMType(AlloyCompiler::NodeID id);
 };
 
 #endif		// LLVMCODEGENERATOR_INCLUDE
