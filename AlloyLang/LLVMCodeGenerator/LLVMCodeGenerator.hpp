@@ -71,6 +71,7 @@ private:
 	Value* codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node);
 	Value* codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& node);
 	Value* codegen(const AlloyCompiler::RETURN_STATEMENT& node);
+	Value* codegen(const AlloyCompiler::STRUCT_DEFINITION& node);
 
 	// straight-forward cases
 

@@ -202,7 +202,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 
 	case NodeKind::STRUCT_DEFINITION:				// struct IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ; (* TODO: force default values? *)
-		assert(false);	// To be implemented
+		result = codegen(node.StructDefinition);
 		break;
 
 	case NodeKind::ENUM_DEFINITION:					// enum IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
@@ -259,8 +259,38 @@ Value* LLVMCodeGenerator::codegen(NodeID nodeID) {
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
 	//
 	// Expression of type: [const] identifier = value;	(with the semi-colon at the end)
+	// TBD: this should return True or False and not a value
 	//
 	return codegen(node.ValueDefinitionExpressionID);
+}
+
+Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
+	//
+	// Expression of type: struct IDENTIFIER { VALUE_DECLARATION semicolon }
+	// Returns only True (1) or False (0)
+	//
+	
+	Value* result = nullptr;
+
+	// get the name of the structure
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
+	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
+
+	// get a vector of member types
+	std::vector<Type*> MemberTypes;
+	for (auto id : node.MemberIDs) {
+		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
+		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
+		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
+		MemberTypes.push_back(type);
+	}
+
+	// now create the structure type in llvm
+	llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);
+	
+	result = (structType != nullptr ? ConstantInt::getTrue(*TheContext) : ConstantInt::getFalse(*TheContext));
+
+	return result;
 }
 
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
@@ -276,7 +306,7 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 
 	// now get the value by recursively calling codegen
 	Value* value = codegen(node.ValueID);
-
+	
 	if (Builder->GetInsertBlock() == nullptr) {
 		// If no insertion block, we are creating global variables
 		GlobalVariable* gv = new GlobalVariable(*TheModule,
@@ -365,6 +395,7 @@ bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Na
 Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 	//
 	// TBD: This needs to be written properly for various operation and value types
+	// TBD: Use a map to map Alloy operator tokens to llvm Instruction::BinaryOps enum then call ConstantFoldBinaryInstruction or similar
 	//
 
 	Value* result = nullptr;

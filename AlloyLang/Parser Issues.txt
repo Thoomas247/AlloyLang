@@ -10,3 +10,6 @@
 
 - Need support for hexadecimal, octal, binary ... integers
 
+- This statement is not parsed correctly: 
+	var test : i64;
+
