@@ -51,6 +51,138 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& identifierNode = nodeBuffers.GetNode(nodeID).Identifier;
+
+		json j;
+		j["kind"] = "IDENTIFIER";
+		j["value"] = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+
+		return j;
+	}
+
+	template <>
+	json print<TYPE_IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
+
+		std::string modifierString = "NONE";
+
+		if (typeIdentifierNode.Mod == TYPE_IDENTIFIER::Modifier::Reference)
+		{
+			modifierString = "REFERENCE";
+		}
+
+		else if (typeIdentifierNode.Mod == TYPE_IDENTIFIER::Modifier::Pointer)
+		{
+			modifierString = "POINTER";
+		}
+
+		json j;
+		j["kind"] = "TYPE_IDENTIFIER";
+		j["modifier"] = modifierString;
+
+		if (nodeBuffers.GetNode(typeIdentifierNode.IdentifierOrTypeIdentifierID).Kind == NodeKind::IDENTIFIER)
+		{
+			j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, typeIdentifierNode.IdentifierOrTypeIdentifierID);
+		}
+		else
+		{
+			j["type_identifier"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, typeIdentifierNode.IdentifierOrTypeIdentifierID);
+		}
+
+		if (typeIdentifierNode.ArraySizeID != ERROR_NODE_ID)
+		{
+			j["array_size"] = print<LITERAL>(tokenBuffers, nodeBuffers, typeIdentifierNode.ArraySizeID);
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<TYPE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& typeDeclarationNode = nodeBuffers.GetNode(nodeID).TypeDeclaration;
+
+		std::string typeString = "COPY";
+
+		if (typeDeclarationNode.Kind == TYPE_DECLARATION::Type::Constant)
+		{
+			typeString = "CONSTANT";
+		}
+		else if (typeDeclarationNode.Kind == TYPE_DECLARATION::Type::Variable)
+		{
+			typeString = "VARIABLE";
+		}
+
+		json j;
+		j["kind"] = "TYPE_DECLARATION";
+		j["type"] = typeString;
+		j["identifier"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, typeDeclarationNode.IdentifierOrTypeIdentifierID);
+
+		return j;
+	}
+
+	template <>
+	json print<VALUE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& valueDeclarationNode = nodeBuffers.GetNode(nodeID).ValueDeclaration;
+
+		json j;
+		j["kind"] = "VALUE_DECLARATION";
+		j["type"] = valueDeclarationNode.Kind == VALUE_DECLARATION::Type::Variable ? "VARIABLE" : "CONSTANT";
+		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.IdentifierID);
+		j["type"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.IdentifierOrTypeIdentifierID);
+
+		return j;
+	}
+
+	template <>
+	json print<FUNCTION_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& functionDeclarationNode = nodeBuffers.GetNode(nodeID).FunctionDeclaration;
+
+		json j;
+		j["kind"] = "FUNCTION_DECLARATION";
+		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, functionDeclarationNode.IdentifierID);
+
+		for (const auto& parameterID : functionDeclarationNode.ParameterIDs)
+		{
+			j["parameters"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, parameterID));
+		}
+
+		if (functionDeclarationNode.ReturnTypeID != ERROR_NODE_ID)
+		{
+			j["return_type"] = print<TYPE_DECLARATION>(tokenBuffers, nodeBuffers, functionDeclarationNode.ReturnTypeID);
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<CONSTRUCTOR_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& constructorExpressionNode = nodeBuffers.GetNode(nodeID).ConstructorExpression;
+
+		json j;
+		j["kind"] = "CONSTRUCTOR_EXPRESSION";
+		j["struct_type"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, constructorExpressionNode.StructIdentifierID);
+
+		for (size_t i = 0; i < constructorExpressionNode.MemberIdentifierIDs.size(); i++)
+		{
+			json member;
+
+			member["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, constructorExpressionNode.MemberIdentifierIDs[i]);
+			member["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, constructorExpressionNode.MemberValueIDs[i]);
+
+			j["initializers"].push_back(member);
+		}
+
+		return j;
+	}
+
+	template <>
 	json print<POINTER_INITIALIZER_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& pointerInitializerExpressionNode = nodeBuffers.GetNode(nodeID).PointerInitializerExpression;
@@ -84,18 +216,6 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	json print<IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
-	{
-		const auto& identifierNode = nodeBuffers.GetNode(nodeID).Identifier;
-
-		json j;
-		j["kind"] = "IDENTIFIER";
-		j["value"] = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
-
-		return j;
-	}
-
-	template <>
 	json print<ARRAY_ACCESS_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& arrayAccessExpressionNode = nodeBuffers.GetNode(nodeID).ArrayAccessExpression;
@@ -117,104 +237,6 @@ namespace AlloyCompiler
 		j["kind"] = "MEMBER_ACCESS_EXPRESSION";
 		j["left"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, memberAccessExpressionNode.LeftID);
 		j["right"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, memberAccessExpressionNode.RightID);
-
-		return j;
-	}
-
-	template <>
-	json print<TYPE_IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
-	{
-		const auto& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
-
-		std::string modifierString = "NONE";
-
-		if (typeIdentifierNode.Mod == TYPE_IDENTIFIER::Modifier::Reference)
-		{
-			modifierString = "REFERENCE";
-		}
-
-		else if (typeIdentifierNode.Mod == TYPE_IDENTIFIER::Modifier::Pointer)
-		{
-			modifierString = "POINTER";
-		}
-
-		json j;
-		j["kind"] = "TYPE_IDENTIFIER";
-		j["modifier"] = modifierString;
-
-		if (nodeBuffers.GetNode(typeIdentifierNode.TypeIdentifierID).Kind == NodeKind::IDENTIFIER)
-		{
-			j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, typeIdentifierNode.TypeIdentifierID);
-		}
-		else
-		{
-			j["type_identifier"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, typeIdentifierNode.TypeIdentifierID);
-		}
-
-		if (typeIdentifierNode.ArraySizeID != ERROR_NODE_ID)
-		{
-			j["array_size"] = print<LITERAL>(tokenBuffers, nodeBuffers, typeIdentifierNode.ArraySizeID);
-		}
-
-		return j;
-	}
-
-	template <>
-	json print<TYPE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
-	{
-		const auto& typeDeclarationNode = nodeBuffers.GetNode(nodeID).TypeDeclaration;
-
-		std::string typeString = "COPY";
-
-		if (typeDeclarationNode.Kind == TYPE_DECLARATION::Type::Constant)
-		{
-			typeString = "CONSTANT";
-		}
-		else if (typeDeclarationNode.Kind == TYPE_DECLARATION::Type::Variable)
-		{
-			typeString = "VARIABLE";
-		}
-
-		json j;
-		j["kind"] = "TYPE_DECLARATION";
-		j["type"] = typeString;
-		j["identifier"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, typeDeclarationNode.TypeIdentifierID);
-
-		return j;
-	}
-
-	template <>
-	json print<VALUE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
-	{
-		const auto& valueDeclarationNode = nodeBuffers.GetNode(nodeID).ValueDeclaration;
-
-		json j;
-		j["kind"] = "VALUE_DECLARATION";
-		j["type"] = valueDeclarationNode.Kind == VALUE_DECLARATION::Type::Variable ? "VARIABLE" : "CONSTANT";
-		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.IdentifierID);
-		j["type"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.TypeIdentifierID);
-
-		return j;
-	}
-
-	template <>
-	json print<FUNCTION_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
-	{
-		const auto& functionDeclarationNode = nodeBuffers.GetNode(nodeID).FunctionDeclaration;
-
-		json j;
-		j["kind"] = "FUNCTION_DECLARATION";
-		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, functionDeclarationNode.IdentifierID);
-
-		for (const auto& parameterID : functionDeclarationNode.ParameterIDs)
-		{
-			j["parameters"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, parameterID));
-		}
-
-		if (functionDeclarationNode.ReturnTypeID != ERROR_NODE_ID)
-		{
-			j["return_type"] = print<TYPE_DECLARATION>(tokenBuffers, nodeBuffers, functionDeclarationNode.ReturnTypeID);
-		}
 
 		return j;
 	}
@@ -301,6 +323,9 @@ namespace AlloyCompiler
 		case NodeKind::LITERAL:
 			return print<LITERAL>(tokenBuffers, nodeBuffers, nodeID);
 
+		case NodeKind::CONSTRUCTOR_EXPRESSION:
+			return print<CONSTRUCTOR_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
 			return print<POINTER_INITIALIZER_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
@@ -335,7 +360,16 @@ namespace AlloyCompiler
 
 		json j;
 		j["kind"] = "ASSIGNMENT_EXPRESSION";
-		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, assignmentExpressionNode.IdentifierID);
+
+		if (nodeBuffers.GetNode(assignmentExpressionNode.IdentifierOrMemberAccessID).Kind == NodeKind::IDENTIFIER)
+		{
+			j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, assignmentExpressionNode.IdentifierOrMemberAccessID);
+		}
+		else
+		{
+			j["member_access"] = print<MEMBER_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, assignmentExpressionNode.IdentifierOrMemberAccessID);
+		}
+
 		j["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, assignmentExpressionNode.ValueID);
 
 		return j;
@@ -356,6 +390,7 @@ namespace AlloyCompiler
 
 		case NodeKind::IDENTIFIER:
 		case NodeKind::LITERAL:
+		case NodeKind::CONSTRUCTOR_EXPRESSION:
 		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:

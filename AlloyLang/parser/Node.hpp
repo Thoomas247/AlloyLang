@@ -52,7 +52,7 @@ namespace AlloyCompiler
 
 		Modifier Mod;
 		NodeID ArraySizeID;			// ERROR_NODE_ID if not an array
-		NodeID TypeIdentifierID;	// can be ID of TYPE_IDENTIFIER for multi-dimensional arrays, or IDENTIFIER for basic types
+		NodeID IdentifierOrTypeIdentifierID;	// can be ID of TYPE_IDENTIFIER for multi-dimensional arrays, or IDENTIFIER for basic types
 	};
 
 #pragma endregion
@@ -69,7 +69,7 @@ namespace AlloyCompiler
 		};
 
 		Type Kind;
-		NodeID TypeIdentifierID;
+		NodeID IdentifierOrTypeIdentifierID;
 	};
 
 	struct VALUE_DECLARATION
@@ -82,7 +82,7 @@ namespace AlloyCompiler
 
 		Type Kind;
 		NodeID IdentifierID;
-		NodeID TypeIdentifierID;
+		NodeID IdentifierOrTypeIdentifierID;
 	};
 
 	struct FUNCTION_DECLARATION
@@ -95,6 +95,13 @@ namespace AlloyCompiler
 #pragma endregion
 
 #pragma region Expressions
+
+	struct CONSTRUCTOR_EXPRESSION
+	{
+		NodeID StructIdentifierID;
+		VectorRef<NodeID> MemberIdentifierIDs;	// name of the member to assign the corresponding value in MemberValueIDs to
+		VectorRef<NodeID> MemberValueIDs;		// value to assign to the corresponding member in MemberIdentifierIDs
+	};
 
 	struct POINTER_INITIALIZER_EXPRESSION
 	{
@@ -153,6 +160,7 @@ namespace AlloyCompiler
 	{
 		IDENTIFIER Identifier;
 		LITERAL Literal;
+		CONSTRUCTOR_EXPRESSION ConstructorExpression;
 		POINTER_INITIALIZER_EXPRESSION PointerInitializerExpression;
 		INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 		VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
@@ -164,7 +172,7 @@ namespace AlloyCompiler
 
 	struct ASSIGNMENT_EXPRESSION
 	{
-		NodeID IdentifierID;
+		NodeID IdentifierOrMemberAccessID;	// IDENTIFIER or MEMBER_ACCESS_EXPRESSION
 		TokenID OperatorTokenID;
 		NodeID ValueID;
 	};
@@ -319,6 +327,7 @@ namespace AlloyCompiler
 		VALUE_DECLARATION,
 		FUNCTION_DECLARATION,
 
+		CONSTRUCTOR_EXPRESSION,
 		POINTER_INITIALIZER_EXPRESSION,
 		INITIALIZER_LIST_EXPRESSION,
 		VALUE_DEFINITION_EXPRESSION,
@@ -375,6 +384,7 @@ namespace AlloyCompiler
 			VALUE_DECLARATION ValueDeclaration;
 			FUNCTION_DECLARATION FunctionDeclaration;
 
+			CONSTRUCTOR_EXPRESSION ConstructorExpression;
 			POINTER_INITIALIZER_EXPRESSION PointerInitializerExpression;
 			INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 			VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;

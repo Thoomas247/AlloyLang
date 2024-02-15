@@ -55,6 +55,31 @@ enum TokenTypes
 	Unknown
 }
 
+fn struct_constructor () -> Vector3
+{
+	return Vector3 
+	{ 
+		x = 32.0, 
+		y = 64.0, 
+		z = 0.0 
+	};
+}
+
+fn struct_ptr_constructor () -> var *Vector3
+{
+	return new Vector3 
+	{ 
+		x = 32.0,
+		y = 64.0,
+		z = 0.0,	// trailing comma is allowed
+	};
+}
+
+fn member_assignment (var t : &Transform, const value : f32)
+{
+	t.rotation.x = value;
+}
+
 fn member_access (const t : &Transform) -> f32
 {
 	return t.rotation.x;

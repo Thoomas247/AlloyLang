@@ -31,10 +31,10 @@ public:
 
 	std::shared_ptr<CGNamedValues>& getParent() { return parent; }
 
-	static llvm::Type* AlloyToLLVMType(llvm::LLVMContext& llvmContext, 
-										const AlloyCompiler::NodeBuffers& NodeBuffers,
-										const AlloyCompiler::TokenBuffers& TokenBuffers,
-										AlloyCompiler::NodeID id) {
+	static llvm::Type* AlloyToLLVMType(llvm::LLVMContext& llvmContext,
+		const AlloyCompiler::NodeBuffers& NodeBuffers,
+		const AlloyCompiler::TokenBuffers& TokenBuffers,
+		AlloyCompiler::NodeID id) {
 		//
 		// get llvm type from AlloyLang types
 		// the input node ID should be of type TYPE_IDENTIFIER
@@ -54,7 +54,7 @@ public:
 
 		assert(NodeBuffers.GetNode(id).Kind == AlloyCompiler::NodeKind::TYPE_IDENTIFIER);
 		const AlloyCompiler::TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
-		const AlloyCompiler::IDENTIFIER& i = NodeBuffers.GetNode(ti.TypeIdentifierID).Identifier;
+		const AlloyCompiler::IDENTIFIER& i = NodeBuffers.GetNode(ti.IdentifierOrTypeIdentifierID).Identifier;
 		std::string AlloyType(TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView());
 
 		for (int t = 0; t < sizeof(AlloyTypes) / sizeof(AlloyTypes[0]); t++) {

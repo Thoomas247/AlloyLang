@@ -288,7 +288,7 @@ Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
 	for (auto id : node.MemberIDs) {
 		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
 		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
-		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
+		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.IdentifierOrTypeIdentifierID);
 		MemberTypes.push_back(type);
 
 		// retrieve member name and add it to memberNames map
@@ -554,13 +554,13 @@ Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, co
 	for (auto id : node.ParameterIDs) {
 		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
 		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
-		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
+		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.IdentifierOrTypeIdentifierID);
 		ParamTypes.push_back(type);
 	}
 
 	// now convert the return type to llvm
 	const TYPE_DECLARATION& td = NodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
-	Type* returnType = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, td.TypeIdentifierID);
+	Type* returnType = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, td.IdentifierOrTypeIdentifierID);
 
 	// Make the function type: return type(param type, param type, ...)
 	// TBD: the last parameter should be true only for variable number of parmeters (e.g. printf), currently assuming all functions are variable parameters
@@ -702,8 +702,8 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& no
 	// TBD: what is ASSIGNMENT_EXPRESSION.OperatorTokenID for?
 	Value* result = nullptr;
 
-	assert(NodeBuffers.GetNode(node.IdentifierID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
-	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierID).Identifier;
+	assert(NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
+	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).Identifier;
 	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
 	// now get the value by recursively calling codegen

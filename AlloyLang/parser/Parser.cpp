@@ -314,7 +314,7 @@ namespace AlloyCompiler
 				{
 					.Mod = modifier,
 					.ArraySizeID = arraySizeID,
-					.TypeIdentifierID = typeIdentifierID
+					.IdentifierOrTypeIdentifierID = typeIdentifierID
 				}
 			},
 			iter.GetCurrentID()
@@ -377,7 +377,7 @@ namespace AlloyCompiler
 				.TypeDeclaration = TYPE_DECLARATION
 				{
 					.Kind = type,
-					.TypeIdentifierID = identifierID
+					.IdentifierOrTypeIdentifierID = identifierID
 				}
 			},
 			errorInfo
@@ -453,7 +453,7 @@ namespace AlloyCompiler
 				{
 					.Kind = type,
 					.IdentifierID = identifierID,
-					.TypeIdentifierID = typeID
+					.IdentifierOrTypeIdentifierID = typeID
 				}
 			},
 			errorInfo
@@ -583,6 +583,110 @@ namespace AlloyCompiler
 
 	template <>
 	NodeID parse<PRIMARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
+	NodeID parse<CONSTRUCTOR_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+
+		// parse struct identifier
+		NodeID structIdentifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (structIdentifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		// check for opening brace
+		if (iter.GetKind() != TokenKind::open_brace)
+		{
+			unexpectedToken(iter, { "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "member assignment" });
+			return ERROR_NODE_ID;
+		}
+
+		VectorRef<NodeID> memberIdentifierIDs = nodeBuffers.CreateNodeIDVector();
+		VectorRef<NodeID> memberValueIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_brace)
+		{
+			// parse member identifier
+			NodeID memberIdentifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+			if (memberIdentifierID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			// check for assignment operator
+			if (iter.GetKind() != TokenKind::assignment_operator)
+			{
+				unexpectedToken(iter, { "=" });
+				return ERROR_NODE_ID;
+			}
+
+			// consume assignment operator
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "member assignment" });
+				return ERROR_NODE_ID;
+			}
+
+			// parse member value
+			NodeID memberValueID = parse<EXPRESSION>(nodeBuffers, iter);
+
+			if (memberValueID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			memberIdentifierIDs.push_back(memberIdentifierID);
+			memberValueIDs.push_back(memberValueID);
+
+			// check for comma
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				// consume comma
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "}" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_brace)
+			{
+				unexpectedToken(iter, { ",", "}" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { ";" });
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::CONSTRUCTOR_EXPRESSION,
+				.ConstructorExpression = CONSTRUCTOR_EXPRESSION
+				{
+					.StructIdentifierID = structIdentifierID,
+					.MemberIdentifierIDs = memberIdentifierIDs,
+					.MemberValueIDs = memberValueIDs
+				}
+			},
+			errorInfo
+		);
+	}
 
 	template <>
 	NodeID parse<POINTER_INITIALIZER_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
@@ -1317,6 +1421,14 @@ namespace AlloyCompiler
 				return parse<FUNCTION_CALL_EXPRESSION>(nodeBuffers, iter);
 			}
 
+			// check if next token is an opening brace
+			if (iter.GetKind() == TokenKind::open_brace)
+			{
+				iter.Previous();
+
+				return parse<CONSTRUCTOR_EXPRESSION>(nodeBuffers, iter);
+			}
+
 			// check if next token is opening square bracket
 			if (iter.GetKind() == TokenKind::open_bracket)
 			{
@@ -1356,9 +1468,29 @@ namespace AlloyCompiler
 	template <>
 	NodeID parse<ASSIGNMENT_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+		// check that we have an identifier
+		if (iter.GetKind() != TokenKind::identifier)
+		{
+			unexpectedToken(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
 
-		if (identifierID == ERROR_NODE_ID)
+		NodeID identifierOrMemberAccessID = ERROR_NODE_ID;
+
+		// check if we have a . after the identifier, denoting a member access expression
+		if (iter.Next() && iter.GetKind() == TokenKind::dot)
+		{
+			iter.Previous();
+			identifierOrMemberAccessID = parse<MEMBER_ACCESS_EXPRESSION>(nodeBuffers, iter);
+		}
+
+		else
+		{
+			iter.Previous();
+			identifierOrMemberAccessID = parse<IDENTIFIER>(nodeBuffers, iter);
+		}
+
+		if (identifierOrMemberAccessID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
@@ -1393,7 +1525,7 @@ namespace AlloyCompiler
 				.Kind = NodeKind::ASSIGNMENT_EXPRESSION,
 				.AssignmentExpression = ASSIGNMENT_EXPRESSION
 				{
-					.IdentifierID = identifierID,
+					.IdentifierOrMemberAccessID = identifierOrMemberAccessID,
 					.OperatorTokenID = operatorTokenID,
 					.ValueID = expressionID
 				}
