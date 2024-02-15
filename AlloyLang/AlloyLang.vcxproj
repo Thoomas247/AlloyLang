@@ -150,6 +150,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="LLVMCodeGenerator\NamedStructs.cpp" />
     <ClCompile Include="parser\Node.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="parser\TreePrinter.cpp" />
@@ -162,6 +163,7 @@
     <ClInclude Include="LLVMCodeGenerator\LLVMCodeGenerator.hpp" />
     <ClInclude Include="LLVMCodeGenerator\NamedValues.hpp" />
     <ClInclude Include="log\Log.hpp" />
+    <ClInclude Include="LLVMCodeGenerator\NamedStructs.hpp" />
     <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
     <ClInclude Include="parser\TreePrinter.hpp" />

@@ -1,6 +1,7 @@
 #include "llvm.hpp"
 #include "LLVMCodeGenerator.hpp"
 #include "NamedValues.hpp"
+#include "NamedStructs.hpp"
 
 using namespace llvm;
 using namespace AlloyCompiler;
@@ -153,6 +154,10 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		result = codegen(node.AssignmentExpression);
 		break;
 
+	case NodeKind::MEMBER_ACCESS_EXPRESSION:		// IDENTIFIER.IDENTIFIER
+		assert(false);
+		break;
+
 		/// End of NodeKind::EXPRESSION group
 
 	/// NodeKind::STATEMENT group
@@ -278,12 +283,22 @@ Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
 
 	// get a vector of member types
 	std::vector<Type*> MemberTypes;
+	std::map<std::string, int> memberNames;
+	int memberIndex = 0;
 	for (auto id : node.MemberIDs) {
 		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
 		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
 		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
 		MemberTypes.push_back(type);
+
+		// retrieve member name and add it to memberNames map
+		const IDENTIFIER& memberID = NodeBuffers.GetNode(vd.IdentifierID).Identifier;
+		std::string memberName(TokenBuffers.GetValue(memberID.IdentifierTokenID).ToStringView());
+		memberNames[memberName] = memberIndex++;
 	}
+
+	// store a map to member names
+	NamedStructs::setMemberNames(Name, memberNames);
 
 	// now create the structure type in llvm
 	llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);

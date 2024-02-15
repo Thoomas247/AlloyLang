@@ -48,6 +48,9 @@
     <ClCompile Include="LLVMCodeGenerator\LLVMCodeGenerator.cpp">
       <Filter>Source Files\LLVMCodeGenerator</Filter>
     </ClCompile>
+    <ClCompile Include="LLVMCodeGenerator\NamedStructs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tokenizer\Tokenizer.hpp">
@@ -85,6 +88,9 @@
     </ClInclude>
     <ClInclude Include="LLVMCodeGenerator\NamedValues.hpp">
       <Filter>Header Files\LLVMCodeGenerator</Filter>
+    </ClInclude>
+    <ClInclude Include="LLVMCodeGenerator\NamedStructs.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

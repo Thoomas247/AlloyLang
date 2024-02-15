@@ -40,13 +40,15 @@ public:
 		// the input node ID should be of type TYPE_IDENTIFIER
 		//
 		// TBD: this method is called frequently, we need to use a map for faster lookups
+		// We also need to dynamically add new types to the map, e.g. structures
 		//
-		const char* AlloyTypes[] = { "i64", "F32", "F64", "String" };
+		const char* AlloyTypes[] = { "i64", "F32", "F64", "String", "Vector3" };	// Vector3 is only for testing, we need to be able to add this dynamically
 		llvm::Type* LLVMTypes[] = {
 			llvm::Type::getInt64Ty(llvmContext),
 			llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::FloatTyID),
 			llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::DoubleTyID),
-			llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0)			// convert string to uint_8*
+			llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0),		// convert string to uint_8*
+			llvm::StructType::getTypeByName(llvmContext, "Vector3")					// this is how structure types should be added
 		};
 		llvm::Type* llvmType = nullptr;
 
