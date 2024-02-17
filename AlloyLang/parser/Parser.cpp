@@ -102,8 +102,8 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-	template <typename T>
-	NodeID parse(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter) = delete;
+	template <typename T, typename... Ps>
+	NodeID parse(NodeBuffers&, TokenBuffers::Iterator&, Ps...) = delete;
 
 #pragma region Literals
 
@@ -461,7 +461,7 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	NodeID parse<FUNCTION_DECLARATION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	NodeID parse<FUNCTION_DECLARATION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter, bool allowVarArg)
 	{
 		if (iter.GetKind() != TokenKind::function_keyword)
 		{
@@ -503,8 +503,31 @@ namespace AlloyCompiler
 		// parse parameters
 		VectorRef<NodeID> parameterIDs = nodeBuffers.CreateNodeIDVector();
 
+		bool isVarArg = false;
+
 		while (iter.GetKind() != TokenKind::close_paren)
 		{
+			if (allowVarArg && iter.GetKind() == TokenKind::ellipsis)
+			{
+				isVarArg = true;
+
+				// consume ellipsis
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { ")" });
+					return ERROR_NODE_ID;
+				}
+
+				// check for closing parenthesis
+				if (iter.GetKind() != TokenKind::close_paren)
+				{
+					unexpectedToken(iter, { ")" });
+					return ERROR_NODE_ID;
+				}
+
+				break;
+			}
+
 			NodeID parameterID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
 
 			if (parameterID == ERROR_NODE_ID)
@@ -564,7 +587,8 @@ namespace AlloyCompiler
 				{
 					.IdentifierID = identifierID,
 					.ParameterIDs = parameterIDs,
-					.ReturnTypeID = returnTypeID
+					.ReturnTypeID = returnTypeID,
+					.IsVariadic = isVarArg
 				}
 			},
 			errorInfo
@@ -2078,7 +2102,7 @@ namespace AlloyCompiler
 		}
 
 		// parse function declaration
-		NodeID functionDeclarationID = parse<FUNCTION_DECLARATION>(nodeBuffers, iter);
+		NodeID functionDeclarationID = parse<FUNCTION_DECLARATION>(nodeBuffers, iter, /*allowVarArg*/ true);
 
 		if (functionDeclarationID == ERROR_NODE_ID)
 		{
@@ -2324,7 +2348,7 @@ namespace AlloyCompiler
 	{
 		TokenID errorInfo = iter.GetCurrentID();
 
-		NodeID declarationID = parse<FUNCTION_DECLARATION>(nodeBuffers, iter);
+		NodeID declarationID = parse<FUNCTION_DECLARATION>(nodeBuffers, iter, /*allowVarArg*/ false);
 
 		if (declarationID == ERROR_NODE_ID)
 		{

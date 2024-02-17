@@ -34,6 +34,7 @@ colon:							':' ;
 semicolon:						';' ;
 dot:							'.' ;
 arrow:							'->' ;
+ellipsis:						'...' ;
 
 open_paren:						'(' ;
 close_paren:					')' ;

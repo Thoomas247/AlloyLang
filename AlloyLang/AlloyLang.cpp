@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
 
 	const uint64_t tokenizeTime = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), 1ll);
 
-	//PrintTokens(tokenBuffers);
+	PrintTokens(tokenBuffers);
 
 	start = std::chrono::high_resolution_clock::now();
 	auto nodeBuffers = Parse(tokenBuffers);

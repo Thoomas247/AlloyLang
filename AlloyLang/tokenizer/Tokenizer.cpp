@@ -104,20 +104,32 @@ namespace AlloyCompiler
 		size_t start = iter.CurrentIndex();
 		const Location& location = iter.CurrentLocation();
 
-		// consume the first character
-		iter.NextChar();
-
-		// check the next character to see if it's also part of the operator
-		bool found = false;
-		for (char c : it->second)
+		// special case for '...' since it is 3 characters long
+		if (iter.CurrentChar() == '.')
 		{
-			if (iter.CurrentChar() == c)
-				found = true;
+			iter.NextChar();	// consume .
+
+			if (iter.CurrentChar() == '.' && iter.PeekNext() == '.')
+			{
+				iter.NextChar();
+				iter.NextChar();
+			}
 		}
 
-		// if we found the next character in the map, consume it
-		if (found)
-			iter.NextChar();
+		// check all other 2 character operators
+		else
+		{
+			iter.NextChar();	// consume any first character
+
+			for (char c : it->second)
+			{
+				if (iter.CurrentChar() == c)
+				{
+					iter.NextChar();
+					break;
+				}
+			}
+		}
 
 		// get the operator string
 		auto tokenString = iter.CreateSmallStringView(start, iter.CurrentIndex());
@@ -125,7 +137,10 @@ namespace AlloyCompiler
 		// check if the operator is in the known symbols map
 		ASSERT(KNOWN_SYMBOLS.contains(tokenString.ToStringView()), "Unknown operator: {0}", tokenString.ToStringView());
 
-		tokenBuffers.AddToken(KNOWN_SYMBOLS.at(tokenString.ToStringView()), tokenString, location);
+		// get the token kind
+		TokenKind kind = KNOWN_SYMBOLS.at(tokenString.ToStringView());
+
+		tokenBuffers.AddToken(kind, tokenString, location);
 
 		return true;
 	}

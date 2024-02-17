@@ -2,6 +2,7 @@
 
 constexpr auto TestSrc1 = R"(
 extern fn test (var a : i64);
+extern fn printf (const format : String, ...);
 
 // array of i64
 exp var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };

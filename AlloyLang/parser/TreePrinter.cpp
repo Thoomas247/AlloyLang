@@ -152,6 +152,8 @@ namespace AlloyCompiler
 			j["parameters"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, parameterID));
 		}
 
+		j["variadic"] = functionDeclarationNode.IsVariadic;
+
 		if (functionDeclarationNode.ReturnTypeID != ERROR_NODE_ID)
 		{
 			j["return_type"] = print<TYPE_DECLARATION>(tokenBuffers, nodeBuffers, functionDeclarationNode.ReturnTypeID);

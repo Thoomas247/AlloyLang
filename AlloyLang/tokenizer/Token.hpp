@@ -51,6 +51,7 @@ namespace AlloyCompiler
 		semicolon,
 		dot,
 		arrow,
+		ellipsis,
 
 		open_paren,
 		close_paren,
@@ -111,6 +112,7 @@ namespace AlloyCompiler
 		{ TokenKind::semicolon, "semicolon" },
 		{ TokenKind::dot, "dot" },
 		{ TokenKind::arrow, "arrow" },
+		{ TokenKind::ellipsis, "ellipsis" },
 
 		{ TokenKind::open_paren, "open_paren" },
 		{ TokenKind::close_paren, "close_paren" },
@@ -168,6 +170,7 @@ namespace AlloyCompiler
 		{ ";", TokenKind::semicolon },
 		{ ".", TokenKind::dot },
 		{ "->", TokenKind::arrow },
+		{ "...", TokenKind::ellipsis },
 
 		{ "(", TokenKind::open_paren },
 		{ ")", TokenKind::close_paren },
@@ -217,7 +220,7 @@ namespace AlloyCompiler
 		{ '/', { } },		// /
 		{ '%', { } },		// %
 		{ '@', { } },		// @
-		{ '.', { } }		// .
+		{ '.', { } }		// . (... doesn't fit here as it is 3 characters long, case is handled manually in tokenizer)
 	};
 
 	/// <summary>

@@ -90,6 +90,7 @@ namespace AlloyCompiler
 		NodeID IdentifierID;
 		VectorRef<NodeID> ParameterIDs;
 		NodeID ReturnTypeID;
+		bool IsVariadic;
 	};
 
 #pragma endregion
