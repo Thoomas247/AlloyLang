@@ -42,20 +42,33 @@ public:
 		// TBD: this method is called frequently, we need to use a map for faster lookups
 		// We also need to dynamically add new types to the map, e.g. structures
 		//
-		const char* AlloyTypes[] = { "i64", "F32", "F64", "String", "Vector3" };	// Vector3 is only for testing, we need to be able to add this dynamically
+		const char* AlloyTypes[] = { "i64", "f32", "f64", "String", "Vector3" };	// Vector3 is only for testing, we need to be able to add this dynamically
 		llvm::Type* LLVMTypes[] = {
 			llvm::Type::getInt64Ty(llvmContext),
-			llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::FloatTyID),
+			llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::DoubleTyID),
 			llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::DoubleTyID),
 			llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0),		// convert string to uint_8*
 			llvm::StructType::getTypeByName(llvmContext, "Vector3")					// this is how structure types should be added
 		};
-		llvm::Type* llvmType = nullptr;
 
-		assert(NodeBuffers.GetNode(id).Kind == AlloyCompiler::NodeKind::TYPE_IDENTIFIER);
-		const AlloyCompiler::TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
-		const AlloyCompiler::IDENTIFIER& i = NodeBuffers.GetNode(ti.IdentifierOrTypeIdentifierID).Identifier;
-		std::string AlloyType(TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView());
+		llvm::Type* llvmType = nullptr;
+		std::string AlloyType;
+		if (NodeBuffers.GetNode(id).Kind == AlloyCompiler::NodeKind::TYPE_IDENTIFIER) {
+			const AlloyCompiler::TYPE_IDENTIFIER& ti = NodeBuffers.GetNode(id).TypeIdentifier;
+			const AlloyCompiler::IDENTIFIER& i = NodeBuffers.GetNode(ti.IdentifierOrTypeIdentifierID).Identifier;
+			AlloyType = TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView();
+		}
+		else
+		{
+			if (NodeBuffers.GetNode(id).Kind == AlloyCompiler::NodeKind::IDENTIFIER) {
+				const AlloyCompiler::IDENTIFIER& i = NodeBuffers.GetNode(id).Identifier;
+				AlloyType = TokenBuffers.GetValue(i.IdentifierTokenID).ToStringView();
+			}
+			else {
+				assert(false);
+			}
+		}
+
 
 		for (int t = 0; t < sizeof(AlloyTypes) / sizeof(AlloyTypes[0]); t++) {
 			if (AlloyType == AlloyTypes[t]) {
@@ -63,7 +76,7 @@ public:
 				break;
 			}
 		}
-
+		assert(llvmType != nullptr);	// TBD: unknown type
 		return llvmType;
 	}
 

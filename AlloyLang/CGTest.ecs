@@ -1,4 +1,4 @@
-extern fn printf (const str : String, const param : i64) -> i64;
+extern fn printf (const str : String, const param : f64) -> i64;
 
 struct Vector3
 {
@@ -7,9 +7,16 @@ struct Vector3
 	var z : f32;
 }
 
-fn main (var test : &Vector3) -> i64
+fn main () -> i64
 {
-//	test.x = 1;
-	printf("test.x = %d\n", test.x);
+	var test : Vector3 = 
+		Vector3 
+		{ 
+			x = 32.0, 
+			y = 64.0, 
+			z = 0.0 
+		};
+	// test.z = 10.0;
+	printf("test.z = %f", test.z);
 	return 0;
 }

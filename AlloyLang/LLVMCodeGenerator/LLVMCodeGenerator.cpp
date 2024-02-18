@@ -4,8 +4,9 @@
 #include "NamedStructs.hpp"
 
 using namespace llvm;
-using namespace AlloyCompiler;
 
+namespace AlloyCompiler
+{
 LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuffers,
 	const AlloyCompiler::NodeBuffers& nodeBuffers)
 	: NodeBuffers(nodeBuffers), TokenBuffers(tokenBuffers) {
@@ -130,6 +131,18 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 
 		/// NodeKind::EXPRESSION group
 
+	case NodeKind::CONSTRUCTOR_EXPRESSION:			// IDENTIFIER open_brace ( IDENTIFIER assignment_operator EXPRESSION ) { comma IDENTIFIER assignment_operator EXPRESSION } close_brace ;
+		return codegen(node.ConstructorExpression);
+		break;
+
+	case NodeKind::POINTER_INITIALIZER_EXPRESSION:	// new_keyword ( EXPRESSION | ( open_bracket EXPRESSION semicolon EXPRESSION close_bracket ) ) ;
+		assert(false);
+		break;
+
+	case NodeKind::INITIALIZER_LIST_EXPRESSION:		// open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
+		assert(false);
+		break;
+
 	case NodeKind::VALUE_DEFINITION_EXPRESSION:		// VALUE_DECLARATION assignment_operator EXPRESSION;
 		result = codegen(node.ValueDefinitionExpression);
 		break;
@@ -150,12 +163,12 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		assert(false);	// To be implemented
 		break;
 
-	case NodeKind::ASSIGNMENT_EXPRESSION:			// IDENTIFIER assignment_operator EXPRESSION;
+	case NodeKind::ASSIGNMENT_EXPRESSION:			// ( MEMBER_ACCESS_EXPRESSION | IDENTIFIER ) assignment_operator EXPRESSION;
 		result = codegen(node.AssignmentExpression);
 		break;
 
 	case NodeKind::MEMBER_ACCESS_EXPRESSION:		// IDENTIFIER.IDENTIFIER
-		assert(false);
+		result = codegen(node.MemberAccessExpression);
 		break;
 
 		/// End of NodeKind::EXPRESSION group
@@ -264,8 +277,8 @@ Value* LLVMCodeGenerator::codegen(NodeID nodeID) {
 Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION& node) {
 	//
 	// Expression of type: [const] identifier = value;	(with the semi-colon at the end)
-	// TBD: this should return True or False and not a value
 	//
+	assert(false);	// TBD: this should return a value of type True or False
 	return codegen(node.ValueDefinitionExpressionID);
 }
 
@@ -304,6 +317,19 @@ Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
 	llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);
 
 	result = (structType != nullptr ? ConstantInt::getTrue(*TheContext) : ConstantInt::getFalse(*TheContext));
+
+	return result;
+}
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::CONSTRUCTOR_EXPRESSION& node) {
+	//
+	// IDENTIFIER { ( IDENTIFIER = EXPRESSION ) { comma IDENTIFIER = EXPRESSION } } ;
+	//
+	//
+	Value* result = NamedStructs::getConstantStruct(*this,
+		node.StructIdentifierID,
+		node.MemberIdentifierIDs,
+		node.MemberValueIDs);
 
 	return result;
 }
@@ -359,25 +385,35 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IDENTIFIER& node) {
 	// Lookup this variable in the current function
 	const std::string Name(TokenBuffers.GetValue(node.IdentifierTokenID).ToStringView());
 	Value* value = nullptr;
-	AllocaInst* A = NamedValues->contains(Name, true);
-	if (A) {
-		// Found in the local variables, load the value
-		value = Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
-	}
-	else {
-		// not a local variable, check the globals
-		GlobalVariable* gv = TheModule->getGlobalVariable(Name);
-		if (gv) {
-			value = gv->getInitializer();
-		}
-		else {
-			// TBD: LogErrorV("Unknown variable name");
-			assert(false);
-		}
+	if (!loadValueOfLocalOrGlobalVariable(Name, value)) {
+		// TBD: LogErrorV("Unknown variable name");
+		assert(false);
 	}
 
 	return value;
 }
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::MEMBER_ACCESS_EXPRESSION& node) {
+	//
+	// return the value of a single member of a local or global struct variable
+	// 
+	// Lookup this variable in the current function
+	const IDENTIFIER& left = NodeBuffers.GetNode(node.LeftID).Identifier;
+	std::string StructName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
+
+	const IDENTIFIER& right = NodeBuffers.GetNode(node.RightID).Identifier;
+	std::string MemberName(TokenBuffers.GetValue(right.IdentifierTokenID).ToStringView());
+
+	Value* value = nullptr;
+	if (!NamedStructs::loadValueOfLocalOrGlobalStructMember(*this, StructName, MemberName, value)) {
+		// TBD: LogErrorV("Unknown variable or member name");
+		assert(false);
+	}
+
+	return value;
+
+}
+
 
 bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value) {
 	//
@@ -399,12 +435,42 @@ bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Na
 			result = true;
 		}
 		else {
-			// TBD: LogErrorV("Unknown variable name");
+			// TBD: Unknown variable name
 			assert(false);
 		}
 	}
 
 	return result;
+}
+
+Value* LLVMCodeGenerator::loadValueOfLocalOrGlobalVariable(const std::string& Name, Value*& Value) {
+	//
+	// read the value of a local or global variable
+	// returns the pointer to the local or global variable or nullptr if not found
+	// 
+	llvm::Value* ptr = nullptr;
+
+	AllocaInst* A = NamedValues->contains(Name, true);
+	GlobalVariable* gv = nullptr;
+	if (A) {
+		// Found in the local variables, load the value
+		Value = Builder->CreateLoad(A->getAllocatedType(), A, Name.c_str());
+		ptr = A;
+	}
+	else {
+		// not a local variable, check the globals
+		gv = TheModule->getGlobalVariable(Name);
+		if (gv) {
+			Value = gv->getInitializer();
+			ptr = gv;
+		}
+		else {
+			// TBD: LogErrorV("Unknown variable name");
+			assert(false);
+		}
+	}
+
+	return ptr;
 }
 
 Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
@@ -702,18 +768,47 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& no
 	// TBD: what is ASSIGNMENT_EXPRESSION.OperatorTokenID for?
 	Value* result = nullptr;
 
-	assert(NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).Kind == NodeKind::IDENTIFIER);		// make sure we are getting back the right node type
-	const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).Identifier;
-	std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
+	switch (NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).Kind) {
+	case NodeKind::IDENTIFIER:
+	{
+		const IDENTIFIER& identifier = NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).Identifier;
+		std::string Name(TokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView());
 
-	// now get the value by recursively calling codegen
-	result = codegen(node.ValueID);
+		// now evaluate the expression by recursively calling codegen
+		result = codegen(node.ValueID);
 
-	if (!updateValueOfLocalOrGlobalVariable(Name, result)) {
-		// error updating the value of local or global variable
-		assert(false);
+		if (!updateValueOfLocalOrGlobalVariable(Name, result)) {
+			// error updating the value of local or global variable
+			assert(false);
+		}
+
+		break;
 	}
 
+	case NodeKind::MEMBER_ACCESS_EXPRESSION:
+	{
+		const MEMBER_ACCESS_EXPRESSION& memberAccess = NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).MemberAccessExpression;
+		const IDENTIFIER& left = NodeBuffers.GetNode(memberAccess.LeftID).Identifier;
+		const IDENTIFIER& right = NodeBuffers.GetNode(memberAccess.RightID).Identifier;
+		std::string StructName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
+		std::string MemberName(TokenBuffers.GetValue(right.IdentifierTokenID).ToStringView());
+
+		// now evaluate the expression by recursively calling codegen
+		result = codegen(node.ValueID);
+
+		if (!NamedStructs::updateValueOfLocalOrGlobalStructMember(*this, StructName, MemberName, result)) {
+			// error updating the value of local or global variable
+			assert(false);
+		}
+
+		break;
+	}
+
+	default:			// TBD: wrong node type
+		assert(false);
+		break;
+
+	}
 	return result;
 }
 
@@ -967,3 +1062,4 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::RETURN_STATEMENT& node) {
 	return result;
 }
 
+}	// end of namespace AlloyCompiler

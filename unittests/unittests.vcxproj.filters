@@ -39,6 +39,9 @@
     <ClCompile Include="..\AlloyLang\tokenizer\Tokenizer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\AlloyLang\LLVMCodeGenerator\NamedStructs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
