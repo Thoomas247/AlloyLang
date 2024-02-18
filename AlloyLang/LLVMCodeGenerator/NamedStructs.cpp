@@ -143,7 +143,7 @@ namespace AlloyCompiler
 			indices[0] = llvm::ConstantInt::get(*codeGen.TheContext, llvm::APInt(32, 0, true));
 			indices[1] = llvm_index;
 
-			llvm::Value* member = codeGen.Builder->CreateGEP(structType->getContainedType(index), ptr, indices, "memberptr");
+			llvm::Value* member = codeGen.Builder->CreateGEP(structType, ptr, indices, "memberptr");
 			codeGen.Builder->CreateStore(Value, member, "savetmp");
 
 			result = true;

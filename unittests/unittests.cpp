@@ -34,6 +34,25 @@ namespace unittests
 
 	TEST_CLASS(LLVMCodeGeneratorUnitTests)
 	{
+	private:
+		void RunTest(const std::string code, const std::string expected) {
+
+			Source	src(code);
+			TokenBuffers tokenBuffers = Tokenize(src);
+			auto nodeBuffers = Parse(tokenBuffers);
+			LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
+
+			// suppress output to out.ll file
+			codegen.Process(&llvm::nulls());
+
+			// interpret and execute resulting code
+			codegen.Execute();
+
+			// retrieve result and compare with expected data
+			std::string result = static_cast<redirect_stdout&>(llvm::outs()).buffer;
+			Assert::AreEqual(expected, result);
+		}
+
 	public:
 		
 		TEST_METHOD(IfStatements)
@@ -58,21 +77,7 @@ namespace unittests
 				}
 			)";
 			std::string expected = "3 x 5 = 15";
-
-			Source	src(TestStr);
-			TokenBuffers tokenBuffers = Tokenize(src);
-			auto nodeBuffers = Parse(tokenBuffers);
-			LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
-
-			// suppress output to out.ll file
-			codegen.Process(&llvm::nulls());
-
-			// interpret and execute resulting code
-			codegen.Execute();
-
-			// retrieve result and compare with expected data
-			std::string result = static_cast<redirect_stdout &>(llvm::outs()).buffer;
-			Assert::AreEqual(expected, result);
+			RunTest(TestStr, expected);
 		}
 
 		TEST_METHOD(ForLoop)
@@ -97,20 +102,38 @@ namespace unittests
 			)";
 			std::string expected = "3 x 5 = 15";
 
-			Source	src(TestStr);
-			TokenBuffers tokenBuffers = Tokenize(src);
-			auto nodeBuffers = Parse(tokenBuffers);
-			LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
+			RunTest(TestStr, expected);
+		}
 
-			// suppress output to out.ll file
-			codegen.Process(&llvm::nulls());
+		TEST_METHOD(Structures)
+		{
+			constexpr auto TestStr = R"(
+				extern fn printf (const str : String, const param : f64) -> i64;
 
-			// interpret and execute resulting code
-			codegen.Execute();
+				struct Vector3
+				{
+					var x : f32;
+					var y : f32;
+					var z : f32;
+				}
 
-			// retrieve result and compare with expected data
-			std::string result = static_cast<redirect_stdout&>(llvm::outs()).buffer;
-			Assert::AreEqual(expected, result);
+				fn main () -> i64
+				{
+					var test : Vector3 = 
+						Vector3 
+						{ 
+							x = 32.0, 
+							y = 64.0, 
+							z = 0.0 
+						};
+					test.z = 10.0;
+					printf("test.z = %f", test.z);
+					return 0;
+				}
+			)";
+			std::string expected = "test.z = 10.000000";
+
+			RunTest(TestStr, expected);
 		}
 	};
 }

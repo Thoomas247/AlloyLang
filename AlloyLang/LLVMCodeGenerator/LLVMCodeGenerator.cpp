@@ -19,7 +19,7 @@ LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuf
 	Builder = std::make_unique<IRBuilder<>>(*TheContext);
 
 	// tree of named values that is passed around the code generator
-	RootNamedValues = std::make_unique<CGNamedValues>();
+	RootNamedValues = std::make_unique<CGNamedValues>(*TheContext);
 	NamedValues = std::move(RootNamedValues);
 
 #ifndef NO_CODE_OPTIMIZATION
@@ -315,8 +315,16 @@ Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
 
 	// now create the structure type in llvm
 	llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);
+	if (nullptr != structType) {
 
-	result = (structType != nullptr ? ConstantInt::getTrue(*TheContext) : ConstantInt::getFalse(*TheContext));
+		// add the newly created type tot he AlloyToLLVM map
+		CGNamedValues::addType(Name, StructType::getTypeByName(*TheContext, Name));
+		result = ConstantInt::getTrue(*TheContext);
+
+	}
+	else {
+		result = ConstantInt::getFalse(*TheContext);
+	}
 
 	return result;
 }
@@ -465,7 +473,7 @@ Value* LLVMCodeGenerator::loadValueOfLocalOrGlobalVariable(const std::string& Na
 			ptr = gv;
 		}
 		else {
-			// TBD: LogErrorV("Unknown variable name");
+			// TBD: Unknown variable name
 			assert(false);
 		}
 	}
@@ -703,7 +711,7 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	}
 
 	// create a new local names map for the function body
-	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
+	NamedValues = std::make_unique<CGNamedValues>(*TheContext, std::move(NamedValues));
 
 	ConstantInt* retval = static_cast<ConstantInt*>(codegen(node.BodyID));
 
@@ -737,7 +745,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 	Value* result = ConstantInt::getTrue(*TheContext);
 
 	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
-	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
+	NamedValues = std::make_unique<CGNamedValues>(*TheContext, std::move(NamedValues));
 
 	for (const NodeID& S : node.StatementIDs) {
 
@@ -966,7 +974,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	}
 
 	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
-	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
+	NamedValues = std::make_unique<CGNamedValues>(*TheContext, std::move(NamedValues));
 
 	// Emit the start code first if any.
 	if (ERROR_NODE_ID != node.InitExpressionID) {

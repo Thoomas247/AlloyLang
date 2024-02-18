@@ -7,6 +7,13 @@ struct Vector3
 	var z : f32;
 }
 
+struct Transform
+{
+	var position : Vector3;
+	var rotation : Vector3;
+	var scale : Vector3;
+}
+
 fn main () -> i64
 {
 	var test : Vector3 = 
@@ -16,7 +23,17 @@ fn main () -> i64
 			y = 64.0, 
 			z = 0.0 
 		};
-	// test.z = 10.0;
-	printf("test.z = %f", test.z);
+
+	var test2 : Transform = 
+		Transform
+		{
+			position = Vector3 { x = 5.0, y = 6.0, z = 7.1 },
+			rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
+			scale = test
+		};
+	test.z = 10.0;
+	test2.position.y = test2.position.y + 10;
+
+	printf("result = %f", test.z * test2.position.y);
 	return 0;
 }
