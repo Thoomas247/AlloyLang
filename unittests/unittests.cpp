@@ -108,7 +108,7 @@ namespace unittests
 		TEST_METHOD(Structures)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : f64) -> i64;
+				extern fn printf (const str : String, const param : f32) -> i64;
 
 				struct Vector3
 				{

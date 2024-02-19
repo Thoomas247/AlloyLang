@@ -46,7 +46,14 @@ namespace AlloyCompiler
 					Value* value = codeGen.codegen(valueIds[i]);
 
 					// add to the vector of values
-					structMembers[i] = static_cast<Constant*>(value);
+					if (isa<Constant>(value)) {
+						structMembers[i] = static_cast<Constant*>(value);
+					}
+					else {
+						// TBD: implement case where initializer is another variable and not a constant
+						assert(false);
+					}
+
 				}
 				else {
 					assert(false);	// TBD: referencing a non-existing member

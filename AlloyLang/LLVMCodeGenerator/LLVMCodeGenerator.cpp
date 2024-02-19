@@ -369,8 +369,14 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 		gv->setDSOLocal(true);
 
 		// currently assuming the initializer is constant
-		Constant* ptr_2 = static_cast<Constant*>(value);
-		gv->setInitializer(ptr_2);
+		if (isa<Constant>(value)) {
+			Constant* ptr_2 = static_cast<Constant*>(value);
+			gv->setInitializer(ptr_2);
+		}
+		else {
+			// TBD: should convert value to constant
+			assert(false);
+		}
 	}
 	else {
 		// add the variable to the end of the insertion block (e.g. function local variables)
@@ -749,8 +755,11 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 
 	for (const NodeID& S : node.StatementIDs) {
 
-		ConstantInt* stmtResult = static_cast<ConstantInt*>(codegen(S));
-		if (stmtResult == nullptr || stmtResult->isZero()) {
+		Value* stmtResult = codegen(S);
+		if (stmtResult == nullptr 
+			|| !isa<ConstantInt>(stmtResult) 
+			|| static_cast<ConstantInt *>(stmtResult)->isZero()
+			) {
 			assert(false);
 			result = ConstantInt::getFalse(*TheContext);
 			break;
@@ -889,8 +898,11 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 
 	// Emit then statements
 	Builder->SetInsertPoint(ThenBB);
-	ConstantInt* ThenV = static_cast<ConstantInt*>(codegen(node.BodyID));
-	if (ThenV == nullptr || ThenV->isZero()) {
+	Value* ThenV = codegen(node.BodyID);
+	if (ThenV == nullptr
+		|| !isa<ConstantInt>(ThenV)
+		|| static_cast<ConstantInt*>(ThenV)->isZero()
+		) {
 		assert(false);
 		return result;
 	}
@@ -900,7 +912,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	ThenBB = Builder->GetInsertBlock();
 
 	// Emit else block if any
-	ConstantInt* ElseV = nullptr;
+	Value* ElseV = nullptr;
 	if (ElseBB) {
 		TheFunction->insert(TheFunction->end(), ElseBB);
 		Builder->SetInsertPoint(ElseBB);
@@ -909,8 +921,11 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 			result = ConstantInt::getTrue(*TheContext);;
 		}
 		else {
-			ElseV = static_cast<ConstantInt*>(codegen(node.ElseID));
-			if (ElseV == nullptr || ElseV->isZero()) {
+			ElseV = codegen(node.ElseID);
+			if (ElseV == nullptr
+				|| !isa<ConstantInt>(ElseV)
+				|| static_cast<ConstantInt*>(ElseV)->isZero()
+				) {
 				assert(false);
 				return result;
 			}
@@ -926,14 +941,6 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	TheFunction->insert(TheFunction->end(), MergeBB);
 	Builder->SetInsertPoint(MergeBB);
 
-	/* Note: This call will assert if SDL checks are enabled in Visual Studio as per this article :
-	// https://stackoverflow.com/questions/34892732/error-when-call-createphi-in-llvm
-	// Need to disable SDL checks for this code to run
-	PHINode* PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
-
-	PN->addIncoming(ThenV, ThenBB);
-	PN->addIncoming(ElseV, ElseBB);
-	*/
 	result = ConstantInt::getTrue(*TheContext);
 	return result;
 }
@@ -1001,8 +1008,12 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	// Emit the body of the loop.  This, like any other expr, can change the
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
-	result = static_cast<ConstantInt*>(codegen(node.BodyID));
-	if (nullptr == result || result->isZero()) {
+	Value* stmtResult = codegen(node.BodyID);
+	result = static_cast<ConstantInt*>(stmtResult);
+	if (nullptr == stmtResult
+		|| !isa<ConstantInt>(stmtResult)
+		|| result->isZero()
+		) {
 		assert(false);
 		return result;
 	}
