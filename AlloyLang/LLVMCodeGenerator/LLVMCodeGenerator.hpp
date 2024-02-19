@@ -69,7 +69,7 @@ namespace AlloyCompiler
 		Value* codegen(const VALUE_DEFINITION& node);
 		Value* codegen(const VALUE_DEFINITION_EXPRESSION& node);
 		Value* codegen(const IDENTIFIER& node);
-		Value* codegen(const MEMBER_ACCESS_EXPRESSION& node);
+		Value* codegen(const MEMBER_ACCESS_EXPRESSION& node, Value** ObjectPtr = nullptr);	// for this specific expression, we need the value and the pointer to the object
 		Function* codegen(const FUNCTION_DEFINITION& node);
 		Function* codegen(const FUNCTION_DECLARATION& node);
 		Value* codegen(const BLOCK_STATEMENT& node);

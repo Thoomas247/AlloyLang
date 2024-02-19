@@ -20,13 +20,19 @@ namespace AlloyCompiler
 			const std::vector<NodeID>& memberIds,
 			const std::vector<NodeID>& valueIds);
 
-		static bool loadValueOfLocalOrGlobalStructMember(LLVMCodeGenerator& codeGen,
+		static Value* loadValueOfLocalOrGlobalStructMember(LLVMCodeGenerator& codeGen,
 			const std::string& VariableName, 
 			const std::string& MemberName, 
 			Value*& Value);
 
+		static Value* loadValueOfLocalOrGlobalStructMember(LLVMCodeGenerator& codeGen,
+			Value* VariablePtr,
+			const std::string& MemberName,
+			Value*& Value);
+
 		static bool updateValueOfLocalOrGlobalStructMember(LLVMCodeGenerator& codeGen,
-			const std::string& VariableName, 
+			Value* StructVariable,		// this is a pointer to the structure variable
+			Value *StructValue,			// this is the structure variable
 			const std::string& MemberName, 
 			Value* Value);
 

@@ -68,15 +68,16 @@ namespace AlloyCompiler
 	}
 
 	/*static*/
-	bool NamedStructs::loadValueOfLocalOrGlobalStructMember(LLVMCodeGenerator& codeGen,
+	Value* NamedStructs::loadValueOfLocalOrGlobalStructMember(LLVMCodeGenerator& codeGen,
 		const std::string& Name, 
 		const std::string& MemberName, 
 		Value*& Value) {
 		//
 		// read the value of one member of a local or global structure variable
+		// returns a pointer to the structure member or nullptr
 		// 
 
-		bool ret = true;
+		llvm::Value* ret = nullptr;
 
 		// check if the structure exists and load it
 		llvm::Value* ptr = codeGen.loadValueOfLocalOrGlobalVariable(Name, Value);
@@ -84,9 +85,35 @@ namespace AlloyCompiler
 		if (!ptr) {
 			// TBD: Unknown variable name
 			assert(false);
-			return false;
+			return ret;
 		}
 		
+		return loadValueOfLocalOrGlobalStructMember(codeGen, ptr, MemberName, Value);
+	}
+
+	/*static*/
+	Value* NamedStructs::loadValueOfLocalOrGlobalStructMember(LLVMCodeGenerator& codeGen,
+		Value* VariablePtr,
+		const std::string& MemberName,
+		Value*& Value) {
+		//
+		// Read the value of one member of a local or global structure variable
+		// Returns a pointer to the structure member or nullptr
+		// On entry: The parameter Value should contain the structure's value, it is needed in addition to the pointer to the structure in VariablePtr
+		// On exit: Value contains the returned value
+		// 
+
+		llvm::Value* ret = nullptr;
+
+		// check if the structure exists and load it
+		llvm::Value* ptr = VariablePtr;
+
+		if (!ptr) {
+			// TBD: Unknown variable name
+			assert(false);
+			return ret;
+		}
+
 		// this is a structure and we are requesting the value of one member
 		StructType* structType = static_cast<StructType*>(Value->getType());
 		assert(structType->getTypeID() == Type::StructTyID);
@@ -104,11 +131,11 @@ namespace AlloyCompiler
 			indices[1] = llvm_index;
 
 			// case of a local structure variable
-			llvm::Value* member = codeGen.Builder->CreateGEP(structType, ptr, indices, "memberptr");
-			Value = codeGen.Builder->CreateLoad(structType->getTypeAtIndex(index), member, "loadtmp");
+			ret = codeGen.Builder->CreateGEP(structType, ptr, indices, "memberptr");
+			Value = codeGen.Builder->CreateLoad(structType->getTypeAtIndex(index), ret, "loadtmp");
 		}
 		else {
-			ret = false;
+			ret = nullptr;
 			assert(false);	// TBD: referencing a non-existing member
 		}
 
@@ -117,7 +144,8 @@ namespace AlloyCompiler
 
 	/*static*/
 	bool NamedStructs::updateValueOfLocalOrGlobalStructMember(LLVMCodeGenerator& codeGen,
-		const std::string& VariableName,
+		Value* StructVariable,		// this is a pointer to the structure variable
+		Value* StructValue,			// this is the structure variable
 		const std::string& MemberName,
 		Value* Value) {
 		//
@@ -125,35 +153,33 @@ namespace AlloyCompiler
 		//
 
 		bool result = false;
-		llvm::Value* structValue = nullptr;
 
-		// Lookup this variable in the current function and load the previous value
-		// loading the previous value (which is a structure) gives us the details about the structure
-		llvm::Value* ptr = codeGen.loadValueOfLocalOrGlobalVariable(VariableName, structValue);
-		if (!ptr) {
-			// TBD: Unknown variable name
+		// make sure we are receiving a variable of type Structure
+		if (!isa<StructType>(StructValue->getType())) {
+			// TBD: not a structure
 			assert(false);
 		}
+		else {
+			// this is a structure and we are requesting the value of one member
+			StructType* structType = static_cast<StructType*>(StructValue->getType());
+			assert(structType->getTypeID() == Type::StructTyID);
 
-		// this is a structure and we are requesting the value of one member
-		StructType* structType = static_cast<StructType*>(structValue->getType());
-		assert(structType->getTypeID() == Type::StructTyID);
+			int index = NamedStructs::getMemberIndex(structType->getStructName().str(), MemberName);
+			if (index != -1) {
+				// convert our index to an llvm 32-bit Int
+				llvm::Value* llvm_index = llvm::ConstantInt::get(*codeGen.TheContext, llvm::APInt(32, index, true));
 
-		int index = NamedStructs::getMemberIndex(structType->getStructName().str(), MemberName);
-		if (index != -1) {
-			// convert our index to an llvm 32-bit Int
-			llvm::Value* llvm_index = llvm::ConstantInt::get(*codeGen.TheContext, llvm::APInt(32, index, true));
+				// struct members are accessed through 2 indices, this is described in details here:
+				// https://llvm.org/docs/GetElementPtr.html
+				std::vector<llvm::Value*> indices(2);
+				indices[0] = llvm::ConstantInt::get(*codeGen.TheContext, llvm::APInt(32, 0, true));
+				indices[1] = llvm_index;
 
-			// struct members are accessed through 2 indices, this is described in details here:
-			// https://llvm.org/docs/GetElementPtr.html
-			std::vector<llvm::Value*> indices(2);
-			indices[0] = llvm::ConstantInt::get(*codeGen.TheContext, llvm::APInt(32, 0, true));
-			indices[1] = llvm_index;
+				llvm::Value* member = codeGen.Builder->CreateGEP(structType, StructVariable, indices, "memberptr");
+				codeGen.Builder->CreateStore(Value, member, "savetmp");
 
-			llvm::Value* member = codeGen.Builder->CreateGEP(structType, ptr, indices, "memberptr");
-			codeGen.Builder->CreateStore(Value, member, "savetmp");
-
-			result = true;
+				result = true;
+			}
 		}
 		return result;
 	}

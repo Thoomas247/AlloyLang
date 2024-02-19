@@ -117,6 +117,13 @@ namespace unittests
 					var z : f32;
 				}
 
+				struct Transform
+				{
+					var position : Vector3;
+					var rotation : Vector3;
+					var scale : Vector3;
+				}
+
 				fn main () -> i64
 				{
 					var test : Vector3 = 
@@ -126,12 +133,23 @@ namespace unittests
 							y = 64.0, 
 							z = 0.0 
 						};
+
+					var test2 : Transform = 
+						Transform
+						{
+							position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
+							rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
+							scale = Vector3 { x = 5.0, y = 6.0, z = 7.1 }
+						};
+
 					test.z = 10.0;
-					printf("test.z = %f", test.z);
+					test2.rotation.y = 20.0;
+
+					printf("result = %f", test2.rotation.y * test.z);
 					return 0;
 				}
 			)";
-			std::string expected = "test.z = 10.000000";
+			std::string expected = "test.z = 200.000000";
 
 			RunTest(TestStr, expected);
 		}

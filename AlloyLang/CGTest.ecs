@@ -32,8 +32,9 @@ fn main () -> i64
 			scale = Vector3 { x = 5.0, y = 6.0, z = 7.1 }
 		};
 
-	tes2.position.x = 20.0;
+	test.z = 10.0;
+	test2.rotation.y = 20.0;
 
-	printf("result = %f", test.z);
+	printf("result = %f", test2.rotation.y * test.z);
 	return 0;
 }

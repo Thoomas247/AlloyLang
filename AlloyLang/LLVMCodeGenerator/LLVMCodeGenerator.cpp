@@ -407,28 +407,6 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IDENTIFIER& node) {
 	return value;
 }
 
-Value* LLVMCodeGenerator::codegen(const AlloyCompiler::MEMBER_ACCESS_EXPRESSION& node) {
-	//
-	// return the value of a single member of a local or global struct variable
-	// 
-	// Lookup this variable in the current function
-	const IDENTIFIER& left = NodeBuffers.GetNode(node.LeftID).Identifier;
-	std::string StructName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
-
-	const IDENTIFIER& right = NodeBuffers.GetNode(node.RightID).Identifier;
-	std::string MemberName(TokenBuffers.GetValue(right.IdentifierTokenID).ToStringView());
-
-	Value* value = nullptr;
-	if (!NamedStructs::loadValueOfLocalOrGlobalStructMember(*this, StructName, MemberName, value)) {
-		// TBD: LogErrorV("Unknown variable or member name");
-		assert(false);
-	}
-
-	return value;
-
-}
-
-
 bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value) {
 	//
 	// update the value of a local or global variable
@@ -778,6 +756,62 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 	return result;
 }
 
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::MEMBER_ACCESS_EXPRESSION& node, Value** ObjectPtr /*= nullptr*/) {
+	//
+	// return the value of a single member of a local or global struct variable
+	// 
+
+	Value* value = nullptr;
+	Value* ptr = nullptr;
+
+	assert(NodeBuffers.GetNode(node.RightID).Kind == NodeKind::IDENTIFIER);
+	const IDENTIFIER& right = NodeBuffers.GetNode(node.RightID).Identifier;
+	std::string MemberName(TokenBuffers.GetValue(right.IdentifierTokenID).ToStringView());
+
+	switch (NodeBuffers.GetNode(node.LeftID).Kind) {
+	case NodeKind::IDENTIFIER:
+	{
+		// Lookup this variable in the current function
+		const IDENTIFIER& left = NodeBuffers.GetNode(node.LeftID).Identifier;
+		std::string ObjectName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
+
+		ptr = NamedStructs::loadValueOfLocalOrGlobalStructMember(*this, ObjectName, MemberName, value);
+		break;
+	}
+
+	case NodeKind::MEMBER_ACCESS_EXPRESSION:
+	{
+		Value* ObjectPtr = nullptr;
+		Value* MemberValue = codegen(NodeBuffers.GetNode(node.LeftID).MemberAccessExpression, &ObjectPtr);
+		if (MemberValue != nullptr && ObjectPtr != nullptr) {
+			// then get the value of the object's member
+			value = MemberValue;
+			ptr = NamedStructs::loadValueOfLocalOrGlobalStructMember(*this, ObjectPtr, MemberName, value);
+		}
+		else {
+			assert(false);	// TBD: could not evaluate structure member
+		}
+		break;
+	}
+
+	default:
+		// TBD: unexpected left ID
+		assert(false);
+		break;
+	}
+
+	if (nullptr == ptr) {
+		// TBD: Unknown variable or member name
+		assert(false);
+	}
+	// in addition to the value, return a pointer to the object or the member
+	if (ObjectPtr != nullptr) {
+		*ObjectPtr = ptr;
+	}
+	return value;
+}
+
+
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& node) {
 	//
 	// identifier = expression
@@ -805,17 +839,53 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& no
 	case NodeKind::MEMBER_ACCESS_EXPRESSION:
 	{
 		const MEMBER_ACCESS_EXPRESSION& memberAccess = NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).MemberAccessExpression;
-		const IDENTIFIER& left = NodeBuffers.GetNode(memberAccess.LeftID).Identifier;
+
+		Value* structVariable = nullptr;
+		Value* structValue = nullptr;
+
 		const IDENTIFIER& right = NodeBuffers.GetNode(memberAccess.RightID).Identifier;
-		std::string StructName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
 		std::string MemberName(TokenBuffers.GetValue(right.IdentifierTokenID).ToStringView());
 
-		// now evaluate the expression by recursively calling codegen
-		result = codegen(node.ValueID);
+		const Node& leftNode = NodeBuffers.GetNode(memberAccess.LeftID);
+		if (leftNode.Kind == NodeKind::IDENTIFIER) {
+			const IDENTIFIER& left = leftNode.Identifier;
+			std::string StructName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
 
-		if (!NamedStructs::updateValueOfLocalOrGlobalStructMember(*this, StructName, MemberName, result)) {
-			// error updating the value of local or global variable
-			assert(false);
+			// Lookup this variable in the current function and load the previous value
+			// loading the previous value (which is a structure) gives us the details about the structure
+			structVariable = loadValueOfLocalOrGlobalVariable(StructName, structValue);
+			if (!structVariable) {
+				// TBD: Unknown variable name
+				assert(false);
+			}
+
+			// now evaluate the right-hand expression by recursively calling codegen
+			result = codegen(node.ValueID);
+
+			if (!NamedStructs::updateValueOfLocalOrGlobalStructMember(*this, structVariable, structValue, MemberName, result)) {
+				// error updating the value of local or global variable
+				assert(false);
+			}
+		}
+		else {
+			assert(leftNode.Kind == NodeKind::MEMBER_ACCESS_EXPRESSION);	// TBD: if it is not an identifier, it must be another member access
+
+			const MEMBER_ACCESS_EXPRESSION& left = leftNode.MemberAccessExpression;
+
+			// recursively call the same method till we get to the initial structure
+			Value* ObjectPtr = nullptr;
+			Value* MemberValue = codegen(left, &ObjectPtr);
+			if (MemberValue != nullptr && ObjectPtr != nullptr) {
+
+				// evaluate the right-hand expression by recursively calling codegen
+				result = codegen(node.ValueID);
+
+				// then set the value of the object's member
+				if (!NamedStructs::updateValueOfLocalOrGlobalStructMember(*this, ObjectPtr, MemberValue, MemberName, result)) {
+					// error updating the value of local or global object member
+					assert(false);
+				}
+			}
 		}
 
 		break;
