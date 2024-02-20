@@ -27,6 +27,7 @@ namespace AlloyCompiler
 			const AlloyCompiler::TokenBuffers& TokenBuffers,
 			AlloyCompiler::NodeID id);
 		static void addType(const std::string& AlloyType, llvm::Type* LLVMType) { alloyToLlvmMap[AlloyType] = LLVMType; }
+		static void clearAlloyToLlvmMap() { alloyToLlvmMap.clear(); }
 		static int CompareTypes(const llvm::Type* L, const llvm::Type* R);
 		static llvm::Type* MakeCompatible(llvm::Value*& L, llvm::Value*& R);
 

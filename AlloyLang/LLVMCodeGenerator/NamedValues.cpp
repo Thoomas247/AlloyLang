@@ -16,8 +16,8 @@ namespace AlloyCompiler
 			const std::string AlloyTypes[] = { "i64", "f32", "f64", "String" };
 			llvm::Type* LLVMTypes[] = {
 				llvm::Type::getInt64Ty(llvmContext),
-				llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::DoubleTyID),
-				llvm::Type::getPrimitiveType(llvmContext, llvm::Type::TypeID::DoubleTyID),
+				llvm::Type::getDoubleTy(llvmContext),
+				llvm::Type::getDoubleTy(llvmContext),
 				llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0)		// convert string to uint_8*
 			};
 
@@ -27,8 +27,6 @@ namespace AlloyCompiler
 			}
 		}
 	}
-
-	//			llvm::StructType::getTypeByName(llvmContext, "Vector3")					// this is how structure types should be added
 
 	CGNamedValues::~CGNamedValues() {
 	}

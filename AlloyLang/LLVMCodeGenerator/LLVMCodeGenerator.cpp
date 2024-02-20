@@ -54,7 +54,10 @@ LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuf
 }
 
 LLVMCodeGenerator::~LLVMCodeGenerator() {
-
+	// values in the satic map are linked to the LLVMContext
+	// we need to clear them when the context is destroyed 
+	// otherwise we cannot run multiple code generations in the same executable
+	CGNamedValues::clearAlloyToLlvmMap();
 }
 
 int LLVMCodeGenerator::Process(llvm::raw_ostream* llvmOutput /*= nullptr*/) {
@@ -334,7 +337,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::CONSTRUCTOR_EXPRESSION& n
 	// IDENTIFIER { ( IDENTIFIER = EXPRESSION ) { comma IDENTIFIER = EXPRESSION } } ;
 	//
 	//
-	Value* result = NamedStructs::getConstantStruct(*this,
+	Value* result = NamedStructs::getMutableStruct(*this,
 		node.StructIdentifierID,
 		node.MemberIdentifierIDs,
 		node.MemberValueIDs);
@@ -423,7 +426,13 @@ bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Na
 		// not a local variable, check the globals
 		GlobalVariable* gv = TheModule->getGlobalVariable(Name);
 		if (gv) {
-			gv->setInitializer((llvm::Constant*)Value);
+			if (isa<Constant>(Value)) {
+				gv->setInitializer(static_cast<Constant*>(Value));
+			}
+			else {
+				// need to convert initializer to constant
+				assert(false);
+			}
 			result = true;
 		}
 		else {

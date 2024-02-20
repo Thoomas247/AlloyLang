@@ -50,6 +50,7 @@ namespace unittests
 
 			// retrieve result and compare with expected data
 			std::string result = static_cast<redirect_stdout&>(llvm::outs()).buffer;
+			llvm::outs().flush();
 			Assert::AreEqual(expected, result);
 		}
 
@@ -126,6 +127,7 @@ namespace unittests
 
 				fn main () -> i64
 				{
+					var a : f32 = 32.0;
 					var test : Vector3 = 
 						Vector3 
 						{ 
@@ -139,17 +141,17 @@ namespace unittests
 						{
 							position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
 							rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
-							scale = Vector3 { x = 5.0, y = 6.0, z = 7.1 }
+							scale = test
 						};
 
 					test.z = 10.0;
 					test2.rotation.y = 20.0;
 
-					printf("result = %f", test2.rotation.y * test.z);
+					printf("result = %f", test.x * test2.scale.y);
 					return 0;
 				}
 			)";
-			std::string expected = "test.z = 200.000000";
+			std::string expected = "result = 2048.000000";
 
 			RunTest(TestStr, expected);
 		}
