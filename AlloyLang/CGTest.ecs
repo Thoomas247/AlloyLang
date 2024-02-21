@@ -1,4 +1,4 @@
-extern fn printf (const str : String, const param : f64) -> i64;
+extern fn printf (const str : String, const param : f32) -> i64;
 
 struct Vector3
 {
@@ -7,16 +7,36 @@ struct Vector3
 	var z : f32;
 }
 
+struct Transform
+{
+	var position : Vector3;
+	var rotation : Vector3;
+	var scale : Vector3;
+}
+
 fn main () -> i64
 {
+	var a : f32 = 32.0;
 	var test : Vector3 = 
 		Vector3 
 		{ 
-			x = 32.0, 
+			x = a, 
 			y = 64.0, 
 			z = 0.0 
 		};
-	// test.z = 10.0;
-	printf("test.z = %f", test.z);
+
+	var test2 : Transform = 
+		Transform
+		{
+			position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
+			rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
+			scale = test
+		};
+
+	test.z = 10.0;
+	test2.rotation.y = 20.0;
+
+	printf("result = %f", test.x * test2.scale.y);
 	return 0;
 }
+

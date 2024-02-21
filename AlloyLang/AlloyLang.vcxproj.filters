@@ -51,6 +51,9 @@
     <ClCompile Include="LLVMCodeGenerator\NamedStructs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LLVMCodeGenerator\NamedValues.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tokenizer\Tokenizer.hpp">

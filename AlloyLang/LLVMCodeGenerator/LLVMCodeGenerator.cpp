@@ -19,7 +19,7 @@ LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuf
 	Builder = std::make_unique<IRBuilder<>>(*TheContext);
 
 	// tree of named values that is passed around the code generator
-	RootNamedValues = std::make_unique<CGNamedValues>();
+	RootNamedValues = std::make_unique<CGNamedValues>(*TheContext);
 	NamedValues = std::move(RootNamedValues);
 
 #ifndef NO_CODE_OPTIMIZATION
@@ -54,7 +54,10 @@ LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuf
 }
 
 LLVMCodeGenerator::~LLVMCodeGenerator() {
-
+	// values in the satic map are linked to the LLVMContext
+	// we need to clear them when the context is destroyed 
+	// otherwise we cannot run multiple code generations in the same executable
+	CGNamedValues::clearAlloyToLlvmMap();
 }
 
 int LLVMCodeGenerator::Process(llvm::raw_ostream* llvmOutput /*= nullptr*/) {
@@ -315,8 +318,16 @@ Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
 
 	// now create the structure type in llvm
 	llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);
+	if (nullptr != structType) {
 
-	result = (structType != nullptr ? ConstantInt::getTrue(*TheContext) : ConstantInt::getFalse(*TheContext));
+		// add the newly created type tot he AlloyToLLVM map
+		CGNamedValues::addType(Name, StructType::getTypeByName(*TheContext, Name));
+		result = ConstantInt::getTrue(*TheContext);
+
+	}
+	else {
+		result = ConstantInt::getFalse(*TheContext);
+	}
 
 	return result;
 }
@@ -326,7 +337,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::CONSTRUCTOR_EXPRESSION& n
 	// IDENTIFIER { ( IDENTIFIER = EXPRESSION ) { comma IDENTIFIER = EXPRESSION } } ;
 	//
 	//
-	Value* result = NamedStructs::getConstantStruct(*this,
+	Value* result = NamedStructs::getMutableStruct(*this,
 		node.StructIdentifierID,
 		node.MemberIdentifierIDs,
 		node.MemberValueIDs);
@@ -361,8 +372,14 @@ Value* LLVMCodeGenerator::codegen(const VALUE_DEFINITION_EXPRESSION& node) {
 		gv->setDSOLocal(true);
 
 		// currently assuming the initializer is constant
-		Constant* ptr_2 = static_cast<Constant*>(value);
-		gv->setInitializer(ptr_2);
+		if (isa<Constant>(value)) {
+			Constant* ptr_2 = static_cast<Constant*>(value);
+			gv->setInitializer(ptr_2);
+		}
+		else {
+			// TBD: should convert value to constant
+			assert(false);
+		}
 	}
 	else {
 		// add the variable to the end of the insertion block (e.g. function local variables)
@@ -393,28 +410,6 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IDENTIFIER& node) {
 	return value;
 }
 
-Value* LLVMCodeGenerator::codegen(const AlloyCompiler::MEMBER_ACCESS_EXPRESSION& node) {
-	//
-	// return the value of a single member of a local or global struct variable
-	// 
-	// Lookup this variable in the current function
-	const IDENTIFIER& left = NodeBuffers.GetNode(node.LeftID).Identifier;
-	std::string StructName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
-
-	const IDENTIFIER& right = NodeBuffers.GetNode(node.RightID).Identifier;
-	std::string MemberName(TokenBuffers.GetValue(right.IdentifierTokenID).ToStringView());
-
-	Value* value = nullptr;
-	if (!NamedStructs::loadValueOfLocalOrGlobalStructMember(*this, StructName, MemberName, value)) {
-		// TBD: LogErrorV("Unknown variable or member name");
-		assert(false);
-	}
-
-	return value;
-
-}
-
-
 bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Name, Value* Value) {
 	//
 	// update the value of a local or global variable
@@ -431,7 +426,13 @@ bool LLVMCodeGenerator::updateValueOfLocalOrGlobalVariable(const std::string& Na
 		// not a local variable, check the globals
 		GlobalVariable* gv = TheModule->getGlobalVariable(Name);
 		if (gv) {
-			gv->setInitializer((llvm::Constant*)Value);
+			if (isa<Constant>(Value)) {
+				gv->setInitializer(static_cast<Constant*>(Value));
+			}
+			else {
+				// need to convert initializer to constant
+				assert(false);
+			}
 			result = true;
 		}
 		else {
@@ -465,7 +466,7 @@ Value* LLVMCodeGenerator::loadValueOfLocalOrGlobalVariable(const std::string& Na
 			ptr = gv;
 		}
 		else {
-			// TBD: LogErrorV("Unknown variable name");
+			// TBD: Unknown variable name
 			assert(false);
 		}
 	}
@@ -703,7 +704,7 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	}
 
 	// create a new local names map for the function body
-	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
+	NamedValues = std::make_unique<CGNamedValues>(*TheContext, std::move(NamedValues));
 
 	ConstantInt* retval = static_cast<ConstantInt*>(codegen(node.BodyID));
 
@@ -737,12 +738,15 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 	Value* result = ConstantInt::getTrue(*TheContext);
 
 	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
-	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
+	NamedValues = std::make_unique<CGNamedValues>(*TheContext, std::move(NamedValues));
 
 	for (const NodeID& S : node.StatementIDs) {
 
-		ConstantInt* stmtResult = static_cast<ConstantInt*>(codegen(S));
-		if (stmtResult == nullptr || stmtResult->isZero()) {
+		Value* stmtResult = codegen(S);
+		if (stmtResult == nullptr 
+			|| !isa<ConstantInt>(stmtResult) 
+			|| static_cast<ConstantInt *>(stmtResult)->isZero()
+			) {
 			assert(false);
 			result = ConstantInt::getFalse(*TheContext);
 			break;
@@ -760,6 +764,62 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::BLOCK_STATEMENT& node) {
 
 	return result;
 }
+
+Value* LLVMCodeGenerator::codegen(const AlloyCompiler::MEMBER_ACCESS_EXPRESSION& node, Value** ObjectPtr /*= nullptr*/) {
+	//
+	// return the value of a single member of a local or global struct variable
+	// 
+
+	Value* value = nullptr;
+	Value* ptr = nullptr;
+
+	assert(NodeBuffers.GetNode(node.RightID).Kind == NodeKind::IDENTIFIER);
+	const IDENTIFIER& right = NodeBuffers.GetNode(node.RightID).Identifier;
+	std::string MemberName(TokenBuffers.GetValue(right.IdentifierTokenID).ToStringView());
+
+	switch (NodeBuffers.GetNode(node.LeftID).Kind) {
+	case NodeKind::IDENTIFIER:
+	{
+		// Lookup this variable in the current function
+		const IDENTIFIER& left = NodeBuffers.GetNode(node.LeftID).Identifier;
+		std::string ObjectName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
+
+		ptr = NamedStructs::loadValueOfLocalOrGlobalStructMember(*this, ObjectName, MemberName, value);
+		break;
+	}
+
+	case NodeKind::MEMBER_ACCESS_EXPRESSION:
+	{
+		Value* ObjectPtr = nullptr;
+		Value* MemberValue = codegen(NodeBuffers.GetNode(node.LeftID).MemberAccessExpression, &ObjectPtr);
+		if (MemberValue != nullptr && ObjectPtr != nullptr) {
+			// then get the value of the object's member
+			value = MemberValue;
+			ptr = NamedStructs::loadValueOfLocalOrGlobalStructMember(*this, ObjectPtr, MemberName, value);
+		}
+		else {
+			assert(false);	// TBD: could not evaluate structure member
+		}
+		break;
+	}
+
+	default:
+		// TBD: unexpected left ID
+		assert(false);
+		break;
+	}
+
+	if (nullptr == ptr) {
+		// TBD: Unknown variable or member name
+		assert(false);
+	}
+	// in addition to the value, return a pointer to the object or the member
+	if (ObjectPtr != nullptr) {
+		*ObjectPtr = ptr;
+	}
+	return value;
+}
+
 
 Value* LLVMCodeGenerator::codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& node) {
 	//
@@ -788,17 +848,53 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::ASSIGNMENT_EXPRESSION& no
 	case NodeKind::MEMBER_ACCESS_EXPRESSION:
 	{
 		const MEMBER_ACCESS_EXPRESSION& memberAccess = NodeBuffers.GetNode(node.IdentifierOrMemberAccessID).MemberAccessExpression;
-		const IDENTIFIER& left = NodeBuffers.GetNode(memberAccess.LeftID).Identifier;
+
+		Value* structVariable = nullptr;
+		Value* structValue = nullptr;
+
 		const IDENTIFIER& right = NodeBuffers.GetNode(memberAccess.RightID).Identifier;
-		std::string StructName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
 		std::string MemberName(TokenBuffers.GetValue(right.IdentifierTokenID).ToStringView());
 
-		// now evaluate the expression by recursively calling codegen
-		result = codegen(node.ValueID);
+		const Node& leftNode = NodeBuffers.GetNode(memberAccess.LeftID);
+		if (leftNode.Kind == NodeKind::IDENTIFIER) {
+			const IDENTIFIER& left = leftNode.Identifier;
+			std::string StructName(TokenBuffers.GetValue(left.IdentifierTokenID).ToStringView());
 
-		if (!NamedStructs::updateValueOfLocalOrGlobalStructMember(*this, StructName, MemberName, result)) {
-			// error updating the value of local or global variable
-			assert(false);
+			// Lookup this variable in the current function and load the previous value
+			// loading the previous value (which is a structure) gives us the details about the structure
+			structVariable = loadValueOfLocalOrGlobalVariable(StructName, structValue);
+			if (!structVariable) {
+				// TBD: Unknown variable name
+				assert(false);
+			}
+
+			// now evaluate the right-hand expression by recursively calling codegen
+			result = codegen(node.ValueID);
+
+			if (!NamedStructs::updateValueOfLocalOrGlobalStructMember(*this, structVariable, structValue, MemberName, result)) {
+				// error updating the value of local or global variable
+				assert(false);
+			}
+		}
+		else {
+			assert(leftNode.Kind == NodeKind::MEMBER_ACCESS_EXPRESSION);	// TBD: if it is not an identifier, it must be another member access
+
+			const MEMBER_ACCESS_EXPRESSION& left = leftNode.MemberAccessExpression;
+
+			// recursively call the same method till we get to the initial structure
+			Value* ObjectPtr = nullptr;
+			Value* MemberValue = codegen(left, &ObjectPtr);
+			if (MemberValue != nullptr && ObjectPtr != nullptr) {
+
+				// evaluate the right-hand expression by recursively calling codegen
+				result = codegen(node.ValueID);
+
+				// then set the value of the object's member
+				if (!NamedStructs::updateValueOfLocalOrGlobalStructMember(*this, ObjectPtr, MemberValue, MemberName, result)) {
+					// error updating the value of local or global object member
+					assert(false);
+				}
+			}
 		}
 
 		break;
@@ -881,8 +977,11 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 
 	// Emit then statements
 	Builder->SetInsertPoint(ThenBB);
-	ConstantInt* ThenV = static_cast<ConstantInt*>(codegen(node.BodyID));
-	if (ThenV == nullptr || ThenV->isZero()) {
+	Value* ThenV = codegen(node.BodyID);
+	if (ThenV == nullptr
+		|| !isa<ConstantInt>(ThenV)
+		|| static_cast<ConstantInt*>(ThenV)->isZero()
+		) {
 		assert(false);
 		return result;
 	}
@@ -892,7 +991,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	ThenBB = Builder->GetInsertBlock();
 
 	// Emit else block if any
-	ConstantInt* ElseV = nullptr;
+	Value* ElseV = nullptr;
 	if (ElseBB) {
 		TheFunction->insert(TheFunction->end(), ElseBB);
 		Builder->SetInsertPoint(ElseBB);
@@ -901,8 +1000,11 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 			result = ConstantInt::getTrue(*TheContext);;
 		}
 		else {
-			ElseV = static_cast<ConstantInt*>(codegen(node.ElseID));
-			if (ElseV == nullptr || ElseV->isZero()) {
+			ElseV = codegen(node.ElseID);
+			if (ElseV == nullptr
+				|| !isa<ConstantInt>(ElseV)
+				|| static_cast<ConstantInt*>(ElseV)->isZero()
+				) {
 				assert(false);
 				return result;
 			}
@@ -918,14 +1020,6 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	TheFunction->insert(TheFunction->end(), MergeBB);
 	Builder->SetInsertPoint(MergeBB);
 
-	/* Note: This call will assert if SDL checks are enabled in Visual Studio as per this article :
-	// https://stackoverflow.com/questions/34892732/error-when-call-createphi-in-llvm
-	// Need to disable SDL checks for this code to run
-	PHINode* PN = Builder->CreatePHI(Type::getDoubleTy(*TheContext), 2, "iftmp");
-
-	PN->addIncoming(ThenV, ThenBB);
-	PN->addIncoming(ElseV, ElseBB);
-	*/
 	result = ConstantInt::getTrue(*TheContext);
 	return result;
 }
@@ -966,7 +1060,7 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	}
 
 	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
-	NamedValues = std::make_unique<CGNamedValues>(std::move(NamedValues));
+	NamedValues = std::make_unique<CGNamedValues>(*TheContext, std::move(NamedValues));
 
 	// Emit the start code first if any.
 	if (ERROR_NODE_ID != node.InitExpressionID) {
@@ -993,8 +1087,12 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	// Emit the body of the loop.  This, like any other expr, can change the
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
-	result = static_cast<ConstantInt*>(codegen(node.BodyID));
-	if (nullptr == result || result->isZero()) {
+	Value* stmtResult = codegen(node.BodyID);
+	result = static_cast<ConstantInt*>(stmtResult);
+	if (nullptr == stmtResult
+		|| !isa<ConstantInt>(stmtResult)
+		|| result->isZero()
+		) {
 		assert(false);
 		return result;
 	}

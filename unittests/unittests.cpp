@@ -34,6 +34,26 @@ namespace unittests
 
 	TEST_CLASS(LLVMCodeGeneratorUnitTests)
 	{
+	private:
+		void RunTest(const std::string code, const std::string expected) {
+
+			Source	src(code);
+			TokenBuffers tokenBuffers = Tokenize(src);
+			auto nodeBuffers = Parse(tokenBuffers);
+			LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
+
+			// suppress output to out.ll file
+			codegen.Process(&llvm::nulls());
+
+			// interpret and execute resulting code
+			codegen.Execute();
+
+			// retrieve result and compare with expected data
+			std::string result = static_cast<redirect_stdout&>(llvm::outs()).buffer;
+			llvm::outs().flush();
+			Assert::AreEqual(expected, result);
+		}
+
 	public:
 		
 		TEST_METHOD(IfStatements)
@@ -58,21 +78,7 @@ namespace unittests
 				}
 			)";
 			std::string expected = "3 x 5 = 15";
-
-			Source	src(TestStr);
-			TokenBuffers tokenBuffers = Tokenize(src);
-			auto nodeBuffers = Parse(tokenBuffers);
-			LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
-
-			// suppress output to out.ll file
-			codegen.Process(&llvm::nulls());
-
-			// interpret and execute resulting code
-			codegen.Execute();
-
-			// retrieve result and compare with expected data
-			std::string result = static_cast<redirect_stdout &>(llvm::outs()).buffer;
-			Assert::AreEqual(expected, result);
+			RunTest(TestStr, expected);
 		}
 
 		TEST_METHOD(ForLoop)
@@ -97,20 +103,57 @@ namespace unittests
 			)";
 			std::string expected = "3 x 5 = 15";
 
-			Source	src(TestStr);
-			TokenBuffers tokenBuffers = Tokenize(src);
-			auto nodeBuffers = Parse(tokenBuffers);
-			LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
+			RunTest(TestStr, expected);
+		}
 
-			// suppress output to out.ll file
-			codegen.Process(&llvm::nulls());
+		TEST_METHOD(Structures)
+		{
+			constexpr auto TestStr = R"(
+				extern fn printf (const str : String, const param : f32) -> i64;
 
-			// interpret and execute resulting code
-			codegen.Execute();
+				struct Vector3
+				{
+					var x : f32;
+					var y : f32;
+					var z : f32;
+				}
 
-			// retrieve result and compare with expected data
-			std::string result = static_cast<redirect_stdout&>(llvm::outs()).buffer;
-			Assert::AreEqual(expected, result);
+				struct Transform
+				{
+					var position : Vector3;
+					var rotation : Vector3;
+					var scale : Vector3;
+				}
+
+				fn main () -> i64
+				{
+					var a : f32 = 32.0;
+					var test : Vector3 = 
+						Vector3 
+						{ 
+							x = 32.0, 
+							y = 64.0, 
+							z = 0.0 
+						};
+
+					var test2 : Transform = 
+						Transform
+						{
+							position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
+							rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
+							scale = test
+						};
+
+					test.z = 10.0;
+					test2.rotation.y = 20.0;
+
+					printf("result = %f", test.x * test2.scale.y);
+					return 0;
+				}
+			)";
+			std::string expected = "result = 2048.000000";
+
+			RunTest(TestStr, expected);
 		}
 	};
 }
