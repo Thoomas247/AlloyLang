@@ -314,6 +314,11 @@ namespace AlloyCompiler
 		/// </summary>
 		const Location& GetLocation(TokenID id) const;
 
+		/// <summary>
+		/// Returns the string value of the line starting at the given character index.
+		/// </summary>
+		std::string_view GetLine(size_t startIndex) const;
+
 	private:
 		const Source& m_Source;
 
