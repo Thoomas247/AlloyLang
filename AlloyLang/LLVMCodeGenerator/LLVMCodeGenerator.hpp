@@ -26,7 +26,7 @@ namespace AlloyCompiler
 		// generate the LLVM intermediate code (IR)
 		int Process(llvm::raw_ostream* llvmOutput = nullptr);
 		// execute generated code
-		int Execute();
+		int Execute(const std::string& EntryMethodName, bool useInterpreter = false);
 
 		LLVMContext& getContext() { return *TheContext; }
 		llvm::Module& getModule() { return *TheModule; }
@@ -76,6 +76,7 @@ namespace AlloyCompiler
 		Value* codegen(const FUNCTION_CALL_EXPRESSION& node);
 		Value* codegen(const IF_STATEMENT& node);
 		Value* codegen(const FOR_LOOP_STATEMENT& node);
+		Value* codegen(const WHILE_LOOP_STATEMENT& node);
 		Value* codegen(const ASSIGNMENT_EXPRESSION& node);
 		Value* codegen(const RETURN_STATEMENT& node);
 		Value* codegen(const STRUCT_DEFINITION& node);

@@ -4,6 +4,9 @@
 #include "NamedStructs.hpp"
 
 using namespace llvm;
+#ifndef NO_CODE_EXECUTION
+using namespace llvm::orc;
+#endif
 
 namespace AlloyCompiler
 {
@@ -35,7 +38,7 @@ LLVMCodeGenerator::LLVMCodeGenerator(const AlloyCompiler::TokenBuffers& tokenBuf
 		/*DebugLogging*/ true);
 	TheSI->registerCallbacks(*ThePIC, TheMAM.get());
 
-	// Add transform passes.
+	// Add transform passes
 	// Do simple "peephole" optimizations and bit-twiddling optzns.
 	TheFPM->addPass(InstCombinePass());
 	// Reassociate expressions.
@@ -77,31 +80,55 @@ int LLVMCodeGenerator::Process(llvm::raw_ostream* llvmOutput /*= nullptr*/) {
 	}
 	else {
 		std::error_code EC;
-		raw_fd_ostream out("out.ll", EC);
+		raw_fd_ostream out("c:\\temp\\out.ll", EC);
 		TheModule->print(out, nullptr);
 	}
 	return result;
 }
 
-int LLVMCodeGenerator::Execute() {
+int LLVMCodeGenerator::Execute(const std::string& MethodName, bool useInterpreter /*= false*/) {
 	//
 	// execute generated code
 	//
+	int result = 0;
+
 #ifndef NO_CODE_EXECUTION
 	InitializeNativeTarget();
-	ExecutionEngine* executionEngine = EngineBuilder(std::move(TheModule)).setEngineKind(llvm::EngineKind::Interpreter).create();
-	if (executionEngine) {
-		executionEngine->DisableLazyCompilation();
-		Function* main = executionEngine->FindFunctionNamed(StringRef("main"));
-		auto result = executionEngine->runFunction(main, {});
-		delete executionEngine;
+	LLVMInitializeNativeAsmPrinter();
+
+	if (!useInterpreter) {
+
+		// using the recommended LLJIT engine to execute the code
+		ExitOnError ExitOnErr;
+
+		// Create an LLJIT instance
+		auto J = ExitOnErr(LLJITBuilder().create());
+		ExitOnErr(J->addIRModule(ThreadSafeModule(std::move(TheModule), std::move(TheContext))));
+
+		// Look up the JIT'd function, cast it to a function pointer, then call it.
+		auto MainAddr = ExitOnErr(J->lookup(MethodName));
+		int (*main)() = MainAddr.toPtr<int()>();
+		result = main();
+
 	}
 	else {
-		assert(false);	// could not instantiate execution engine
+		EngineBuilder	engineBuilder(std::move(TheModule));
+		std::string		err;
+		engineBuilder.setEngineKind(llvm::EngineKind::Interpreter).setErrorStr(&err);
+		ExecutionEngine* executionEngine = engineBuilder.create();
+		if (executionEngine) {
+			executionEngine->finalizeObject();
+			Function* main = executionEngine->FindFunctionNamed(MethodName);
+			auto ret = executionEngine->runFunction(main, {});
+			delete executionEngine;
+			result = (int)ret.IntVal.getSExtValue();
+		}
+		else {
+			assert(false);	// could not instantiate execution engine
+		}
 	}
-
 #endif // NO_CODE_EXECUTION
-	return 0;
+	return result;
 }
 
 Value* LLVMCodeGenerator::codegen(const Node& node) {
@@ -183,7 +210,7 @@ Value* LLVMCodeGenerator::codegen(const Node& node) {
 		break;
 
 	case NodeKind::WHILE_LOOP_STATEMENT:			// while ENCLOSED_EXPRESSION STATEMENT;
-		assert(false);	// To be implemented
+		result = codegen(node.WhileLoopStatement);
 		break;
 
 	case NodeKind::VALUE_DEFINITION_STATEMENT:		// VALUE_DEFINITION_EXPRESSION semicolon;
@@ -501,7 +528,7 @@ Value* LLVMCodeGenerator::codegen(const BINARY_EXPRESSION& node) {
 				// example for handling both integer and floating additions
 				result = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateAdd(L, R, "addtmp") : Builder->CreateFAdd(L, R, "addtmp"));
 			else if (op == "-")
-				result = Builder->CreateFSub(L, R, "subtmp");
+				result = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateSub(L, R, "subtmp") : Builder->CreateFSub(L, R, "subtmp"));
 			else if (op == "*")
 				// example for handling both integer and floating multiplications
 				result = (operandType->getTypeID() == Type::TypeID::IntegerTyID ? Builder->CreateMul(L, R, "multmp") : Builder->CreateFMul(L, R, "multmp"));
@@ -625,9 +652,15 @@ Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, co
 		ParamTypes.push_back(type);
 	}
 
-	// now convert the return type to llvm
-	const TYPE_DECLARATION& td = NodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
-	Type* returnType = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, td.IdentifierOrTypeIdentifierID);
+	// now convert the return type (if any) to llvm
+	Type* returnType = nullptr;
+	if (node.ReturnTypeID != ERROR_NODE_ID) {
+		const TYPE_DECLARATION& td = NodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
+		returnType = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, td.IdentifierOrTypeIdentifierID);
+	}
+	else {
+		returnType = Type::getVoidTy(*TheContext);
+	}
 
 	// Make the function type: return type(param type, param type, ...)
 	// TBD: the last parameter should be true only for variable number of parmeters (e.g. printf), currently assuming all functions are variable parameters
@@ -707,6 +740,14 @@ Function* LLVMCodeGenerator::codegen(const AlloyCompiler::FUNCTION_DEFINITION& n
 	NamedValues = std::make_unique<CGNamedValues>(*TheContext, std::move(NamedValues));
 
 	ConstantInt* retval = static_cast<ConstantInt*>(codegen(node.BodyID));
+
+	// if there is no return instruction before the end of a function, llvm generates an error
+	// e.g.: fn main() -> i64 { if (1.0 == 1.0) return 1; else return 0; } generates at the end of main: ifcont: } which is an error 
+	// even if we are actually returning a value
+	if (BB->getTerminator() == nullptr
+		|| !isa<ReturnInst>(BB->getTerminator())) {
+		// TBI: tricky situation, we cannot force a return instruction because we might be returning an unintended value
+	}
 
 	if (retval && retval->isOne()) {
 		// Validate the generated code, checking for consistency.
@@ -956,8 +997,14 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 		return result;
 	}
 
-	// Convert condition to a bool by comparing non-equal to 0.0.
-	CondV = Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
+	// Convert condition to a bool by comparing non-equal to 0
+	// TBI: extend to all possible data types
+	if (CondV->getType()->getTypeID() == Type::TypeID::IntegerTyID) {
+		CondV = Builder->CreateICmpEQ(CondV, ConstantInt::get(*TheContext, APInt(64, 0)), "ifcond");
+	}
+	else {
+		CondV = Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0)), "ifcond");
+	}
 
 	// we are supposed to be inside a function, otherwise this is going to fail
 	Function* TheFunction = Builder->GetInsertBlock()->getParent();
@@ -987,8 +1034,6 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	}
 
 	Builder->CreateBr(MergeBB);
-	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-	ThenBB = Builder->GetInsertBlock();
 
 	// Emit else block if any
 	Value* ElseV = nullptr;
@@ -1012,9 +1057,6 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::IF_STATEMENT& node) {
 	}
 
 	Builder->CreateBr(MergeBB);
-
-	// codegen of 'Else' can change the current block, update ElseBB for the PHI.
-	ElseBB = Builder->GetInsertBlock();
 
 	// Emit merge block.
 	TheFunction->insert(TheFunction->end(), MergeBB);
@@ -1078,7 +1120,8 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	// Make the new basic block for the loop header, inserting after current block.
 	BasicBlock* LoopBB = BasicBlock::Create(*TheContext, "loop", TheFunction);
 
-	// Insert an explicit fall through from the current block to the LoopBB.
+	// Insert an explicit fall through from the current block to the LoopBB
+	// (why is this needed is an LLVM mystery)
 	Builder->CreateBr(LoopBB);
 
 	// Start insertion in LoopBB.
@@ -1137,6 +1180,95 @@ Value* LLVMCodeGenerator::codegen(const AlloyCompiler::FOR_LOOP_STATEMENT& node)
 	Builder->SetInsertPoint(AfterBB);
 
 	// for expr always returns nullptr
+	return result;
+}
+
+Value* LLVMCodeGenerator::codegen(const WHILE_LOOP_STATEMENT& node) {
+	//
+	// while (expression) statement;
+	//
+	// Output while-loop as:
+	// goto loop
+	// loop:
+	// endcond = condexpr
+	// br endcond, bodyloop, outloop
+	// bodyloop:
+	// ...
+	// bodystmts
+	// ...
+	// goto loop
+	// outloop:
+	//
+	ConstantInt* result = ConstantInt::getFalse(*TheContext);
+
+	// we are supposed to be inside a function, otherwise this is going to fail
+	Function* TheFunction = Builder->GetInsertBlock()->getParent();
+	if (!TheFunction) {
+		// not inside a function or something missing in the codegen of the function
+		assert(false);
+		return result;
+	}
+
+	// create a new local names map for each block statement, any variables declared inside the block are limited to this scope
+	NamedValues = std::make_unique<CGNamedValues>(*TheContext, std::move(NamedValues));
+
+	// Make the new basic block for the loop header, inserting after current block.
+	BasicBlock* LoopBB = BasicBlock::Create(*TheContext, "loop", TheFunction);
+
+	// Insert an explicit fall through from the current block to the LoopBB
+	// (why is this needed is an LLVM mystery)
+	Builder->CreateBr(LoopBB);
+
+	// Start insertion in LoopBB.
+	Builder->SetInsertPoint(LoopBB);
+
+	// Compute the end condition
+	Value* EndCond = codegen(node.ConditionExpressionID);
+	if (!EndCond) {
+		// error evaluating end expression
+		assert(false);
+
+		// restore the named values of the higher level
+		NamedValues = std::move(NamedValues->getParent());
+
+		return result;
+	}
+
+	// Convert condition to a bool by comparing non-equal to 0.0.
+	EndCond = Builder->CreateFCmpONE(EndCond, ConstantFP::get(*TheContext, APFloat(0.0)), "loopcond");
+
+	// Create the "body loop" block
+	BasicBlock* BodyBB = BasicBlock::Create(*TheContext, "bodyloop", TheFunction);
+
+	// Create the "out loop" block
+	BasicBlock* OutBB = BasicBlock::Create(*TheContext, "outloop", TheFunction);
+
+	// Insert the conditional branch
+	Builder->CreateCondBr(EndCond, BodyBB, OutBB);
+
+	// Any new code will be inserted in BodyBB
+	Builder->SetInsertPoint(BodyBB);
+
+	// Emit the body of the loop.  This, like any other expr, can change the
+	// current BB.  Note that we ignore the value computed by the body, but don't
+	// allow an error.
+	Value* stmtResult = codegen(node.BodyID);
+	result = static_cast<ConstantInt*>(stmtResult);
+	if (nullptr == stmtResult
+		|| !isa<ConstantInt>(stmtResult)
+		|| result->isZero()
+		) {
+		assert(false);
+		return result;
+	}
+
+	// Unconditional branch to start of loop
+	Builder->CreateBr(LoopBB);
+
+	// Any new code will be inserted in OutBB.
+	Builder->SetInsertPoint(OutBB);
+
+	// while expr always returns nullptr
 	return result;
 }
 

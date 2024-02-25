@@ -33,6 +33,7 @@
 
 #ifndef NO_CODE_EXECUTION
 #include "llvm/ExecutionEngine/Interpreter.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #endif	// NO_CODE_EXECUTION

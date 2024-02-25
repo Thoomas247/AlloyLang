@@ -13,8 +13,9 @@ namespace AlloyCompiler
 
 		// first call, prefill static map with know types
 		if (alloyToLlvmMap.size() == 0) {
-			const std::string AlloyTypes[] = { "i64", "f32", "f64", "String" };
+			const std::string AlloyTypes[] = { "i32", "i64", "f32", "f64", "String" };
 			llvm::Type* LLVMTypes[] = {
+				llvm::Type::getInt32Ty(llvmContext),
 				llvm::Type::getInt64Ty(llvmContext),
 				llvm::Type::getDoubleTy(llvmContext),
 				llvm::Type::getDoubleTy(llvmContext),

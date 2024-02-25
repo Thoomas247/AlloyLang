@@ -35,7 +35,7 @@ namespace unittests
 	TEST_CLASS(LLVMCodeGeneratorUnitTests)
 	{
 	private:
-		void RunTest(const std::string code, const std::string expected) {
+		void RunTest(const std::string code, int expected) {
 
 			Source	src(code);
 			TokenBuffers tokenBuffers = Tokenize(src);
@@ -46,16 +46,35 @@ namespace unittests
 			codegen.Process(&llvm::nulls());
 
 			// interpret and execute resulting code
-			codegen.Execute();
+ 			int result = codegen.Execute("main", false);
 
+#if 0
 			// retrieve result and compare with expected data
+			// this only works for the interpreter and not for JIT which we are using for unit testing
 			std::string result = static_cast<redirect_stdout&>(llvm::outs()).buffer;
 			llvm::outs().flush();
+#endif
+
 			Assert::AreEqual(expected, result);
 		}
 
 	public:
 		
+		TEST_METHOD(BasicTest)
+		{
+			constexpr auto TestStr = R"(
+				extern fn printf (const str : String) -> i32;
+
+				fn main () -> i32
+				{
+					printf("Basic");
+					return 1;
+				}
+			)";
+			std::string expected_ = "Basic";
+			RunTest(TestStr, 1);
+		}
+
 		TEST_METHOD(IfStatements)
 		{
 			constexpr auto TestStr = R"(
@@ -74,11 +93,11 @@ namespace unittests
 				fn main () -> i64
 				{
 					printf("3 x 5 = %d", mul(3, 5));
-					return 0;
+					return mul(3, 5);
 				}
 			)";
 			std::string expected = "3 x 5 = 15";
-			RunTest(TestStr, expected);
+			RunTest(TestStr, 15);
 		}
 
 		TEST_METHOD(ForLoop)
@@ -98,12 +117,37 @@ namespace unittests
 				fn main () -> i64
 				{
 					printf("3 x 5 = %d", mul(3, 5));
-					return 0;
+					return mul(3, 5);
 				}
 			)";
 			std::string expected = "3 x 5 = 15";
 
-			RunTest(TestStr, expected);
+			RunTest(TestStr, 15);
+		}
+
+		TEST_METHOD(WhileLoop)
+		{
+			constexpr auto TestStr = R"(
+				extern fn printf (const str : String, const param : i64) -> i64;
+
+				fn main () -> i64
+				{
+					var a : i64 = 4;
+					var i : i64 = 0;
+					var res : i64 = 2;
+					while (i < a)
+					{
+						res = res * res;
+						i = i + 1;
+					}
+					printf("2 ^ 16 = %d", res);
+					return res;
+				}
+	
+			)";
+			std::string expected = "2 ^ 16 = 65536";
+
+			RunTest(TestStr, 65536);
 		}
 
 		TEST_METHOD(Structures)
@@ -128,6 +172,7 @@ namespace unittests
 				fn main () -> i64
 				{
 					var a : f32 = 32.0;
+					var result : i64 = 0;
 					var test : Vector3 = 
 						Vector3 
 						{ 
@@ -148,16 +193,22 @@ namespace unittests
 					test2.rotation.y = 20.0;
 
 					printf("result = %f", test.x * test2.scale.y);
-					return 0;
+					if (test.x * test2.scale.y == 2048.0)
+						result = 1;
+					else
+						result = 0;
+					return result;
 				}
 			)";
 			std::string expected = "result = 2048.000000";
 
-			RunTest(TestStr, expected);
+			RunTest(TestStr, 1);
 		}
 	};
 }
 
+#if 0
+// this is not needed as we are using the JIT instead of the interpreter for testing
 // replace the default implementation of llvm::outs() in order to redirect stdout to our buffer
 // requires linker option /FORCE:MULTIPLE
 namespace llvm
@@ -167,3 +218,4 @@ namespace llvm
 		return S;
 	}
 }
+#endif
