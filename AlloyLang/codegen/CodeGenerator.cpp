@@ -68,82 +68,55 @@ namespace AlloyCompiler
 		}
 	};
 
-	/// <summary>
-	/// Creates an alloca instruction in the given block.
-	/// </summary>
-	llvm::AllocaInst* createAlloca(llvm::BasicBlock* block, const std::string_view& varName, llvm::Type* type)
+	std::string unescapeString(const AlloyCompiler::SmallStringView& str)
 	{
-		llvm::IRBuilder<> tempBuilder(block, block->begin());
+		static const std::unordered_map<char, char> escapeCharacterMap =
+		{
+			{ 'n',	'\n' },
+			{ 'r',	'\r' },
+			{ 't',	'\t' },
+			{ 'v',	'\v' },
+			{ '\\', '\\' },
+			{ '\'', '\'' },
+			{ '\"', '\"' },
+			{ '0',	'\0' },
+			{ 's',	' ' }
+		};
 
-		return tempBuilder.CreateAlloca(type, nullptr, varName);
+		std::string result;
+		result.reserve(str.Size());
+
+		for (size_t i = 0; i < str.Size(); i++)
+		{
+			char c = str[i];
+
+			if (c == '\\' && i + 1 < str.Size())
+			{
+				i++;
+
+				auto it = escapeCharacterMap.find(str[i]);
+
+				if (it != escapeCharacterMap.end())
+				{
+					c = it->second;
+				}
+
+				else
+				{
+					continue;	// TODO: log error?
+				}
+			}
+
+			result.push_back(c);
+		}
+
+		return result;
 	}
 
-	llvm::Type* typeIdentifierToLLVMType(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string& varName, llvm::Type* type)
 	{
-		const TYPE_IDENTIFIER& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
-
-		const Node& identifierOrTypeIdentifierNode = nodeBuffers.GetNode(typeIdentifierNode.TypeIdentifierID);
-
-		// handle array types
-		if (typeIdentifierNode.ArraySizeID != ERROR_NODE_ID)
-		{
-			const LITERAL& arraySizeNode = nodeBuffers.GetNode(typeIdentifierNode.ArraySizeID).Literal;
-			const SmallStringView& arraySizeStringView = tokenBuffers.GetValue(arraySizeNode.InfoTokenID);
-
-			uint64_t arraySize;
-			std::from_chars(arraySizeStringView.Data(), arraySizeStringView.Data() + arraySizeStringView.Size(), arraySize);
-
-			if (arraySize < 2)
-			{
-				// TODO: log error
-				return nullptr;
-			}
-
-			llvm::Type* elementType = nullptr;
-
-			// handle array within array
-			if (identifierOrTypeIdentifierNode.Kind == NodeKind::TYPE_IDENTIFIER)
-			{
-				elementType = typeIdentifierToLLVMType(tokenBuffers, nodeBuffers, state, typeIdentifierNode.TypeIdentifierID);
-			}
-
-			// handle other types
-			else if (identifierOrTypeIdentifierNode.Kind == NodeKind::IDENTIFIER)
-			{
-				const IDENTIFIER& identifierNode = identifierOrTypeIdentifierNode.Identifier;
-				const std::string_view typeName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
-
-				elementType = state.NamedValues.GetType(typeName);
-			}
-
-			else
-			{
-				ASSERT(false, "Invalid TYPE_IDENTIFIER node! .TypeIdentifierID should be ID of TYPE_IDENTIFIER or IDENTIFIER.");
-				return nullptr;
-			}
-
-			llvm::ArrayType* arrayType = llvm::ArrayType::get(elementType, arraySize);
-
-			return arrayType;
-		}
-
-		// handle non-array types
-		else
-		{
-			ASSERT(identifierOrTypeIdentifierNode.Kind == NodeKind::IDENTIFIER, "Invalid TYPE_IDENTIFIER node! .TypeIdentifierID should be ID of IDENTIFIER for non-array types.");
-
-			const IDENTIFIER& identifierNode = identifierOrTypeIdentifierNode.Identifier;
-			const std::string_view typeName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
-
-			llvm::Type* type = state.NamedValues.GetType(typeName);
-
-			if (type == nullptr)
-			{
-				// TODO: log error
-			}
-
-			return type;
-		}
+		llvm::IRBuilder<> tempBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
+		return tempBuilder.CreateAlloca(type, nullptr, varName);
 	}
 
 	template <typename T>
@@ -193,6 +166,7 @@ namespace AlloyCompiler
 		}
 
 		case LITERAL::Type::String:
+			//return state.Builder->CreateGlobalStringPtr(literalStr);
 			return llvm::ConstantDataArray::getString(*state.Context, literalStr);
 
 		case LITERAL::Type::Character:
@@ -212,7 +186,7 @@ namespace AlloyCompiler
 		const std::string_view name = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
 
 		// look up the name in the function
-		llvm::Value* value = state.NamedValues.GetValue(name);
+		llvm::Value* value = state.NamedValues.contains();
 
 		if (value)
 		{

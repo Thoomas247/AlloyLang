@@ -4,6 +4,7 @@
 #define LLVM_INCLUDE
 
 #include <llvm/ADT/APFloat.h>
+#include <llvm/ADT/APInt.h>
 #include <llvm/ADT/STLExtras.h>
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -29,5 +30,12 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils.h"
 #endif // NO_CODE_OPTIMIZATION
+
+#ifndef NO_CODE_EXECUTION
+#include "llvm/ExecutionEngine/Interpreter.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/GenericValue.h"
+#endif	// NO_CODE_EXECUTION
 
 #endif // LLVM_INCLUDE
