@@ -69,7 +69,7 @@ namespace AlloyCompiler
 		};
 
 		Type Kind;
-		NodeID IdentifierOrTypeIdentifierID;
+		NodeID TypeIdentifierID;
 	};
 
 	struct VALUE_DECLARATION
@@ -82,7 +82,7 @@ namespace AlloyCompiler
 
 		Type Kind;
 		NodeID IdentifierID;
-		NodeID IdentifierOrTypeIdentifierID;
+		NodeID TypeIdentifierID;
 	};
 
 	struct FUNCTION_DECLARATION

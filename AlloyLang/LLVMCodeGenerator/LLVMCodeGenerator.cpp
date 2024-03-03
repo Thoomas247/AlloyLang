@@ -331,7 +331,7 @@ Value* LLVMCodeGenerator::codegen(const STRUCT_DEFINITION& node) {
 	for (auto id : node.MemberIDs) {
 		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
 		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
-		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.IdentifierOrTypeIdentifierID);
+		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
 		MemberTypes.push_back(type);
 
 		// retrieve member name and add it to memberNames map
@@ -648,7 +648,7 @@ Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, co
 	for (auto id : node.ParameterIDs) {
 		assert(NodeBuffers.GetNode(id).Kind == NodeKind::VALUE_DECLARATION);
 		const VALUE_DECLARATION& vd = NodeBuffers.GetNode(id).ValueDeclaration;
-		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.IdentifierOrTypeIdentifierID);
+		llvm::Type* type = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, vd.TypeIdentifierID);
 		ParamTypes.push_back(type);
 	}
 
@@ -656,7 +656,7 @@ Function* LLVMCodeGenerator::createFunctionPrototype(const std::string& Name, co
 	Type* returnType = nullptr;
 	if (node.ReturnTypeID != ERROR_NODE_ID) {
 		const TYPE_DECLARATION& td = NodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
-		returnType = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, td.IdentifierOrTypeIdentifierID);
+		returnType = CGNamedValues::AlloyToLLVMType(*TheContext, NodeBuffers, TokenBuffers, td.TypeIdentifierID);
 	}
 	else {
 		returnType = Type::getVoidTy(*TheContext);
