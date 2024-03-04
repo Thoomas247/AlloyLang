@@ -26,14 +26,22 @@ namespace AlloyCompiler
 		void InsertValue(const std::string_view& name, llvm::AllocaInst* value);
 
 		llvm::Type* GetType(const std::string_view& name);
-		void InsertType(const std::string_view& name, llvm::Type* type);
+		void InsertType(const std::string_view& name, llvm::Type* type, std::unordered_map<std::string_view, size_t> structMembers = {});
 
 	private:
+		struct TypeInfo
+		{
+			llvm::Type* Type;
+			std::string_view Name;
+			bool IsStruct;
+			std::unordered_map<std::string_view, size_t> StructMembers;
+		};
+
 		struct Scope
 		{
 			std::string_view Name;
 			std::unordered_map<std::string_view, llvm::AllocaInst*> Values;
-			std::unordered_map<std::string_view, llvm::Type*> Types;
+			std::unordered_map<std::string_view, TypeInfo> Types;
 
 			Scope(const std::string_view& name)
 				: Name(name)

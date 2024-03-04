@@ -459,6 +459,8 @@ namespace AlloyCompiler
 	template <>
 	llvm::Value* generateValue<FUNCTION_CALL_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::FUNCTION_CALL_EXPRESSION, "Expected FUNCTION_CALL_EXPRESSION!");
+
 		const FUNCTION_CALL_EXPRESSION& functionCallExpressionNode = nodeBuffers.GetNode(nodeID).FunctionCallExpression;
 		const IDENTIFIER& identifierNode = nodeBuffers.GetNode(functionCallExpressionNode.IdentifierID).Identifier;
 
@@ -481,12 +483,20 @@ namespace AlloyCompiler
 		// evaluate all the arguments
 		std::vector<llvm::Value*> args;
 
-		for (const NodeID argumentID : functionCallExpressionNode.ArgumentIDs)
+		for (size_t i = 0; i < functionCallExpressionNode.ArgumentIDs.size(); i++)
 		{
+			const NodeID argumentID = functionCallExpressionNode.ArgumentIDs[i];
+
 			llvm::Value* argVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, argumentID);
 
 			if (argVal == nullptr)
 			{
+				return nullptr;
+			}
+
+			if (argVal->getType() != calleeFunc->getArg(i)->getType())
+			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID), "Argument type mismatch!");
 				return nullptr;
 			}
 
@@ -672,24 +682,38 @@ namespace AlloyCompiler
 	llvm::Value* generateValue<ASSIGNMENT_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const ASSIGNMENT_EXPRESSION& assignmentExpressionNode = nodeBuffers.GetNode(nodeID).AssignmentExpression;
-		const IDENTIFIER& identifierNode = nodeBuffers.GetNode(assignmentExpressionNode.IdentifierID).Identifier;
 
-		const std::string_view identifierName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+		const Node& identifierOrMemberAccessNode = nodeBuffers.GetNode(assignmentExpressionNode.IdentifierOrMemberAccessID);
+
+		llvm::Value* allocaInst;
+
+		if (identifierOrMemberAccessNode.Kind == NodeKind::MEMBER_ACCESS_EXPRESSION)
+		{
+			allocaInst = generateValue<MEMBER_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.IdentifierOrMemberAccessID);
+			
+			if (!allocaInst)
+			{
+				return nullptr;
+			}
+		}
+
+		else
+		{
+			const IDENTIFIER& identifierNode = nodeBuffers.GetNode(assignmentExpressionNode.IdentifierOrMemberAccessID).Identifier;
+			const std::string_view identifierName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+
+			llvm::Value* value;
+			allocaInst = getVariable(state, identifierName, value);
+
+			if (!allocaInst)
+			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown variable name '{0}'!", identifierName);
+				return nullptr;
+			}
+		}
+		
 
 		llvm::Value* expressionVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.ValueID);
-
-		if (expressionVal == nullptr)
-		{
-			return nullptr;
-		}
-
-		// find the variable in the named values
-		llvm::AllocaInst* allocaInst = state.NamedValues.GetValue(identifierName);
-
-		if (allocaInst == nullptr)
-		{
-			return nullptr;
-		}
 
 		// store the value into the alloca
 		return state.Builder->CreateStore(expressionVal, allocaInst);
@@ -730,10 +754,8 @@ namespace AlloyCompiler
 
 	template <>
 	llvm::Value* generateValue<VALUE_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
-
 	template <>
 	llvm::Value* generateValue<STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
-
 	template <>
 	llvm::Value* generateValue<BLOCK_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
 
@@ -1067,37 +1089,57 @@ namespace AlloyCompiler
 	template <>
 	llvm::Value* generateValue<STRUCT_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::STRUCT_DEFINITION, "Expected STRUCT_DEFINITION!");
+
 		const STRUCT_DEFINITION& structDefinitionNode = nodeBuffers.GetNode(nodeID).StructDefinition;
-		const IDENTIFIER& identifierNode = nodeBuffers.GetNode(structDefinitionNode.IdentifierID).Identifier;
+		const IDENTIFIER& identifier = nodeBuffers.GetNode(structDefinitionNode.IdentifierID).Identifier;
 
-		const std::string_view structName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+		const std::string_view name = tokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView();
 
-		// collect all the member types
+		llvm::Value* result = nullptr;
+
+		// get a vector of member types
 		std::vector<llvm::Type*> memberTypes;
+		std::map<std::string, int> memberNames;
 
-		for (const NodeID memberTypeID : structDefinitionNode.MemberIDs)
+		int memberIndex = 0;
+		for (auto id : structDefinitionNode.MemberIDs)
 		{
-			llvm::Type* memberType = typeIdentifierToLLVMType(tokenBuffers, nodeBuffers, state, memberTypeID);
+			const VALUE_DECLARATION& valueDeclaration = nodeBuffers.GetNode(id).ValueDeclaration;
 
-			if (memberType == nullptr)
+			llvm::Type* type = generateType<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID);
+
+			if (!type)
 			{
 				return nullptr;
 			}
 
-			memberTypes.push_back(memberType);
+			memberTypes.push_back(type);
+
+			// retrieve member name and add it to memberNames map
+			const IDENTIFIER& memberID = nodeBuffers.GetNode(valueDeclaration.IdentifierID).Identifier;
+			const std::string memberName = std::string(tokenBuffers.GetValue(memberID.IdentifierTokenID).ToStringView());
+
+			memberNames[memberName] = memberIndex++;
 		}
 
-		llvm::StructType* structType = llvm::StructType::create(*state.Context, memberTypes, structName);
+		// store a map to member names
+		NamedStructs::setMemberNames(Name, memberNames);
 
-		if (structType == nullptr)
-		{
-			// TODO: log error
-			return nullptr;
+		// now create the structure type in llvm
+		llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);
+		if (nullptr != structType) {
+
+			// add the newly created type tot he AlloyToLLVM map
+			CGNamedValues::addType(Name, StructType::getTypeByName(*TheContext, Name));
+			result = ConstantInt::getTrue(*TheContext);
+
+		}
+		else {
+			result = ConstantInt::getFalse(*TheContext);
 		}
 
-		state.NamedValues.InsertType(structName, structType);
-
-		return nullptr;
+		return result;
 	}
 
 	template <>

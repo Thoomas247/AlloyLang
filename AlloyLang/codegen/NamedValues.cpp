@@ -65,11 +65,18 @@ namespace AlloyCompiler
 		return nullptr;
 	}
 
-	void NamedValues::InsertType(const std::string_view& name, llvm::Type* type)
+	void NamedValues::InsertType(const std::string_view& name, llvm::Type* type, std::unordered_map<std::string_view, size_t> structMembers)
 	{
 		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
 
-		m_ScopeStack.back().Types[name] = type;
+		TypeInfo typeInfo;
+		typeInfo.Type = type;
+		typeInfo.Name = name;
+		typeInfo.IsStruct = structMembers.size() > 0;
+		typeInfo.StructMembers = structMembers;
+
+
+		m_ScopeStack.back().Types[name] = typeInfo;
 	}
 
 }
