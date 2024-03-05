@@ -409,6 +409,71 @@ namespace AlloyCompiler
 
 #pragma region Expressions
 
+	llvm::Value* generateConstructorExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	{
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::CONSTRUCTOR_EXPRESSION, "Expected CONSTRUCTOR_EXPRESSION!");
+
+		const CONSTRUCTOR_EXPRESSION& constructorExpressionNode = nodeBuffers.GetNode(nodeID).ConstructorExpression;
+
+		const IDENTIFIER& structIdentifier = nodeBuffers.GetNode(constructorExpressionNode.StructIdentifierID).Identifier;
+		const std::string_view structName = tokenBuffers.GetValue(structIdentifier.IdentifierTokenID).ToStringView();
+
+		llvm::StructType* structType = static_cast<llvm::StructType*>(state.NamedValues.GetType(structName));
+
+		if (!structType || structType->getTypeID() != llvm::Type::StructTyID)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.StructIdentifierID), "Unknown struct type '{0}'!", structName);
+			return nullptr;
+		}
+
+		// create a mutable variable at the end of the insertion block
+		llvm::IRBuilder<> tempBuilder(state.Builder->GetInsertBlock(), state.Builder->GetInsertBlock()->end());
+		llvm::AllocaInst* structPtr = tempBuilder.CreateAlloca(structType, nullptr);
+
+		// go through the list of initializers and initialize all members
+		for (int i = 0; i < constructorExpressionNode.MemberIdentifierIDs.size(); i++)
+		{
+			// get the name of the member to initiliaze
+			const IDENTIFIER& memberIdentifier = nodeBuffers.GetNode(constructorExpressionNode.MemberIdentifierIDs[i]).Identifier;
+			const std::string_view memberName = tokenBuffers.GetValue(memberIdentifier.IdentifierTokenID).ToStringView();
+
+			int memberIndex = state.NamedValues.GetMemberIndex(structName, memberName);
+
+			if (memberIndex == -1)
+			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.MemberIdentifierIDs[i]), "Type '{0}' is not a struct!", structName);
+				return nullptr;
+			}
+
+			if (memberIndex == -2)
+			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.MemberIdentifierIDs[i]), "Struct '{0}' does not have a member '{1}'!", structName, memberName);
+				return nullptr;
+			}
+
+			llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, constructorExpressionNode.MemberValueIDs[i]);
+
+			if (!expressionVal)
+			{
+				return nullptr;
+			}
+
+			// convert our index to an llvm 32-bit Int
+			llvm::Value* llvmIndex = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberIndex, true));
+
+			// struct members are accessed through 2 indices, this is described in detail here:
+			// https://llvm.org/docs/GetElementPtr.html
+			std::vector<llvm::Value*> indices(2);
+			indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
+			indices[1] = llvmIndex;
+
+			llvm::Value* memberPtr = state.Builder->CreateGEP(structType, structPtr, indices, "memberptr");
+			state.Builder->CreateStore(expressionVal, memberPtr, "savetmp");
+		}
+
+		return state.Builder->CreateLoad(structPtr->getAllocatedType(), structPtr);	// result contains the whole initialized structure
+	}
+
 	llvm::Value* generatePointerInitializerExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(false, "Not yet implemented!");
@@ -509,13 +574,13 @@ namespace AlloyCompiler
 		}
 
 		// convert our index to an llvm 32-bit Int
-		llvm::Value* llvm_index = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberIndex, true));
+		llvm::Value* llvmIndex = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberIndex, true));
 
 		// struct members are accessed through 2 indices, this is described in detail here:
 		// https://llvm.org/docs/GetElementPtr.html
 		std::vector<llvm::Value*> indices(2);
 		indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
-		indices[1] = llvm_index;
+		indices[1] = llvmIndex;
 
 		llvm::Value* memberPtr = state.Builder->CreateGEP(structType, left.Ptr, indices, "memberptr");
 		llvm::Value* memberValue = state.Builder->CreateLoad(structType->getTypeAtIndex(memberIndex), memberPtr, "loadtmp");
@@ -715,6 +780,9 @@ namespace AlloyCompiler
 
 		case NodeKind::LITERAL:
 			return generateLiteral(tokenBuffers, nodeBuffers, state, nodeID);
+
+		case NodeKind::CONSTRUCTOR_EXPRESSION:
+			return generateConstructorExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
 			return generatePointerInitializerExpression(tokenBuffers, nodeBuffers, state, nodeID);
