@@ -119,7 +119,7 @@ namespace AlloyCompiler
 		json j;
 		j["kind"] = "TYPE_DECLARATION";
 		j["type"] = typeString;
-		j["identifier"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, typeDeclarationNode.IdentifierOrTypeIdentifierID);
+		j["identifier"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, typeDeclarationNode.TypeIdentifierID);
 
 		return j;
 	}
@@ -133,7 +133,7 @@ namespace AlloyCompiler
 		j["kind"] = "VALUE_DECLARATION";
 		j["type"] = valueDeclarationNode.Kind == VALUE_DECLARATION::Type::Variable ? "VARIABLE" : "CONSTANT";
 		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.IdentifierID);
-		j["type"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.IdentifierOrTypeIdentifierID);
+		j["type"] = print<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, valueDeclarationNode.TypeIdentifierID);
 
 		return j;
 	}

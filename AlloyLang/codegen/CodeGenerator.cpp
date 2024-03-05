@@ -1366,6 +1366,8 @@ namespace AlloyCompiler
 
 	llvm::Value* generateProgram(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::PROGRAM, "Expected PROGRAM!");
+
 		const PROGRAM& programNode = nodeBuffers.GetNode(nodeID).Program;
 
 		// generate code for each module in the program
@@ -1373,7 +1375,7 @@ namespace AlloyCompiler
 		return generateModule(tokenBuffers, nodeBuffers, state, programNode.ModuleIDs[0]);
 	}
 
-	llvm::Value* Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize)
+	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize)
 	{
 		const NodeID rootNodeID = nodeBuffers.GetRootNodeID();
 
@@ -1381,12 +1383,12 @@ namespace AlloyCompiler
 
 		LLVMState state(optimize);
 
-		llvm::Value* pValue = generateProgram(tokenBuffers, nodeBuffers, state, rootNodeID);
+		llvm::Value* program = generateProgram(tokenBuffers, nodeBuffers, state, rootNodeID);
 
 		std::error_code errorCode;
-		llvm::raw_fd_ostream out("out.ll", errorCode);
+		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
 		state.Module->print(out, nullptr);
 
-		return pValue;
+		return program != nullptr;
 	}
 }

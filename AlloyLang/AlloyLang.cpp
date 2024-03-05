@@ -1,9 +1,8 @@
-#include "LLVMCodeGenerator/llvm.hpp"
-
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
 #include "parser/TreePrinter.hpp"
-#include "LLVMCodeGenerator/LLVMCodeGenerator.hpp"
+//#include "LLVMCodeGenerator/LLVMCodeGenerator.hpp"
+#include "codegen/CodeGenerator.hpp"
 
 #include "log/Log.hpp"
 #include "TestString.hpp"
@@ -70,8 +69,9 @@ int main(int argc, char* argv[])
 	PrintTree(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
 
 	start = std::chrono::high_resolution_clock::now();
-	LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
-	codegen.Process();	// TBD: implement error handling
+	//LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
+	//codegen.Process();	// TBD: implement error handling
+	Generate(tokenBuffers, nodeBuffers, true);
 
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

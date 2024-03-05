@@ -42,25 +42,10 @@
     <ClCompile Include="parser\TreePrinter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="LLVMCodeGenerator\llvm.cpp">
-      <Filter>Source Files\LLVMCodeGenerator</Filter>
-    </ClCompile>
-    <ClCompile Include="LLVMCodeGenerator\LLVMCodeGenerator.cpp">
-      <Filter>Source Files\LLVMCodeGenerator</Filter>
-    </ClCompile>
-    <ClCompile Include="LLVMCodeGenerator\NamedStructs.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="LLVMCodeGenerator\NamedValues.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="codegen\llvm\llvm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="codegen\CodeGenerator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="codegen\NamedStructs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="codegen\NamedValues.cpp">
@@ -95,25 +80,10 @@
     <ClInclude Include="parser\TreePrinter.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="LLVMCodeGenerator\LLVMCodeGenerator.hpp">
-      <Filter>Header Files\LLVMCodeGenerator</Filter>
-    </ClInclude>
-    <ClInclude Include="LLVMCodeGenerator\llvm.hpp">
-      <Filter>Header Files\LLVMCodeGenerator</Filter>
-    </ClInclude>
-    <ClInclude Include="LLVMCodeGenerator\NamedValues.hpp">
-      <Filter>Header Files\LLVMCodeGenerator</Filter>
-    </ClInclude>
-    <ClInclude Include="LLVMCodeGenerator\NamedStructs.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="codegen\llvm\llvm.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="codegen\CodeGenerator.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="codegen\NamedStructs.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="codegen\NamedValues.hpp">

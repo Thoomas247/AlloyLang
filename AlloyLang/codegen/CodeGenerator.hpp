@@ -8,5 +8,5 @@ namespace llvm
 
 namespace AlloyCompiler
 {
-	llvm::Value* Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize);
+	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize);
 }

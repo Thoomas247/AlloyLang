@@ -377,7 +377,7 @@ namespace AlloyCompiler
 				.TypeDeclaration = TYPE_DECLARATION
 				{
 					.Kind = type,
-					.IdentifierOrTypeIdentifierID = identifierID
+					.TypeIdentifierID = identifierID
 				}
 			},
 			errorInfo
@@ -453,7 +453,7 @@ namespace AlloyCompiler
 				{
 					.Kind = type,
 					.IdentifierID = identifierID,
-					.IdentifierOrTypeIdentifierID = typeID
+					.TypeIdentifierID = typeID
 				}
 			},
 			errorInfo
