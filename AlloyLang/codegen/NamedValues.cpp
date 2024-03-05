@@ -5,6 +5,8 @@
 namespace AlloyCompiler
 {
 
+	/* -- PUBLIC -- */
+
 	NamedValues::NamedValues()
 	{
 		m_ScopeStack.emplace_back("");
@@ -51,6 +53,55 @@ namespace AlloyCompiler
 
 	llvm::Type* NamedValues::GetType(const std::string_view& name)
 	{
+		TypeInfo* typeInfo = findType(name);
+
+		if (typeInfo)
+		{
+			return typeInfo->Type;
+		}
+
+		return nullptr;
+	}
+
+	int NamedValues::GetMemberIndex(const std::string_view& structName, const std::string_view& memberName)
+	{
+		TypeInfo* typeInfo = findType(structName);
+
+		if (!typeInfo || !typeInfo->IsStruct)
+		{
+			return -1;
+		}
+
+		auto it = typeInfo->StructMembers.find(memberName);
+
+		if (it == typeInfo->StructMembers.end())
+		{
+			return -2;
+		}
+
+		return it->second;
+	}
+
+	void NamedValues::InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, int> structMembers)
+	{
+		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
+		ASSERT(structMembers.empty() || isStruct, "Struct members can only be added to a struct type.");
+
+		TypeInfo typeInfo;
+		typeInfo.Type = type;
+		typeInfo.Name = name;
+		typeInfo.IsStruct = isStruct;
+		typeInfo.StructMembers = structMembers;
+
+		m_ScopeStack.back().Types[name] = typeInfo;
+	}
+
+
+
+	/* -- PRIVATE -- */
+
+	NamedValues::TypeInfo* NamedValues::findType(const std::string_view& name)
+	{
 		// look for the type starting from the current scope and going up
 		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
 		{
@@ -58,25 +109,11 @@ namespace AlloyCompiler
 			auto found = scope.Types.find(name);
 			if (found != scope.Types.end())
 			{
-				return found->second;
+				return &found->second;
 			}
 		}
 
 		return nullptr;
-	}
-
-	void NamedValues::InsertType(const std::string_view& name, llvm::Type* type, std::unordered_map<std::string_view, size_t> structMembers)
-	{
-		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
-
-		TypeInfo typeInfo;
-		typeInfo.Type = type;
-		typeInfo.Name = name;
-		typeInfo.IsStruct = structMembers.size() > 0;
-		typeInfo.StructMembers = structMembers;
-
-
-		m_ScopeStack.back().Types[name] = typeInfo;
 	}
 
 }

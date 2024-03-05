@@ -129,7 +129,7 @@ namespace AlloyCompiler
 
 	struct MEMBER_ACCESS_EXPRESSION
 	{
-		NodeID LeftID;
+		NodeID LeftID; // can be IDENTIFIER or MEMBER_ACCESS_EXPRESSION
 		NodeID RightID;
 	};
 

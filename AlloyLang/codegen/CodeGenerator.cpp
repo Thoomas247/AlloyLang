@@ -5,6 +5,9 @@
 
 namespace AlloyCompiler
 {
+
+#pragma region Util
+
 	struct LLVMState
 	{
 		std::unique_ptr<llvm::LLVMContext> Context;
@@ -68,13 +71,19 @@ namespace AlloyCompiler
 		}
 	};
 
+	struct PtrValuePair
+	{
+		llvm::Value* Ptr = nullptr;
+		llvm::Value* Value = nullptr;
+	};
+
 	template<typename ...Args>
 	constexpr void logErrorAtPosition(const TokenBuffers& tokenBuffers, TokenID tokenID, const std::string& format, Args && ...args)
 	{
 		const Location& location = tokenBuffers.GetLocation(tokenID);
 
 		Log::Error("Error at location ({0} : {1}):", location.Line, location.Column);
-		Log::Error("\t{0}", tokenBuffers.GetLine(tokenID));
+		Log::Error("\t{0}", tokenBuffers.GetLine(location.LineStart));
 		Log::Error("\t{0}^", std::string(location.Column - 1, ' '));
 		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 	}
@@ -130,42 +139,14 @@ namespace AlloyCompiler
 		return tempBuilder.CreateAlloca(type, nullptr, varName);
 	}
 
-	llvm::Value* getVariable(LLVMState& state, const std::string_view& name, llvm::Value*& outValue)
-	{
-		// check if we have a local variable with this name
-		llvm::AllocaInst* allocaInst = state.NamedValues.GetValue(name);
-
-		if (allocaInst)
-		{
-			outValue = state.Builder->CreateLoad(allocaInst->getAllocatedType(), allocaInst, name);
-			return allocaInst;
-		}
-
-		// check if we have a global
-		llvm::GlobalVariable* globalVar = state.Module->getGlobalVariable(name);
-
-		if (globalVar)
-		{
-			outValue = globalVar->getInitializer();
-			return globalVar;
-		}
-
-		// TODO: error
-		return nullptr;
-	}
-
+#pragma endregion
 	
-	template <typename T>
-	llvm::Value* generateValue(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID) = delete;
+	// forward declarations
+	llvm::Value* generateExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
 
-	template <typename T>
-	llvm::Type* generateType(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID) = delete;
+#pragma region Literals
 
-	template <>
-	llvm::Value* generateValue<EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
-
-	template <>
-	llvm::Value* generateValue<LITERAL>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateLiteral(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::LITERAL, "Expected LITERAL!");
 
@@ -219,27 +200,40 @@ namespace AlloyCompiler
 		}
 	}
 
-	template <>
-	llvm::Value* generateValue<IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+#pragma endregion
+
+#pragma region Identifiers
+
+	PtrValuePair generateIdentifier(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::IDENTIFIER, "Expected IDENTIFIER!");
 
 		const IDENTIFIER& node = nodeBuffers.GetNode(nodeID).Identifier;
 		const std::string_view name = tokenBuffers.GetValue(node.IdentifierTokenID).ToStringView();
 
-		llvm::Value* value;
-		llvm::Value* variable = getVariable(state, name, value);
+		// check if we have a local variable with this name
+		llvm::AllocaInst* allocaInst = state.NamedValues.GetValue(name);
 
-		if (!variable)
+		if (allocaInst)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown variable name '{0}'!", name);
+			llvm::Value* value = state.Builder->CreateLoad(allocaInst->getAllocatedType(), allocaInst, name);
+			return PtrValuePair { .Ptr = allocaInst, .Value = value };
 		}
 
-		return variable;
-	}
+		// check if we have a global
+		llvm::GlobalVariable* globalVar = state.Module->getGlobalVariable(name);
 
-	template <>
-	llvm::Type* generateType<TYPE_IDENTIFIER>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+		if (globalVar)
+		{
+			llvm::Value* value = globalVar->getInitializer();
+			return PtrValuePair{ .Ptr = allocaInst, .Value = value };
+		}
+
+		logErrorAtPosition(tokenBuffers, node.IdentifierTokenID, "Unknown variable name '{0}'!", name);
+		return {};
+	}
+	
+	llvm::Type* generateTypeIdentifier(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::TYPE_IDENTIFIER, "Expected TYPE_IDENTIFIER!");
 
@@ -286,7 +280,7 @@ namespace AlloyCompiler
 
 		const NodeID elementTypeIdentifierNode = typeIdentifierNode.IdentifierOrTypeIdentifierID;
 
-		llvm::Type* elementType = generateType<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, state, elementTypeIdentifierNode);
+		llvm::Type* elementType = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, elementTypeIdentifierNode);
 
 		if (!elementType)
 		{
@@ -296,8 +290,11 @@ namespace AlloyCompiler
 		return llvm::ArrayType::get(elementType, arraySize);
 	}
 
-	template <>
-	llvm::Type* generateType<TYPE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+#pragma endregion
+
+#pragma region Declarations
+
+	llvm::Type* generateTypeDeclaration(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::TYPE_DECLARATION, "Expected TYPE_DECLARATION!");
 
@@ -305,11 +302,10 @@ namespace AlloyCompiler
 
 		const TYPE_DECLARATION& typeDeclarationNode = nodeBuffers.GetNode(nodeID).TypeDeclaration;
 
-		return generateType<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, state, typeDeclarationNode.TypeIdentifierID);
+		return generateTypeIdentifier(tokenBuffers, nodeBuffers, state, typeDeclarationNode.TypeIdentifierID);
 	}
-
-	template <>
-	llvm::Value* generateValue<VALUE_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generateValueDeclaration(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::VALUE_DECLARATION, "Expected VALUE_DECLARATION!");
 
@@ -328,7 +324,7 @@ namespace AlloyCompiler
 		{
 			const std::string_view name = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
 
-			llvm::Type* type = generateType<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, state, valueDeclarationNode.TypeIdentifierID);
+			llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclarationNode.TypeIdentifierID);
 
 			if (!type)
 			{
@@ -348,9 +344,8 @@ namespace AlloyCompiler
 			return allocaInst;
 		}
 	}
-
-	template <>
-	llvm::Value* generateValue<FUNCTION_DECLARATION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generateFunctionDeclaration(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::FUNCTION_DECLARATION, "Expected FUNCTION_DECLARATION!");
 
@@ -373,7 +368,7 @@ namespace AlloyCompiler
 		{
 			const VALUE_DECLARATION& valueDeclaration = nodeBuffers.GetNode(parameterID).ValueDeclaration;
 
-			llvm::Type* type = generateType<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID);
+			llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID);
 
 			if (!type)
 			{
@@ -389,7 +384,7 @@ namespace AlloyCompiler
 		if (node.ReturnTypeID != ERROR_NODE_ID)
 		{
 			const TYPE_DECLARATION& typeDeclaration = nodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
-			returnType = generateType<TYPE_DECLARATION>(tokenBuffers, nodeBuffers, state, node.ReturnTypeID);
+			returnType = generateTypeDeclaration(tokenBuffers, nodeBuffers, state, node.ReturnTypeID);
 		}
 
 		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, paramTypes.size() > 1);
@@ -410,27 +405,28 @@ namespace AlloyCompiler
 		return function;
 	}
 
-	template <>
-	llvm::Value* generateValue<POINTER_INITIALIZER_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+#pragma endregion
+
+#pragma region Expressions
+
+	llvm::Value* generatePointerInitializerExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(false, "Not yet implemented!");
 		return nullptr;
 	}
 
-	template <>
-	llvm::Value* generateValue<INITIALIZER_LIST_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateInitializerListExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(false, "Not yet implemented!");
 		return nullptr;
 	}
 
-	template <>
-	llvm::Value* generateValue<VALUE_DEFINITION_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateValueDefinitionExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const VALUE_DEFINITION_EXPRESSION& valueDefinitionExpressionNode = nodeBuffers.GetNode(nodeID).ValueDefinitionExpression;
 
 		// create the declaration
-		llvm::Value* declarationVal = generateValue<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, state, valueDefinitionExpressionNode.ValueDeclarationID);
+		llvm::Value* declarationVal = generateValueDeclaration(tokenBuffers, nodeBuffers, state, valueDefinitionExpressionNode.ValueDeclarationID);
 
 		if (!declarationVal)
 		{
@@ -438,7 +434,7 @@ namespace AlloyCompiler
 		}
 
 		// create the value expression
-		llvm::Value* value = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, valueDefinitionExpressionNode.ValueID);
+		llvm::Value* value = generateExpression(tokenBuffers, nodeBuffers, state, valueDefinitionExpressionNode.ValueID);
 
 		if (!value)
 		{
@@ -449,15 +445,85 @@ namespace AlloyCompiler
 		return state.Builder->CreateStore(value, declarationVal);
 	}
 
-	template <>
-	llvm::Value* generateValue<ARRAY_ACCESS_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateArrayAccessExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(false, "Not yet implemented!");
 		return nullptr;
 	}
 
-	template <>
-	llvm::Value* generateValue<FUNCTION_CALL_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	PtrValuePair generateMemberAccessExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	{
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::MEMBER_ACCESS_EXPRESSION, "Expected MEMBER_ACCESS_EXPRESSION!");
+
+		const MEMBER_ACCESS_EXPRESSION& memberAccessExpressionNode = nodeBuffers.GetNode(nodeID).MemberAccessExpression;
+
+		const IDENTIFIER& right = nodeBuffers.GetNode(memberAccessExpressionNode.RightID).Identifier;
+		const std::string_view memberName = tokenBuffers.GetValue(right.IdentifierTokenID).ToStringView();
+
+		PtrValuePair left;
+
+		// handle nested member access
+		if (nodeBuffers.GetNode(memberAccessExpressionNode.LeftID).Kind == NodeKind::MEMBER_ACCESS_EXPRESSION)
+		{
+			left = generateMemberAccessExpression(tokenBuffers, nodeBuffers, state, memberAccessExpressionNode.LeftID);
+		}
+
+		// handle identifier
+		else if (nodeBuffers.GetNode(memberAccessExpressionNode.LeftID).Kind == NodeKind::IDENTIFIER)
+		{
+			left = generateIdentifier(tokenBuffers, nodeBuffers, state, memberAccessExpressionNode.LeftID);
+		}
+
+		if (!left.Ptr)
+		{
+			return {};
+		}
+
+		// get the type of the left
+		llvm::Type* leftType = left.Ptr->getType();
+
+		if (leftType->getTypeID() != llvm::Type::StructTyID)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.LeftID), "Expected struct type!");
+			return {};
+		}
+
+		llvm::StructType* structType = static_cast<llvm::StructType*>(leftType);
+
+		// get the name of the struct type
+		const std::string_view structName = structType->getName();
+
+		// get the index of the member
+		int memberIndex = state.NamedValues.GetMemberIndex(structName, memberName);
+
+		if (memberIndex == -1)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.RightID), "Type '{0}' is not a struct type!", structName);
+			return {};
+		}
+
+		if (memberIndex == -2)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.RightID), "Struct '{0}' does not have a member '{1}'!", structName, memberName);
+			return {};
+		}
+
+		// convert our index to an llvm 32-bit Int
+		llvm::Value* llvm_index = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberIndex, true));
+
+		// struct members are accessed through 2 indices, this is described in detail here:
+		// https://llvm.org/docs/GetElementPtr.html
+		std::vector<llvm::Value*> indices(2);
+		indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
+		indices[1] = llvm_index;
+
+		llvm::Value* memberPtr = state.Builder->CreateGEP(structType, left.Ptr, indices, "memberptr");
+		llvm::Value* memberValue = state.Builder->CreateLoad(structType->getTypeAtIndex(memberIndex), memberPtr, "loadtmp");
+
+		return PtrValuePair { .Ptr = memberPtr, .Value = memberValue };
+	}
+
+	llvm::Value* generateFunctionCallExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::FUNCTION_CALL_EXPRESSION, "Expected FUNCTION_CALL_EXPRESSION!");
 
@@ -487,7 +553,7 @@ namespace AlloyCompiler
 		{
 			const NodeID argumentID = functionCallExpressionNode.ArgumentIDs[i];
 
-			llvm::Value* argVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, argumentID);
+			llvm::Value* argVal = generateExpression(tokenBuffers, nodeBuffers, state, argumentID);
 
 			if (argVal == nullptr)
 			{
@@ -506,21 +572,19 @@ namespace AlloyCompiler
 		return state.Builder->CreateCall(calleeFunc, args, "calltmp");
 	}
 
-	template <>
-	llvm::Value* generateValue<ENCLOSED_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateEnclosedExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const ENCLOSED_EXPRESSION& enclosedExpressionNode = nodeBuffers.GetNode(nodeID).EnclosedExpression;
 
-		return generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, enclosedExpressionNode.ExpressionID);
+		return generateExpression(tokenBuffers, nodeBuffers, state, enclosedExpressionNode.ExpressionID);
 	}
-
-	template <>
-	llvm::Value* generateValue<BINARY_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generateBinaryExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const BINARY_EXPRESSION& binaryExpressionNode = nodeBuffers.GetNode(nodeID).BinaryExpression;
 
-		llvm::Value* leftVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, binaryExpressionNode.LeftID);
-		llvm::Value* rightVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, binaryExpressionNode.RightID);
+		llvm::Value* leftVal = generateExpression(tokenBuffers, nodeBuffers, state, binaryExpressionNode.LeftID);
+		llvm::Value* rightVal = generateExpression(tokenBuffers, nodeBuffers, state, binaryExpressionNode.RightID);
 
 		if (!leftVal || !rightVal)
 		{
@@ -611,15 +675,14 @@ namespace AlloyCompiler
 		ASSERT(false, "Unknown binary operator '{0}'!", operatorStr);
 		return nullptr;
 	}
-
-	template <>
-	llvm::Value* generateValue<UNARY_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generateUnaryExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const UNARY_EXPRESSION& unaryExpressionNode = nodeBuffers.GetNode(nodeID).UnaryExpression;
 
 		std::string_view operatorStr = tokenBuffers.GetValue(unaryExpressionNode.OperatorTokenID).ToStringView();
 
-		llvm::Value* expressionVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID);
+		llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID);
 
 		if (!expressionVal)
 		{
@@ -640,37 +703,36 @@ namespace AlloyCompiler
 
 		return nullptr;
 	}
-
-	template <>
-	llvm::Value* generateValue<PRIMARY_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generatePrimaryExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const Node& node = nodeBuffers.GetNode(nodeID);
 
 		switch (node.Kind)
 		{
 		case NodeKind::IDENTIFIER:
-			return generateValue<IDENTIFIER>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateIdentifier(tokenBuffers, nodeBuffers, state, nodeID).Value;
 
 		case NodeKind::LITERAL:
-			return generateValue<LITERAL>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateLiteral(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
-			return generateValue<POINTER_INITIALIZER_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generatePointerInitializerExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
-			return generateValue<INITIALIZER_LIST_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateInitializerListExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
-			return generateValue<VALUE_DEFINITION_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateValueDefinitionExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
-			return generateValue<ARRAY_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateArrayAccessExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
-			return generateValue<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateFunctionCallExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::ENCLOSED_EXPRESSION:
-			return generateValue<ENCLOSED_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateEnclosedExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		default:
 			ASSERT(false, "Unknown primary expression node kind!");
@@ -678,59 +740,41 @@ namespace AlloyCompiler
 		}
 	}
 
-	template <>
-	llvm::Value* generateValue<ASSIGNMENT_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateAssignmentExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const ASSIGNMENT_EXPRESSION& assignmentExpressionNode = nodeBuffers.GetNode(nodeID).AssignmentExpression;
 
 		const Node& identifierOrMemberAccessNode = nodeBuffers.GetNode(assignmentExpressionNode.IdentifierOrMemberAccessID);
 
-		llvm::Value* allocaInst;
+		llvm::Value* ptr = nullptr;
 
 		if (identifierOrMemberAccessNode.Kind == NodeKind::MEMBER_ACCESS_EXPRESSION)
 		{
-			allocaInst = generateValue<MEMBER_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.IdentifierOrMemberAccessID);
-			
-			if (!allocaInst)
-			{
-				return nullptr;
-			}
+			ptr = generateMemberAccessExpression(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.IdentifierOrMemberAccessID).Ptr;
 		}
 
-		else
+		else if (identifierOrMemberAccessNode.Kind == NodeKind::IDENTIFIER)
 		{
-			const IDENTIFIER& identifierNode = nodeBuffers.GetNode(assignmentExpressionNode.IdentifierOrMemberAccessID).Identifier;
-			const std::string_view identifierName = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
-
-			llvm::Value* value;
-			allocaInst = getVariable(state, identifierName, value);
-
-			if (!allocaInst)
-			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown variable name '{0}'!", identifierName);
-				return nullptr;
-			}
+			ptr = generateIdentifier(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.IdentifierOrMemberAccessID).Ptr;
 		}
 		
-
-		llvm::Value* expressionVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.ValueID);
+		llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.ValueID);
 
 		// store the value into the alloca
-		return state.Builder->CreateStore(expressionVal, allocaInst);
+		return state.Builder->CreateStore(expressionVal, ptr);
 	}
 
-	template <>
-	llvm::Value* generateValue<EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const auto& expressionNode = nodeBuffers.GetNode(nodeID);
 
 		switch (expressionNode.Kind)
 		{
 		case NodeKind::BINARY_EXPRESSION:
-			return generateValue<BINARY_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateBinaryExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::UNARY_EXPRESSION:
-			return generateValue<UNARY_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateUnaryExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::IDENTIFIER:
 		case NodeKind::LITERAL:
@@ -740,10 +784,10 @@ namespace AlloyCompiler
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 		case NodeKind::ENCLOSED_EXPRESSION:
-			return generateValue<PRIMARY_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generatePrimaryExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::ASSIGNMENT_EXPRESSION:
-			return generateValue<ASSIGNMENT_EXPRESSION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateAssignmentExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		default:
 			ASSERT(false, "Unknown expression node kind!");
@@ -752,39 +796,37 @@ namespace AlloyCompiler
 		}
 	}
 
-	template <>
-	llvm::Value* generateValue<VALUE_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
-	template <>
-	llvm::Value* generateValue<STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
-	template <>
-	llvm::Value* generateValue<BLOCK_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
+#pragma endregion
 
-	template <>
-	llvm::Value* generateValue<VALUE_DEFINITION_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	// forward declarations
+	llvm::Value* generateValueDefinition(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
+	llvm::Value* generateStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
+	llvm::Value* generateBlockStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID);
+	
+#pragma region Statements
+
+	llvm::Value* generateValueDefinitionStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const VALUE_DEFINITION_STATEMENT& valueDefinitionStatementNode = nodeBuffers.GetNode(nodeID).ValueDefinitionStatement;
 
-		return generateValue<VALUE_DEFINITION>(tokenBuffers, nodeBuffers, state, valueDefinitionStatementNode.ValueDefinitionExpressionID);
+		return generateValueDefinition(tokenBuffers, nodeBuffers, state, valueDefinitionStatementNode.ValueDefinitionExpressionID);
 	}
 
-	template <>
-	llvm::Value* generateValue<FUNCTION_CALL_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateFunctionCallStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const FUNCTION_CALL_STATEMENT& functionCallStatementNode = nodeBuffers.GetNode(nodeID).FunctionCallStatement;
 
-		return generateValue<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, state, functionCallStatementNode.FunctionCallExpressionID);
+		return generateFunctionCallExpression(tokenBuffers, nodeBuffers, state, functionCallStatementNode.FunctionCallExpressionID);
 	}
 
-	template <>
-	llvm::Value* generateValue<ASSIGNMENT_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateAssignmentStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const ASSIGNMENT_STATEMENT& assignmentStatementNode = nodeBuffers.GetNode(nodeID).AssignmentStatement;
 
-		return generateValue<ASSIGNMENT_EXPRESSION>(tokenBuffers, nodeBuffers, state, assignmentStatementNode.AssignmentExpressionID);
+		return generateAssignmentExpression(tokenBuffers, nodeBuffers, state, assignmentStatementNode.AssignmentExpressionID);
 	}
 
-	template <>
-	llvm::Value* generateValue<FOR_LOOP_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateForLoopStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const FOR_LOOP_STATEMENT& forLoopStatementNode = nodeBuffers.GetNode(nodeID).ForLoopStatement;
 
@@ -795,7 +837,7 @@ namespace AlloyCompiler
 		// emit init code before the loop
 		if (forLoopStatementNode.InitExpressionID != ERROR_NODE_ID)
 		{
-			llvm::Value* initVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, forLoopStatementNode.InitExpressionID);
+			llvm::Value* initVal = generateExpression(tokenBuffers, nodeBuffers, state, forLoopStatementNode.InitExpressionID);
 
 			if (initVal == nullptr)
 			{
@@ -813,7 +855,7 @@ namespace AlloyCompiler
 		state.Builder->SetInsertPoint(loopBlock);
 
 		// generate the body of the loop
-		llvm::Value* bodyVal = generateValue<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, state, forLoopStatementNode.BodyID);
+		llvm::Value* bodyVal = generateBlockStatement(tokenBuffers, nodeBuffers, state, forLoopStatementNode.BodyID);
 
 		if (bodyVal == nullptr)
 		{
@@ -823,7 +865,7 @@ namespace AlloyCompiler
 		// emit step value
 		if (forLoopStatementNode.IncrementExpressionID != ERROR_NODE_ID)
 		{
-			llvm::Value* stepVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, forLoopStatementNode.IncrementExpressionID);
+			llvm::Value* stepVal = generateExpression(tokenBuffers, nodeBuffers, state, forLoopStatementNode.IncrementExpressionID);
 
 			if (stepVal == nullptr)
 			{
@@ -832,7 +874,7 @@ namespace AlloyCompiler
 		}
 
 		// emit the condition
-		llvm::Value* conditionVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, forLoopStatementNode.ConditionExpressionID);
+		llvm::Value* conditionVal = generateExpression(tokenBuffers, nodeBuffers, state, forLoopStatementNode.ConditionExpressionID);
 
 		if (conditionVal == nullptr)
 		{
@@ -855,8 +897,7 @@ namespace AlloyCompiler
 		return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
 	}
 
-	template <>
-	llvm::Value* generateValue<WHILE_LOOP_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateWhileLoopStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const WHILE_LOOP_STATEMENT& whileLoopStatement = nodeBuffers.GetNode(nodeID).WhileLoopStatement;
 
@@ -874,7 +915,7 @@ namespace AlloyCompiler
 		state.Builder->SetInsertPoint(loopBlock);
 
 		// generate the body of the loop
-		llvm::Value* bodyVal = generateValue<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, state, whileLoopStatement.BodyID);
+		llvm::Value* bodyVal = generateBlockStatement(tokenBuffers, nodeBuffers, state, whileLoopStatement.BodyID);
 
 		if (bodyVal == nullptr)
 		{
@@ -882,7 +923,7 @@ namespace AlloyCompiler
 		}
 
 		// emit the condition
-		llvm::Value* conditionVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, whileLoopStatement.ConditionExpressionID);
+		llvm::Value* conditionVal = generateExpression(tokenBuffers, nodeBuffers, state, whileLoopStatement.ConditionExpressionID);
 
 		if (conditionVal == nullptr)
 		{
@@ -905,12 +946,11 @@ namespace AlloyCompiler
 		return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
 	}
 
-	template <>
-	llvm::Value* generateValue<IF_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateIfStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const IF_STATEMENT& ifStatementNode = nodeBuffers.GetNode(nodeID).IfStatement;
 
-		llvm::Value* conditionVal = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, ifStatementNode.ConditionExpressionID);
+		llvm::Value* conditionVal = generateExpression(tokenBuffers, nodeBuffers, state, ifStatementNode.ConditionExpressionID);
 
 		if (conditionVal == nullptr)
 		{
@@ -940,7 +980,7 @@ namespace AlloyCompiler
 		// emit then value
 		state.Builder->SetInsertPoint(thenBlock);
 
-		llvm::Value* thenVal = generateValue<STATEMENT>(tokenBuffers, nodeBuffers, state, ifStatementNode.BodyID);
+		llvm::Value* thenVal = generateStatement(tokenBuffers, nodeBuffers, state, ifStatementNode.BodyID);
 
 		if (thenVal == nullptr)
 		{
@@ -969,7 +1009,7 @@ namespace AlloyCompiler
 
 		else
 		{
-			elseVal = generateValue<STATEMENT>(tokenBuffers, nodeBuffers, state, ifStatementNode.ElseID);
+			elseVal = generateStatement(tokenBuffers, nodeBuffers, state, ifStatementNode.ElseID);
 
 			if (elseVal == nullptr)
 			{
@@ -997,9 +1037,8 @@ namespace AlloyCompiler
 
 		return phiNode;
 	}
-
-	template <>
-	llvm::Value* generateValue<BLOCK_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generateBlockStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const BLOCK_STATEMENT& blockStatementNode = nodeBuffers.GetNode(nodeID).BlockStatement;
 
@@ -1007,7 +1046,7 @@ namespace AlloyCompiler
 
 		for (const NodeID statementID : blockStatementNode.StatementIDs)
 		{
-			statementVal = generateValue<STATEMENT>(tokenBuffers, nodeBuffers, state, statementID);
+			statementVal = generateStatement(tokenBuffers, nodeBuffers, state, statementID);
 
 			if (statementVal == nullptr)
 			{
@@ -1017,13 +1056,12 @@ namespace AlloyCompiler
 
 		return statementVal;
 	}
-
-	template <>
-	llvm::Value* generateValue<RETURN_STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generateReturnStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const RETURN_STATEMENT& returnStatementNode = nodeBuffers.GetNode(nodeID).ReturnStatement;
 
-		llvm::Value* expressionValue = generateValue<EXPRESSION>(tokenBuffers, nodeBuffers, state, returnStatementNode.ExpressionID);
+		llvm::Value* expressionValue = generateExpression(tokenBuffers, nodeBuffers, state, returnStatementNode.ExpressionID);
 
 		if (expressionValue == nullptr)
 		{
@@ -1032,37 +1070,36 @@ namespace AlloyCompiler
 
 		return state.Builder->CreateRet(expressionValue);
 	}
-
-	template <>
-	llvm::Value* generateValue<STATEMENT>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generateStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const Node& node = nodeBuffers.GetNode(nodeID);
 
 		switch (node.Kind)
 		{
 		case NodeKind::VALUE_DEFINITION_STATEMENT:
-			return generateValue<VALUE_DEFINITION_STATEMENT>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateValueDefinitionStatement(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::FUNCTION_CALL_STATEMENT:
-			return generateValue<FUNCTION_CALL_STATEMENT>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateFunctionCallStatement(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::ASSIGNMENT_STATEMENT:
-			return generateValue<ASSIGNMENT_STATEMENT>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateAssignmentStatement(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::FOR_LOOP_STATEMENT:
-			return generateValue<FOR_LOOP_STATEMENT>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateForLoopStatement(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::WHILE_LOOP_STATEMENT:
-			return generateValue<WHILE_LOOP_STATEMENT>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateWhileLoopStatement(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::IF_STATEMENT:
-			return generateValue<IF_STATEMENT>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateIfStatement(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::BLOCK_STATEMENT:
-			return generateValue<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateBlockStatement(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::RETURN_STATEMENT:
-			return generateValue<RETURN_STATEMENT>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateReturnStatement(tokenBuffers, nodeBuffers, state, nodeID);
 
 		default:
 			ASSERT(false, "Unknown statement node kind!");
@@ -1070,24 +1107,25 @@ namespace AlloyCompiler
 		}
 	}
 
-	template <>
-	llvm::Value* generateValue<EXTERN_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+#pragma endregion
+
+#pragma region Definitions
+
+	llvm::Value* generateExternDefinition(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const EXTERN_DEFINITION& externDefinitionNode = nodeBuffers.GetNode(nodeID).ExternDefinition;
 
-		return generateValue<FUNCTION_DECLARATION>(tokenBuffers, nodeBuffers, state, externDefinitionNode.FunctionDeclarationID);
+		return generateFunctionDeclaration(tokenBuffers, nodeBuffers, state, externDefinitionNode.FunctionDeclarationID);
 	}
-
-	template <>
-	llvm::Value* generateValue<VALUE_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	
+	llvm::Value* generateValueDefinition(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const VALUE_DEFINITION& valueDefinitionNode = nodeBuffers.GetNode(nodeID).ValueDefinition;
 
-		return generateValue<VALUE_DEFINITION_EXPRESSION>(tokenBuffers, nodeBuffers, state, valueDefinitionNode.ValueDefinitionExpressionID);
+		return generateValueDefinitionExpression(tokenBuffers, nodeBuffers, state, valueDefinitionNode.ValueDefinitionExpressionID);
 	}
 
-	template <>
-	llvm::Value* generateValue<STRUCT_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Type* generateStructDefinition(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::STRUCT_DEFINITION, "Expected STRUCT_DEFINITION!");
 
@@ -1100,14 +1138,14 @@ namespace AlloyCompiler
 
 		// get a vector of member types
 		std::vector<llvm::Type*> memberTypes;
-		std::map<std::string, int> memberNames;
+		std::unordered_map<std::string_view, int> memberNames;
 
 		int memberIndex = 0;
 		for (auto id : structDefinitionNode.MemberIDs)
 		{
 			const VALUE_DECLARATION& valueDeclaration = nodeBuffers.GetNode(id).ValueDeclaration;
 
-			llvm::Type* type = generateType<TYPE_IDENTIFIER>(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID);
+			llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID);
 
 			if (!type)
 			{
@@ -1115,7 +1153,7 @@ namespace AlloyCompiler
 			}
 
 			memberTypes.push_back(type);
-
+			
 			// retrieve member name and add it to memberNames map
 			const IDENTIFIER& memberID = nodeBuffers.GetNode(valueDeclaration.IdentifierID).Identifier;
 			const std::string memberName = std::string(tokenBuffers.GetValue(memberID.IdentifierTokenID).ToStringView());
@@ -1123,40 +1161,32 @@ namespace AlloyCompiler
 			memberNames[memberName] = memberIndex++;
 		}
 
-		// store a map to member names
-		NamedStructs::setMemberNames(Name, memberNames);
+		llvm::StructType* structType = llvm::StructType::create(*state.Context, memberTypes, name);
 
-		// now create the structure type in llvm
-		llvm::StructType* structType = StructType::create(*TheContext, MemberTypes, Name);
-		if (nullptr != structType) {
-
-			// add the newly created type tot he AlloyToLLVM map
-			CGNamedValues::addType(Name, StructType::getTypeByName(*TheContext, Name));
-			result = ConstantInt::getTrue(*TheContext);
-
-		}
-		else {
-			result = ConstantInt::getFalse(*TheContext);
+		if (!structType)
+		{
+			// TODO: log error
+			return nullptr;
 		}
 
-		return result;
+		state.NamedValues.InsertType(name, structType, /*isStruct*/true, memberNames);
+
+		return structType;
 	}
 
-	template <>
-	llvm::Value* generateValue<ENUM_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateEnumDefinition(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(false, "To be implemented.");
 		return nullptr;
 	}
 
-	template <>
-	llvm::Value* generateValue<FUNCTION_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateFunctionDefinition(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::FUNCTION_DEFINITION, "Expected FUNCTION_DEFINITION!")
 
 		const FUNCTION_DEFINITION& functionDefinitionNode = nodeBuffers.GetNode(nodeID).FunctionDefinition;
 
-		llvm::Function* func = static_cast<llvm::Function*>(generateValue<FUNCTION_DECLARATION>(tokenBuffers, nodeBuffers, state, functionDefinitionNode.FunctionDeclarationID));
+		llvm::Function* func = static_cast<llvm::Function*>(generateFunctionDeclaration(tokenBuffers, nodeBuffers, state, functionDefinitionNode.FunctionDeclarationID));
 
 		// push a new scope for the function
 		state.NamedValues.PushScope(func->getName().str());
@@ -1188,7 +1218,7 @@ namespace AlloyCompiler
 			state.NamedValues.InsertValue(arg.getName().str(), allocaInst);
 		}
 
-		llvm::Value* bodyVal = generateValue<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, state, functionDefinitionNode.BodyID);
+		llvm::Value* bodyVal = generateBlockStatement(tokenBuffers, nodeBuffers, state, functionDefinitionNode.BodyID);
 
 		if (!bodyVal)
 		{
@@ -1215,27 +1245,26 @@ namespace AlloyCompiler
 		return func;
 	}
 
-	template <>
-	llvm::Value* generateValue<DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateDefinition(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const Node& node = nodeBuffers.GetNode(nodeID);
 
 		switch (node.Kind)
 		{
 		case NodeKind::EXTERN_DEFINITION:
-			return generateValue<EXTERN_DEFINITION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateExternDefinition(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::VALUE_DEFINITION:
-			return generateValue<VALUE_DEFINITION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateValueDefinition(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::STRUCT_DEFINITION:
-			return generateValue<STRUCT_DEFINITION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateStructDefinition(tokenBuffers, nodeBuffers, state, nodeID) ? llvm::ConstantInt::getTrue(*state.Context) : nullptr;
 
 		case NodeKind::ENUM_DEFINITION:
-			return generateValue<ENUM_DEFINITION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateEnumDefinition(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::FUNCTION_DEFINITION:
-			return generateValue<FUNCTION_DEFINITION>(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateFunctionDefinition(tokenBuffers, nodeBuffers, state, nodeID);
 
 		default:
 			ASSERT(false, "Unknown definition node kind!");
@@ -1243,38 +1272,37 @@ namespace AlloyCompiler
 		}
 	}
 
-	template <>
-	llvm::Value* generateValue<QUALIFIED_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateQualifiedDefinition(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const QUALIFIED_DEFINITION& qualifiedDefinitionNode = nodeBuffers.GetNode(nodeID).QualifiedDefinition;
 
 		// TODO: where does the qualifier come in?
 
-		return generateValue<DEFINITION>(tokenBuffers, nodeBuffers, state, qualifiedDefinitionNode.DefinitionID);
+		return generateDefinition(tokenBuffers, nodeBuffers, state, qualifiedDefinitionNode.DefinitionID);
 	}
 
-	template <>
-	llvm::Value* generateValue<MODULE>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+#pragma endregion
+
+	llvm::Value* generateModule(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const MODULE& moduleNode = nodeBuffers.GetNode(nodeID).Module;
 
 		// generate code for each qualified definition in the module
 		for (const NodeID qualifiedDefinitionID : moduleNode.QualifiedDefinitionIDs)
 		{
-			generateValue<QUALIFIED_DEFINITION>(tokenBuffers, nodeBuffers, state, qualifiedDefinitionID);
+			generateQualifiedDefinition(tokenBuffers, nodeBuffers, state, qualifiedDefinitionID);
 		}
 
 		return nullptr;
 	}
 
-	template <>
-	llvm::Value* generateValue<PROGRAM>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Value* generateProgram(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		const PROGRAM& programNode = nodeBuffers.GetNode(nodeID).Program;
 
 		// generate code for each module in the program
 		// TODO: support for multiple modules
-		return generateValue<MODULE>(tokenBuffers, nodeBuffers, state, programNode.ModuleIDs[0]);
+		return generateModule(tokenBuffers, nodeBuffers, state, programNode.ModuleIDs[0]);
 	}
 
 	llvm::Value* Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize)
@@ -1285,7 +1313,7 @@ namespace AlloyCompiler
 
 		LLVMState state(optimize);
 
-		llvm::Value* pValue = generateValue<PROGRAM>(tokenBuffers, nodeBuffers, state, rootNodeID);
+		llvm::Value* pValue = generateProgram(tokenBuffers, nodeBuffers, state, rootNodeID);
 
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("out.ll", errorCode);
