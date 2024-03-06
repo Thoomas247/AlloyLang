@@ -628,62 +628,83 @@ namespace AlloyCompiler
 
 		if (operatorStr == "==")
 		{
-			return isFloatingPoint ? state.Builder->CreateFCmpUEQ(leftVal, rightVal, "eqtmp") : state.Builder->CreateICmpEQ(leftVal, rightVal, "eqtmp");
-
+			return isFloatingPoint
+				? state.Builder->CreateFCmpOEQ(leftVal, rightVal, "eqtmp")
+				: state.Builder->CreateICmpEQ(leftVal, rightVal, "eqtmp");
 		}
 
 		if (operatorStr == "!=")
 		{
-			return isFloatingPoint ? state.Builder->CreateFCmpUNE(leftVal, rightVal, "neqtmp") : state.Builder->CreateICmpNE(leftVal, rightVal, "neqtmp");
+			return isFloatingPoint
+				? state.Builder->CreateFCmpONE(leftVal, rightVal, "neqtmp")
+				: state.Builder->CreateICmpNE(leftVal, rightVal, "neqtmp");
 		}
 
 		if (operatorStr == ">")
 		{
-			return isFloatingPoint ? state.Builder->CreateFCmpUGT(leftVal, rightVal, "gttmp") : state.Builder->CreateICmpUGT(leftVal, rightVal, "gttmp");
+			return isFloatingPoint
+				? state.Builder->CreateFCmpUGT(leftVal, rightVal, "gttmp")
+				: state.Builder->CreateICmpSGT(leftVal, rightVal, "gttmp");
 		}
 
 		if (operatorStr == "<")
 		{
-			return isFloatingPoint ? state.Builder->CreateFCmpULT(leftVal, rightVal, "lttmp") : state.Builder->CreateICmpULT(leftVal, rightVal, "lttmp");
+			return isFloatingPoint
+				? state.Builder->CreateFCmpULT(leftVal, rightVal, "lttmp")
+				: state.Builder->CreateICmpSLT(leftVal, rightVal, "lttmp");
 		}
 
 		if (operatorStr == ">=")
 		{
-			return isFloatingPoint ? state.Builder->CreateFCmpUGE(leftVal, rightVal, "getmp") : state.Builder->CreateICmpUGE(leftVal, rightVal, "getmp");
+			return isFloatingPoint
+				? state.Builder->CreateFCmpUGE(leftVal, rightVal, "getmp")
+				: state.Builder->CreateICmpSGE(leftVal, rightVal, "getmp");
 		}
 
 		if (operatorStr == "<=")
 		{
-			return isFloatingPoint ? state.Builder->CreateFCmpULE(leftVal, rightVal, "letmp") : state.Builder->CreateICmpULE(leftVal, rightVal, "letmp");
+			return isFloatingPoint
+				? state.Builder->CreateFCmpULE(leftVal, rightVal, "letmp")
+				: state.Builder->CreateICmpSLE(leftVal, rightVal, "letmp");
 		}
 
 		// additive operators
 
 		if (operatorStr == "+")
 		{
-			return isFloatingPoint ? state.Builder->CreateFAdd(leftVal, rightVal, "addtmp") : state.Builder->CreateAdd(leftVal, rightVal, "addtmp");
+			return isFloatingPoint
+				? state.Builder->CreateFAdd(leftVal, rightVal, "addtmp")
+				: state.Builder->CreateAdd(leftVal, rightVal, "addtmp");
 		}
 
 		if (operatorStr == "-")
 		{
-			return isFloatingPoint ? state.Builder->CreateFSub(leftVal, rightVal, "subtmp") : state.Builder->CreateSub(leftVal, rightVal, "subtmp");
+			return isFloatingPoint
+				? state.Builder->CreateFSub(leftVal, rightVal, "subtmp")
+				: state.Builder->CreateSub(leftVal, rightVal, "subtmp");
 		}
 
 		// multiplicative operators
 
 		if (operatorStr == "*")
 		{
-			return isFloatingPoint ? state.Builder->CreateFMul(leftVal, rightVal, "multmp") : state.Builder->CreateMul(leftVal, rightVal, "multmp");
+			return isFloatingPoint
+				? state.Builder->CreateFMul(leftVal, rightVal, "multmp")
+				: state.Builder->CreateMul(leftVal, rightVal, "multmp");
 		}
 
 		if (operatorStr == "/")
 		{
-			return isFloatingPoint ? state.Builder->CreateFDiv(leftVal, rightVal, "divtmp") : state.Builder->CreateUDiv(leftVal, rightVal, "divtmp");
+			return isFloatingPoint
+				? state.Builder->CreateFDiv(leftVal, rightVal, "divtmp")
+				: state.Builder->CreateUDiv(leftVal, rightVal, "divtmp");
 		}
 
 		if (operatorStr == "%")
 		{
-			return isFloatingPoint ? state.Builder->CreateFRem(leftVal, rightVal, "modtmp") : state.Builder->CreateURem(leftVal, rightVal, "modtmp");
+			return isFloatingPoint
+				? state.Builder->CreateFRem(leftVal, rightVal, "modtmp")
+				: state.Builder->CreateURem(leftVal, rightVal, "modtmp");
 		}
 
 		ASSERT(false, "Unknown binary operator '{0}'!", operatorStr);
@@ -993,7 +1014,7 @@ namespace AlloyCompiler
 		// TODO: extend to all possible data types
 		if (conditionVal->getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID)
 		{
-			conditionVal = state.Builder->CreateICmpEQ(conditionVal,
+			conditionVal = state.Builder->CreateICmpNE(conditionVal,
 				llvm::ConstantInt::get(*state.Context, llvm::APInt(conditionVal->getType()->getIntegerBitWidth(), 0)), "ifcond");
 		}
 		else {
