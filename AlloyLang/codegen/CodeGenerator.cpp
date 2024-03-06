@@ -342,7 +342,14 @@ namespace AlloyCompiler
 
 		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, functionDeclarationNode.IsVariadic);
 
-		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, state.Module.get());
+		//
+		// This call creates a crash when later executing the code using the JIT engine: 
+		// llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, state.Module.get());
+		// There is a TODO in the source-code of llvm that might explain that: 
+		// TODO: remove this once all users have been updated to pass an AddrSpace
+		// So when using Module.get() to pass a pointer rather than a reference (*Module) we should also pass 0 as address space
+		//
+		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, *state.Module);
 
 		// set names for all arguments
 		for (size_t i = 0; i < function->arg_size(); i++)
@@ -1378,21 +1385,19 @@ namespace AlloyCompiler
 		return generateModule(tokenBuffers, nodeBuffers, state, programNode.ModuleIDs[0]);
 	}
 
-	LLVMState Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize)
+	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state)
 	{
 		const NodeID rootNodeID = nodeBuffers.GetRootNodeID();
 
 		ASSERT(nodeBuffers.GetNode(rootNodeID).Kind == NodeKind::PROGRAM, "Root node must be a program node!");
 
-		LLVMState state(optimize);
-
 		llvm::Value* program = generateProgram(tokenBuffers, nodeBuffers, state, rootNodeID);
-
+		
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
 		state.Module->print(out, nullptr);
-
-		return std::move(state);
+		
+		return true;
 	}
 
 	int Execute(LLVMState& state)

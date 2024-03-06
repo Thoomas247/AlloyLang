@@ -40,8 +40,9 @@ namespace unittests
 			TokenBuffers tokenBuffers = Tokenize(src);
 			auto nodeBuffers = Parse(tokenBuffers);
 
-			LLVMState llvmState = Generate(tokenBuffers, nodeBuffers, true);
-			int result = Execute(llvmState);
+			LLVMState state(true);
+			Generate(tokenBuffers, nodeBuffers, state);
+			int result = Execute(state);
 
 #if 0
 			// retrieve result and compare with expected data
@@ -60,7 +61,7 @@ namespace unittests
 			constexpr auto TestStr = R"(
 				extern fn printf (const str : String) -> i32;
 
-				fn main () -> i32
+				fn main () -> i64
 				{
 					printf("Basic");
 					return 1;

@@ -70,7 +70,8 @@ int main(int argc, char* argv[])
 	start = std::chrono::high_resolution_clock::now();
 	//LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
 	//codegen.Process();	// TBD: implement error handling
-	LLVMState llvmState = Generate(tokenBuffers, nodeBuffers, true);
+	LLVMState state(true);
+	Generate(tokenBuffers, nodeBuffers, state);
 
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

@@ -26,6 +26,11 @@ namespace AlloyCompiler
 
 		bool Optimizations;
 
+		virtual ~LLVMState()
+		{
+			assert(true);
+		}
+
 		LLVMState(bool optimizations)
 			: Optimizations(optimizations)
 		{
@@ -72,6 +77,6 @@ namespace AlloyCompiler
 		}
 	};
 
-	LLVMState Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize);
+	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state);
 	int Execute(LLVMState& state);
 }
