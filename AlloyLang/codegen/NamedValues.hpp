@@ -7,6 +7,7 @@
 
 namespace llvm
 {
+	class LLVMContext;
 	class AllocaInst;
 	class Type;
 }
@@ -18,6 +19,8 @@ namespace AlloyCompiler
 	public:
 		NamedValues();
 		~NamedValues();
+
+		void RegisterDefaultTypes(llvm::LLVMContext& llvmContext);
 
 		void PushScope(const std::string_view& name);
 		void PopScope();

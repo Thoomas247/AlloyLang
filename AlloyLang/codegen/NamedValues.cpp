@@ -1,6 +1,8 @@
 #include "NamedValues.hpp"
 
+#include "llvm/llvm.hpp"
 #include "../log/Log.hpp"
+
 
 namespace AlloyCompiler
 {
@@ -14,6 +16,23 @@ namespace AlloyCompiler
 
 	NamedValues::~NamedValues()
 	{
+	}
+
+	void NamedValues::RegisterDefaultTypes(llvm::LLVMContext& llvmContext)
+	{
+		// insert the default types
+		InsertType("i8", llvm::Type::getInt8Ty(llvmContext), false);
+		InsertType("i16", llvm::Type::getInt16Ty(llvmContext), false);
+		InsertType("i32", llvm::Type::getInt32Ty(llvmContext), false);
+		InsertType("i64", llvm::Type::getInt64Ty(llvmContext), false);
+
+		InsertType("u8", llvm::Type::getInt8Ty(llvmContext), false);
+		InsertType("u16", llvm::Type::getInt16Ty(llvmContext), false);
+		InsertType("u32", llvm::Type::getInt32Ty(llvmContext), false);
+		InsertType("u64", llvm::Type::getInt64Ty(llvmContext), false);
+
+		InsertType("f32", llvm::Type::getFloatTy(llvmContext), false);
+		InsertType("f64", llvm::Type::getDoubleTy(llvmContext), false);
 	}
 
 	void NamedValues::PushScope(const std::string_view& name)

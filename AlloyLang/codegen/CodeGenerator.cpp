@@ -33,6 +33,7 @@ namespace AlloyCompiler
 			Builder = std::make_unique<llvm::IRBuilder<>>(*Context);
 			Module = std::make_unique<llvm::Module>("AlloyModule", *Context);
 
+			NamedValues.RegisterDefaultTypes(*Context);
 
 			if (optimizations)
 			{
@@ -387,6 +388,11 @@ namespace AlloyCompiler
 			returnType = generateTypeDeclaration(tokenBuffers, nodeBuffers, state, node.ReturnTypeID);
 		}
 
+		if (!returnType)
+		{
+			return nullptr;
+		}
+
 		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, paramTypes.size() > 1);
 
 		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, state.Module.get());
@@ -488,6 +494,8 @@ namespace AlloyCompiler
 
 	llvm::Value* generateValueDefinitionExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::VALUE_DEFINITION_EXPRESSION, "Expected VALUE_DEFINITION_EXPRESSION!");
+
 		const VALUE_DEFINITION_EXPRESSION& valueDefinitionExpressionNode = nodeBuffers.GetNode(nodeID).ValueDefinitionExpression;
 
 		// create the declaration
@@ -846,6 +854,7 @@ namespace AlloyCompiler
 
 		case NodeKind::IDENTIFIER:
 		case NodeKind::LITERAL:
+		case NodeKind::CONSTRUCTOR_EXPRESSION:
 		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
@@ -877,7 +886,7 @@ namespace AlloyCompiler
 	{
 		const VALUE_DEFINITION_STATEMENT& valueDefinitionStatementNode = nodeBuffers.GetNode(nodeID).ValueDefinitionStatement;
 
-		return generateValueDefinition(tokenBuffers, nodeBuffers, state, valueDefinitionStatementNode.ValueDefinitionExpressionID);
+		return generateValueDefinitionExpression(tokenBuffers, nodeBuffers, state, valueDefinitionStatementNode.ValueDefinitionExpressionID);
 	}
 
 	llvm::Value* generateFunctionCallStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -1255,6 +1264,11 @@ namespace AlloyCompiler
 		const FUNCTION_DEFINITION& functionDefinitionNode = nodeBuffers.GetNode(nodeID).FunctionDefinition;
 
 		llvm::Function* func = static_cast<llvm::Function*>(generateFunctionDeclaration(tokenBuffers, nodeBuffers, state, functionDefinitionNode.FunctionDeclarationID));
+
+		if (!func)
+		{
+			return nullptr;
+		}
 
 		// push a new scope for the function
 		state.NamedValues.PushScope(func->getName().str());
