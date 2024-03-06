@@ -283,8 +283,8 @@ namespace AlloyCompiler
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::FUNCTION_DECLARATION, "Expected FUNCTION_DECLARATION!");
 
-		const FUNCTION_DECLARATION& node = nodeBuffers.GetNode(nodeID).FunctionDeclaration;
-		const IDENTIFIER& identifier = nodeBuffers.GetNode(node.IdentifierID).Identifier;
+		const FUNCTION_DECLARATION& functionDeclarationNode = nodeBuffers.GetNode(nodeID).FunctionDeclaration;
+		const IDENTIFIER& identifier = nodeBuffers.GetNode(functionDeclarationNode.IdentifierID).Identifier;
 
 		const std::string_view name = tokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView();
 
@@ -298,7 +298,7 @@ namespace AlloyCompiler
 		// retrieve the parameter types
 		std::vector<llvm::Type*> paramTypes;
 
-		for (NodeID parameterID : node.ParameterIDs)
+		for (NodeID parameterID : functionDeclarationNode.ParameterIDs)
 		{
 			const VALUE_DECLARATION& valueDeclaration = nodeBuffers.GetNode(parameterID).ValueDeclaration;
 
@@ -315,10 +315,10 @@ namespace AlloyCompiler
 		// retrieve the return type
 		llvm::Type* returnType = llvm::Type::getVoidTy(*state.Context);
 
-		if (node.ReturnTypeID != ERROR_NODE_ID)
+		if (functionDeclarationNode.ReturnTypeID != ERROR_NODE_ID)
 		{
-			const TYPE_DECLARATION& typeDeclaration = nodeBuffers.GetNode(node.ReturnTypeID).TypeDeclaration;
-			returnType = generateTypeDeclaration(tokenBuffers, nodeBuffers, state, node.ReturnTypeID);
+			const TYPE_DECLARATION& typeDeclaration = nodeBuffers.GetNode(functionDeclarationNode.ReturnTypeID).TypeDeclaration;
+			returnType = generateTypeDeclaration(tokenBuffers, nodeBuffers, state, functionDeclarationNode.ReturnTypeID);
 		}
 
 		if (!returnType)
@@ -326,14 +326,14 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, paramTypes.size() > 1);
+		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, functionDeclarationNode.IsVariadic);
 
 		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, state.Module.get());
 
 		// set names for all arguments
 		for (size_t i = 0; i < function->arg_size(); i++)
 		{
-			const VALUE_DECLARATION& valueDeclaration = nodeBuffers.GetNode(node.ParameterIDs[i]).ValueDeclaration;
+			const VALUE_DECLARATION& valueDeclaration = nodeBuffers.GetNode(functionDeclarationNode.ParameterIDs[i]).ValueDeclaration;
 			const IDENTIFIER& identifier = nodeBuffers.GetNode(valueDeclaration.IdentifierID).Identifier;
 
 			const std::string_view paramName = tokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView();
@@ -1242,9 +1242,6 @@ namespace AlloyCompiler
 			state.NamedValues.PopScope();
 			return nullptr;
 		}
-
-		// finish off the function
-		state.Builder->CreateRet(bodyVal);
 
 		// validate the generated code, checking for consistency
 		llvm::verifyFunction(*func);
