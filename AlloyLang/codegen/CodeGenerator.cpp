@@ -22,6 +22,21 @@ namespace AlloyCompiler
 		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 	}
 
+	llvm::Value* convertToBool(LLVMState& state, llvm::Value* value)
+	{
+		// convert condition to a bool by comparing non-equal to 0
+		// TODO: extend to all possible data types (eg pointers)
+		if (value->getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID)
+		{
+			return state.Builder->CreateICmpNE(value,
+				llvm::ConstantInt::get(*state.Context, llvm::APInt(value->getType()->getIntegerBitWidth(), 0)), "ifcond");
+		}
+		else
+		{
+			return state.Builder->CreateFCmpONE(value, llvm::ConstantFP::get(*state.Context, llvm::APFloat(0.0)), "ifcond");
+		}
+	}
+
 	std::string unescapeString(const AlloyCompiler::SmallStringView& str)
 	{
 		static const std::unordered_map<char, char> escapeCharacterMap =
@@ -934,8 +949,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		// convert condition to a bool by comparing non-equal to 0.0
-		conditionVal = state.Builder->CreateFCmpONE(conditionVal, llvm::ConstantFP::get(*state.Context, llvm::APFloat(0.0)), "loopcond");
+		conditionVal = convertToBool(state, conditionVal);
 
 		// create the "after loop" block and insert it
 		llvm::BasicBlock* afterBlock = llvm::BasicBlock::Create(*state.Context, "afterloop", func);
@@ -983,8 +997,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		// convert condition to a bool by comparing non-equal to 0.0
-		conditionVal = state.Builder->CreateFCmpONE(conditionVal, llvm::ConstantFP::get(*state.Context, llvm::APFloat(0.0)), "loopcond");
+		conditionVal = convertToBool(state, conditionVal);
 
 		// create the "after loop" block and insert it
 		llvm::BasicBlock* afterBlock = llvm::BasicBlock::Create(*state.Context, "afterloop", func);
@@ -1010,16 +1023,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		// convert condition to a bool by comparing non-equal to 0
-		// TODO: extend to all possible data types
-		if (conditionVal->getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID)
-		{
-			conditionVal = state.Builder->CreateICmpNE(conditionVal,
-				llvm::ConstantInt::get(*state.Context, llvm::APInt(conditionVal->getType()->getIntegerBitWidth(), 0)), "ifcond");
-		}
-		else {
-			conditionVal = state.Builder->CreateFCmpONE(conditionVal, llvm::ConstantFP::get(*state.Context, llvm::APFloat(0.0)), "ifcond");
-		}
+		conditionVal = convertToBool(state, conditionVal);
 
 		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
 
