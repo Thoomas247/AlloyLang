@@ -1359,12 +1359,12 @@ namespace AlloyCompiler
 
 					left = nodeBuffers.CreateNode(
 						Node{
-							.Kind = NodeKind::BINARY_EXPRESSION,
-							.BinaryExpression = BINARY_EXPRESSION
+							.Kind = NodeKind::ASSIGNMENT_EXPRESSION,
+							.AssignmentExpression = ASSIGNMENT_EXPRESSION
 							{
+								.IdentifierOrMemberAccessID = left,
 								.OperatorTokenID = opTokenID,
-								.LeftID = left,
-								.RightID = right
+								.ValueID = right
 							}
 						},
 						opTokenID

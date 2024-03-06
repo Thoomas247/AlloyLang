@@ -1,12 +1,21 @@
 #pragma once
 
 constexpr auto TestSrc1 = R"(
-extern fn printf (const str : String) -> i32;
+extern fn printf (const str : String, const param : i64) -> i64;
+
+fn mul (const a : &i64, const b : &i64) -> i64
+{
+	var ret : i64 = 0;
+	for (var i : i64 = 0; i < a; i = i + 1) {
+		ret = ret + b;
+	}
+	return ret;
+}
 
 fn main () -> i64
 {
-	printf("Basic");
-	return 1;
+	printf("3 x 5 = %d", mul(3, 5));
+	return mul(3, 5);
 }
 )";
 
