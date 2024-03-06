@@ -138,7 +138,6 @@ namespace AlloyCompiler
 
 		case LITERAL::Type::String:
 			return state.Builder->CreateGlobalStringPtr(literalStr);
-			//return llvm::ConstantDataArray::getString(*state.Context, literalStr);
 
 		case LITERAL::Type::Character:
 			return llvm::ConstantInt::get(*state.Context, llvm::APInt(64, literalStr[0]));
@@ -1095,12 +1094,37 @@ namespace AlloyCompiler
 
 	llvm::Value* generateReturnStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::RETURN_STATEMENT, "Expected RETURN_STATEMENT!");
+
 		const RETURN_STATEMENT& returnStatementNode = nodeBuffers.GetNode(nodeID).ReturnStatement;
+
+		// handle void return
+		if (returnStatementNode.ExpressionID == ERROR_NODE_ID)
+		{
+			if (state.CurrentReturnType != nullptr)
+			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID),
+					"Function expects a return value of type '{0}'!", state.NamedValues.GetTypeName(state.CurrentReturnType));
+
+				return nullptr;
+			}
+
+			return state.Builder->CreateRetVoid();
+		}
 
 		llvm::Value* expressionValue = generateExpression(tokenBuffers, nodeBuffers, state, returnStatementNode.ExpressionID);
 
 		if (expressionValue == nullptr)
 		{
+			return nullptr;
+		}
+
+		if (expressionValue->getType() != state.CurrentReturnType)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), 
+				"Function has return type '{0}' but provided return value is of type '{1}'!", 
+				state.NamedValues.GetTypeName(state.CurrentReturnType),
+				state.NamedValues.GetTypeName(expressionValue->getType()));
 			return nullptr;
 		}
 
@@ -1224,10 +1248,12 @@ namespace AlloyCompiler
 
 		llvm::Function* func = static_cast<llvm::Function*>(generateFunctionDeclaration(tokenBuffers, nodeBuffers, state, functionDefinitionNode.FunctionDeclarationID));
 
-		if (!func)
+		if (func == nullptr)
 		{
 			return nullptr;
 		}
+
+		state.CurrentReturnType = func->getReturnType();
 
 		// push a new scope for the function
 		state.NamedValues.PushScope(func->getName().str());
@@ -1246,6 +1272,7 @@ namespace AlloyCompiler
 
 				func->eraseFromParent();
 				state.NamedValues.PopScope();
+				state.CurrentReturnType = nullptr;
 				return nullptr;
 			}
 
@@ -1265,6 +1292,7 @@ namespace AlloyCompiler
 		{
 			func->eraseFromParent();
 			state.NamedValues.PopScope();
+			state.CurrentReturnType = nullptr;
 			return nullptr;
 		}
 
@@ -1279,6 +1307,8 @@ namespace AlloyCompiler
 
 		// restore the named values of the higher level
 		state.NamedValues.PopScope();
+
+		state.CurrentReturnType = nullptr;
 
 		return func;
 	}
