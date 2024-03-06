@@ -20,6 +20,9 @@ namespace AlloyCompiler
 
 	void NamedValues::RegisterDefaultTypes(llvm::LLVMContext& llvmContext)
 	{
+		// TODO: remove
+		InsertType("String", llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0), false); // convert string to u8*
+
 		// insert the default types
 		InsertType("i8", llvm::Type::getInt8Ty(llvmContext), false);
 		InsertType("i16", llvm::Type::getInt16Ty(llvmContext), false);
@@ -101,6 +104,23 @@ namespace AlloyCompiler
 		return it->second;
 	}
 
+	std::string_view NamedValues::GetTypeName(llvm::Type* type)
+	{
+		// look for the type starting from the current scope and going up
+		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
+		{
+			auto& scope = *it;
+			auto found = scope.TypeNames.find(type);
+			if (found != scope.TypeNames.end())
+			{
+				return found->second;
+			}
+		}
+
+		ASSERT(false, "Type name not found! This only happens if type wasn't added to NamedValues when it should.");
+		return "";
+	}
+
 	void NamedValues::InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, int> structMembers)
 	{
 		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
@@ -113,6 +133,7 @@ namespace AlloyCompiler
 		typeInfo.StructMembers = structMembers;
 
 		m_ScopeStack.back().Types[name] = typeInfo;
+		m_ScopeStack.back().TypeNames[type] = name;
 	}
 
 
@@ -121,7 +142,7 @@ namespace AlloyCompiler
 
 	NamedValues::TypeInfo* NamedValues::findType(const std::string_view& name)
 	{
-		// look for the type starting from the current scope and going up
+		// look for the type name starting from the current scope and going up
 		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
 		{
 			auto& scope = *it;

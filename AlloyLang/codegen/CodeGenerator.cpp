@@ -1,76 +1,9 @@
 #include "CodeGenerator.hpp"
 
-#include "llvm/llvm.hpp"
-#include "NamedValues.hpp"
-
 namespace AlloyCompiler
 {
 
 #pragma region Util
-
-	struct LLVMState
-	{
-		std::unique_ptr<llvm::LLVMContext> Context;
-		std::unique_ptr<llvm::IRBuilder<>> Builder;
-		std::unique_ptr<llvm::Module> Module;
-		NamedValues NamedValues;
-
-		// handling llvm copde optimizations passes
-		std::unique_ptr<llvm::FunctionPassManager> FPM;
-		std::unique_ptr<llvm::LoopAnalysisManager> LAM;
-		std::unique_ptr<llvm::FunctionAnalysisManager> FAM;
-		std::unique_ptr<llvm::CGSCCAnalysisManager> CGAM;
-		std::unique_ptr<llvm::ModuleAnalysisManager> MAM;
-		std::unique_ptr<llvm::PassInstrumentationCallbacks> PIC;
-		std::unique_ptr<llvm::StandardInstrumentations> SI;
-
-		bool Optimizations;
-
-		LLVMState(bool optimizations)
-			: Optimizations(optimizations)
-		{
-			Context = std::make_unique<llvm::LLVMContext>();
-			Builder = std::make_unique<llvm::IRBuilder<>>(*Context);
-			Module = std::make_unique<llvm::Module>("AlloyModule", *Context);
-
-			NamedValues.RegisterDefaultTypes(*Context);
-
-			if (optimizations)
-			{
-				// check the LLVM tutorial for details about these optimizations
-				// create new pass and analysis managers
-				FPM = std::make_unique<llvm::FunctionPassManager>();
-				LAM = std::make_unique<llvm::LoopAnalysisManager>();
-				FAM = std::make_unique<llvm::FunctionAnalysisManager>();
-				CGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
-				MAM = std::make_unique<llvm::ModuleAnalysisManager>();
-				PIC = std::make_unique<llvm::PassInstrumentationCallbacks>();
-				SI = std::make_unique<llvm::StandardInstrumentations>(*Context, /*DebugLogging*/ true);
-
-				SI->registerCallbacks(*PIC, MAM.get());
-
-				// add transform passes
-
-				// do simple "peephole" optimizations and bit-twiddling optzns
-				FPM->addPass(llvm::InstCombinePass());
-
-				// reassociate expressions
-				FPM->addPass(llvm::ReassociatePass());
-
-				// eliminate Common SubExpressions
-				FPM->addPass(llvm::GVNPass());
-
-				// simplify the control flow graph (deleting unreachable blocks, etc)
-				FPM->addPass(llvm::SimplifyCFGPass());
-
-				// register analysis passes used in these transform passes
-				llvm::PassBuilder PB;
-				PB.registerModuleAnalyses(*MAM);
-				PB.registerFunctionAnalyses(*FAM);
-				PB.crossRegisterProxies(*LAM, *FAM, *CGAM, *MAM);
-			}
-		}
-	};
 
 	struct PtrValuePair
 	{
@@ -553,7 +486,7 @@ namespace AlloyCompiler
 		}
 
 		// get the type of the left
-		llvm::Type* leftType = left.Ptr->getType();
+		llvm::Type* leftType = left.Value->getType();
 
 		if (leftType->getTypeID() != llvm::Type::StructTyID)
 		{
@@ -664,6 +597,19 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		llvm::Type* leftType = leftVal->getType();
+		llvm::Type* rightType = rightVal->getType();
+
+		// check that types match
+		if (leftType != rightType)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Binary operator must be applied to matching types! Current types are '{0}' and '{1}'.",
+				state.NamedValues.GetTypeName(leftType), state.NamedValues.GetTypeName(rightType));
+			return nullptr;
+		}
+
+		bool isFloatingPoint = leftType->isFloatingPointTy();
+
 		std::string_view operatorStr = tokenBuffers.GetValue(binaryExpressionNode.OperatorTokenID).ToStringView();
 
 		// logical operators
@@ -682,67 +628,62 @@ namespace AlloyCompiler
 
 		if (operatorStr == "==")
 		{
-			leftVal = state.Builder->CreateFCmpUEQ(leftVal, rightVal, "cmptmp");
-			return state.Builder->CreateUIToFP(leftVal, llvm::Type::getDoubleTy(*state.Context), "booltmp");
+			return isFloatingPoint ? state.Builder->CreateFCmpUEQ(leftVal, rightVal, "eqtmp") : state.Builder->CreateICmpEQ(leftVal, rightVal, "eqtmp");
+
 		}
 
 		if (operatorStr == "!=")
 		{
-			leftVal = state.Builder->CreateFCmpUNE(leftVal, rightVal, "cmptmp");
-			return state.Builder->CreateUIToFP(leftVal, llvm::Type::getDoubleTy(*state.Context), "booltmp");
+			return isFloatingPoint ? state.Builder->CreateFCmpUNE(leftVal, rightVal, "neqtmp") : state.Builder->CreateICmpNE(leftVal, rightVal, "neqtmp");
 		}
 
 		if (operatorStr == ">")
 		{
-			leftVal = state.Builder->CreateFCmpUGT(leftVal, rightVal, "cmptmp");
-			return state.Builder->CreateUIToFP(leftVal, llvm::Type::getDoubleTy(*state.Context), "booltmp");
+			return isFloatingPoint ? state.Builder->CreateFCmpUGT(leftVal, rightVal, "gttmp") : state.Builder->CreateICmpUGT(leftVal, rightVal, "gttmp");
 		}
 
 		if (operatorStr == "<")
 		{
-			leftVal = state.Builder->CreateFCmpULT(leftVal, rightVal, "cmptmp");
-			return state.Builder->CreateUIToFP(leftVal, llvm::Type::getDoubleTy(*state.Context), "booltmp");
+			return isFloatingPoint ? state.Builder->CreateFCmpULT(leftVal, rightVal, "lttmp") : state.Builder->CreateICmpULT(leftVal, rightVal, "lttmp");
 		}
 
 		if (operatorStr == ">=")
 		{
-			leftVal = state.Builder->CreateFCmpUGE(leftVal, rightVal, "cmptmp");
-			return state.Builder->CreateUIToFP(leftVal, llvm::Type::getDoubleTy(*state.Context), "booltmp");
+			return isFloatingPoint ? state.Builder->CreateFCmpUGE(leftVal, rightVal, "getmp") : state.Builder->CreateICmpUGE(leftVal, rightVal, "getmp");
 		}
 
 		if (operatorStr == "<=")
 		{
-			leftVal = state.Builder->CreateFCmpULE(leftVal, rightVal, "cmptmp");
-			return state.Builder->CreateUIToFP(leftVal, llvm::Type::getDoubleTy(*state.Context), "booltmp");
+			return isFloatingPoint ? state.Builder->CreateFCmpULE(leftVal, rightVal, "letmp") : state.Builder->CreateICmpULE(leftVal, rightVal, "letmp");
 		}
 
 		// additive operators
 
 		if (operatorStr == "+")
 		{
-			return state.Builder->CreateFAdd(leftVal, rightVal, "addtmp");
+			return isFloatingPoint ? state.Builder->CreateFAdd(leftVal, rightVal, "addtmp") : state.Builder->CreateAdd(leftVal, rightVal, "addtmp");
 		}
 
 		if (operatorStr == "-")
 		{
-			return state.Builder->CreateFSub(leftVal, rightVal, "subtmp");
+			return isFloatingPoint ? state.Builder->CreateFSub(leftVal, rightVal, "subtmp") : state.Builder->CreateSub(leftVal, rightVal, "subtmp");
 		}
 
 		// multiplicative operators
 
 		if (operatorStr == "*")
 		{
-			return state.Builder->CreateFMul(leftVal, rightVal, "multmp");
+			return isFloatingPoint ? state.Builder->CreateFMul(leftVal, rightVal, "multmp") : state.Builder->CreateMul(leftVal, rightVal, "multmp");
 		}
 
 		if (operatorStr == "/")
 		{
-			return state.Builder->CreateFDiv(leftVal, rightVal, "divtmp");
+			return isFloatingPoint ? state.Builder->CreateFDiv(leftVal, rightVal, "divtmp") : state.Builder->CreateUDiv(leftVal, rightVal, "divtmp");
 		}
 
 		if (operatorStr == "%")
 		{
-			return state.Builder->CreateFRem(leftVal, rightVal, "modtmp");
+			return isFloatingPoint ? state.Builder->CreateFRem(leftVal, rightVal, "modtmp") : state.Builder->CreateURem(leftVal, rightVal, "modtmp");
 		}
 
 		ASSERT(false, "Unknown binary operator '{0}'!", operatorStr);
@@ -804,6 +745,9 @@ namespace AlloyCompiler
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
 			return generateArrayAccessExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
+		case NodeKind::MEMBER_ACCESS_EXPRESSION:
+			return generateMemberAccessExpression(tokenBuffers, nodeBuffers, state, nodeID).Value;
+
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 			return generateFunctionCallExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
@@ -834,7 +778,17 @@ namespace AlloyCompiler
 			ptr = generateIdentifier(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.IdentifierOrMemberAccessID).Ptr;
 		}
 
+		if (!ptr)
+		{
+			return nullptr;
+		}
+
 		llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.ValueID);
+
+		if (!expressionVal)
+		{
+			return nullptr;
+		}
 
 		// store the value into the alloca
 		return state.Builder->CreateStore(expressionVal, ptr);
@@ -859,6 +813,7 @@ namespace AlloyCompiler
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
+		case NodeKind::MEMBER_ACCESS_EXPRESSION:
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 		case NodeKind::ENCLOSED_EXPRESSION:
 			return generatePrimaryExpression(tokenBuffers, nodeBuffers, state, nodeID);
@@ -1034,24 +989,26 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		// convert condition to a bool by comparing non-equal to 0.0
-		conditionVal = state.Builder->CreateFCmpONE(conditionVal, llvm::ConstantFP::get(*state.Context, llvm::APFloat(0.0)), "ifcond");
+		// convert condition to a bool by comparing non-equal to 0
+		// TODO: extend to all possible data types
+		if (conditionVal->getType()->getTypeID() == llvm::Type::TypeID::IntegerTyID)
+		{
+			conditionVal = state.Builder->CreateICmpEQ(conditionVal,
+				llvm::ConstantInt::get(*state.Context, llvm::APInt(conditionVal->getType()->getIntegerBitWidth(), 0)), "ifcond");
+		}
+		else {
+			conditionVal = state.Builder->CreateFCmpONE(conditionVal, llvm::ConstantFP::get(*state.Context, llvm::APFloat(0.0)), "ifcond");
+		}
 
 		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
 
 		ASSERT(func != nullptr, "No function to insert into!");
 
 		// create blocks for the then and else cases
-		// insert the 'then' block at the end of the function
 		llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(*state.Context, "then", func);
-
-		// insert the 'else' block at the end of the function
 		llvm::BasicBlock* elseBlock = llvm::BasicBlock::Create(*state.Context, "else");
-
-		// insert the 'merge' block at the end of the function
 		llvm::BasicBlock* mergeBlock = llvm::BasicBlock::Create(*state.Context, "ifcont");
 
-		// insert the conditional branch into the end of the current block
 		state.Builder->CreateCondBr(conditionVal, thenBlock, elseBlock);
 
 		// emit then value
@@ -1064,13 +1021,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		// insert the conditional branch into the end of the then block
 		state.Builder->CreateBr(mergeBlock);
-
-		// codegen of 'then' can change the current block, update thenBlock for the PHI
-		thenBlock = state.Builder->GetInsertBlock();
-
-		// emit else block if any
 
 		// emit else block if any
 		llvm::Value* elseVal = nullptr;
@@ -1078,13 +1029,7 @@ namespace AlloyCompiler
 		func->insert(func->end(), elseBlock);
 		state.Builder->SetInsertPoint(elseBlock);
 
-		if (ifStatementNode.ElseID == ERROR_NODE_ID)
-		{
-			// no else statement, assume a null value for the PHINode object
-			elseVal = llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
-		}
-
-		else
+		if (ifStatementNode.ElseID != ERROR_NODE_ID)
 		{
 			elseVal = generateStatement(tokenBuffers, nodeBuffers, state, ifStatementNode.ElseID);
 
@@ -1097,22 +1042,11 @@ namespace AlloyCompiler
 		// insert the conditional branch into the end of the else block
 		state.Builder->CreateBr(mergeBlock);
 
-		// codegen of 'else' can change the current block, update elseBlock for the PHI
-		elseBlock = state.Builder->GetInsertBlock();
-
 		// emit merge block
 		func->insert(func->end(), mergeBlock);
 		state.Builder->SetInsertPoint(mergeBlock);
 
-		// this call will assert if SDL checks are enabled in Visual Studio as per this article:
-		// https://stackoverflow.com/questions/34892732/error-when-call-createphi-in-llvm
-		// need to disable SDL checks for this code to run
-		llvm::PHINode* phiNode = state.Builder->CreatePHI(llvm::Type::getDoubleTy(*state.Context), 2, "iftmp");
-
-		phiNode->addIncoming(thenVal, thenBlock);
-		phiNode->addIncoming(elseVal, elseBlock);
-
-		return phiNode;
+		return llvm::ConstantInt::getTrue(*state.Context);
 	}
 
 	llvm::Value* generateBlockStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -1233,7 +1167,7 @@ namespace AlloyCompiler
 
 			// retrieve member name and add it to memberNames map
 			const IDENTIFIER& memberID = nodeBuffers.GetNode(valueDeclaration.IdentifierID).Identifier;
-			const std::string memberName = std::string(tokenBuffers.GetValue(memberID.IdentifierTokenID).ToStringView());
+			const std::string_view memberName = tokenBuffers.GetValue(memberID.IdentifierTokenID).ToStringView();
 
 			memberNames[memberName] = memberIndex++;
 		}
@@ -1297,7 +1231,7 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(&arg, allocaInst);
 
 			// add arguments to named values
-			state.NamedValues.InsertValue(arg.getName().str(), allocaInst);
+			state.NamedValues.InsertValue(arg.getName(), allocaInst);
 		}
 
 		llvm::Value* bodyVal = generateBlockStatement(tokenBuffers, nodeBuffers, state, functionDefinitionNode.BodyID);
@@ -1389,7 +1323,7 @@ namespace AlloyCompiler
 		return generateModule(tokenBuffers, nodeBuffers, state, programNode.ModuleIDs[0]);
 	}
 
-	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize)
+	LLVMState Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize)
 	{
 		const NodeID rootNodeID = nodeBuffers.GetRootNodeID();
 
@@ -1403,6 +1337,29 @@ namespace AlloyCompiler
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
 		state.Module->print(out, nullptr);
 
-		return program != nullptr;
+		return std::move(state);
+	}
+
+	int Execute(LLVMState& state)
+	{
+#ifndef NO_CODE_EXECUTION
+		llvm::InitializeNativeTarget();
+		LLVMInitializeNativeAsmPrinter();
+
+		// using the recommended LLJIT engine to execute the code
+		llvm::ExitOnError exitOnErr;
+
+		// create an LLJIT instance
+		auto J = exitOnErr(llvm::orc::LLJITBuilder().create());
+		exitOnErr(J->addIRModule(llvm::orc::ThreadSafeModule(std::move(state.Module), std::move(state.Context))));
+
+		// look up the JIT'd function, cast it to a function pointer, then call it.
+		auto mainAddr = exitOnErr(J->lookup("main"));
+		int (*main)() = mainAddr.toPtr<int()>();
+		return main();
+#else
+		ASSERT(false, "Code execution is disabled!");
+		return 0;
+#endif
 	}
 }

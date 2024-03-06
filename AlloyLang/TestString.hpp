@@ -1,6 +1,26 @@
 #pragma once
 
 constexpr auto TestSrc1 = R"(
+				extern fn printf (const str : String, const param : i64) -> i64;
+
+				fn mul (const a : &i64, const b : &i64) -> i64
+				{
+					var ret : i64 = 0;
+					if (a == 1)
+						ret = b;
+					else
+						ret = a * b;
+					return ret;
+				}
+
+				fn main () -> i64
+				{
+					printf("3 x 5 = %d", mul(3, 5));
+					return mul(3, 5);
+				}
+			)";
+
+constexpr auto TestSrc2 = R"(
 extern fn test (var a : i64);
 extern fn printf (const format : String, ...);
 

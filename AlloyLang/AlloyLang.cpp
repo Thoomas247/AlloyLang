@@ -1,7 +1,6 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
 #include "parser/TreePrinter.hpp"
-//#include "LLVMCodeGenerator/LLVMCodeGenerator.hpp"
 #include "codegen/CodeGenerator.hpp"
 
 #include "log/Log.hpp"
@@ -15,25 +14,25 @@ using namespace AlloyCompiler;
 
 int main(int argc, char* argv[])
 {
-	std::string str;
-	if (argc > 1) {
-		// read test file provided on the command line
-		std::ifstream file(argv[1]);
-		if (file) {
-			std::string line;
-			while (std::getline(file, line)) {
-				str += line;
-				str += "\r\n";
-			}
-			file.close();
-		}
-		else {
-			ASSERT(false, "Cannot read input file");
-		}
-	}
-	else {
-		str = TestSrc1;
-	}
+	std::string str = TestSrc1;
+	//if (argc > 1) {
+	//	// read test file provided on the command line
+	//	std::ifstream file(argv[1]);
+	//	if (file) {
+	//		std::string line;
+	//		while (std::getline(file, line)) {
+	//			str += line;
+	//			str += "\r\n";
+	//		}
+	//		file.close();
+	//	}
+	//	else {
+	//		ASSERT(false, "Cannot read input file");
+	//	}
+	//}
+	//else {
+	//	str = TestSrc1;
+	//}
 
 	// duplicate the test file or string 2^n times
 	const size_t n = 0;// 0'000;
@@ -71,7 +70,7 @@ int main(int argc, char* argv[])
 	start = std::chrono::high_resolution_clock::now();
 	//LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
 	//codegen.Process();	// TBD: implement error handling
-	Generate(tokenBuffers, nodeBuffers, true);
+	LLVMState llvmState = Generate(tokenBuffers, nodeBuffers, true);
 
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

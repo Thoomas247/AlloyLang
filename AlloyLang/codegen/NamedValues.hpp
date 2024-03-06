@@ -33,6 +33,7 @@ namespace AlloyCompiler
 		/// Returns -1 if the struct does not exist, -2 if the member does not exist.
 		/// </summary>
 		int GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
+		std::string_view GetTypeName(llvm::Type* type);
 		void InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, int> structMembers = {});
 
 	private:
@@ -49,6 +50,7 @@ namespace AlloyCompiler
 			std::string_view Name;
 			std::unordered_map<std::string_view, llvm::AllocaInst*> Values;
 			std::unordered_map<std::string_view, TypeInfo> Types;
+			std::unordered_map<llvm::Type*, std::string_view> TypeNames; // used for error messages
 
 			Scope(const std::string_view& name)
 				: Name(name)

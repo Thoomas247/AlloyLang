@@ -1,10 +1,9 @@
-#include "pch.h"
 #include "CppUnitTest.h"
-#include "../AlloyLang/LLVMCodeGenerator/llvm.hpp"
+#include "../AlloyLang/codegen/llvm/llvm.hpp"
 
 #include "../AlloyLang/tokenizer/Tokenizer.hpp"
 #include "../AlloyLang/parser/Parser.hpp"
-#include "../AlloyLang/LLVMCodeGenerator/LLVMCodeGenerator.hpp"
+#include "../AlloyLang/codegen/CodeGenerator.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -18,7 +17,7 @@ namespace unittests
 {
 	// helper class to redirect stdout to our internal buffer
 	// see below the implementation of llvm::out()
-	class redirect_stdout : public raw_fd_ostream
+	class redirect_stdout : public llvm::raw_fd_ostream
 	{
 	private:
 		std::error_code EC;
@@ -40,13 +39,9 @@ namespace unittests
 			Source	src(code);
 			TokenBuffers tokenBuffers = Tokenize(src);
 			auto nodeBuffers = Parse(tokenBuffers);
-			LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
 
-			// suppress output to out.ll file
-			codegen.Process(&llvm::nulls());
-
-			// interpret and execute resulting code
- 			int result = codegen.Execute("main", false);
+			LLVMState llvmState = Generate(tokenBuffers, nodeBuffers, true);
+			int result = Execute(llvmState);
 
 #if 0
 			// retrieve result and compare with expected data
@@ -59,7 +54,7 @@ namespace unittests
 		}
 
 	public:
-		
+
 		TEST_METHOD(BasicTest)
 		{
 			constexpr auto TestStr = R"(

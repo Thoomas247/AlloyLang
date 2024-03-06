@@ -18,7 +18,6 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 
-#ifndef NO_CODE_OPTIMIZATION
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/TargetSelect.h"
@@ -29,13 +28,12 @@
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils.h"
-#endif // NO_CODE_OPTIMIZATION
 
 #ifndef NO_CODE_EXECUTION
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
-#endif	// NO_CODE_EXECUTION
+#endif
 
 #endif // LLVM_INCLUDE
