@@ -582,7 +582,10 @@ namespace AlloyCompiler
 
 			if (argVal->getType() != calleeFunc->getArg(i)->getType())
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID), "Argument type mismatch!");
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID), 
+					"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
+					state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
+					state.NamedValues.GetTypeName(argVal->getType()));
 				return nullptr;
 			}
 
