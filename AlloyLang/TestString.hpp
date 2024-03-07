@@ -1,23 +1,52 @@
 #pragma once
 
 constexpr auto TestSrc1 = R"(
-				extern fn printf (const str : String, const param : i64) -> i64;
+extern fn printf (const str : String, const param : f64) -> i64;
 
-				fn mul (const a : &i64, const b : &i64) -> i64
-				{
-					var ret : i64 = 0;
-					if (a == 1)
-						ret = b;
-					else
-						ret = a * b;
-					return ret;
-				}
+struct Vector3
+{
+	var x : f64;
+	var y : f64;
+	var z : f64;
+}
 
-				fn main () -> i64
-				{
-					printf("3 x 5 = %d", mul(3, 5));
-					return mul(3, 5);
-				}
+struct Transform
+{
+	var position : Vector3;
+	var rotation : Vector3;
+	var scale : Vector3;
+}
+
+fn main () -> i64
+{
+	var a : f64 = 32.0;
+	var result : i64 = 0;
+	var test : Vector3 = 
+		Vector3 
+		{ 
+			x = 32.0, 
+			y = 64.0, 
+			z = 0.0 
+		};
+
+	var test2 : Transform = 
+		Transform
+		{
+			position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
+			rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
+			scale = test
+		};
+
+	test.z = 10.0;
+	test2.rotation.y = 20.0;
+
+	printf("result = %f", test.x * test2.scale.y);
+	if (test.x * test2.scale.y == 2048.0)
+		result = 1;
+	else
+		result = 0;
+	return result;
+}
 			)";
 
 constexpr auto TestSrc2 = R"(
