@@ -105,6 +105,7 @@
       <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib";"LLVMPasses.lib";"LLVMInstCombine.lib";"LLVMipo.lib";"LLVMAggressiveInstCombine.lib";"LLVMCoroutines.lib";"LLVMMC.lib";"LLVMBitWriter.lib";"LLVMInstrumentation.lib";"LLVMVectorize.lib";"LLVMIRPrinter.lib";"LLVMCFGuard.lib";"LLVMHipStdPar.lib";"LLVMObjCARCOpts.lib";"LLVMFrontendOpenMP.lib";"LLVMProfileData.lib";"LLVMObject.lib";"LLVMCodeGenTypes.lib";"LLVMDebugInfoDWARF.lib";"LLVMLinker.lib";"LLVMFrontendOffloading.lib";"LLVMIRReader.lib";"LLVMMCParser.lib";"LLVMTextAPI.lib";"LLVMExecutionEngine.lib";"LLVMInterpreter.lib";"LLVMTarget.lib";"LLVMX86TargetMCA.lib";"LLVMTargetParser.lib";"LLVMX86Desc.lib";"LLVMX86Info.lib";"LLVMX86CodeGen.lib";"LLVMMCDisassembler.lib";"LLVMMCParser.lib";"LLVMSelectionDAG.lib";"LLVMGlobalISel.lib";"LLVMRuntimeDyld.lib";"LLVMMCJIT.lib";"LLVMJITLink.lib";"LLVMOrcJIT.lib";"LLVMOrcShared.lib";"LLVMOrcTargetProcess.lib";"LLVMAsmPrinter.lib";"LLVMDebugInfoCodeView.lib";"LLVMWindowsDriver.lib";"LLVMOption.lib"</AdditionalDependencies>
       <ForceFileOutput>
       </ForceFileOutput>
+      <AdditionalOptions>/IGNORE:4099</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -163,6 +164,7 @@
       <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib";"LLVMPasses.lib";"LLVMInstCombine.lib";"LLVMipo.lib";"LLVMAggressiveInstCombine.lib";"LLVMCoroutines.lib";"LLVMMC.lib";"LLVMBitWriter.lib";"LLVMInstrumentation.lib";"LLVMVectorize.lib";"LLVMIRPrinter.lib";"LLVMCFGuard.lib";"LLVMHipStdPar.lib";"LLVMObjCARCOpts.lib";"LLVMFrontendOpenMP.lib";"LLVMProfileData.lib";"LLVMObject.lib";"LLVMCodeGenTypes.lib";"LLVMDebugInfoDWARF.lib";"LLVMLinker.lib";"LLVMFrontendOffloading.lib";"LLVMIRReader.lib";"LLVMMCParser.lib";"LLVMTextAPI.lib";"LLVMExecutionEngine.lib";"LLVMInterpreter.lib";"LLVMTarget.lib";"LLVMX86TargetMCA.lib";"LLVMTargetParser.lib";"LLVMX86Desc.lib";"LLVMX86Info.lib";"LLVMX86CodeGen.lib";"LLVMMCDisassembler.lib";"LLVMMCParser.lib";"LLVMSelectionDAG.lib";"LLVMGlobalISel.lib";"LLVMRuntimeDyld.lib";"LLVMMCJIT.lib";"LLVMJITLink.lib";"LLVMOrcJIT.lib";"LLVMOrcShared.lib";"LLVMOrcTargetProcess.lib";"LLVMAsmPrinter.lib";"LLVMDebugInfoCodeView.lib";"LLVMWindowsDriver.lib";"LLVMOption.lib"</AdditionalDependencies>
       <ForceFileOutput>
       </ForceFileOutput>
+      <AdditionalOptions>/IGNORE:4099</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

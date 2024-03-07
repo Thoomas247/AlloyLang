@@ -1402,24 +1402,45 @@ namespace AlloyCompiler
 
 	int Execute(LLVMState& state)
 	{
+		//
+		// Use the recommended LLJIT engine to execute the code
+		// Return -1 in case of error
+		//
 #ifndef NO_CODE_EXECUTION
 		llvm::InitializeNativeTarget();
 		LLVMInitializeNativeAsmPrinter();
 
-		// using the recommended LLJIT engine to execute the code
-		llvm::ExitOnError exitOnErr;
-
 		// create an LLJIT instance
-		auto J = exitOnErr(llvm::orc::LLJITBuilder().create());
-		exitOnErr(J->addIRModule(llvm::orc::ThreadSafeModule(std::move(state.Module), std::move(state.Context))));
+		auto J = llvm::orc::LLJITBuilder().create();
+		if (auto E = J.takeError()) {
+			ASSERT(false, "Failed creating the JIT engine!");
+			Log::Error("Error creating the JIT engine: {0}", toString(std::move(E)));
+			return -1;
+		}
 
-		// look up the JIT'd function, cast it to a function pointer, then call it.
-		auto mainAddr = exitOnErr(J->lookup("main"));
-		int (*main)() = mainAddr.toPtr<int()>();
-		return main();
+		std::unique_ptr<llvm::orc::LLJIT>& jit = *J;
+		llvm::Error err = jit->addIRModule(llvm::orc::ThreadSafeModule(std::move(state.Module), std::move(state.Context)));
+		if (!err) {
+			// look up the JIT'd function, cast it to a function pointer, then call it.
+			auto mainAddr = jit->lookup("main");
+			if (auto E = mainAddr.takeError()) {
+				ASSERT(false, "Cannot find main entry point!");
+				Log::Error("Error locating main entry point: {0}", toString(std::move(E)));
+				return -1;
+			}
+			llvm::orc::ExecutorAddr& mainptr = *mainAddr;
+			int (*main)() = mainptr.toPtr<int()>();
+			return main();
+		}
+		else {
+			ASSERT(false, "Failed adding module!");
+			Log::Error("Error adding module");
+			return -1;
+		}
+
 #else
 		ASSERT(false, "Code execution is disabled!");
-		return 0;
+		return -1;
 #endif
 	}
 }
