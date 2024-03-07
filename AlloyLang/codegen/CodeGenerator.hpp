@@ -13,6 +13,8 @@ namespace AlloyCompiler
 		std::unique_ptr<llvm::Module> Module;
 		NamedValues NamedValues;
 
+		llvm::Type* CurrentReturnType = nullptr;	// keep track of the return type of the current function
+
 		// handling llvm copde optimizations passes
 		std::unique_ptr<llvm::FunctionPassManager> FPM;
 		std::unique_ptr<llvm::LoopAnalysisManager> LAM;
@@ -23,6 +25,11 @@ namespace AlloyCompiler
 		std::unique_ptr<llvm::StandardInstrumentations> SI;
 
 		bool Optimizations;
+
+		virtual ~LLVMState()
+		{
+			assert(true);
+		}
 
 		LLVMState(bool optimizations)
 			: Optimizations(optimizations)
@@ -70,6 +77,6 @@ namespace AlloyCompiler
 		}
 	};
 
-	LLVMState Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize);
+	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state);
 	int Execute(LLVMState& state);
 }

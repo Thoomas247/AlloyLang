@@ -47,7 +47,7 @@ fn main () -> i64
 		result = 0;
 	return result;
 }
-			)";
+)";
 
 constexpr auto TestSrc2 = R"(
 extern fn test (var a : i64);

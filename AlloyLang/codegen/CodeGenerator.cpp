@@ -138,7 +138,6 @@ namespace AlloyCompiler
 
 		case LITERAL::Type::String:
 			return state.Builder->CreateGlobalStringPtr(literalStr);
-			//return llvm::ConstantDataArray::getString(*state.Context, literalStr);
 
 		case LITERAL::Type::Character:
 			return llvm::ConstantInt::get(*state.Context, llvm::APInt(64, literalStr[0]));
@@ -343,7 +342,14 @@ namespace AlloyCompiler
 
 		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, functionDeclarationNode.IsVariadic);
 
-		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, state.Module.get());
+		//
+		// This call creates a crash when later executing the code using the JIT engine: 
+		// llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, state.Module.get());
+		// There is a TODO in the source-code of llvm that might explain that: 
+		// TODO: remove this once all users have been updated to pass an AddrSpace
+		// So when using Module.get() to pass a pointer rather than a reference (*Module) we should also pass 0 as address space
+		//
+		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, *state.Module);
 
 		// set names for all arguments
 		for (size_t i = 0; i < function->arg_size(); i++)
@@ -583,8 +589,8 @@ namespace AlloyCompiler
 
 			if (argVal->getType() != calleeFunc->getArg(i)->getType())
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
-					"Function argument {0} expects type '{1}' but given type is '{2}'", i + 1,
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID), 
+					"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
 					state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
 					state.NamedValues.GetTypeName(argVal->getType()));
 				return nullptr;
@@ -1098,12 +1104,37 @@ namespace AlloyCompiler
 
 	llvm::Value* generateReturnStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::RETURN_STATEMENT, "Expected RETURN_STATEMENT!");
+
 		const RETURN_STATEMENT& returnStatementNode = nodeBuffers.GetNode(nodeID).ReturnStatement;
+
+		// handle void return
+		if (returnStatementNode.ExpressionID == ERROR_NODE_ID)
+		{
+			if (state.CurrentReturnType != nullptr)
+			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID),
+					"Function expects a return value of type '{0}'!", state.NamedValues.GetTypeName(state.CurrentReturnType));
+
+				return nullptr;
+			}
+
+			return state.Builder->CreateRetVoid();
+		}
 
 		llvm::Value* expressionValue = generateExpression(tokenBuffers, nodeBuffers, state, returnStatementNode.ExpressionID);
 
 		if (expressionValue == nullptr)
 		{
+			return nullptr;
+		}
+
+		if (expressionValue->getType() != state.CurrentReturnType)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), 
+				"Function has return type '{0}' but provided return value is of type '{1}'!", 
+				state.NamedValues.GetTypeName(state.CurrentReturnType),
+				state.NamedValues.GetTypeName(expressionValue->getType()));
 			return nullptr;
 		}
 
@@ -1227,10 +1258,12 @@ namespace AlloyCompiler
 
 		llvm::Function* func = static_cast<llvm::Function*>(generateFunctionDeclaration(tokenBuffers, nodeBuffers, state, functionDefinitionNode.FunctionDeclarationID));
 
-		if (!func)
+		if (func == nullptr)
 		{
 			return nullptr;
 		}
+
+		state.CurrentReturnType = func->getReturnType();
 
 		// push a new scope for the function
 		state.NamedValues.PushScope(func->getName().str());
@@ -1249,6 +1282,7 @@ namespace AlloyCompiler
 
 				func->eraseFromParent();
 				state.NamedValues.PopScope();
+				state.CurrentReturnType = nullptr;
 				return nullptr;
 			}
 
@@ -1268,6 +1302,7 @@ namespace AlloyCompiler
 		{
 			func->eraseFromParent();
 			state.NamedValues.PopScope();
+			state.CurrentReturnType = nullptr;
 			return nullptr;
 		}
 
@@ -1282,6 +1317,8 @@ namespace AlloyCompiler
 
 		// restore the named values of the higher level
 		state.NamedValues.PopScope();
+
+		state.CurrentReturnType = nullptr;
 
 		return func;
 	}
@@ -1348,43 +1385,62 @@ namespace AlloyCompiler
 		return generateModule(tokenBuffers, nodeBuffers, state, programNode.ModuleIDs[0]);
 	}
 
-	LLVMState Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, bool optimize)
+	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state)
 	{
 		const NodeID rootNodeID = nodeBuffers.GetRootNodeID();
 
 		ASSERT(nodeBuffers.GetNode(rootNodeID).Kind == NodeKind::PROGRAM, "Root node must be a program node!");
 
-		LLVMState state(optimize);
-
 		llvm::Value* program = generateProgram(tokenBuffers, nodeBuffers, state, rootNodeID);
-
+		
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
 		state.Module->print(out, nullptr);
-
-		return std::move(state);
+		
+		return true;
 	}
 
 	int Execute(LLVMState& state)
 	{
+		//
+		// Use the recommended LLJIT engine to execute the code
+		// Return -1 in case of error
+		//
 #ifndef NO_CODE_EXECUTION
 		llvm::InitializeNativeTarget();
 		LLVMInitializeNativeAsmPrinter();
 
-		// using the recommended LLJIT engine to execute the code
-		llvm::ExitOnError exitOnErr;
-
 		// create an LLJIT instance
-		auto J = exitOnErr(llvm::orc::LLJITBuilder().create());
-		exitOnErr(J->addIRModule(llvm::orc::ThreadSafeModule(std::move(state.Module), std::move(state.Context))));
+		auto J = llvm::orc::LLJITBuilder().create();
+		if (auto E = J.takeError()) {
+			ASSERT(false, "Failed creating the JIT engine!");
+			Log::Error("Error creating the JIT engine: {0}", toString(std::move(E)));
+			return -1;
+		}
 
-		// look up the JIT'd function, cast it to a function pointer, then call it.
-		auto mainAddr = exitOnErr(J->lookup("main"));
-		int (*main)() = mainAddr.toPtr<int()>();
-		return main();
+		std::unique_ptr<llvm::orc::LLJIT>& jit = *J;
+		llvm::Error err = jit->addIRModule(llvm::orc::ThreadSafeModule(std::move(state.Module), std::move(state.Context)));
+		if (!err) {
+			// look up the JIT'd function, cast it to a function pointer, then call it.
+			auto mainAddr = jit->lookup("main");
+			if (auto E = mainAddr.takeError()) {
+				ASSERT(false, "Cannot find main entry point!");
+				Log::Error("Error locating main entry point: {0}", toString(std::move(E)));
+				return -1;
+			}
+			llvm::orc::ExecutorAddr& mainptr = *mainAddr;
+			int (*main)() = mainptr.toPtr<int()>();
+			return main();
+		}
+		else {
+			ASSERT(false, "Failed adding module!");
+			Log::Error("Error adding module");
+			return -1;
+		}
+
 #else
 		ASSERT(false, "Code execution is disabled!");
-		return 0;
+		return -1;
 #endif
 }
 }
