@@ -22,6 +22,74 @@ namespace AlloyCompiler
 		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 	}
 
+	bool convertValueToType(LLVMState& state, llvm::Value*& value, llvm::Type* newType)
+	{
+		//
+		// Create an llvm instruction to convert input value from its current type to another type
+		// TODO: 
+		//		- Extend to include other needed types
+		//		- Add a warning in case the conversion loses precision 
+		//
+		llvm::Type* oldType = value->getType();
+		bool result = false;
+
+		if (oldType == newType) {
+			return true;	// nothing to do
+		}
+
+		switch (oldType->getTypeID()) {
+			case llvm::Type::IntegerTyID:
+			{
+				switch (newType->getTypeID()) {
+				case llvm::Type::FloatTyID:
+				case llvm::Type::DoubleTyID:
+					value = state.Builder->CreateSIToFP(value, newType);
+					result = true;
+					break;
+				default:
+					ASSERT(false, "Conversion to type is not implemented");
+					break;
+				}
+				break;
+			}
+
+			case llvm::Type::FloatTyID:
+			{
+				switch (newType->getTypeID()) {
+				case llvm::Type::DoubleTyID:
+					value = state.Builder->CreateFPCast(value, newType);
+					result = true;
+					break;
+				default:
+					ASSERT(false, "Conversion to type is not implemented");
+					break;
+				}
+				break;
+			}
+
+			case llvm::Type::DoubleTyID:
+			{
+				switch (newType->getTypeID()) {
+				case llvm::Type::FloatTyID:
+					value = state.Builder->CreateFPCast(value, newType);
+					result = true;
+					break;
+
+				default:
+					ASSERT(false, "Conversion to type is not implemented");
+					break;
+				}
+				break;
+			}
+
+			default:
+				ASSERT(false, "Conversion from type is not implemented");
+				break;
+		}
+
+		return result;
+	}
+
 	llvm::Value* convertToBool(LLVMState& state, llvm::Value* value)
 	{
 		// convert condition to a bool by comparing non-equal to 0
@@ -115,9 +183,9 @@ namespace AlloyCompiler
 
 		case LITERAL::Type::Float:
 		{
-			double floatValue;
-			std::from_chars_result result = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), floatValue);
-			return llvm::ConstantFP::get(*state.Context, llvm::APFloat(floatValue));
+			double dblValue;
+			std::from_chars_result result = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), dblValue);
+			return llvm::ConstantFP::get(*state.Context, llvm::APFloat(dblValue));
 		}
 
 		case LITERAL::Type::Boolean:
@@ -140,7 +208,7 @@ namespace AlloyCompiler
 			return state.Builder->CreateGlobalStringPtr(literalStr);
 
 		case LITERAL::Type::Character:
-			return llvm::ConstantInt::get(*state.Context, llvm::APInt(64, literalStr[0]));
+			return llvm::ConstantInt::get(*state.Context, llvm::APInt(8, literalStr[0]));
 
 		default:
 			ASSERT(false, "Unknown literal type!");
@@ -340,7 +408,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, functionDeclarationNode.IsVariadic);
+		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, true /*functionDeclarationNode.IsVariadic*/);
 
 		//
 		// This call creates a crash when later executing the code using the JIT engine: 
@@ -428,6 +496,9 @@ namespace AlloyCompiler
 			indices[1] = llvmIndex;
 
 			llvm::Value* memberPtr = state.Builder->CreateGEP(structType, structPtr, indices, "memberptr");
+
+			convertValueToType(state, expressionVal, structType->getElementType(memberIndex));
+
 			state.Builder->CreateStore(expressionVal, memberPtr, "savetmp");
 		}
 
@@ -446,6 +517,7 @@ namespace AlloyCompiler
 		return nullptr;
 	}
 
+	
 	llvm::Value* generateValueDefinitionExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::VALUE_DEFINITION_EXPRESSION, "Expected VALUE_DEFINITION_EXPRESSION!");
@@ -466,6 +538,11 @@ namespace AlloyCompiler
 		if (!value)
 		{
 			return nullptr;
+		}
+
+		if (llvm::isa<llvm::AllocaInst>(declarationVal)) {
+			llvm::AllocaInst* alloc = static_cast<llvm::AllocaInst*>(declarationVal);
+			convertValueToType(state, value, alloc->getAllocatedType());
 		}
 
 		// store the value into the alloca
@@ -586,6 +663,8 @@ namespace AlloyCompiler
 			{
 				return nullptr;
 			}
+
+			convertValueToType(state, argVal, calleeFunc->getArg(i)->getType());
 
 			if (argVal->getType() != calleeFunc->getArg(i)->getType())
 			{
@@ -833,6 +912,12 @@ namespace AlloyCompiler
 		if (!expressionVal)
 		{
 			return nullptr;
+		}
+
+		// store the value into the alloca
+		if (llvm::isa<llvm::AllocaInst>(ptr)) {
+			llvm::AllocaInst* alloc = static_cast<llvm::AllocaInst*>(ptr);
+			convertValueToType(state, expressionVal, alloc->getAllocatedType());
 		}
 
 		// store the value into the alloca

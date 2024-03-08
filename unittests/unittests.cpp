@@ -149,7 +149,7 @@ namespace unittests
 		TEST_METHOD(Structures)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : f32) -> i64;
+				extern fn printf (const str : String, const param : f64) -> i64;
 
 				struct Vector3
 				{
@@ -168,6 +168,7 @@ namespace unittests
 				fn main () -> i64
 				{
 					var a : f32 = 32.0;
+					var expected : f32 = 2048.0;
 					var result : i64 = 0;
 					var test : Vector3 = 
 						Vector3 
@@ -189,7 +190,7 @@ namespace unittests
 					test2.rotation.y = 20.0;
 
 					printf("result = %f", test.x * test2.scale.y);
-					if (test.x * test2.scale.y == 2048.0)
+					if (test.x * test2.scale.y == expected)
 						result = 1;
 					else
 						result = 0;
