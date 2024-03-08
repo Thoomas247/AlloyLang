@@ -13,7 +13,8 @@ namespace AlloyCompiler
 		std::unique_ptr<llvm::Module> Module;
 		NamedValues NamedValues;
 
-		llvm::Type* CurrentReturnType = nullptr;	// keep track of the return type of the current function
+		llvm::Type* CurrentReturnType = nullptr;		// keep track of the return type of the current function
+		llvm::Type* CurrentIdentifierType = nullptr;	// keep track of the type of the last identifier being created or assigned
 
 		// handling llvm copde optimizations passes
 		std::unique_ptr<llvm::FunctionPassManager> FPM;

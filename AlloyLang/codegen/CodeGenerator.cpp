@@ -46,6 +46,12 @@ namespace AlloyCompiler
 					value = state.Builder->CreateSIToFP(value, newType);
 					result = true;
 					break;
+
+				case llvm::Type::IntegerTyID:
+					value = state.Builder->CreateIntCast(value, newType, true);
+					result = true;
+					break;
+
 				default:
 					ASSERT(false, "Conversion to type is not implemented");
 					break;
@@ -83,7 +89,7 @@ namespace AlloyCompiler
 			}
 
 			default:
-				ASSERT(false, "Conversion from type is not implemented");
+				/// ASSERT(false, "Conversion from type is not implemented");
 				break;
 		}
 
@@ -150,10 +156,17 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, llvm::Type* type)
+	llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, llvm::Type* type, int numElements = 0)
 	{
+		//
+		// numElements added for array support
+		//
 		llvm::IRBuilder<> tempBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
-		return tempBuilder.CreateAlloca(type, nullptr, varName);
+		llvm::Value* elements = nullptr;
+		if (numElements > 0) {
+			elements = llvm::ConstantInt::get(function->getContext(), llvm::APInt(64, numElements));
+		}
+		return tempBuilder.CreateAlloca(type, elements, varName);
 	}
 
 #pragma endregion
@@ -170,6 +183,7 @@ namespace AlloyCompiler
 		const LITERAL& literalNode = nodeBuffers.GetNode(nodeID).Literal;
 
 		const std::string_view literalStr = tokenBuffers.GetValue(literalNode.InfoTokenID).ToStringView();
+		llvm::Value* result = nullptr;
 
 		switch (literalNode.Kind)
 		{
@@ -177,43 +191,60 @@ namespace AlloyCompiler
 		{
 			// TODO: allow negative values
 			uint64_t uintValue;
-			std::from_chars_result result = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), uintValue);
-			return llvm::ConstantInt::get(*state.Context, llvm::APInt(64, uintValue));
+			int bits = 64;	// default conversion to 64-bit integers
+			if (state.CurrentIdentifierType && state.CurrentIdentifierType->isIntegerTy()) {
+				// if we are expecting a specific integer type, generate an integer with the right type
+				bits = state.CurrentIdentifierType->getIntegerBitWidth();
+			}
+			std::from_chars_result temp = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), uintValue);
+			result = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, uintValue));
+			break;
 		}
 
 		case LITERAL::Type::Float:
 		{
 			double dblValue;
-			std::from_chars_result result = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), dblValue);
-			return llvm::ConstantFP::get(*state.Context, llvm::APFloat(dblValue));
+			std::from_chars_result temp = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), dblValue);
+			result = llvm::ConstantFP::get(*state.Context, llvm::APFloat(dblValue));
+			break;
 		}
 
 		case LITERAL::Type::Boolean:
 		{
 			if (literalStr == "true")
 			{
-				return llvm::ConstantInt::getTrue(*state.Context);
+				result = llvm::ConstantInt::getTrue(*state.Context);
+				break;
 			}
 
 			if (literalStr == "false")
 			{
-				return llvm::ConstantInt::getFalse(*state.Context);
+				result = llvm::ConstantInt::getFalse(*state.Context);
+				break;
 			}
 
 			ASSERT(false, "Unknown boolean literal '{0}'!", literalStr);
-			return nullptr;
+			break;
 		}
 
 		case LITERAL::Type::String:
-			return state.Builder->CreateGlobalStringPtr(literalStr);
+			result = state.Builder->CreateGlobalStringPtr(literalStr);
+			break;
 
 		case LITERAL::Type::Character:
-			return llvm::ConstantInt::get(*state.Context, llvm::APInt(8, literalStr[0]));
+			result = llvm::ConstantInt::get(*state.Context, llvm::APInt(8, literalStr[0]));
+			break;
 
 		default:
 			ASSERT(false, "Unknown literal type!");
-			return nullptr;
+			break;
 		}
+
+		// if we know the type that we are expecting, convert right away to that type
+		if (result && state.CurrentIdentifierType) {
+			convertValueToType(state, result, state.CurrentIdentifierType);
+		}
+		return result;
 	}
 
 #pragma endregion
@@ -255,8 +286,9 @@ namespace AlloyCompiler
 
 		// TODO: references and pointers
 
-		const TYPE_IDENTIFIER& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
+		llvm::Type* type = nullptr;
 
+		const TYPE_IDENTIFIER& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
 		const Node& identifierOrTypeIdentifierNode = nodeBuffers.GetNode(typeIdentifierNode.IdentifierOrTypeIdentifierID);
 
 		// handle non-array types
@@ -265,45 +297,53 @@ namespace AlloyCompiler
 			const IDENTIFIER& identifierNode = identifierOrTypeIdentifierNode.Identifier;
 			const std::string_view name = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
 
-			llvm::Type* type = state.NamedValues.GetType(name);
+			type = state.NamedValues.GetType(name);
 
 			if (!type)
 			{
 				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.IdentifierOrTypeIdentifierID),
 					"Unknown type name '{0}'!", name);
 			}
-
-			return type;
 		}
-
-
-		// handle array types
-		ASSERT(identifierOrTypeIdentifierNode.Kind == NodeKind::TYPE_IDENTIFIER, "Expected type identifier node!");
-		ASSERT(typeIdentifierNode.ArraySizeID != ERROR_NODE_ID, "Expected array size node!");
-
-		const LITERAL& arraySizeNode = nodeBuffers.GetNode(typeIdentifierNode.ArraySizeID).Literal;
-
-		const std::string_view arraySizeStr = tokenBuffers.GetValue(arraySizeNode.InfoTokenID).ToStringView();
-
-		uint64_t arraySize;
-		std::from_chars(arraySizeStr.data(), arraySizeStr.data() + arraySizeStr.size(), arraySize);
-
-		if (arraySize == 0)
+		else
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.ArraySizeID), "Array size must be greater than 0!");
-			return nullptr;
+
+			// handle array types
+			ASSERT(identifierOrTypeIdentifierNode.Kind == NodeKind::TYPE_IDENTIFIER, "Expected type identifier node!");
+			ASSERT(typeIdentifierNode.ArraySizeID != ERROR_NODE_ID, "Expected array size node!");
+
+			const LITERAL& arraySizeNode = nodeBuffers.GetNode(typeIdentifierNode.ArraySizeID).Literal;
+
+			const std::string_view arraySizeStr = tokenBuffers.GetValue(arraySizeNode.InfoTokenID).ToStringView();
+
+			uint64_t arraySize;
+			std::from_chars(arraySizeStr.data(), arraySizeStr.data() + arraySizeStr.size(), arraySize);
+
+			if (arraySize == 0)
+			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.ArraySizeID), "Array size must be greater than 0!");
+			}
+			else
+			{
+				const NodeID elementTypeIdentifierNode = typeIdentifierNode.IdentifierOrTypeIdentifierID;
+
+				llvm::Type* elementType = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, elementTypeIdentifierNode);
+
+				if (elementType)
+				{
+					type = llvm::ArrayType::get(elementType, arraySize);
+				}
+			}
 		}
 
-		const NodeID elementTypeIdentifierNode = typeIdentifierNode.IdentifierOrTypeIdentifierID;
+		// storing the last identifier type in order to set the value to the right type
+		// e.g. var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }; when we encounter var array : [i64; 10] we know that we are
+		// initializing an i64 array of 10 elements
+		state.CurrentIdentifierType = type;
 
-		llvm::Type* elementType = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, elementTypeIdentifierNode);
+		ASSERT(type != nullptr, "Error determining identifier type");
 
-		if (!elementType)
-		{
-			return nullptr;
-		}
-
-		return llvm::ArrayType::get(elementType, arraySize);
+		return type;
 	}
 
 #pragma endregion
@@ -394,6 +434,9 @@ namespace AlloyCompiler
 			paramTypes.push_back(type);
 		}
 
+		// reset the expected type
+		state.CurrentIdentifierType = nullptr;
+
 		// retrieve the return type
 		llvm::Type* returnType = llvm::Type::getVoidTy(*state.Context);
 
@@ -479,6 +522,9 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
+			// set the type that we are expecting for each structure element
+			state.CurrentIdentifierType = structType->getElementType(memberIndex);
+
 			llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, constructorExpressionNode.MemberValueIDs[i]);
 
 			if (!expressionVal)
@@ -502,6 +548,9 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(expressionVal, memberPtr, "savetmp");
 		}
 
+		// reset the expected type
+		state.CurrentIdentifierType = nullptr;
+
 		return state.Builder->CreateLoad(structPtr->getAllocatedType(), structPtr);	// result contains the whole initialized structure
 	}
 
@@ -513,8 +562,58 @@ namespace AlloyCompiler
 
 	llvm::Value* generateInitializerListExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
-		ASSERT(false, "Not yet implemented!");
-		return nullptr;
+		//
+		// Array initialization in the form of: { EXPRESSION, EXPRESSION, ... }
+		//
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::INITIALIZER_LIST_EXPRESSION, "Expected INITIALIZER_LIST_EXPRESSION!");
+
+		const INITIALIZER_LIST_EXPRESSION& initListExpressionNode = nodeBuffers.GetNode(nodeID).InitializerListExpression;
+
+		if (!state.CurrentIdentifierType || state.CurrentIdentifierType->getTypeID() != llvm::Type::ArrayTyID)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown array type!");
+			return nullptr;
+		}
+
+		llvm::ArrayType* arrayType = static_cast<llvm::ArrayType * >(state.CurrentIdentifierType);
+
+		// set the type that we are expecting for each array element
+		state.CurrentIdentifierType = arrayType->getElementType();
+
+		// create a mutable variable at the end of the insertion block
+		llvm::IRBuilder<> tempBuilder(state.Builder->GetInsertBlock(), state.Builder->GetInsertBlock()->end());
+		llvm::AllocaInst* arrayPtr = tempBuilder.CreateAlloca(arrayType, nullptr);
+
+		// go through the list of initializers and initialize all members
+		for (int i = 0; i < initListExpressionNode.ValueIDs.size(); i++)
+		{
+			llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, initListExpressionNode.ValueIDs[i]);
+
+			if (!expressionVal)
+			{
+				return nullptr;
+			}
+
+			// convert our index to an llvm 32-bit Int
+			llvm::Value* llvmIndex = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, i, true));
+
+			// struct members are accessed through 2 indices, this is described in detail here:
+			// https://llvm.org/docs/GetElementPtr.html
+			std::vector<llvm::Value*> indices(2);
+			indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
+			indices[1] = llvmIndex;
+
+			llvm::Value* memberPtr = state.Builder->CreateGEP(arrayType, arrayPtr, indices, "memberptr");
+
+			convertValueToType(state, expressionVal, arrayType->getElementType());
+
+			state.Builder->CreateStore(expressionVal, memberPtr, "savetmp");
+		}
+
+		// reset the expected type
+		state.CurrentIdentifierType = nullptr;
+
+		return state.Builder->CreateLoad(arrayPtr->getAllocatedType(), arrayPtr);	// result contains the whole initialized structure
 	}
 
 	
@@ -549,10 +648,41 @@ namespace AlloyCompiler
 		return state.Builder->CreateStore(value, declarationVal);
 	}
 
-	llvm::Value* generateArrayAccessExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	PtrValuePair generateArrayAccessExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
-		ASSERT(false, "Not yet implemented!");
-		return nullptr;
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::ARRAY_ACCESS_EXPRESSION, "Expected ARRAY_ACCESS_EXPRESSION!");
+
+		const ARRAY_ACCESS_EXPRESSION& arrayAccessExpressionNode = nodeBuffers.GetNode(nodeID).ArrayAccessExpression;
+
+		llvm::Value* memberIndex = generateExpression(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.IndexExpressionID);
+		PtrValuePair left = generateIdentifier(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.ArrayIdentifierID);
+
+		if (!left.Ptr)
+		{
+			return {};
+		}
+
+		// get the type of the left
+		llvm::Type* leftType = left.Value->getType();
+
+		if (leftType->getTypeID() != llvm::Type::ArrayTyID)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayIdentifierID), "Expected array type!");
+			return {};
+		}
+
+		llvm::ArrayType* arrayType = static_cast<llvm::ArrayType*>(leftType);
+
+		// struct members are accessed through 2 indices, this is described in detail here:
+		// https://llvm.org/docs/GetElementPtr.html
+		std::vector<llvm::Value*> indices(2);
+		indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
+		indices[1] = memberIndex;
+
+		llvm::Value* memberPtr = state.Builder->CreateGEP(arrayType, left.Ptr, indices, "memberptr");
+		llvm::Value* memberValue = state.Builder->CreateLoad(arrayType->getElementType(), memberPtr, "loadtmp");
+
+		return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue };
 	}
 
 	PtrValuePair generateMemberAccessExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -867,7 +997,7 @@ namespace AlloyCompiler
 			return generateValueDefinitionExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
-			return generateArrayAccessExpression(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateArrayAccessExpression(tokenBuffers, nodeBuffers, state, nodeID).Value;
 
 		case NodeKind::MEMBER_ACCESS_EXPRESSION:
 			return generateMemberAccessExpression(tokenBuffers, nodeBuffers, state, nodeID).Value;
@@ -1325,6 +1455,9 @@ namespace AlloyCompiler
 		}
 
 		state.NamedValues.InsertType(name, structType, /*isStruct*/true, memberNames);
+
+		// reset the expected type
+		state.CurrentIdentifierType = nullptr;
 
 		return structType;
 	}

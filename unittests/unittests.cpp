@@ -201,6 +201,34 @@ namespace unittests
 
 			RunTest(TestStr, 1);
 		}
+		
+		TEST_METHOD(Arrays)
+		{
+			constexpr auto TestStr = R"(
+			extern fn printf (const str : String, const param : i64) -> i64;
+
+				fn main () -> i64
+				{
+					var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+					var expected : i64 = 1*2*3*4*5*6*7*8*9*10;
+					var result : i64 = 1;
+
+					for (var i : i32 = 0; i < 10; i = i + 1) {
+							result = result * array[i];
+						}
+
+					printf("result = %d", result);
+					if (result == expected)
+						result = 1;
+					else
+						result = 0;
+					return result;
+				}
+			)";
+			std::string expected = "result = 3628800";
+
+			RunTest(TestStr, 1);
+		}
 	};
 }
 

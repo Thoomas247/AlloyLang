@@ -1,45 +1,17 @@
-	extern fn printf (const str : String, const param : f64) -> i64;
-
-	struct Vector3
-	{
-		var x : f32;
-		var y : f32;
-		var z : f32;
-	}
-
-	struct Transform
-	{
-		var position : Vector3;
-		var rotation : Vector3;
-		var scale : Vector3;
-	}
+	extern fn printf (const str : String, const param : i64) -> i64;
 
 	fn main () -> i64
 	{
-		var a : f32 = 32;
-		var expected : f32 = 2048.0;
-		var result : i64 = 0;
-		var test : Vector3 = 
-			Vector3 
-			{ 
-				x = 32.0, 
-				y = 64.0, 
-				z = 0.0 
-			};
+		var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+		var expected : i64 = 1*2*3*4*5*6*7*8*9*10;
+		var result : i64 = 1;
 
-		var test2 : Transform = 
-			Transform
-			{
-				position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
-				rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
-				scale = test
-			};
+		for (var i : i32 = 0; i < 10; i = i + 1) {
+				result = result * array[i];
+			}
 
-		test.z = 10.0;
-		test2.rotation.y = 20.0;
-
-		printf("result = %f", test.x * test2.scale.y);
-		if (test.x * test2.scale.y == expected)
+		printf("result = %d", result);
+		if (result == expected)
 			result = 1;
 		else
 			result = 0;
