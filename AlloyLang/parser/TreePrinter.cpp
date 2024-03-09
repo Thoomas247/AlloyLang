@@ -202,6 +202,18 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<POINTER_MOVE_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& pointerMoveExpressionNode = nodeBuffers.GetNode(nodeID).PointerMoveExpression;
+
+		json j;
+		j["kind"] = "POINTER_MOVE_EXPRESSION";
+		j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, pointerMoveExpressionNode.IdentifierID);
+
+		return j;
+	}
+
+	template <>
 	json print<INITIALIZER_LIST_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& initializerListExpressionNode = nodeBuffers.GetNode(nodeID).InitializerListExpression;
@@ -331,6 +343,9 @@ namespace AlloyCompiler
 		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
 			return print<POINTER_INITIALIZER_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
+		case NodeKind::POINTER_MOVE_EXPRESSION:
+			return print<POINTER_MOVE_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 			return print<INITIALIZER_LIST_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
@@ -394,6 +409,7 @@ namespace AlloyCompiler
 		case NodeKind::LITERAL:
 		case NodeKind::CONSTRUCTOR_EXPRESSION:
 		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
+		case NodeKind::POINTER_MOVE_EXPRESSION:
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:

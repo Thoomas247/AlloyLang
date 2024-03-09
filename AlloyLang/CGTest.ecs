@@ -1,5 +1,47 @@
 	extern fn printf (const str : String, const param : i64) -> i64;
 
+	struct TestStruct
+	{
+		var a : i64;
+		var b : i64;
+	}
+
+	fn pointer_test()
+	{
+		const a : TestStruct = TestStruct { a = 2, b = 5 };
+
+		// new keyword allocates value of expression on heap and returns pointer to it
+		var ptr : *TestStruct = new a;
+
+		// no dereference needed to perform operations on value being pointed to
+		ptr.a = ptr.b + 1;	
+
+		// create a reference to the pointed value
+		// in debug mode, & operator will check if pointer is valid
+		const heap_ref : &TestStruct = &ptr;
+
+		// change ownership of pointed value to new pointer
+		// old ptr is now invalid and cannot be used
+		var new_ptr : *TestStruct = move ptr;
+
+
+		// create an array on the stack of known size
+		const stack_array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+
+		// copy array over to heap
+		var heap_array : *[i64; 10] = new stack_array;
+
+		// create a reference to the array
+		var stack_array_ref : &[i64; 10] = &stack_array;
+		var heap_array_ref : &[i64; 10] = &heap_array;
+
+
+		var user_input : i64 = 5;
+
+		// allocate a dynamic array on the heap with all values initialized to 0
+		var dynamic_array : *[i64] = new [0; user_input];
+	}
+
 	fn main () -> i64
 	{
 		var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };

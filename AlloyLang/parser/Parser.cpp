@@ -814,6 +814,46 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	NodeID parse<POINTER_MOVE_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		// check for move keyword
+		if (iter.GetKind() != TokenKind::move_keyword)
+		{
+			unexpectedToken(iter, { "move" });
+			return ERROR_NODE_ID;
+		}
+
+		TokenID errorInfo = iter.GetCurrentID();
+
+		// consume move keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse identifier
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::POINTER_MOVE_EXPRESSION,
+				.PointerMoveExpression = POINTER_MOVE_EXPRESSION
+				{
+					.IdentifierID = identifierID
+				}
+			},
+			errorInfo
+		);
+	}
+
+	template <>
 	NodeID parse<INITIALIZER_LIST_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		// check for opening brace
@@ -1427,6 +1467,9 @@ namespace AlloyCompiler
 		{
 		case TokenKind::new_keyword:
 			return parse<POINTER_INITIALIZER_EXPRESSION>(nodeBuffers, iter);
+
+		case TokenKind::move_keyword:
+			return parse<POINTER_MOVE_EXPRESSION>(nodeBuffers, iter);
 
 		case TokenKind::open_brace:
 			return parse<INITIALIZER_LIST_EXPRESSION>(nodeBuffers, iter);
