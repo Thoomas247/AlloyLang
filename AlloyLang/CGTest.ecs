@@ -1,4 +1,4 @@
-	extern fn printf (const str : String, const param : i64) -> i64;
+	extern fn printf (const str : String, const param : f64) -> i64;
 
 	struct TestStruct
 	{
@@ -6,12 +6,16 @@
 		var b : i64;
 	}
 
-	fn pointer_test()
+	fn main () -> i64
 	{
 		const a : TestStruct = TestStruct { a = 2, b = 5 };
 
 		// new keyword allocates value of expression on heap and returns pointer to it
 		var ptr : *TestStruct = new a;
+
+		return printf("result = %f", ptr.b);
+
+		/*
 
 		// no dereference needed to perform operations on value being pointed to
 		ptr.a = ptr.b + 1;	
@@ -40,22 +44,6 @@
 
 		// allocate a dynamic array on the heap with all values initialized to 0
 		var dynamic_array : *[i64] = new [0; user_input];
+		*/
 	}
 
-	fn main () -> i64
-	{
-		var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-		var expected : i64 = 1*2*3*4*5*6*7*8*9*10;
-		var result : i64 = 1;
-
-		for (var i : i32 = 0; i < 10; i = i + 1) {
-				result = result * array[i];
-			}
-
-		printf("result = %d", result);
-		if (result == expected)
-			result = 1;
-		else
-			result = 0;
-		return result;
-	}
