@@ -14,6 +14,16 @@ namespace llvm
 
 namespace AlloyCompiler
 {
+
+	// for pointer types, llvm does not store the type pointed to by the pointer
+	// we have to kee track of it ourselves
+	// type is null if this is not a pointer
+	struct ValueTypePair
+	{
+		llvm::AllocaInst* value = nullptr;
+		llvm::Type* type = nullptr;
+	};
+
 	class NamedValues
 	{
 	public:
@@ -25,8 +35,8 @@ namespace AlloyCompiler
 		void PushScope(const std::string_view& name);
 		void PopScope();
 
-		llvm::AllocaInst* GetValue(const std::string_view& name);
-		void InsertValue(const std::string_view& name, llvm::AllocaInst* value);
+		ValueTypePair* GetValue(const std::string_view& name);
+		void InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type);
 
 		llvm::Type* GetType(const std::string_view& name);
 		/// <summary>
@@ -48,7 +58,7 @@ namespace AlloyCompiler
 		struct Scope
 		{
 			std::string_view Name;
-			std::unordered_map<std::string_view, llvm::AllocaInst*> Values;
+			std::unordered_map<std::string_view, ValueTypePair> Values;
 			std::unordered_map<std::string_view, TypeInfo> Types;
 			std::unordered_map<llvm::Type*, std::string_view> TypeNames; // used for error messages
 

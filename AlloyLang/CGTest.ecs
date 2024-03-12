@@ -1,4 +1,4 @@
-	extern fn printf (const str : String, const param : f64) -> i64;
+	extern fn printf (const str : String, const param : i64) -> i64;
 
 	struct TestStruct
 	{
@@ -8,12 +8,14 @@
 
 	fn main () -> i64
 	{
-		const a : TestStruct = TestStruct { a = 2, b = 5 };
+		/// const a : TestStruct = TestStruct { a = 2, b = 5 };
 
 		// new keyword allocates value of expression on heap and returns pointer to it
-		var ptr : *TestStruct = new a;
+		var ptr : *i64 = new 123;
 
-		return printf("result = %f", ptr.b);
+		printf("result = %d", ptr);
+
+		return 0;
 
 		/*
 
@@ -39,11 +41,6 @@
 		var stack_array_ref : &[i64; 10] = &stack_array;
 		var heap_array_ref : &[i64; 10] = &heap_array;
 
-
-		var user_input : i64 = 5;
-
-		// allocate a dynamic array on the heap with all values initialized to 0
-		var dynamic_array : *[i64] = new [0; user_input];
 		*/
 	}
 
