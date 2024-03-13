@@ -191,10 +191,9 @@ namespace unittests
 
 					printf("result = %f", test.x * test2.scale.y);
 					if (test.x * test2.scale.y == expected)
-						result = 1;
+						return 1;
 					else
-						result = 0;
-					return result;
+						return 0;
 				}
 			)";
 			std::string expected = "result = 2048.000000";

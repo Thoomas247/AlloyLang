@@ -50,6 +50,23 @@ namespace AlloyCompiler
 		m_ScopeStack.pop_back();
 	}
 
+	void NamedValues::FreeHeapPointers(llvm::IRBuilder<>& builder)
+	{
+		//
+		// Free memory allocated on the heap
+		// When a pointer variable goes out of scope, we should free its memory
+		//
+		for (auto& it : m_ScopeStack.back().Values) {
+
+			// only pointers have their type set explicitely
+			if (it.second.type != nullptr) {
+				// llvm::Value* ptr = builder.CreateLoad(it.second.value->getAllocatedType(), it.second.value);
+				// builder.CreateFree(ptr);
+			}
+		}
+	}
+
+
 	ValueTypePair* NamedValues::GetValue(const std::string_view& name)
 	{
 		ValueTypePair* result = nullptr;

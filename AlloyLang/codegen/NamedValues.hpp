@@ -8,6 +8,10 @@
 namespace llvm
 {
 	class LLVMContext;
+	class ConstantFolder;
+	class IRBuilderDefaultInserter;
+	template <typename, typename>
+		class IRBuilder;
 	class AllocaInst;
 	class Type;
 }
@@ -45,6 +49,9 @@ namespace AlloyCompiler
 		int GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
 		std::string_view GetTypeName(llvm::Type* type);
 		void InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, int> structMembers = {});
+
+		// should be called before PopScope in order to free memory allocated on the heap
+		void FreeHeapPointers(llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>& builder);
 
 	private:
 		struct TypeInfo

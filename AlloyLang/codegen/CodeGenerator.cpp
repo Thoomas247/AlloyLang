@@ -20,6 +20,8 @@ namespace AlloyCompiler
 		Log::Error("\t{0}", tokenBuffers.GetLine(location.LineStart));
 		Log::Error("\t{0}^", std::string(location.Column - 1, ' '));
 		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+
+		ASSERT(false, "Check log file for errors!");	// all errors should assert in debug mode
 	}
 
 	std::vector<llvm::Value*> getGEPIndex(LLVMState& state, int index)
@@ -285,12 +287,6 @@ namespace AlloyCompiler
 
 			if (valueTypePair->type) {
 				// the type is set in the case of pointers, we need to load the pointed to value
-				/*
-				llvm::Value* Ptr = state.Builder->CreateGEP(valueTypePair->value->getAllocatedType(), 
-									valueTypePair->value, 
-									llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 0, true)), 
-									"memberptr");
-									*/
 				llvm::Value* Value = state.Builder->CreateLoad(valueTypePair->type, valueOrPtr, "loadtmp");
 				return PtrValuePair{ .Ptr = valueOrPtr, .Value = Value };
 			}
@@ -550,7 +546,7 @@ namespace AlloyCompiler
 		// go through the list of initializers and initialize all members
 		for (int i = 0; i < constructorExpressionNode.MemberIdentifierIDs.size(); i++)
 		{
-			// get the name of the member to initiliaze
+			// get the name of the member to initialize
 			const IDENTIFIER& memberIdentifier = nodeBuffers.GetNode(constructorExpressionNode.MemberIdentifierIDs[i]).Identifier;
 			const std::string_view memberName = tokenBuffers.GetValue(memberIdentifier.IdentifierTokenID).ToStringView();
 
@@ -603,12 +599,13 @@ namespace AlloyCompiler
 		const POINTER_INITIALIZER_EXPRESSION& pointerInitializerNode = nodeBuffers.GetNode(nodeID).PointerInitializerExpression;
 
 		llvm::Type* elementType = state.CurrentIdentifierType;
+		state.CurrentIdentifierType = nullptr;
 		llvm::PointerType* pointerType = llvm::PointerType::get(elementType, 0);	// note that elementType is not actually used by llvm
 
 		// get the value to set for each element
-		llvm::Value* result = generateExpression(tokenBuffers, nodeBuffers, state, pointerInitializerNode.ValueID);
+		llvm::Value* defaultValue = generateExpression(tokenBuffers, nodeBuffers, state, pointerInitializerNode.ValueID);
 		// try to convert the value to the expected type	
-		convertValueToType(state, result, elementType);
+		convertValueToType(state, defaultValue, elementType);
 
 		// now get the count of objects to create on the heap
 		llvm::Value* count;
@@ -631,44 +628,49 @@ namespace AlloyCompiler
 		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
 		ASSERT(func != nullptr, "No function to insert into!");
 
+		llvm::IRBuilder<>& tempBuilder = *state.Builder;
+
 		// emit init code before the loop
-		llvm::Value* start = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 0, true));
-		llvm::Value* step = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1, true));
+		// start is the loop variable, initialize it to 0
+		llvm::AllocaInst* start = tempBuilder.CreateAlloca(llvm::IntegerType::getInt64Ty(*state.Context), nullptr);
+		tempBuilder.CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 0)), start);
+		llvm::Value* step = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1));
 
 		// create a new basic block to start insertion into
 		llvm::BasicBlock* loopBlock = llvm::BasicBlock::Create(*state.Context, "loop", func);
 		// insert an explicit fall through from the current block to the loopBlock
-		state.Builder->CreateBr(loopBlock);
+		tempBuilder.CreateBr(loopBlock);
 
 		// start insertion into the loopBlock
-		state.Builder->SetInsertPoint(loopBlock);
+		tempBuilder.SetInsertPoint(loopBlock);
 
 		// generate the body of the loop
 
 		// create the instructions to store the value for each element
-		llvm::Value* memberPtr = state.Builder->CreateGEP(pointerType, Ptr, start, "memberptr");
-		state.Builder->CreateStore(result, memberPtr, "savetmp");
+		llvm::Value* current = tempBuilder.CreateLoad(start->getAllocatedType(), start);
+		llvm::Value* memberPtr = tempBuilder.CreateGEP(pointerType, Ptr, current, "memberptr");
+		tempBuilder.CreateStore(defaultValue, memberPtr, "savetmp");
 
-		// emit step value
-		start = state.Builder->CreateAdd(start, step, "addtmp");
+		// increment loop variable (start) by step value
+		current = tempBuilder.CreateAdd(current, step, "addtmp");
+		tempBuilder.CreateStore(current, start);
 
 		// emit the condition
-		llvm::Value* conditionVal = state.Builder->CreateICmpSGE(start, count, "eqtmp");;
+		llvm::Value* conditionVal = tempBuilder.CreateICmpUGE(current, count, "eqtmp");;
 		conditionVal = convertToBool(state, conditionVal);
 
 		// create the "after loop" block and insert it
 		llvm::BasicBlock* afterBlock = llvm::BasicBlock::Create(*state.Context, "afterloop", func);
 
 		// insert the conditional branch into the end of afterBlock
-		state.Builder->CreateCondBr(conditionVal, afterBlock, loopBlock);
+		tempBuilder.CreateCondBr(conditionVal, afterBlock, loopBlock);
 
 		// any new code will be inserted in afterBlock
-		state.Builder->SetInsertPoint(afterBlock);
+		tempBuilder.SetInsertPoint(afterBlock);
 
-		result = Ptr;	// result contains the whole initialized pointer
 		state.CurrentIdentifierType = nullptr;
 
-		return result;
+		return Ptr;	// return the initialized pointer
 	}
 
 	llvm::Value* generateInitializerListExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -1449,15 +1451,15 @@ namespace AlloyCompiler
 		// handle void return
 		if (returnStatementNode.ExpressionID == ERROR_NODE_ID)
 		{
-			if (state.CurrentReturnType != nullptr)
+			if (state.CurrentReturnValue != nullptr)
 			{
 				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID),
-					"Function expects a return value of type '{0}'!", state.NamedValues.GetTypeName(state.CurrentReturnType));
+					"Function expects a return value of type '{0}'!", state.NamedValues.GetTypeName(state.CurrentReturnValue->getType()));
 
 				return nullptr;
 			}
 
-			return state.Builder->CreateRetVoid();
+			return state.Builder->CreateBr(state.FuncExitBlock);
 		}
 
 		llvm::Value* expressionValue = generateExpression(tokenBuffers, nodeBuffers, state, returnStatementNode.ExpressionID);
@@ -1467,16 +1469,25 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (expressionValue->getType() != state.CurrentReturnType)
+		if (state.CurrentReturnValue != nullptr) {
+			// convert the return value to the right type
+			// TODO: should we generate a warning here?
+			convertValueToType(state, expressionValue, state.CurrentReturnValue->getAllocatedType());
+		}
+
+		if (state.CurrentReturnValue == nullptr 
+			|| expressionValue->getType() != state.CurrentReturnValue->getAllocatedType())
 		{
 			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), 
 				"Function has return type '{0}' but provided return value is of type '{1}'!", 
-				state.NamedValues.GetTypeName(state.CurrentReturnType),
+				state.CurrentReturnValue == nullptr ? "void" : state.NamedValues.GetTypeName(state.CurrentReturnValue->getType()),
 				state.NamedValues.GetTypeName(expressionValue->getType()));
 			return nullptr;
 		}
 
-		return state.Builder->CreateRet(expressionValue);
+		// store the return value and branch to the exit block
+		state.Builder->CreateStore(expressionValue, state.CurrentReturnValue);
+		return state.Builder->CreateBr(state.FuncExitBlock);
 	}
 
 	llvm::Value* generateStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -1604,14 +1615,18 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		state.CurrentReturnType = func->getReturnType();
-
 		// push a new scope for the function
 		state.NamedValues.PushScope(func->getName().str());
 
 		// create a new basic block to start insertion into
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", func);
 		state.Builder->SetInsertPoint(entryBlock);
+
+		// create an alloca for the function's return value, if any
+		llvm::AllocaInst* previousReturnValue = state.CurrentReturnValue;
+		if (func->getReturnType() != nullptr) {
+			state.CurrentReturnValue = createEntryBlockAlloca(func, "", func->getReturnType());
+		}
 
 		// create allocations for function arguments
 		for (auto& arg : func->args())
@@ -1622,8 +1637,9 @@ namespace AlloyCompiler
 				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Variable '{0}' already defined!", arg.getName().str());
 
 				func->eraseFromParent();
+				state.NamedValues.FreeHeapPointers(*state.Builder);
 				state.NamedValues.PopScope();
-				state.CurrentReturnType = nullptr;
+				state.CurrentReturnValue = nullptr;
 				return nullptr;
 			}
 
@@ -1637,15 +1653,48 @@ namespace AlloyCompiler
 			state.NamedValues.InsertValue(arg.getName(), allocaInst, nullptr);
 		}
 
+		// every function has an exit block for cleanup and setting the return value
+		llvm::BasicBlock* previousExitBlock = state.FuncExitBlock;
+		state.FuncExitBlock = llvm::BasicBlock::Create(*state.Context, "exit", func);
+
 		llvm::Value* bodyVal = generateBlockStatement(tokenBuffers, nodeBuffers, state, functionDefinitionNode.BodyID);
 
 		if (!bodyVal)
 		{
 			func->eraseFromParent();
+			state.NamedValues.FreeHeapPointers(*state.Builder);
 			state.NamedValues.PopScope();
-			state.CurrentReturnType = nullptr;
+			state.CurrentReturnValue = previousReturnValue;
+			state.FuncExitBlock = previousExitBlock;
 			return nullptr;
 		}
+
+
+		// check if the code block ends with a branch, if not insert a branch to the exit code
+		// this is needed because if the function ends with 2 consecutive branches, the code optimizers fail
+		llvm::Instruction* PTI = state.Builder->GetInsertBlock()->getTerminator();
+		if (PTI->getOpcode() != llvm::Instruction::Br) {
+			state.Builder->CreateBr(state.FuncExitBlock);
+		}
+
+		// create the exit block
+		state.Builder->SetInsertPoint(state.FuncExitBlock);
+
+		// clear all pointers allocated on the heap
+		state.NamedValues.FreeHeapPointers(*state.Builder);
+		// restore the named values of the higher level
+		state.NamedValues.PopScope();
+		// set the return value if any
+		if (state.CurrentReturnValue != nullptr) {
+			llvm::Value* retValue = state.Builder->CreateLoad(state.CurrentReturnValue->getAllocatedType(), state.CurrentReturnValue, "returnval");
+			if (retValue != nullptr) {
+				state.Builder->CreateRet(retValue);
+			}
+		}
+
+		// restore the previous exit block and return value
+		state.FuncExitBlock = previousExitBlock;
+		state.CurrentReturnValue = previousReturnValue;
 
 		// validate the generated code, checking for consistency
 		llvm::verifyFunction(*func);
@@ -1656,10 +1705,7 @@ namespace AlloyCompiler
 			state.FPM->run(*func, *state.FAM);
 		}
 
-		// restore the named values of the higher level
-		state.NamedValues.PopScope();
-
-		state.CurrentReturnType = nullptr;
+		state.CurrentReturnValue = nullptr;
 
 		return func;
 	}
