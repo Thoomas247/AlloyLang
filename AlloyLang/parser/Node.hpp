@@ -110,6 +110,11 @@ namespace AlloyCompiler
 		NodeID CountID;	// ERROR_NODE_ID if not an array
 	};
 
+	struct POINTER_MOVE_EXPRESSION
+	{
+		NodeID IdentifierID;	// name of the pointer to move
+	};
+
 	struct INITIALIZER_LIST_EXPRESSION
 	{
 		VectorRef<NodeID> ValueIDs;
@@ -163,6 +168,7 @@ namespace AlloyCompiler
 		LITERAL Literal;
 		CONSTRUCTOR_EXPRESSION ConstructorExpression;
 		POINTER_INITIALIZER_EXPRESSION PointerInitializerExpression;
+		POINTER_MOVE_EXPRESSION PointerMoveExpression;
 		INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 		VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
 		ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;
@@ -330,6 +336,7 @@ namespace AlloyCompiler
 
 		CONSTRUCTOR_EXPRESSION,
 		POINTER_INITIALIZER_EXPRESSION,
+		POINTER_MOVE_EXPRESSION,
 		INITIALIZER_LIST_EXPRESSION,
 		VALUE_DEFINITION_EXPRESSION,
 		ARRAY_ACCESS_EXPRESSION,
@@ -387,6 +394,7 @@ namespace AlloyCompiler
 
 			CONSTRUCTOR_EXPRESSION ConstructorExpression;
 			POINTER_INITIALIZER_EXPRESSION PointerInitializerExpression;
+			POINTER_MOVE_EXPRESSION PointerMoveExpression;
 			INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 			VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
 			ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;

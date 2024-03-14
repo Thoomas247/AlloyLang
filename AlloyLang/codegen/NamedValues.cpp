@@ -50,8 +50,27 @@ namespace AlloyCompiler
 		m_ScopeStack.pop_back();
 	}
 
-	llvm::AllocaInst* NamedValues::GetValue(const std::string_view& name)
+	void NamedValues::FreeHeapPointers(llvm::IRBuilder<>& builder)
 	{
+		//
+		// Free memory allocated on the heap
+		// When a pointer variable goes out of scope, we should free its memory
+		//
+		for (auto& it : m_ScopeStack.back().Values) {
+
+			// only pointers have their type set explicitely
+			if (it.second.type != nullptr) {
+				// llvm::Value* ptr = builder.CreateLoad(it.second.value->getAllocatedType(), it.second.value);
+				// builder.CreateFree(ptr);
+			}
+		}
+	}
+
+
+	ValueTypePair* NamedValues::GetValue(const std::string_view& name)
+	{
+		ValueTypePair* result = nullptr;
+
 		// look for the value starting from the current scope and going up
 		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
 		{
@@ -59,18 +78,19 @@ namespace AlloyCompiler
 			auto found = scope.Values.find(name);
 			if (found != scope.Values.end())
 			{
-				return found->second;
+				result = &found->second;
+				break;
 			}
 		}
 
-		return nullptr;
+		return result;
 	}
 
-	void NamedValues::InsertValue(const std::string_view& name, llvm::AllocaInst* value)
+	void NamedValues::InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type)
 	{
 		ASSERT(!m_ScopeStack.back().Values.contains(name), "Named value already exists! Should check if it exists first with NamedValues::GetValue(const std::string& name).");
-
-		m_ScopeStack.back().Values[name] = value;
+		ValueTypePair valueTypePair = { value, type };
+		m_ScopeStack.back().Values[name] = valueTypePair;
 	}
 
 	llvm::Type* NamedValues::GetType(const std::string_view& name)

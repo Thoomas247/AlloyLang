@@ -42,6 +42,7 @@ namespace AlloyCompiler
 		return_keyword,
 
 		new_keyword,
+		move_keyword,
 
 		reference,
 		//pointer,
@@ -103,6 +104,7 @@ namespace AlloyCompiler
 		{ TokenKind::return_keyword, "return_keyword" },
 
 		{ TokenKind::new_keyword, "new_keyword" },
+		{ TokenKind::move_keyword, "move_keyword" },
 
 		{ TokenKind::reference, "reference" },
 		//{ TokenKind::pointer, "pointer" },
@@ -161,6 +163,7 @@ namespace AlloyCompiler
 		{ "return", TokenKind::return_keyword },
 
 		{ "new", TokenKind::new_keyword },
+		{ "move", TokenKind::move_keyword },
 
 		{ "&", TokenKind::reference },
 		//{ "*", TokenKind::pointer },
@@ -197,7 +200,6 @@ namespace AlloyCompiler
 
 		{ "!", TokenKind::unary_operator },
 		//{ "-", TokenKind::unary_operator },
-		{ "@", TokenKind::unary_operator },
 
 		{ "true", TokenKind::boolean_literal },
 		{ "false", TokenKind::boolean_literal }
@@ -219,7 +221,6 @@ namespace AlloyCompiler
 		{ '*', { } },		// *
 		{ '/', { } },		// /
 		{ '%', { } },		// %
-		{ '@', { } },		// @
 		{ '.', { } }		// . (... doesn't fit here as it is 3 characters long, case is handled manually in tokenizer)
 	};
 

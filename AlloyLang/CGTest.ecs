@@ -1,44 +1,50 @@
-extern fn printf (const str : String, const param : f64) -> i64;
+	extern fn printf (const str : String, const param : i64) -> i64;
+	extern fn rand() -> i64;
+	
+	struct TestStruct
+	{
+		var a : i64;
+		var b : i64;
+	}
+	
 
-struct Vector3
-{
-	var x : f64;
-	var y : f64;
-	var z : f64;
-}
+	fn main () -> i64
+	{
+		const a : TestStruct = TestStruct { a = 2, b = 5 };
 
-struct Transform
-{
-	var position : Vector3;
-	var rotation : Vector3;
-	var scale : Vector3;
-}
+		// new keyword allocates value of expression on heap and returns pointer to it
+		var ptr1 : *TestStruct = new a;
+		var ptr2 : *i64 = new [123; 4];
+		
+		// no dereference needed to perform operations on value being pointed to
+		ptr1.a = ptr1.b + 1;
+		ptr2[1] = ptr2[1] + 1;
 
-fn main () -> i64
-{
-	var a : f64 = 32.0;
-	var test : Vector3 = 
-		Vector3 
-		{ 
-			x = 32.0, 
-			y = 64.0, 
-			z = 0.0 
-		};
-
-	var test2 : Transform = 
-		Transform
-		{
-			position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
-			rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
-			scale = test
-		};
-
-	test.z = 10.0;
-	test2.rotation.y = 20.0;
-
-	printf("result = %f", test.x * test2.scale.y);
-	if (test.x * test2.scale.y == 2048.0)
-		return 1;
-	// else
+		printf("ptr1.a = %d", ptr1.a);
+		printf("ptr2[1] = %d", ptr1[1]);
 		return 0;
-}
+
+		/*
+
+		// create a reference to the pointed value
+		// in debug mode, & operator will check if pointer is valid
+		const heap_ref : &TestStruct = &ptr;
+
+		// change ownership of pointed value to new pointer
+		// old ptr is now invalid and cannot be used
+		var new_ptr : *TestStruct = move ptr;
+
+
+		// create an array on the stack of known size
+		const stack_array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+
+		// copy array over to heap
+		var heap_array : *[i64; 10] = new stack_array;
+
+		// create a reference to the array
+		var stack_array_ref : &[i64; 10] = &stack_array;
+		var heap_array_ref : &[i64; 10] = &heap_array;
+
+		*/
+	}
+

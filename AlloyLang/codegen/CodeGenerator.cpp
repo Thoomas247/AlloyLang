@@ -20,6 +20,113 @@ namespace AlloyCompiler
 		Log::Error("\t{0}", tokenBuffers.GetLine(location.LineStart));
 		Log::Error("\t{0}^", std::string(location.Column - 1, ' '));
 		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+
+		ASSERT(false, "Check log file for errors!");	// all errors should assert in debug mode
+	}
+
+	std::vector<llvm::Value*> getGEPIndex(LLVMState& state, int index)
+	{
+		//
+		// Given a index into an array or structure element, convert it to a the format required
+		// by llvm GEP (GetElementPtr) operarions
+		// Array and structure members are accessed through 2 indices, this is described in detail here:
+		// https://llvm.org/docs/GetElementPtr.html
+		// 
+		// convert our index to an llvm 32-bit Int
+		llvm::Value* llvmIndex = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, index, true));
+
+		std::vector<llvm::Value*> indices(2);
+		indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
+		indices[1] = llvmIndex;
+
+		return indices;
+	}
+
+	void branchIfNotDuplicate(LLVMState& state, llvm::BasicBlock* destination)
+	{
+		//
+		// check if the code block ends with a branch, if not insert a branch to the provided destination
+		// this is needed because if the function ends with 2 consecutive branches, the code optimizers fail
+		//
+		llvm::Instruction* PTI = state.Builder->GetInsertBlock()->getTerminator();
+		if (PTI == nullptr 
+			|| PTI->getOpcode() != llvm::Instruction::Br) {
+			state.Builder->CreateBr(destination);
+		}
+	}
+
+	bool convertValueToType(LLVMState& state, llvm::Value*& value, llvm::Type* newType)
+	{
+		//
+		// Create an llvm instruction to convert input value from its current type to another type
+		// TODO: 
+		//		- Extend to include other needed types
+		//		- Add a warning in case the conversion loses precision 
+		//
+		llvm::Type* oldType = value->getType();
+		bool result = false;
+
+		if (oldType == newType) {
+			return true;	// nothing to do
+		}
+
+		switch (oldType->getTypeID()) {
+			case llvm::Type::IntegerTyID:
+			{
+				switch (newType->getTypeID()) {
+				case llvm::Type::FloatTyID:
+				case llvm::Type::DoubleTyID:
+					value = state.Builder->CreateSIToFP(value, newType);
+					result = true;
+					break;
+
+				case llvm::Type::IntegerTyID:
+					value = state.Builder->CreateIntCast(value, newType, true);
+					result = true;
+					break;
+
+				default:
+					ASSERT(false, "Conversion to type is not implemented");
+					break;
+				}
+				break;
+			}
+
+			case llvm::Type::FloatTyID:
+			{
+				switch (newType->getTypeID()) {
+				case llvm::Type::DoubleTyID:
+					value = state.Builder->CreateFPCast(value, newType);
+					result = true;
+					break;
+				default:
+					ASSERT(false, "Conversion to type is not implemented");
+					break;
+				}
+				break;
+			}
+
+			case llvm::Type::DoubleTyID:
+			{
+				switch (newType->getTypeID()) {
+				case llvm::Type::FloatTyID:
+					value = state.Builder->CreateFPCast(value, newType);
+					result = true;
+					break;
+
+				default:
+					ASSERT(false, "Conversion to type is not implemented");
+					break;
+				}
+				break;
+			}
+
+			default:
+				/// ASSERT(false, "Conversion from type is not implemented");
+				break;
+		}
+
+		return result;
 	}
 
 	llvm::Value* convertToBool(LLVMState& state, llvm::Value* value)
@@ -82,10 +189,17 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, llvm::Type* type)
+	llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, llvm::Type* type, int numElements = 0)
 	{
+		//
+		// numElements added for array support
+		//
 		llvm::IRBuilder<> tempBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
-		return tempBuilder.CreateAlloca(type, nullptr, varName);
+		llvm::Value* elements = nullptr;
+		if (numElements > 0) {
+			elements = llvm::ConstantInt::get(function->getContext(), llvm::APInt(64, numElements));
+		}
+		return tempBuilder.CreateAlloca(type, elements, varName);
 	}
 
 #pragma endregion
@@ -102,6 +216,7 @@ namespace AlloyCompiler
 		const LITERAL& literalNode = nodeBuffers.GetNode(nodeID).Literal;
 
 		const std::string_view literalStr = tokenBuffers.GetValue(literalNode.InfoTokenID).ToStringView();
+		llvm::Value* result = nullptr;
 
 		switch (literalNode.Kind)
 		{
@@ -109,43 +224,60 @@ namespace AlloyCompiler
 		{
 			// TODO: allow negative values
 			uint64_t uintValue;
-			std::from_chars_result result = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), uintValue);
-			return llvm::ConstantInt::get(*state.Context, llvm::APInt(64, uintValue));
+			int bits = 64;	// default conversion to 64-bit integers
+			if (state.CurrentIdentifierType && state.CurrentIdentifierType->isIntegerTy()) {
+				// if we are expecting a specific integer type, generate an integer with the right type
+				bits = state.CurrentIdentifierType->getIntegerBitWidth();
+			}
+			std::from_chars_result temp = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), uintValue);
+			result = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, uintValue));
+			break;
 		}
 
 		case LITERAL::Type::Float:
 		{
-			double floatValue;
-			std::from_chars_result result = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), floatValue);
-			return llvm::ConstantFP::get(*state.Context, llvm::APFloat(floatValue));
+			double dblValue;
+			std::from_chars_result temp = std::from_chars(literalStr.data(), literalStr.data() + literalStr.size(), dblValue);
+			result = llvm::ConstantFP::get(*state.Context, llvm::APFloat(dblValue));
+			break;
 		}
 
 		case LITERAL::Type::Boolean:
 		{
 			if (literalStr == "true")
 			{
-				return llvm::ConstantInt::getTrue(*state.Context);
+				result = llvm::ConstantInt::getTrue(*state.Context);
+				break;
 			}
 
 			if (literalStr == "false")
 			{
-				return llvm::ConstantInt::getFalse(*state.Context);
+				result = llvm::ConstantInt::getFalse(*state.Context);
+				break;
 			}
 
 			ASSERT(false, "Unknown boolean literal '{0}'!", literalStr);
-			return nullptr;
+			break;
 		}
 
 		case LITERAL::Type::String:
-			return state.Builder->CreateGlobalStringPtr(literalStr);
+			result = state.Builder->CreateGlobalStringPtr(literalStr);
+			break;
 
 		case LITERAL::Type::Character:
-			return llvm::ConstantInt::get(*state.Context, llvm::APInt(64, literalStr[0]));
+			result = llvm::ConstantInt::get(*state.Context, llvm::APInt(8, literalStr[0]));
+			break;
 
 		default:
 			ASSERT(false, "Unknown literal type!");
-			return nullptr;
+			break;
 		}
+
+		// if we know the type that we are expecting, convert right away to that type
+		if (result && state.CurrentIdentifierType) {
+			convertValueToType(state, result, state.CurrentIdentifierType);
+		}
+		return result;
 	}
 
 #pragma endregion
@@ -160,36 +292,49 @@ namespace AlloyCompiler
 		const std::string_view name = tokenBuffers.GetValue(node.IdentifierTokenID).ToStringView();
 
 		// check if we have a local variable with this name
-		llvm::AllocaInst* allocaInst = state.NamedValues.GetValue(name);
+		ValueTypePair* valueTypePair = state.NamedValues.GetValue(name);
 
-		if (allocaInst)
+		if (valueTypePair)
 		{
-			llvm::Value* value = state.Builder->CreateLoad(allocaInst->getAllocatedType(), allocaInst, name);
-			return PtrValuePair{ .Ptr = allocaInst, .Value = value };
+			llvm::Value* valueOrPtr = state.Builder->CreateLoad(valueTypePair->value->getAllocatedType(), valueTypePair->value, name);
+
+			if (valueTypePair->type) {
+				// the type is set in the case of pointers, we need to load the pointed to value
+				llvm::Value* Value = state.Builder->CreateLoad(valueTypePair->type, valueOrPtr, "loadtmp");
+				return PtrValuePair{ .Ptr = valueOrPtr, .Value = Value };
+			}
+			else {
+				return PtrValuePair{ .Ptr = valueTypePair->value, .Value = valueOrPtr };
+			}
 		}
 
 		// check if we have a global
-		llvm::GlobalVariable* globalVar = state.Module->getGlobalVariable(name);
+		llvm::GlobalVariable* globalVar = state.Module->getGlobalVariable(name, true);
 
 		if (globalVar)
 		{
-			llvm::Value* value = globalVar->getInitializer();
-			return PtrValuePair{ .Ptr = allocaInst, .Value = value };
+			llvm::Value* value = state.Builder->CreateLoad(globalVar->getValueType(), globalVar, name);
+			return PtrValuePair{ .Ptr = globalVar, .Value = value };
 		}
 
 		logErrorAtPosition(tokenBuffers, node.IdentifierTokenID, "Unknown variable name '{0}'!", name);
 		return {};
 	}
 
-	llvm::Type* generateTypeIdentifier(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	llvm::Type* generateTypeIdentifier(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID,
+										TYPE_IDENTIFIER::Modifier& modifier)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::TYPE_IDENTIFIER, "Expected TYPE_IDENTIFIER!");
 
 		// TODO: references and pointers
 
-		const TYPE_IDENTIFIER& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
+		llvm::Type* type = nullptr;
 
+		const TYPE_IDENTIFIER& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
 		const Node& identifierOrTypeIdentifierNode = nodeBuffers.GetNode(typeIdentifierNode.IdentifierOrTypeIdentifierID);
+
+		// let the caller know if this is a pointer, a reference or none
+		modifier = typeIdentifierNode.Mod;
 
 		// handle non-array types
 		if (identifierOrTypeIdentifierNode.Kind == NodeKind::IDENTIFIER)
@@ -197,45 +342,53 @@ namespace AlloyCompiler
 			const IDENTIFIER& identifierNode = identifierOrTypeIdentifierNode.Identifier;
 			const std::string_view name = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
 
-			llvm::Type* type = state.NamedValues.GetType(name);
+			type = state.NamedValues.GetType(name);
 
 			if (!type)
 			{
 				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.IdentifierOrTypeIdentifierID),
 					"Unknown type name '{0}'!", name);
 			}
-
-			return type;
 		}
-
-
-		// handle array types
-		ASSERT(identifierOrTypeIdentifierNode.Kind == NodeKind::TYPE_IDENTIFIER, "Expected type identifier node!");
-		ASSERT(typeIdentifierNode.ArraySizeID != ERROR_NODE_ID, "Expected array size node!");
-
-		const LITERAL& arraySizeNode = nodeBuffers.GetNode(typeIdentifierNode.ArraySizeID).Literal;
-
-		const std::string_view arraySizeStr = tokenBuffers.GetValue(arraySizeNode.InfoTokenID).ToStringView();
-
-		uint64_t arraySize;
-		std::from_chars(arraySizeStr.data(), arraySizeStr.data() + arraySizeStr.size(), arraySize);
-
-		if (arraySize == 0)
+		else
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.ArraySizeID), "Array size must be greater than 0!");
-			return nullptr;
+
+			// handle array types
+			ASSERT(identifierOrTypeIdentifierNode.Kind == NodeKind::TYPE_IDENTIFIER, "Expected type identifier node!");
+			ASSERT(typeIdentifierNode.ArraySizeID != ERROR_NODE_ID, "Expected array size node!");
+
+			const LITERAL& arraySizeNode = nodeBuffers.GetNode(typeIdentifierNode.ArraySizeID).Literal;
+
+			const std::string_view arraySizeStr = tokenBuffers.GetValue(arraySizeNode.InfoTokenID).ToStringView();
+
+			uint64_t arraySize;
+			std::from_chars(arraySizeStr.data(), arraySizeStr.data() + arraySizeStr.size(), arraySize);
+
+			if (arraySize == 0)
+			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.ArraySizeID), "Array size must be greater than 0!");
+			}
+			else
+			{
+				const NodeID elementTypeIdentifierNode = typeIdentifierNode.IdentifierOrTypeIdentifierID;
+				TYPE_IDENTIFIER::Modifier modifier = TYPE_IDENTIFIER::Modifier::None;
+				llvm::Type* elementType = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, elementTypeIdentifierNode, modifier);
+
+				if (elementType)
+				{
+					type = llvm::ArrayType::get(elementType, arraySize);
+				}
+			}
 		}
 
-		const NodeID elementTypeIdentifierNode = typeIdentifierNode.IdentifierOrTypeIdentifierID;
+		// storing the last identifier type in order to set the value to the right type
+		// e.g. var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }; when we encounter var array : [i64; 10] we know that we are
+		// initializing an i64 array of 10 elements
+		state.CurrentIdentifierType = type;
 
-		llvm::Type* elementType = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, elementTypeIdentifierNode);
+		ASSERT(type != nullptr, "Error determining identifier type");
 
-		if (!elementType)
-		{
-			return nullptr;
-		}
-
-		return llvm::ArrayType::get(elementType, arraySize);
+		return type;
 	}
 
 #pragma endregion
@@ -249,8 +402,8 @@ namespace AlloyCompiler
 		// TODO: var and const
 
 		const TYPE_DECLARATION& typeDeclarationNode = nodeBuffers.GetNode(nodeID).TypeDeclaration;
-
-		return generateTypeIdentifier(tokenBuffers, nodeBuffers, state, typeDeclarationNode.TypeIdentifierID);
+		TYPE_IDENTIFIER::Modifier modifier = TYPE_IDENTIFIER::Modifier::None;
+		return generateTypeIdentifier(tokenBuffers, nodeBuffers, state, typeDeclarationNode.TypeIdentifierID, modifier);
 	}
 
 	llvm::Value* generateValueDeclaration(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -260,37 +413,47 @@ namespace AlloyCompiler
 		const VALUE_DECLARATION& valueDeclarationNode = nodeBuffers.GetNode(nodeID).ValueDeclaration;
 		const IDENTIFIER& identifierNode = nodeBuffers.GetNode(valueDeclarationNode.IdentifierID).Identifier;
 
-		// handle globals
-		if (state.Builder->GetInsertBlock() == nullptr)
+		const std::string_view name = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+		TYPE_IDENTIFIER::Modifier modifier = TYPE_IDENTIFIER::Modifier::None;
+		llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclarationNode.TypeIdentifierID, modifier);
+		llvm::Type* containedType = nullptr;	// contained type in case of pointers only
+
+		if (!type)
 		{
-			ASSERT(false, "Not yet implemented!");
+			assert(false);
 			return nullptr;
 		}
 
-		// handle locals
-		else
-		{
-			const std::string_view name = tokenBuffers.GetValue(identifierNode.IdentifierTokenID).ToStringView();
+		switch (modifier) {
+			case TYPE_IDENTIFIER::Modifier::None:
+				break;
 
-			llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclarationNode.TypeIdentifierID);
-
-			if (!type)
+			case TYPE_IDENTIFIER::Modifier::Pointer:
 			{
-				return nullptr;
+				// allocating a pointer to this type
+				containedType = type;
+				type = llvm::PointerType::get(containedType, 0);
+				break;
 			}
 
-			// create the alloca
-			llvm::AllocaInst* allocaInst = createEntryBlockAlloca(
-				state.Builder->GetInsertBlock()->getParent(),
-				name,
-				type
-			);
-
-			// add the variable to the named values
-			state.NamedValues.InsertValue(name, allocaInst);
-
-			return allocaInst;
+			default:
+			{
+				assert(false);		// TODO: references are not yet implemented
+				break;
+			}
 		}
+
+		// create the alloca
+		llvm::AllocaInst* allocaInst = createEntryBlockAlloca(
+			state.Builder->GetInsertBlock()->getParent(),
+			name,
+			type
+		);
+
+		// add the variable to the named values
+		state.NamedValues.InsertValue(name, allocaInst, containedType);
+
+		return allocaInst;
 	}
 
 	llvm::Value* generateFunctionDeclaration(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -315,8 +478,8 @@ namespace AlloyCompiler
 		for (NodeID parameterID : functionDeclarationNode.ParameterIDs)
 		{
 			const VALUE_DECLARATION& valueDeclaration = nodeBuffers.GetNode(parameterID).ValueDeclaration;
-
-			llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID);
+			TYPE_IDENTIFIER::Modifier modifier = TYPE_IDENTIFIER::Modifier::None;
+			llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID, modifier);
 
 			if (!type)
 			{
@@ -325,6 +488,9 @@ namespace AlloyCompiler
 
 			paramTypes.push_back(type);
 		}
+
+		// reset the expected type
+		state.CurrentIdentifierType = nullptr;
 
 		// retrieve the return type
 		llvm::Type* returnType = llvm::Type::getVoidTy(*state.Context);
@@ -340,7 +506,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, functionDeclarationNode.IsVariadic);
+		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, true /*functionDeclarationNode.IsVariadic*/);
 
 		//
 		// This call creates a crash when later executing the code using the JIT engine: 
@@ -393,7 +559,7 @@ namespace AlloyCompiler
 		// go through the list of initializers and initialize all members
 		for (int i = 0; i < constructorExpressionNode.MemberIdentifierIDs.size(); i++)
 		{
-			// get the name of the member to initiliaze
+			// get the name of the member to initialize
 			const IDENTIFIER& memberIdentifier = nodeBuffers.GetNode(constructorExpressionNode.MemberIdentifierIDs[i]).Identifier;
 			const std::string_view memberName = tokenBuffers.GetValue(memberIdentifier.IdentifierTokenID).ToStringView();
 
@@ -411,6 +577,9 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
+			// set the type that we are expecting for each structure element
+			state.CurrentIdentifierType = structType->getElementType(memberIndex);
+
 			llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, constructorExpressionNode.MemberValueIDs[i]);
 
 			if (!expressionVal)
@@ -418,34 +587,156 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			// convert our index to an llvm 32-bit Int
-			llvm::Value* llvmIndex = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberIndex, true));
-
-			// struct members are accessed through 2 indices, this is described in detail here:
-			// https://llvm.org/docs/GetElementPtr.html
-			std::vector<llvm::Value*> indices(2);
-			indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
-			indices[1] = llvmIndex;
+			// convert our index to the format required by llvm
+			std::vector<llvm::Value*> indices = getGEPIndex(state, memberIndex);
 
 			llvm::Value* memberPtr = state.Builder->CreateGEP(structType, structPtr, indices, "memberptr");
+
+			convertValueToType(state, expressionVal, structType->getElementType(memberIndex));
+
 			state.Builder->CreateStore(expressionVal, memberPtr, "savetmp");
 		}
+
+		// reset the expected type
+		state.CurrentIdentifierType = nullptr;
 
 		return state.Builder->CreateLoad(structPtr->getAllocatedType(), structPtr);	// result contains the whole initialized structure
 	}
 
 	llvm::Value* generatePointerInitializerExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
-		ASSERT(false, "Not yet implemented!");
-		return nullptr;
+		//
+		// new ( EXPRESSION | ( [ EXPRESSION; EXPRESSION ] ) ) ;
+		//
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::POINTER_INITIALIZER_EXPRESSION, "Expected POINTER_INITIALIZER_EXPRESSION!");
+		const POINTER_INITIALIZER_EXPRESSION& pointerInitializerNode = nodeBuffers.GetNode(nodeID).PointerInitializerExpression;
+
+		llvm::Type* elementType = state.CurrentIdentifierType;
+		state.CurrentIdentifierType = nullptr;
+		llvm::PointerType* pointerType = llvm::PointerType::get(elementType, 0);	// note that elementType is not actually used by llvm
+
+		// get the value to set for each element
+		llvm::Value* defaultValue = generateExpression(tokenBuffers, nodeBuffers, state, pointerInitializerNode.ValueID);
+		// try to convert the value to the expected type	
+		convertValueToType(state, defaultValue, elementType);
+
+		// now get the count of objects to create on the heap
+		llvm::Value* count;
+		if (ERROR_NODE_ID == pointerInitializerNode.CountID) {
+			// creating a single object
+			count = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1, true));
+		}
+		else {
+			count = generateExpression(tokenBuffers, nodeBuffers, state, pointerInitializerNode.CountID);
+		}
+
+		// create a mutable variable on the heap
+		llvm::Type* PointerType = llvm::Type::getInt64Ty(*state.Context);	// pointers are 64-bit values
+		llvm::Constant* AllocSize = llvm::ConstantExpr::getSizeOf(elementType);
+		AllocSize = llvm::ConstantExpr::getTruncOrBitCast(AllocSize, PointerType);
+		llvm::CallInst* Ptr = state.Builder->CreateMalloc(PointerType, elementType, AllocSize, count);
+
+		// create code to go through the list of members and initialize them to the given value
+		// we need to create the loop within the llvm code because we don' t know before hand how many objects we are creating
+		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
+		ASSERT(func != nullptr, "No function to insert into!");
+
+		llvm::IRBuilder<>& tempBuilder = *state.Builder;
+
+		// emit init code before the loop
+		// start is the loop variable, initialize it to 0
+		llvm::AllocaInst* start = tempBuilder.CreateAlloca(llvm::IntegerType::getInt64Ty(*state.Context), nullptr);
+		tempBuilder.CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 0)), start);
+		llvm::Value* step = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1));
+
+		// create a new basic block to start insertion into
+		llvm::BasicBlock* loopBlock = llvm::BasicBlock::Create(*state.Context, "loop", func);
+		// insert an explicit fall through from the current block to the loopBlock
+		tempBuilder.CreateBr(loopBlock);
+
+		// start insertion into the loopBlock
+		tempBuilder.SetInsertPoint(loopBlock);
+
+		// generate the body of the loop
+
+		// create the instructions to store the value for each element
+		llvm::Value* current = tempBuilder.CreateLoad(start->getAllocatedType(), start);
+		llvm::Value* memberPtr = tempBuilder.CreateGEP(pointerType, Ptr, current, "memberptr");
+		tempBuilder.CreateStore(defaultValue, memberPtr, "savetmp");
+
+		// increment loop variable (start) by step value
+		current = tempBuilder.CreateAdd(current, step, "addtmp");
+		tempBuilder.CreateStore(current, start);
+
+		// emit the condition
+		llvm::Value* conditionVal = tempBuilder.CreateICmpUGE(current, count, "eqtmp");;
+		conditionVal = convertToBool(state, conditionVal);
+
+		// create the "after loop" block and insert it
+		llvm::BasicBlock* afterBlock = llvm::BasicBlock::Create(*state.Context, "afterloop", func);
+
+		// insert the conditional branch into the end of afterBlock
+		tempBuilder.CreateCondBr(conditionVal, afterBlock, loopBlock);
+
+		// any new code will be inserted in afterBlock
+		tempBuilder.SetInsertPoint(afterBlock);
+
+		state.CurrentIdentifierType = nullptr;
+
+		return Ptr;	// return the initialized pointer
 	}
 
 	llvm::Value* generateInitializerListExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
-		ASSERT(false, "Not yet implemented!");
-		return nullptr;
+		//
+		// Array initialization in the form of: { EXPRESSION, EXPRESSION, ... }
+		//
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::INITIALIZER_LIST_EXPRESSION, "Expected INITIALIZER_LIST_EXPRESSION!");
+
+		const INITIALIZER_LIST_EXPRESSION& initListExpressionNode = nodeBuffers.GetNode(nodeID).InitializerListExpression;
+
+		if (!state.CurrentIdentifierType || state.CurrentIdentifierType->getTypeID() != llvm::Type::ArrayTyID)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown array type!");
+			return nullptr;
+		}
+
+		llvm::ArrayType* arrayType = static_cast<llvm::ArrayType * >(state.CurrentIdentifierType);
+
+		// set the type that we are expecting for each array element
+		state.CurrentIdentifierType = arrayType->getElementType();
+
+		// create a mutable variable at the end of the insertion block
+		llvm::IRBuilder<> tempBuilder(state.Builder->GetInsertBlock(), state.Builder->GetInsertBlock()->end());
+		llvm::AllocaInst* arrayPtr = tempBuilder.CreateAlloca(arrayType, nullptr);
+
+		// go through the list of initializers and initialize all members
+		for (int i = 0; i < initListExpressionNode.ValueIDs.size(); i++)
+		{
+			llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, initListExpressionNode.ValueIDs[i]);
+
+			if (!expressionVal)
+			{
+				return nullptr;
+			}
+
+			// convert our index to the format required by GEP operations
+			std::vector<llvm::Value*> indices = getGEPIndex(state, i);
+
+			llvm::Value* memberPtr = state.Builder->CreateGEP(arrayType, arrayPtr, indices, "memberptr");
+
+			convertValueToType(state, expressionVal, arrayType->getElementType());
+
+			state.Builder->CreateStore(expressionVal, memberPtr, "savetmp");
+		}
+
+		// reset the expected type
+		state.CurrentIdentifierType = nullptr;
+
+		return state.Builder->CreateLoad(arrayPtr->getAllocatedType(), arrayPtr);	// result contains the whole initialized array
 	}
 
+	
 	llvm::Value* generateValueDefinitionExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::VALUE_DEFINITION_EXPRESSION, "Expected VALUE_DEFINITION_EXPRESSION!");
@@ -468,14 +759,50 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		if (llvm::isa<llvm::AllocaInst>(declarationVal)) {
+			llvm::AllocaInst* alloc = static_cast<llvm::AllocaInst*>(declarationVal);
+			convertValueToType(state, value, alloc->getAllocatedType());
+		}
+
 		// store the value into the alloca
 		return state.Builder->CreateStore(value, declarationVal);
 	}
 
-	llvm::Value* generateArrayAccessExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
+	PtrValuePair generateArrayAccessExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
 	{
-		ASSERT(false, "Not yet implemented!");
-		return nullptr;
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::ARRAY_ACCESS_EXPRESSION, "Expected ARRAY_ACCESS_EXPRESSION!");
+
+		const ARRAY_ACCESS_EXPRESSION& arrayAccessExpressionNode = nodeBuffers.GetNode(nodeID).ArrayAccessExpression;
+
+		llvm::Value* memberIndex = generateExpression(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.IndexExpressionID);
+		PtrValuePair left = generateIdentifier(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.ArrayIdentifierID);
+
+		if (!left.Ptr)
+		{
+			return {};
+		}
+
+		// get the type of the left
+		llvm::Type* leftType = left.Value->getType();
+
+		if (leftType->getTypeID() != llvm::Type::ArrayTyID)
+		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayIdentifierID), "Expected array type!");
+			return {};
+		}
+
+		llvm::ArrayType* arrayType = static_cast<llvm::ArrayType*>(leftType);
+
+		// struct members are accessed through 2 indices, this is described in detail here:
+		// https://llvm.org/docs/GetElementPtr.html
+		std::vector<llvm::Value*> indices(2);
+		indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
+		indices[1] = memberIndex;
+
+		llvm::Value* memberPtr = state.Builder->CreateGEP(arrayType, left.Ptr, indices, "memberptr");
+		llvm::Value* memberValue = state.Builder->CreateLoad(arrayType->getElementType(), memberPtr, "loadtmp");
+
+		return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue };
 	}
 
 	PtrValuePair generateMemberAccessExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -586,6 +913,8 @@ namespace AlloyCompiler
 			{
 				return nullptr;
 			}
+
+			convertValueToType(state, argVal, calleeFunc->getArg(i)->getType());
 
 			if (argVal->getType() != calleeFunc->getArg(i)->getType())
 			{
@@ -740,27 +1069,45 @@ namespace AlloyCompiler
 		const UNARY_EXPRESSION& unaryExpressionNode = nodeBuffers.GetNode(nodeID).UnaryExpression;
 
 		std::string_view operatorStr = tokenBuffers.GetValue(unaryExpressionNode.OperatorTokenID).ToStringView();
-
-		llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID);
-
-		if (!expressionVal)
-		{
-			return nullptr;
-		}
+		llvm::Value* result = nullptr;
 
 		if (operatorStr == "-")
 		{
-			return state.Builder->CreateFNeg(expressionVal, "negtmp");
-		}
+			llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID);
 
+			if (expressionVal)
+			{
+				result = state.Builder->CreateFNeg(expressionVal, "negtmp");
+			}
+		}
+		else
 		if (operatorStr == "!")
 		{
-			return state.Builder->CreateNot(expressionVal, "nottmp");
+			llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID);
+
+			if (expressionVal)
+			{
+				result = state.Builder->CreateNot(expressionVal, "nottmp");
+			}
+		}
+		else
+		if (operatorStr == "&")
+		{
+			PtrValuePair ptr = generateIdentifier(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID);
+			result = ptr.Ptr;
+		}
+		else
+		if (operatorStr == "@")
+		{
+			PtrValuePair ptr = generateIdentifier(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID);
+			result = ptr.Value;
+		}
+		else
+		{
+			ASSERT(false, "Unknown unary operator!");
 		}
 
-		ASSERT(false, "Unknown unary operator!");
-
-		return nullptr;
+		return result;
 	}
 
 	llvm::Value* generatePrimaryExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -788,7 +1135,7 @@ namespace AlloyCompiler
 			return generateValueDefinitionExpression(tokenBuffers, nodeBuffers, state, nodeID);
 
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
-			return generateArrayAccessExpression(tokenBuffers, nodeBuffers, state, nodeID);
+			return generateArrayAccessExpression(tokenBuffers, nodeBuffers, state, nodeID).Value;
 
 		case NodeKind::MEMBER_ACCESS_EXPRESSION:
 			return generateMemberAccessExpression(tokenBuffers, nodeBuffers, state, nodeID).Value;
@@ -833,6 +1180,12 @@ namespace AlloyCompiler
 		if (!expressionVal)
 		{
 			return nullptr;
+		}
+
+		// store the value into the alloca
+		if (llvm::isa<llvm::AllocaInst>(ptr)) {
+			llvm::AllocaInst* alloc = static_cast<llvm::AllocaInst*>(ptr);
+			convertValueToType(state, expressionVal, alloc->getAllocatedType());
 		}
 
 		// store the value into the alloca
@@ -1055,7 +1408,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		state.Builder->CreateBr(mergeBlock);
+		// insert the branch into the end of the if block
+		branchIfNotDuplicate(state, mergeBlock);
 
 		// emit else block if any
 		llvm::Value* elseVal = nullptr;
@@ -1073,8 +1427,9 @@ namespace AlloyCompiler
 			}
 		}
 
-		// insert the conditional branch into the end of the else block
-		state.Builder->CreateBr(mergeBlock);
+		// insert the branch into the end of the if block
+		// insert the branch into the end of the if block
+		branchIfNotDuplicate(state, mergeBlock);
 
 		// emit merge block
 		func->insert(func->end(), mergeBlock);
@@ -1111,15 +1466,15 @@ namespace AlloyCompiler
 		// handle void return
 		if (returnStatementNode.ExpressionID == ERROR_NODE_ID)
 		{
-			if (state.CurrentReturnType != nullptr)
+			if (state.CurrentReturnValue != nullptr)
 			{
 				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID),
-					"Function expects a return value of type '{0}'!", state.NamedValues.GetTypeName(state.CurrentReturnType));
+					"Function expects a return value of type '{0}'!", state.NamedValues.GetTypeName(state.CurrentReturnValue->getType()));
 
 				return nullptr;
 			}
 
-			return state.Builder->CreateRetVoid();
+			return state.Builder->CreateBr(state.FuncExitBlock);
 		}
 
 		llvm::Value* expressionValue = generateExpression(tokenBuffers, nodeBuffers, state, returnStatementNode.ExpressionID);
@@ -1129,16 +1484,25 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (expressionValue->getType() != state.CurrentReturnType)
+		if (state.CurrentReturnValue != nullptr) {
+			// convert the return value to the right type
+			// TODO: should we generate a warning here?
+			convertValueToType(state, expressionValue, state.CurrentReturnValue->getAllocatedType());
+		}
+
+		if (state.CurrentReturnValue == nullptr 
+			|| expressionValue->getType() != state.CurrentReturnValue->getAllocatedType())
 		{
 			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), 
 				"Function has return type '{0}' but provided return value is of type '{1}'!", 
-				state.NamedValues.GetTypeName(state.CurrentReturnType),
+				state.CurrentReturnValue == nullptr ? "void" : state.NamedValues.GetTypeName(state.CurrentReturnValue->getType()),
 				state.NamedValues.GetTypeName(expressionValue->getType()));
 			return nullptr;
 		}
 
-		return state.Builder->CreateRet(expressionValue);
+		// store the return value and branch to the exit block
+		state.Builder->CreateStore(expressionValue, state.CurrentReturnValue);
+		return state.Builder->CreateBr(state.FuncExitBlock);
 	}
 
 	llvm::Value* generateStatement(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
@@ -1214,8 +1578,8 @@ namespace AlloyCompiler
 		for (auto id : structDefinitionNode.MemberIDs)
 		{
 			const VALUE_DECLARATION& valueDeclaration = nodeBuffers.GetNode(id).ValueDeclaration;
-
-			llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID);
+			TYPE_IDENTIFIER::Modifier modifier = TYPE_IDENTIFIER::Modifier::None;
+			llvm::Type* type = generateTypeIdentifier(tokenBuffers, nodeBuffers, state, valueDeclaration.TypeIdentifierID, modifier);
 
 			if (!type)
 			{
@@ -1241,6 +1605,9 @@ namespace AlloyCompiler
 
 		state.NamedValues.InsertType(name, structType, /*isStruct*/true, memberNames);
 
+		// reset the expected type
+		state.CurrentIdentifierType = nullptr;
+
 		return structType;
 	}
 
@@ -1263,14 +1630,18 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		state.CurrentReturnType = func->getReturnType();
-
 		// push a new scope for the function
 		state.NamedValues.PushScope(func->getName().str());
 
 		// create a new basic block to start insertion into
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", func);
 		state.Builder->SetInsertPoint(entryBlock);
+
+		// create an alloca for the function's return value, if any
+		llvm::AllocaInst* previousReturnValue = state.CurrentReturnValue;
+		if (func->getReturnType() != nullptr) {
+			state.CurrentReturnValue = createEntryBlockAlloca(func, "", func->getReturnType());
+		}
 
 		// create allocations for function arguments
 		for (auto& arg : func->args())
@@ -1281,8 +1652,9 @@ namespace AlloyCompiler
 				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Variable '{0}' already defined!", arg.getName().str());
 
 				func->eraseFromParent();
+				state.NamedValues.FreeHeapPointers(*state.Builder);
 				state.NamedValues.PopScope();
-				state.CurrentReturnType = nullptr;
+				state.CurrentReturnValue = nullptr;
 				return nullptr;
 			}
 
@@ -1293,18 +1665,46 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(&arg, allocaInst);
 
 			// add arguments to named values
-			state.NamedValues.InsertValue(arg.getName(), allocaInst);
+			state.NamedValues.InsertValue(arg.getName(), allocaInst, nullptr);
 		}
+
+		// every function has an exit block for cleanup and setting the return value
+		llvm::BasicBlock* previousExitBlock = state.FuncExitBlock;
+		state.FuncExitBlock = llvm::BasicBlock::Create(*state.Context, "exit", func);
 
 		llvm::Value* bodyVal = generateBlockStatement(tokenBuffers, nodeBuffers, state, functionDefinitionNode.BodyID);
 
 		if (!bodyVal)
 		{
 			func->eraseFromParent();
+			state.NamedValues.FreeHeapPointers(*state.Builder);
 			state.NamedValues.PopScope();
-			state.CurrentReturnType = nullptr;
+			state.CurrentReturnValue = previousReturnValue;
+			state.FuncExitBlock = previousExitBlock;
 			return nullptr;
 		}
+
+		// insert the branch into the end of the function
+		branchIfNotDuplicate(state, state.FuncExitBlock);
+
+		// create the exit block
+		state.Builder->SetInsertPoint(state.FuncExitBlock);
+
+		// clear all pointers allocated on the heap
+		state.NamedValues.FreeHeapPointers(*state.Builder);
+		// restore the named values of the higher level
+		state.NamedValues.PopScope();
+		// set the return value if any
+		if (state.CurrentReturnValue != nullptr) {
+			llvm::Value* retValue = state.Builder->CreateLoad(state.CurrentReturnValue->getAllocatedType(), state.CurrentReturnValue, "returnval");
+			if (retValue != nullptr) {
+				state.Builder->CreateRet(retValue);
+			}
+		}
+
+		// restore the previous exit block and return value
+		state.FuncExitBlock = previousExitBlock;
+		state.CurrentReturnValue = previousReturnValue;
 
 		// validate the generated code, checking for consistency
 		llvm::verifyFunction(*func);
@@ -1315,10 +1715,7 @@ namespace AlloyCompiler
 			state.FPM->run(*func, *state.FAM);
 		}
 
-		// restore the named values of the higher level
-		state.NamedValues.PopScope();
-
-		state.CurrentReturnType = nullptr;
+		state.CurrentReturnValue = nullptr;
 
 		return func;
 	}
