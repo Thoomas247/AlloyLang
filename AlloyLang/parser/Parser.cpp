@@ -1508,6 +1508,13 @@ namespace AlloyCompiler
 			identifierOrMemberAccessID = parse<MEMBER_ACCESS_EXPRESSION>(nodeBuffers, iter);
 		}
 
+		// check if we have a [ after the identifier, denoting an array access expression
+		else if (iter.GetKind() == TokenKind::open_bracket)
+		{
+			iter.Previous();
+			identifierOrMemberAccessID = parse<ARRAY_ACCESS_EXPRESSION>(nodeBuffers, iter);
+		}
+
 		else
 		{
 			iter.Previous();

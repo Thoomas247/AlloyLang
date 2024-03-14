@@ -367,9 +367,20 @@ namespace AlloyCompiler
 		{
 			j["identifier"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, assignmentExpressionNode.IdentifierOrMemberAccessID);
 		}
-		else
+
+		else if (nodeBuffers.GetNode(assignmentExpressionNode.IdentifierOrMemberAccessID).Kind == NodeKind::MEMBER_ACCESS_EXPRESSION)
 		{
 			j["member_access"] = print<MEMBER_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, assignmentExpressionNode.IdentifierOrMemberAccessID);
+		}
+
+		else if (nodeBuffers.GetNode(assignmentExpressionNode.IdentifierOrMemberAccessID).Kind == NodeKind::ARRAY_ACCESS_EXPRESSION)
+		{
+			j["array_access"] = print<ARRAY_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, assignmentExpressionNode.IdentifierOrMemberAccessID);
+		}
+
+		else
+		{
+			ASSERT(false, "Unknown assignment expression kind!");
 		}
 
 		j["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, assignmentExpressionNode.ValueID);
