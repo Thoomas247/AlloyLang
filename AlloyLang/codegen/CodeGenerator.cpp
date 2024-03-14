@@ -42,6 +42,19 @@ namespace AlloyCompiler
 		return indices;
 	}
 
+	void branchIfNotDuplicate(LLVMState& state, llvm::BasicBlock* destination)
+	{
+		//
+		// check if the code block ends with a branch, if not insert a branch to the provided destination
+		// this is needed because if the function ends with 2 consecutive branches, the code optimizers fail
+		//
+		llvm::Instruction* PTI = state.Builder->GetInsertBlock()->getTerminator();
+		if (PTI == nullptr 
+			|| PTI->getOpcode() != llvm::Instruction::Br) {
+			state.Builder->CreateBr(destination);
+		}
+	}
+
 	bool convertValueToType(LLVMState& state, llvm::Value*& value, llvm::Type* newType)
 	{
 		//
@@ -1395,7 +1408,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		state.Builder->CreateBr(mergeBlock);
+		// insert the branch into the end of the if block
+		branchIfNotDuplicate(state, mergeBlock);
 
 		// emit else block if any
 		llvm::Value* elseVal = nullptr;
@@ -1413,8 +1427,9 @@ namespace AlloyCompiler
 			}
 		}
 
-		// insert the conditional branch into the end of the else block
-		state.Builder->CreateBr(mergeBlock);
+		// insert the branch into the end of the if block
+		// insert the branch into the end of the if block
+		branchIfNotDuplicate(state, mergeBlock);
 
 		// emit merge block
 		func->insert(func->end(), mergeBlock);
@@ -1669,13 +1684,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-
-		// check if the code block ends with a branch, if not insert a branch to the exit code
-		// this is needed because if the function ends with 2 consecutive branches, the code optimizers fail
-		llvm::Instruction* PTI = state.Builder->GetInsertBlock()->getTerminator();
-		if (PTI->getOpcode() != llvm::Instruction::Br) {
-			state.Builder->CreateBr(state.FuncExitBlock);
-		}
+		// insert the branch into the end of the function
+		branchIfNotDuplicate(state, state.FuncExitBlock);
 
 		// create the exit block
 		state.Builder->SetInsertPoint(state.FuncExitBlock);
