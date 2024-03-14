@@ -212,6 +212,8 @@ namespace unittests
 					var expected : i64 = 1*2*3*4*5*6*7*8*9*10;
 					var result : i64 = 1;
 
+					array[2] = 3;
+
 					for (var i : i32 = 0; i < 10; i = i + 1) {
 							result = result * array[i];
 						}
@@ -225,6 +227,43 @@ namespace unittests
 				}
 			)";
 			std::string expected = "result = 3628800";
+
+			RunTest(TestStr, 1);
+		}
+
+		TEST_METHOD(Pointers)
+		{
+			constexpr auto TestStr = R"(
+				extern fn printf (const str : String, const param : i64) -> i64;
+	
+				struct TestStruct
+				{
+					var a : i64;
+					var b : i64;
+				}
+	
+	
+				fn main () -> i64
+				{
+					const a : TestStruct = TestStruct { a = 2, b = 5 };
+
+					// new keyword allocates value of expression on heap and returns pointer to it
+					var ptr1 : *TestStruct = new a;
+					var ptr2 : *[i64] = new [123; 4];
+		
+					// no dereference needed to perform operations on value being pointed to
+					ptr1.a = ptr1.b + 1;
+					ptr2[1] = ptr2[1] + 1;
+
+					printf("ptr1.a = %d\n", ptr1.a);
+					printf("ptr2[1] = %d\n", ptr2[1]);
+					if (ptr1.a == 6 && ptr2[1] == 124)
+						return 1;
+					else
+						return 0;
+				}
+			)";
+			std::string expected = "ptr1.a = 6\nptr2[1] = 124\n";
 
 			RunTest(TestStr, 1);
 		}
