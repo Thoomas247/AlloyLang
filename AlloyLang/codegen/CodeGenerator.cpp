@@ -420,7 +420,7 @@ namespace AlloyCompiler
 
 		if (!type)
 		{
-			assert(false);
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Variable '{0}' type error!", name);
 			return nullptr;
 		}
 
@@ -483,6 +483,7 @@ namespace AlloyCompiler
 
 			if (!type)
 			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' parameter type error!", name);
 				return nullptr;
 			}
 
@@ -503,6 +504,7 @@ namespace AlloyCompiler
 
 		if (!returnType)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' return type error!", name);
 			return nullptr;
 		}
 
@@ -584,6 +586,7 @@ namespace AlloyCompiler
 
 			if (!expressionVal)
 			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating '{0}.{1}'!", structName, memberName);
 				return nullptr;
 			}
 
@@ -613,6 +616,10 @@ namespace AlloyCompiler
 
 		llvm::Type* elementType = state.CurrentIdentifierType;
 		state.CurrentIdentifierType = nullptr;
+		// if this is a pointer to an array, we need the underlying element type
+		if (llvm::isa<llvm::ArrayType>(elementType)) {
+			elementType = static_cast<llvm::ArrayType*>(elementType)->getArrayElementType();
+		}
 		llvm::PointerType* pointerType = llvm::PointerType::get(elementType, 0);	// note that elementType is not actually used by llvm
 
 		// get the value to set for each element
@@ -717,6 +724,7 @@ namespace AlloyCompiler
 
 			if (!expressionVal)
 			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 				return nullptr;
 			}
 
@@ -748,6 +756,7 @@ namespace AlloyCompiler
 
 		if (!declarationVal)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -756,6 +765,7 @@ namespace AlloyCompiler
 
 		if (!value)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -779,6 +789,7 @@ namespace AlloyCompiler
 
 		if (!left.Ptr)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return {};
 		}
 
@@ -830,6 +841,7 @@ namespace AlloyCompiler
 
 		if (!left.Ptr)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return {};
 		}
 
@@ -891,12 +903,14 @@ namespace AlloyCompiler
 
 		if (!calleeFunc)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Cannot find function '{0}'!", functionName);
 			return nullptr;
 		}
 
 		// if the function was found, check for argument mismatch
 		if (calleeFunc->arg_size() != functionCallExpressionNode.ArgumentIDs.size())
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' argument mismatch!", functionName);
 			return nullptr;
 		}
 
@@ -911,6 +925,7 @@ namespace AlloyCompiler
 
 			if (argVal == nullptr)
 			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 				return nullptr;
 			}
 
@@ -947,6 +962,7 @@ namespace AlloyCompiler
 
 		if (!leftVal || !rightVal)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -1097,15 +1113,9 @@ namespace AlloyCompiler
 					result = ptr.Ptr;
 				}
 				else
-					if (operatorStr == "@")
-					{
-						PtrValuePair ptr = generateIdentifier(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID);
-						result = ptr.Value;
-					}
-					else
-					{
-						ASSERT(false, "Unknown unary operator!");
-					}
+				{
+					ASSERT(false, "Unknown unary operator!");
+				}
 
 		return result;
 	}
@@ -1169,9 +1179,14 @@ namespace AlloyCompiler
 		{
 			ptr = generateIdentifier(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.IdentifierOrMemberAccessID).Ptr;
 		}
+		else if (identifierOrMemberAccessNode.Kind == NodeKind::ARRAY_ACCESS_EXPRESSION)
+		{
+			ptr = generateArrayAccessExpression(tokenBuffers, nodeBuffers, state, assignmentExpressionNode.IdentifierOrMemberAccessID).Ptr;
+		}
 
 		if (!ptr)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating identifier!");
 			return nullptr;
 		}
 
@@ -1179,6 +1194,7 @@ namespace AlloyCompiler
 
 		if (!expressionVal)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -1271,6 +1287,7 @@ namespace AlloyCompiler
 
 			if (initVal == nullptr)
 			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.InitExpressionID), "Error evaluating expression!");
 				return nullptr;
 			}
 		}
@@ -1289,6 +1306,7 @@ namespace AlloyCompiler
 
 		if (bodyVal == nullptr)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.BodyID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -1299,6 +1317,7 @@ namespace AlloyCompiler
 
 			if (stepVal == nullptr)
 			{
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.IncrementExpressionID), "Error evaluating expression!");
 				return nullptr;
 			}
 		}
@@ -1308,6 +1327,7 @@ namespace AlloyCompiler
 
 		if (conditionVal == nullptr)
 		{
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.ConditionExpressionID), "Error evaluating expression!");
 			return nullptr;
 		}
 
