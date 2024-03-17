@@ -1,0 +1,84 @@
+Entity:
+	A special type with differing members depending on the context (see query and system).
+
+Resource:
+	Used to store (unique) global data in a controlled manner. Systems will have to query resources to read or write to them.
+	Explicitly controlling access to resources allows us to run systems in parallel safely.
+
+	resource WorldSettings
+	{
+		const gravity : f32;
+		var playerCount : u32;
+	}
+
+Component:
+	Used to store data that is associated with an entity.
+	Can only contain non-reference types.
+	Component storage will be implemented using sparse sets. (https://skypjack.github.io/2019-02-14-ecs-baf-part-1/)
+	Similar to resources, systems must query components to access them.
+
+	component WorldTransform
+	{
+		var position : Vector3;
+		var rotation : Vector3;
+		var scale : Vector3;
+	}
+
+Query:
+	Used to specify which resources or components a system will access.
+	Queries are used to determine which systems can run in parallel.
+	There are many ways to access the queried data:
+		- Resources are accessed like a member variable in a struct. For example: "<query-name>.<resource-name>".
+		- Entities matching the query can be accessed using a for-each loop. For example: "for (var entity : Entity in <query-name>)".
+			Here, Entity takes on different members depending on the query.
+			For example, if the query reads WorldTransform, then Entity will have a const member called WorldTransform.
+		- Components can be accessed using a for-each loop as well. For example: "for (var component : <component-name> in <query-name>)".
+		- Components can also be accessed through the entity itself. For example: "entity.<component-name>".
+	
+
+	query UpdateTransformsQuery
+	{
+		reads { WorldSettings }		// list of resources or components that the system will read
+		writes { WorldTransform }	// list of resources or components that the system will write to
+	}
+
+System:
+	Similar to functions, but can only access queried resources or components.
+	Systems can use multiple queries.
+
+	system UpdateTransforms(UpdateTransformsQuery)
+	{
+		for (var entity : Entity in UpdateTransformsQuery)
+		{
+			entity.WorldTransform.position.y = entity.WorldTransform.position.y - UpdateTransformsQuery.WorldSettings.gravity;
+		}
+	}
+
+Group:
+	Used to group systems together that may or may not be able to run in parallel.
+	The order that systems run in a group is not guaranteed, however, the order in which groups run is defined by the user in the application.
+	
+	group PhysicsUpdateGroup
+	{
+		UpdateTransforms,
+		...
+	}
+
+Application:
+	Used to determine when and how often groups must run relative to each other.
+	This is almost equivalent to the main function in C.
+	Each definition of an application will produce a separate executable.
+
+	application Game
+	{
+		// run once on startup
+		start { }
+
+		// run every frame until application is closed
+		update { PhysicsUpdateGroup, OtherUpdateGroup }	// here, PhysicsUpdateGroup is guaranteed to run before OtherUpdateGroup
+
+		// run once on application close
+		end { }
+	}
+
+
