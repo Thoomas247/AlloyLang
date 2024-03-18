@@ -20,7 +20,7 @@ namespace AlloyCompiler
 {
 
 	// for pointer types, llvm does not store the type pointed to by the pointer
-	// we have to kee track of it ourselves
+	// we have to keep track of it ourselves
 	// type is null if this is not a pointer
 	struct ValueTypePair
 	{
@@ -32,7 +32,7 @@ namespace AlloyCompiler
 	{
 	public:
 		NamedValues();
-		~NamedValues();
+		virtual ~NamedValues();
 
 		void RegisterDefaultTypes(llvm::LLVMContext& llvmContext);
 
@@ -42,13 +42,20 @@ namespace AlloyCompiler
 		ValueTypePair* GetValue(const std::string_view& name);
 		void InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type);
 
+		struct StructMemberInfo
+		{
+			int memberIndex;
+			llvm::Type* containedType;	// for pointer types only
+		};
+
 		llvm::Type* GetType(const std::string_view& name);
 		/// <summary>
 		/// Returns -1 if the struct does not exist, -2 if the member does not exist.
 		/// </summary>
-		int GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
+		NamedValues::StructMemberInfo GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
 		std::string_view GetTypeName(llvm::Type* type);
-		void InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, int> structMembers = {});
+
+		void InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, StructMemberInfo> structMembers = {});
 
 		// should be called before PopScope in order to free memory allocated on the heap
 		void FreeHeapPointers(llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>& builder);
@@ -59,7 +66,7 @@ namespace AlloyCompiler
 			llvm::Type* Type;
 			std::string_view Name;
 			bool IsStruct;
-			std::unordered_map<std::string_view, int> StructMembers;
+			std::unordered_map < std::string_view, StructMemberInfo > StructMembers;
 		};
 
 		struct Scope

@@ -1,0 +1,10 @@
+1) A function or method should have a single return
+This allows for proper cleanup before exiting a function and also makes it easier for debugging (e.g. being able to check the return value before the function exits). 
+In complex cases, it is better to insert a goto cleanup instruction (gotos are not allowed, but this is an exception to the rule)
+...
+if (error) goto cleanup;
+...
+cleanup:
+	if (pointer) { free pointer; }
+	return;
+

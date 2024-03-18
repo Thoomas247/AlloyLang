@@ -244,20 +244,26 @@ namespace unittests
 	
 	
 				fn main () -> i64
-				{
-					const a : TestStruct = TestStruct { a = 2, b = 5 };
+				{				
+					// array of i64
+					var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
 					// new keyword allocates value of expression on heap and returns pointer to it
+					const a : TestStruct = TestStruct { a = 2, b = 5 };
 					var ptr1 : *TestStruct = new a;
 					var ptr2 : *[i64] = new [123; 4];
-		
+			
+					// array of pointers to i64
+					const ptrArray : [*i64; 3] = { new array[1], new a.b, new 12 };
+
 					// no dereference needed to perform operations on value being pointed to
 					ptr1.a = ptr1.b + 1;
 					ptr2[1] = ptr2[1] + 1;
 
 					printf("ptr1.a = %d\n", ptr1.a);
 					printf("ptr2[1] = %d\n", ptr2[1]);
-					if (ptr1.a == 6 && ptr2[1] == 124)
+					printf("ptrArray[0] * ptrArray[1] * ptrArray[2] = 2 * 5 * 12 = %d", ptrArray[0] * ptrArray[1] * ptrArray[2]);
+					if (ptr1.a == 6 && ptr2[1] == 124 && ptrArray[0] * ptrArray[1] * ptrArray[2] == 120)
 						return 1;
 					else
 						return 0;

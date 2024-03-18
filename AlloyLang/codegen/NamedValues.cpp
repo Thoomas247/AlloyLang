@@ -105,20 +105,20 @@ namespace AlloyCompiler
 		return nullptr;
 	}
 
-	int NamedValues::GetMemberIndex(const std::string_view& structName, const std::string_view& memberName)
+	NamedValues::StructMemberInfo NamedValues::GetMemberIndex(const std::string_view& structName, const std::string_view& memberName)
 	{
 		TypeInfo* typeInfo = findType(structName);
 
 		if (!typeInfo || !typeInfo->IsStruct)
 		{
-			return -1;
+			return { -1, nullptr };
 		}
 
 		auto it = typeInfo->StructMembers.find(memberName);
 
 		if (it == typeInfo->StructMembers.end())
 		{
-			return -2;
+			return { -2, nullptr };
 		}
 
 		return it->second;
@@ -141,7 +141,7 @@ namespace AlloyCompiler
 		return "";
 	}
 
-	void NamedValues::InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, int> structMembers)
+	void NamedValues::InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, StructMemberInfo> structMembers)
 	{
 		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
 		ASSERT(structMembers.empty() || isStruct, "Struct members can only be added to a struct type.");

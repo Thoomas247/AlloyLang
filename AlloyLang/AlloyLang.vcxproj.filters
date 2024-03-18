@@ -95,5 +95,6 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="Parser Issues.txt" />
+    <Text Include="Coding Rules.txt" />
   </ItemGroup>
 </Project>
