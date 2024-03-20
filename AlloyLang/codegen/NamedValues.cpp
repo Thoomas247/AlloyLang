@@ -59,9 +59,13 @@ namespace AlloyCompiler
 		for (auto& it : m_ScopeStack.back().Values) {
 
 			// only pointers have their type set explicitely
-			if (it.second.type != nullptr) {
-				// llvm::Value* ptr = builder.CreateLoad(it.second.value->getAllocatedType(), it.second.value);
-				// builder.CreateFree(ptr);
+			if (it.second.type != nullptr 
+				// && it.second.value->getAllocatedType()	// this is null in case of references which we should not free
+				) {
+				llvm::Value* ptr = builder.CreateLoad(it.second.value->getAllocatedType(), it.second.value);
+				if (ptr->getType()->isPointerTy()) {
+				//	builder.CreateFree(ptr);
+				}
 			}
 		}
 	}

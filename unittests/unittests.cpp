@@ -76,7 +76,7 @@ namespace unittests
 			constexpr auto TestStr = R"(
 				extern fn printf (const str : String, const param : i64) -> i64;
 
-				fn mul (const a : &i64, const b : &i64) -> i64
+				fn mul (const a : i64, const b : i64) -> i64
 				{
 					var ret : i64 = 0;
 					if (a == 1)
@@ -101,7 +101,7 @@ namespace unittests
 			constexpr auto TestStr = R"(
 				extern fn printf (const str : String, const param : i64) -> i64;
 
-				fn mul (const a : &i64, const b : &i64) -> i64
+				fn mul (const a : i64, const b : i64) -> i64
 				{
 					var ret : i64 = 0;
 					for (var i : i64 = 0; i < a; i = i + 1) {
@@ -270,6 +270,34 @@ namespace unittests
 				}
 			)";
 			std::string expected = "ptr1.a = 6\nptr2[1] = 124\n";
+
+			RunTest(TestStr, 1);
+		}
+
+		TEST_METHOD(References)
+		{
+			constexpr auto TestStr = R"(
+				extern fn printf (const str : String, const param : i64) -> i64;
+	
+				fn test (var a : i64, var b : &i64) -> i64
+				{
+					b = a;
+					return a;
+				}
+	
+				fn main () -> i64
+				{				
+					var a : i64 = 3;
+					var b : i64 = 0;
+					test(a, b);
+					printf("b = %d", b);
+					if (b == 3)
+						return 1;
+					else
+						return 0;
+				}
+			)";
+			std::string expected = "b = 3";
 
 			RunTest(TestStr, 1);
 		}

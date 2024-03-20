@@ -308,14 +308,16 @@ namespace AlloyCompiler
 
 		if (valueTypePair)
 		{
-			llvm::Value* valueOrPtr = state.Builder->CreateLoad(valueTypePair->value->getAllocatedType(), valueTypePair->value, name);
+			// the "Value" is an AllocaInst, load the actual value pointed to by the AllocaInst
+			llvm::Value* valueOrPtr = state.Builder->CreateLoad(valueTypePair->value->getAllocatedType(), 
+														valueTypePair->value, name);
 
 			// set the current type and subtype
 			identifierType.type = valueOrPtr->getType();
 
 			if (valueTypePair->type
 				&& llvm::isa<llvm::PointerType>(valueOrPtr->getType())) {
-				// the type is set in the case of pointers, we need to load the pointed to value
+				// the type is set in the case of pointers and references, we need to load the pointed to value
 				llvm::Value* Value = state.Builder->CreateLoad(valueTypePair->type, valueOrPtr, "loadtmp");
 				identifierType.containedType = Value->getType();
 				return PtrValuePair{ .Ptr = valueOrPtr, .Value = Value };
@@ -345,8 +347,6 @@ namespace AlloyCompiler
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::TYPE_IDENTIFIER, "Expected TYPE_IDENTIFIER!");
 
-		// TODO: references and pointers
-
 		TypeSubtypePair identifierType = { nullptr, nullptr };
 
 		const TYPE_IDENTIFIER& typeIdentifierNode = nodeBuffers.GetNode(nodeID).TypeIdentifier;
@@ -367,7 +367,8 @@ namespace AlloyCompiler
 			{
 				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.IdentifierOrTypeIdentifierID),
 					"Unknown type name '{0}'!", name);
-				return { nullptr, nullptr };
+				identifierType = { nullptr, nullptr };
+				goto exit;
 			}
 		}
 
@@ -389,7 +390,8 @@ namespace AlloyCompiler
 				if (arraySize == 0)
 				{
 					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.ArraySizeID), "Array size must be greater than 0!");
-					return { nullptr, nullptr };
+					identifierType = { nullptr, nullptr };
+					goto exit;
 				}
 			}
 
@@ -401,7 +403,8 @@ namespace AlloyCompiler
 			if (identifierType.type == nullptr)
 			{
 				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(elementTypeIdentifierNode), "Unknown array element type!");
-				return { nullptr, nullptr };
+				identifierType = { nullptr, nullptr };
+				goto exit;
 			}
 
 			switch (modifier) {
@@ -409,6 +412,7 @@ namespace AlloyCompiler
 					break;
 
 				case TYPE_IDENTIFIER::Modifier::Pointer:
+				case TYPE_IDENTIFIER::Modifier::Reference:
 				{
 					// allocating a pointer to this type
 					identifierType.containedType = identifierType.type;
@@ -418,7 +422,9 @@ namespace AlloyCompiler
 
 				default:
 				{
-					assert(false);		// TODO: references are not yet implemented
+					ASSERT(false, "Invalid type modifier!");
+					identifierType = { nullptr, nullptr };
+					goto exit;
 					break;
 				}
 			}
@@ -429,6 +435,7 @@ namespace AlloyCompiler
 		// return the identifier type and subtype
 		// e.g. var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }; when we encounter var array : [i64; 10] we know that we are
 		// initializing an i64 array of 10 elements
+	exit:
 		return identifierType;
 	}
 
@@ -466,22 +473,27 @@ namespace AlloyCompiler
 		}
 
 		switch (modifier) {
-		case TYPE_IDENTIFIER::Modifier::None:
-			break;
+			case TYPE_IDENTIFIER::Modifier::None:
+				break;
 
-		case TYPE_IDENTIFIER::Modifier::Pointer:
-		{
-			// allocating a pointer to this type
-			identifierType.containedType = identifierType.type;
-			identifierType.type = llvm::PointerType::get(identifierType.containedType, 0);
-			break;
-		}
+			case TYPE_IDENTIFIER::Modifier::Pointer:
+			{
+				// allocating a pointer to this type
+				identifierType.containedType = identifierType.type;
+				identifierType.type = llvm::PointerType::get(identifierType.containedType, 0);
+				break;
+			}
 
-		default:
-		{
-			assert(false);		// TODO: references are not yet implemented
-			break;
-		}
+			case TYPE_IDENTIFIER::Modifier::Reference:
+				// TODO: implement reference value declaration
+				assert(false && "Not Implemented!");
+				break;
+
+			default:
+			{
+				ASSERT(false, "Invalid type modifier!");
+				break;
+			}
 		}
 
 		// create the alloca
@@ -489,7 +501,7 @@ namespace AlloyCompiler
 			state.Builder->GetInsertBlock()->getParent(),
 			name,
 			identifierType.type
-		);
+			);
 
 		// add the variable to the named values
 		state.NamedValues.InsertValue(name, allocaInst, identifierType.containedType);
@@ -515,6 +527,8 @@ namespace AlloyCompiler
 
 		// retrieve the parameter types
 		std::vector<llvm::Type*> paramTypes;
+		std::vector<llvm::Type*> paramSubTypes;
+		std::vector<TYPE_IDENTIFIER::Modifier> paramModifiers;
 
 		for (NodeID parameterID : functionDeclarationNode.ParameterIDs)
 		{
@@ -528,7 +542,16 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			paramTypes.push_back(identifierType.type);
+			// Reference should be passed as pointers
+			if (modifier == TYPE_IDENTIFIER::Modifier::Reference) {
+				paramTypes.push_back(llvm::PointerType::get(identifierType.type, 0));
+				paramSubTypes.push_back(identifierType.type);
+			}
+			else {
+				paramTypes.push_back(identifierType.type);
+				paramSubTypes.push_back(nullptr);
+			}
+			paramModifiers.push_back(modifier);
 		}
 
 		// retrieve the return type
@@ -566,6 +589,11 @@ namespace AlloyCompiler
 			const std::string_view paramName = tokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView();
 
 			function->getArg(i)->setName(paramName);
+
+			// set the ByRef attribute on parameters passed byref
+			if (paramModifiers[i] == TYPE_IDENTIFIER::Modifier::Reference) {
+				function->addAttributeAtIndex(i+1, llvm::Attribute::getWithByRefType(*state.Context, paramSubTypes[i]));
+			}
 		}
 
 		return function;
@@ -984,26 +1012,50 @@ namespace AlloyCompiler
 		for (size_t i = 0; i < functionCallExpressionNode.ArgumentIDs.size(); i++)
 		{
 			const NodeID argumentID = functionCallExpressionNode.ArgumentIDs[i];
+			llvm::Value* argVal = nullptr;
 
-			llvm::Value* argVal = generateExpression(tokenBuffers, nodeBuffers, state, argumentID, { calleeFunc->getArg(i)->getType(), nullptr });
-
-			if (argVal == nullptr)
-			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
-				return nullptr;
+			// check if the parameter is passed byref, in which case it should be an identifier and we will pass the address of the identifier
+			auto attr = calleeFunc->getAttributeAtIndex(i + 1, llvm::Attribute::AttrKind::ByRef);
+			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)) {
+				// we need an identifier to pass it byref
+				if (nodeBuffers.GetNode(argumentID).Kind != NodeKind::IDENTIFIER) {
+					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
+						"Function argument {0} expects an lvalue!", i + 1);
+					return nullptr;
+				}
+				TypeSubtypePair identifierType = { nullptr, nullptr };
+				argVal = generateIdentifier(tokenBuffers, nodeBuffers, state, argumentID, identifierType).Ptr;
+				/* TBD the argument type is a pointer in case of references, how to compare the underlying type?
+				if (identifierType.type != calleeFunc->getArg(i)->getType())
+				{
+					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
+						"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
+						state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
+						state.NamedValues.GetTypeName(identifierType.type));
+					return nullptr;
+				}
+				*/
 			}
+			else {
+				argVal = generateExpression(tokenBuffers, nodeBuffers, state, argumentID, { calleeFunc->getArg(i)->getType(), nullptr });
 
-			convertValueToType(state, argVal, calleeFunc->getArg(i)->getType());
+				if (argVal == nullptr)
+				{
+					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
+					return nullptr;
+				}
 
-			if (argVal->getType() != calleeFunc->getArg(i)->getType())
-			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
-					"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
-					state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
-					state.NamedValues.GetTypeName(argVal->getType()));
-				return nullptr;
+				convertValueToType(state, argVal, calleeFunc->getArg(i)->getType());
+
+				if (argVal->getType() != calleeFunc->getArg(i)->getType())
+				{
+					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
+						"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
+						state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
+						state.NamedValues.GetTypeName(argVal->getType()));
+					return nullptr;
+				}
 			}
-
 			args.push_back(argVal);
 		}
 
@@ -1727,7 +1779,7 @@ namespace AlloyCompiler
 	{
 		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::FUNCTION_DEFINITION, "Expected FUNCTION_DEFINITION!")
 
-			const FUNCTION_DEFINITION& functionDefinitionNode = nodeBuffers.GetNode(nodeID).FunctionDefinition;
+		const FUNCTION_DEFINITION& functionDefinitionNode = nodeBuffers.GetNode(nodeID).FunctionDefinition;
 
 		llvm::Function* func = static_cast<llvm::Function*>(generateFunctionDeclaration(tokenBuffers, nodeBuffers, state, functionDefinitionNode.FunctionDeclarationID));
 
@@ -1745,13 +1797,15 @@ namespace AlloyCompiler
 
 		// create an alloca for the function's return value, if any
 		llvm::AllocaInst* previousReturnValue = state.CurrentReturnValue;
-		if (func->getReturnType() != nullptr) {
+		if (func->getReturnType() != nullptr && !func->getReturnType()->isVoidTy()) {
 			state.CurrentReturnValue = createEntryBlockAlloca(func, "", func->getReturnType());
 		}
 
 		// create allocations for function arguments
-		for (auto& arg : func->args())
+		for (size_t index = 0; index < func->arg_size(); index++)
 		{
+			llvm::Argument& arg = *func->getArg(index);
+
 			// check that we do not have a named value with the same name
 			if (state.NamedValues.GetValue(arg.getName().str()))
 			{
@@ -1764,14 +1818,20 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
+			llvm::Attribute attr = arg.getAttribute(llvm::Attribute::AttrKind::ByRef);
+			llvm::Type* subType = nullptr;
+			llvm::AllocaInst* allocaInst = nullptr;
+			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)) {
+				subType = arg.getParamByRefType();
+			}
 			// create an alloca for this variable
-			llvm::AllocaInst* allocaInst = createEntryBlockAlloca(func, arg.getName().str(), arg.getType());
+			allocaInst = createEntryBlockAlloca(func, arg.getName().str(), arg.getType());
 
 			// store the initial value into the alloca
 			state.Builder->CreateStore(&arg, allocaInst);
 
 			// add arguments to named values
-			state.NamedValues.InsertValue(arg.getName(), allocaInst, nullptr);
+			state.NamedValues.InsertValue(arg.getName(), allocaInst, subType);
 		}
 
 		// every function has an exit block for cleanup and setting the return value
