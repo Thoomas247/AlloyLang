@@ -298,7 +298,10 @@ namespace AlloyCompiler
 	PtrValuePair generateIdentifier(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID,
 									TypeSubtypePair& identifierType)
 	{
-		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::IDENTIFIER, "Expected IDENTIFIER!");
+		if (nodeBuffers.GetNode(nodeID).Kind != NodeKind::IDENTIFIER) {
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Expected IDENTIFIER!");
+			return {};
+		}
 
 		const IDENTIFIER& node = nodeBuffers.GetNode(nodeID).Identifier;
 		const std::string_view name = tokenBuffers.GetValue(node.IdentifierTokenID).ToStringView();
@@ -1229,7 +1232,9 @@ namespace AlloyCompiler
 			else
 				if (operatorStr == "&")
 				{
-					assert(false && "Not Implemented!");
+					TypeSubtypePair tempType = { nullptr, nullptr };
+					PtrValuePair left = generateIdentifier(tokenBuffers, nodeBuffers, state, unaryExpressionNode.OperandID, tempType);
+					result = left.Ptr;
 				}
 				else
 				{
