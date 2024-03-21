@@ -256,19 +256,22 @@ namespace unittests
 					// array of pointers to i64
 					const ptrArray : [*i64; 3] = { new array[1], new a.b, new 12 };
 
+					// array of i64 from ptrArray
+					const arr : [i64; 3] = { ptrArray[0], @ptrArray[1], @ptrArray[2] };
+
 					// no dereference needed to perform operations on value being pointed to
 					ptr1.a = ptr1.b + 1;
 					ptr2[1] = ptr2[1] + 1;
 
 					printf("ptr1.a = %d\n", ptr1.a);
 					printf("ptr2[1] = %d\n", ptr2[1]);
-					printf("ptrArray[0] * ptrArray[1] * ptrArray[2] = 2 * 5 * 12 = %d", ptrArray[0] * ptrArray[1] * ptrArray[2]);
-					if (ptr1.a == 6 && ptr2[1] == 124 && ptrArray[0] * ptrArray[1] * ptrArray[2] == 120)
+					printf("ptrArray[0] * array[1] * ptrArray[2] = 2 * 5 * 12 = %d", ptrArray[0] * arr[1] * ptrArray[2]);
+					if (ptr1.a == 6 && ptr2[1] == 124 && ptrArray[0] * arr[1] * ptrArray[2] == 120)
 						return 1;
 					else
 						return 0;
 				}
-			)";
+					)";
 			std::string expected = "ptr1.a = 6\nptr2[1] = 124\n";
 
 			RunTest(TestStr, 1);
@@ -290,7 +293,11 @@ namespace unittests
 					var a : i64 = 3;
 					var b : i64 = 0;
 					test(a, b);
-					printf("b = %d", b);
+
+					// array of references to i64
+					var refArray : [&i64; 3] = { &a, &b, &a };
+
+					printf("b = %d", refArray[1]);
 					if (b == 3)
 						return 1;
 					else

@@ -11,7 +11,11 @@
 			var a : i64 = 3;
 			var b : i64 = 0;
 			test(a, b);
-			printf("b = %d", b);
+
+			// array of references to i64
+			var refArray : [&i64; 3] = { &a, &b, &a };
+
+			printf("b = %d", refArray[1]);
 			if (b == 3)
 				return 1;
 			else
