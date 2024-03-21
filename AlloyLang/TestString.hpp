@@ -31,7 +31,7 @@ constexpr auto TestSrc1 = R"(
 
 	system UpdateTransforms(UpdateTransformsQuery)
 	{
-		for (var entity: Entity in UpdateTransformsQuery)
+		//for (var entity: Entity in UpdateTransformsQuery)
 		{
 			entity.WorldTransform.position.y = entity.WorldTransform.position.y - UpdateTransformsQuery.WorldSettings.gravity;
 		}

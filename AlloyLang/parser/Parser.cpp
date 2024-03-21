@@ -2560,6 +2560,324 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	NodeID parse<SYSTEM_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+
+		if (iter.GetKind() != TokenKind::system_keyword)
+		{
+			unexpectedToken(iter, { "system" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume system keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		VectorRef<NodeID> queryIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_paren)
+		{
+			NodeID queryID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+			if (queryID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			queryIDs.push_back(queryID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "identifier" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_paren)
+			{
+				unexpectedToken(iter, { ",", ")" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing parenthesis
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "system body" });
+			return ERROR_NODE_ID;
+		}
+
+		// parse body
+		NodeID bodyID = parse<BLOCK_STATEMENT>(nodeBuffers, iter);
+
+		if (bodyID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::SYSTEM_DEFINITION,
+				.SystemDefinition = SYSTEM_DEFINITION
+				{
+					.IdentifierID = identifierID,
+					.QueryIdentifierIDs = queryIDs,
+					.BodyID = bodyID
+				}
+			},
+			errorInfo
+		);
+	}
+
+	template <>
+	NodeID parse<GROUP_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+
+		if (iter.GetKind() != TokenKind::group_keyword)
+		{
+			unexpectedToken(iter, { "group" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume group keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		if (iter.GetKind() != TokenKind::open_brace)
+		{
+			unexpectedToken(iter, { "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		VectorRef<NodeID> systemIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_brace)
+		{
+			NodeID systemID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+			if (systemID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			systemIDs.push_back(systemID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "identifier" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_brace)
+			{
+				unexpectedToken(iter, { ",", "}" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing brace
+		(void)iter.Next();
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::GROUP_DEFINITION,
+				.GroupDefinition = GROUP_DEFINITION
+				{
+					.IdentifierID = identifierID,
+					.SystemIdentifierIDs = systemIDs
+				}
+			},
+			errorInfo
+		);
+	}
+
+	template <>
+	NodeID parse<GROUP_LIST>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		if (iter.GetKind() != TokenKind::open_brace)
+		{
+			unexpectedToken(iter, { "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		VectorRef<NodeID> groupIdentifierIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_brace)
+		{
+			NodeID groupID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+			if (groupID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			groupIdentifierIDs.push_back(groupID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "identifier" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_brace)
+			{
+				unexpectedToken(iter, { ",", "}" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing brace
+		(void)iter.Next();
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::GROUP_LIST,
+				.GroupList = GROUP_LIST
+				{
+					.IdentifierID = identifierID,
+					.GroupIdentifierIDs = groupIdentifierIDs
+				}
+			},
+			errorInfo
+		);
+	}
+
+	template <>
+	NodeID parse<APPLICATION_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+
+		if (iter.GetKind() != TokenKind::application_keyword)
+		{
+			unexpectedToken(iter, { "application" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume application keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		if (iter.GetKind() != TokenKind::open_brace)
+		{
+			unexpectedToken(iter, { "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		VectorRef<NodeID> groupListIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_brace)
+		{
+			NodeID groupListID = parse<GROUP_LIST>(nodeBuffers, iter);
+
+			if (groupListID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			groupListIDs.push_back(groupListID);
+		}
+
+		// consume closing brace
+		(void)iter.Next();
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::APPLICATION_DEFINITION,
+				.ApplicationDefinition = APPLICATION_DEFINITION
+				{
+					.IdentifierID = identifierID,
+					.GroupListIDs = groupListIDs
+				}
+			},
+			errorInfo
+		);
+	}
+
+	template <>
 	NodeID parse<DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		switch (iter.GetKind())
@@ -2584,6 +2902,15 @@ namespace AlloyCompiler
 
 		case TokenKind::query_keyword:
 			return parse<QUERY_DEFINITION>(nodeBuffers, iter);
+
+		case TokenKind::system_keyword:
+			return parse<SYSTEM_DEFINITION>(nodeBuffers, iter);
+
+		case TokenKind::group_keyword:
+			return parse<GROUP_DEFINITION>(nodeBuffers, iter);
+
+		case TokenKind::application_keyword:
+			return parse<APPLICATION_DEFINITION>(nodeBuffers, iter);
 
 		default:
 			unexpectedToken(iter, { "const", "var", "struct", "enum", "fn" });

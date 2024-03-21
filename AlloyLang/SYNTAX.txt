@@ -128,7 +128,10 @@ FUNCTION_DEFINITION:			FUNCTION_DECLARATION BLOCK_STATEMENT ;
 QUERY_DEFINITION:				query_keyword IDENTIFIER open_brace { ( var_keyword | const_keyword ) IDENTIFIER semicolon } close_brace ;
 SYSTEM_DEFINITION:				system_keyword IDENTIFIER open_paren [ IDENTIFIER { comma IDENTIFIER } ] close_paren BLOCK_STATEMENT ;
 GROUP_DEFINITION:				group_keyword IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
-APPLICATION_DEFINITION:			application_keyword IDENTIFIER open_brace { IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace } close_brace ;
+
+GROUP_LIST:						IDENTIFIER open_brace [ IDENTIFIER { comma IDENTIFIER } ] close_brace ;
+
+APPLICATION_DEFINITION:			application_keyword IDENTIFIER open_brace { GROUP_LIST } close_brace ;
 
 DEFINITION:						EXTERN_DEFINITION 
 								| VALUE_DEFINITION 

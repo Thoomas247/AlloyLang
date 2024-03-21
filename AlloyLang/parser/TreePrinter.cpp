@@ -664,6 +664,98 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<QUERY_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& queryDefinitionNode = nodeBuffers.GetNode(nodeID).QueryDefinition;
+
+		json j;
+		j["kind"] = "QUERY_DEFINITION";
+		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, queryDefinitionNode.IdentifierID);
+
+		for (const auto& readID : queryDefinitionNode.ReadIdentifierIDs)
+		{
+			j["reads"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, readID));
+		}
+
+		for (const auto& writeID : queryDefinitionNode.WriteIdentifierIDs)
+		{
+			j["writes"].push_back(print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, writeID));
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<SYSTEM_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& systemDefinitionNode = nodeBuffers.GetNode(nodeID).SystemDefinition;
+
+		json j;
+		j["kind"] = "SYSTEM_DEFINITION";
+		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, systemDefinitionNode.IdentifierID);
+
+		for (const auto& queryID : systemDefinitionNode.QueryIdentifierIDs)
+		{
+			j["queries"].push_back(print<IDENTIFIER>(tokenBuffers, nodeBuffers, queryID));
+		}
+
+		j["body"] = print<BLOCK_STATEMENT>(tokenBuffers, nodeBuffers, systemDefinitionNode.BodyID);
+
+		return j;
+	}
+
+	template <>
+	json print<GROUP_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& groupDefinitionNode = nodeBuffers.GetNode(nodeID).GroupDefinition;
+
+		json j;
+		j["kind"] = "GROUP_DEFINITION";
+		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, groupDefinitionNode.IdentifierID);
+
+		for (const auto& systemID : groupDefinitionNode.SystemIdentifierIDs)
+		{
+			j["systems"].push_back(print<IDENTIFIER>(tokenBuffers, nodeBuffers, systemID));
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<GROUP_LIST>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& groupListNode = nodeBuffers.GetNode(nodeID).GroupList;
+
+		json j;
+		j["kind"] = "GROUP_LIST";
+		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, groupListNode.IdentifierID);
+
+		for (const auto& groupID : groupListNode.GroupIdentifierIDs)
+		{
+			j["groups"].push_back(print<IDENTIFIER>(tokenBuffers, nodeBuffers, groupID));
+		}
+
+		return j;
+	}
+
+	template <>
+	json print<APPLICATION_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& applicationDefinitionNode = nodeBuffers.GetNode(nodeID).ApplicationDefinition;
+
+		json j;
+		j["kind"] = "APPLICATION_DEFINITION";
+		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, applicationDefinitionNode.IdentifierID);
+
+		for (const auto& groupListID : applicationDefinitionNode.GroupListIDs)
+		{
+			j["group_lists"].push_back(print<GROUP_LIST>(tokenBuffers, nodeBuffers, groupListID));
+		}
+
+		return j;
+	}
+
+	template <>
 	json print<DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& definitionNode = nodeBuffers.GetNode(nodeID);
@@ -684,6 +776,18 @@ namespace AlloyCompiler
 
 		case NodeKind::FUNCTION_DEFINITION:
 			return print<FUNCTION_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::QUERY_DEFINITION:
+			return print<QUERY_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::SYSTEM_DEFINITION:
+			return print<SYSTEM_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::GROUP_DEFINITION:
+			return print<GROUP_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::APPLICATION_DEFINITION:
+			return print<APPLICATION_DEFINITION>(tokenBuffers, nodeBuffers, nodeID);
 
 		default:
 			ASSERT(false, "Unknown definition kind");
