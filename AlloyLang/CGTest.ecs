@@ -1,5 +1,5 @@
 		extern fn printf (const str : String, const param : i64) -> i64;
-	
+
 		fn test (var a : i64, var b : &i64) -> i64
 		{
 			b = a;

@@ -2223,9 +2223,23 @@ namespace AlloyCompiler
 	template <>
 	NodeID parse<STRUCT_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
-		if (iter.GetKind() != TokenKind::struct_keyword)
+		STRUCT_DEFINITION::Type type;
+
+		if (iter.GetKind() == TokenKind::struct_keyword)
 		{
-			unexpectedToken(iter, { "struct" });
+			type = STRUCT_DEFINITION::Type::Struct;
+		}
+		else if (iter.GetKind() == TokenKind::resource_keyword)
+		{
+			type = STRUCT_DEFINITION::Type::Resource;
+		}
+		else if (iter.GetKind() == TokenKind::component_keyword)
+		{
+			type = STRUCT_DEFINITION::Type::Component;
+		}
+		else
+		{
+			unexpectedToken(iter, { "struct", "resource", "component"});
 			return ERROR_NODE_ID;
 		}
 
@@ -2234,7 +2248,7 @@ namespace AlloyCompiler
 		// consume struct keyword
 		if (!iter.Next())
 		{
-			unexpectedEndOfFile(iter, { "struct name" });
+			unexpectedEndOfFile(iter, { "identifier" });
 			return ERROR_NODE_ID;
 		}
 
@@ -2298,6 +2312,7 @@ namespace AlloyCompiler
 				.Kind = NodeKind::STRUCT_DEFINITION,
 				.StructDefinition = STRUCT_DEFINITION
 				{
+					.Kind = type,
 					.IdentifierID = identifierID,
 					.MemberIDs = memberIDs
 				}
@@ -2428,6 +2443,123 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	NodeID parse<QUERY_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+
+		if (iter.GetKind() != TokenKind::query_keyword)
+		{
+			unexpectedToken(iter, { "query" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume query keyword
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "function declaration" });
+			return ERROR_NODE_ID;
+		}
+
+		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+		if (identifierID == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		if (iter.GetKind() != TokenKind::open_brace)
+		{
+			unexpectedToken(iter, { "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "query body" });
+			return ERROR_NODE_ID;
+		}
+
+		VectorRef<NodeID> readIdentifierIDs = nodeBuffers.CreateNodeIDVector();
+		VectorRef<NodeID> writeIdentifierIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_brace)
+		{
+			bool isWrite;
+
+			if (iter.GetKind() == TokenKind::variable_keyword)
+			{
+				isWrite = true;
+			}
+			else if (iter.GetKind() == TokenKind::constant_keyword)
+			{
+				isWrite = false;
+			}
+			else
+			{
+				unexpectedToken(iter, { "var", "const" });
+				return ERROR_NODE_ID;
+			}
+
+			// consume var or const keyword
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "identifier" });
+				return ERROR_NODE_ID;
+			}
+
+			// parse identifier
+			NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+			if (identifierID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			// check for semicolon
+			if (iter.GetKind() != TokenKind::semicolon)
+			{
+				unexpectedToken(iter, { ";" });
+				return ERROR_NODE_ID;
+			}
+
+			// consume semicolon
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "query body" });
+				return ERROR_NODE_ID;
+			}
+
+			if (isWrite)
+			{
+				readIdentifierIDs.push_back(identifierID);
+			}
+
+			else
+			{
+				writeIdentifierIDs.push_back(identifierID);
+			}
+		}
+
+		// consume closing brace
+		(void)iter.Next();
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::QUERY_DEFINITION,
+				.QueryDefinition = QUERY_DEFINITION
+				{
+					.IdentifierID = identifierID,
+					.ReadIdentifierIDs = readIdentifierIDs,
+					.WriteIdentifierIDs = writeIdentifierIDs
+				}
+			},
+			errorInfo
+		);
+	}
+
+	template <>
 	NodeID parse<DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		switch (iter.GetKind())
@@ -2440,6 +2572,8 @@ namespace AlloyCompiler
 			return parse<VALUE_DEFINITION>(nodeBuffers, iter);
 
 		case TokenKind::struct_keyword:
+		case TokenKind::resource_keyword:
+		case TokenKind::component_keyword:
 			return parse<STRUCT_DEFINITION>(nodeBuffers, iter);
 
 		case TokenKind::enum_keyword:
@@ -2447,6 +2581,9 @@ namespace AlloyCompiler
 
 		case TokenKind::function_keyword:
 			return parse<FUNCTION_DEFINITION>(nodeBuffers, iter);
+
+		case TokenKind::query_keyword:
+			return parse<QUERY_DEFINITION>(nodeBuffers, iter);
 
 		default:
 			unexpectedToken(iter, { "const", "var", "struct", "enum", "fn" });

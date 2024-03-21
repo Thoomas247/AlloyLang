@@ -35,6 +35,13 @@ namespace AlloyCompiler
 		variable_keyword,
 		constant_keyword,
 
+		resource_keyword,
+		component_keyword,
+		query_keyword,
+		system_keyword,
+		group_keyword,
+		application_keyword,
+
 		for_keyword,
 		while_keyword,
 		if_keyword,
@@ -97,6 +104,13 @@ namespace AlloyCompiler
 		{ TokenKind::variable_keyword, "variable_keyword" },
 		{ TokenKind::constant_keyword, "constant_keyword" },
 
+		{ TokenKind::resource_keyword, "resource_keyword" },
+		{ TokenKind::component_keyword, "component_keyword" },
+		{ TokenKind::query_keyword, "query_keyword" },
+		{ TokenKind::system_keyword, "system_keyword" },
+		{ TokenKind::group_keyword, "group_keyword" },
+		{ TokenKind::application_keyword, "application_keyword" },
+
 		{ TokenKind::for_keyword, "for_keyword" },
 		{ TokenKind::while_keyword, "while_keyword" },
 		{ TokenKind::if_keyword, "if_keyword" },
@@ -155,6 +169,13 @@ namespace AlloyCompiler
 
 		{ "var", TokenKind::variable_keyword },
 		{ "const", TokenKind::constant_keyword },
+
+		{ "resource", TokenKind::resource_keyword },
+		{ "component", TokenKind::component_keyword },
+		{ "query", TokenKind::query_keyword },
+		{ "system", TokenKind::system_keyword },
+		{ "group", TokenKind::group_keyword },
+		{ "application", TokenKind::application_keyword },
 
 		{ "for", TokenKind::for_keyword },
 		{ "while", TokenKind::while_keyword },

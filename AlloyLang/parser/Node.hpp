@@ -270,6 +270,14 @@ namespace AlloyCompiler
 
 	struct STRUCT_DEFINITION
 	{
+		enum class Type : uint8_t
+		{
+			Struct,
+			Resource,
+			Component
+		};
+
+		Type Kind;
 		NodeID IdentifierID;
 		VectorRef<NodeID> MemberIDs;
 	};
@@ -286,6 +294,13 @@ namespace AlloyCompiler
 		NodeID BodyID;
 	};
 
+	struct QUERY_DEFINITION
+	{
+		NodeID IdentifierID;
+		VectorRef<NodeID> ReadIdentifierIDs;
+		VectorRef<NodeID> WriteIdentifierIDs;
+	};
+
 	union DEFINITION
 	{
 		EXTERN_DEFINITION ExternDefinition;
@@ -293,6 +308,8 @@ namespace AlloyCompiler
 		STRUCT_DEFINITION StructDefinition;
 		ENUM_DEFINITION EnumDefinition;
 		FUNCTION_DEFINITION FunctionDefinition;
+
+		QUERY_DEFINITION QueryDefinition;
 	};
 
 	struct QUALIFIED_DEFINITION
@@ -369,6 +386,7 @@ namespace AlloyCompiler
 		STRUCT_DEFINITION,
 		ENUM_DEFINITION,
 		FUNCTION_DEFINITION,
+		QUERY_DEFINITION,
 
 		//DEFINITION,
 		QUALIFIED_DEFINITION,
@@ -427,6 +445,7 @@ namespace AlloyCompiler
 			STRUCT_DEFINITION StructDefinition;
 			ENUM_DEFINITION EnumDefinition;
 			FUNCTION_DEFINITION FunctionDefinition;
+			QUERY_DEFINITION QueryDefinition;
 
 			//DEFINITION Definition;
 			QUALIFIED_DEFINITION QualifiedDefinition;

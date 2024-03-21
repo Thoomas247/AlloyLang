@@ -1,6 +1,61 @@
 #pragma once
 
 constexpr auto TestSrc1 = R"(
+	extern fn printf (const str : String, const param : f64) -> i64;
+
+	resource WorldSettings
+	{
+		const gravity : f32;
+		var playerCount : u32;
+	}
+
+	struct Vector3
+	{
+		var x : f64;
+		var y : f64;
+		var z : f64;
+	}
+
+	component WorldTransform
+	{
+		var position : Vector3;
+		var rotation : Vector3;
+		var scale : Vector3;
+	}
+
+	query UpdateTransformsQuery
+	{
+		const WorldSettings;
+		var WorldTransform;	
+	}
+
+	system UpdateTransforms(UpdateTransformsQuery)
+	{
+		for (var entity: Entity in UpdateTransformsQuery)
+		{
+			entity.WorldTransform.position.y = entity.WorldTransform.position.y - UpdateTransformsQuery.WorldSettings.gravity;
+		}
+	}
+
+	group PhysicsUpdateGroup
+	{
+		UpdateTransforms
+	}
+
+	application Game
+	{
+		// run once on startup
+		start { }
+
+		// run every frame until application is closed
+		update { PhysicsUpdateGroup }
+
+		// run once on application close
+		end { }
+	}
+)";
+
+constexpr auto TestSrc2 = R"(
 extern fn printf (const str : String, const param : f64) -> i64;
 
 struct Vector3
@@ -49,7 +104,7 @@ fn main () -> i64
 }
 )";
 
-constexpr auto TestSrc2 = R"(
+constexpr auto TestSrc3 = R"(
 extern fn test (var a : i64);
 extern fn printf (const format : String, ...);
 

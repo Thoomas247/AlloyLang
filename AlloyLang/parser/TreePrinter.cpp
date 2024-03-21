@@ -739,11 +739,15 @@ namespace AlloyCompiler
 
 	void PrintTree(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID rootNode)
 	{
+		if (rootNode == ERROR_NODE_ID)
+		{
+			Log::Print("No root node to print!");
+			return;
+		}
+
 		json j = print<PROGRAM>(tokenBuffers, nodeBuffers, rootNode);
 
 		Log::Print("{0}", j.dump(NUM_SPACES_PER_TAB));
-
-
 	}
 }
 

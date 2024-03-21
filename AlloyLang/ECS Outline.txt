@@ -4,6 +4,7 @@ Entity:
 Resource:
 	Used to store (unique) global data in a controlled manner. Systems will have to query resources to read or write to them.
 	Explicitly controlling access to resources allows us to run systems in parallel safely.
+	Cannot hold reference types.
 
 	resource WorldSettings
 	{
@@ -38,8 +39,8 @@ Query:
 
 	query UpdateTransformsQuery
 	{
-		reads { WorldSettings }		// list of resources or components that the system will read
-		writes { WorldTransform }	// list of resources or components that the system will write to
+		const WorldSettings;
+		var WorldTransform;	
 	}
 
 System:
