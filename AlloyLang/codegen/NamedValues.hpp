@@ -19,13 +19,14 @@ namespace llvm
 namespace AlloyCompiler
 {
 
-	// for pointer types, llvm does not store the type pointed to by the pointer
+	// for pointer and reference types, llvm does not store the type pointed to by the pointer
 	// we have to keep track of it ourselves
-	// type is null if this is not a pointer
+	// type is null if this is not a pointer nor a reference
 	struct ValueTypePair
 	{
 		llvm::AllocaInst* value = nullptr;
-		llvm::Type* type = nullptr;
+		llvm::Type* containedType = nullptr;
+		bool freeOnExit = false;				// whether we should free the pointer
 	};
 
 	class NamedValues
@@ -40,7 +41,8 @@ namespace AlloyCompiler
 		void PopScope();
 
 		ValueTypePair* GetValue(const std::string_view& name);
-		void InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type);
+		void InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type, bool freeOnExit);
+		bool RemoveValue(const std::string_view& name);
 
 		struct StructMemberInfo
 		{

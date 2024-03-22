@@ -318,15 +318,15 @@ namespace AlloyCompiler
 			// set the current type and subtype
 			identifierType.type = valueOrPtr->getType();
 
-			if (valueTypePair->type
+			if (valueTypePair->containedType
 				&& llvm::isa<llvm::PointerType>(valueOrPtr->getType())) {
 				// the type is set in the case of pointers and references, we need to load the pointed to value
-				llvm::Value* Value = state.Builder->CreateLoad(valueTypePair->type, valueOrPtr, "loadtmp");
+				llvm::Value* Value = state.Builder->CreateLoad(valueTypePair->containedType, valueOrPtr, "loadtmp");
 				identifierType.containedType = Value->getType();
 				return PtrValuePair{ .Ptr = valueOrPtr, .Value = Value };
 			}
 			else {
-				identifierType.containedType = valueTypePair->type;
+				identifierType.containedType = valueTypePair->containedType;
 				return PtrValuePair{ .Ptr = valueTypePair->value, .Value = valueOrPtr };
 			}
 		}
@@ -507,7 +507,7 @@ namespace AlloyCompiler
 			);
 
 		// add the variable to the named values
-		state.NamedValues.InsertValue(name, allocaInst, identifierType.containedType);
+		state.NamedValues.InsertValue(name, allocaInst, identifierType.containedType, (modifier == TYPE_IDENTIFIER::Modifier::Pointer));
 
 		return allocaInst;
 	}
@@ -704,7 +704,7 @@ namespace AlloyCompiler
 		llvm::PointerType* pointerType = llvm::PointerType::get(elementType, 0);	// note that elementType is not actually stored by llvm
 
 		// get the value to set for each element
-		llvm::Value* defaultValue = generateExpression(tokenBuffers, nodeBuffers, state, pointerInitializerNode.ValueID, { pointerType, elementType });
+		llvm::Value* defaultValue = generateExpression(tokenBuffers, nodeBuffers, state, pointerInitializerNode.ValueID, { elementType, nullptr });
 		// try to convert the value to the expected type	
 		convertValueToType(state, defaultValue, elementType);
 
@@ -772,6 +772,31 @@ namespace AlloyCompiler
 		return Ptr;	// return the initialized pointer
 	}
 
+	llvm::Value* generatePointerMoveExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID,
+											const TypeSubtypePair& expectedType)
+	{
+		//
+		// move Identifier ;
+		//
+		ASSERT(nodeBuffers.GetNode(nodeID).Kind == NodeKind::POINTER_MOVE_EXPRESSION, "Expected POINTER_MOVE_EXPRESSION!");
+		const POINTER_MOVE_EXPRESSION& pointerMoveNode = nodeBuffers.GetNode(nodeID).PointerMoveExpression;
+
+		TypeSubtypePair identifierType = { nullptr, nullptr };
+		PtrValuePair ptrValue = generateIdentifier(tokenBuffers, nodeBuffers, state, pointerMoveNode.IdentifierID, identifierType);
+
+		// retrieve the name of the identifier in the right-side node in order to remove it from the NamedValues map
+		const IDENTIFIER& rightNode = nodeBuffers.GetNode(pointerMoveNode.IdentifierID).Identifier;
+		const std::string_view name = tokenBuffers.GetValue(rightNode.IdentifierTokenID).ToStringView();
+		state.NamedValues.RemoveValue(name);
+
+		if (identifierType != expectedType) {
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Wrong pointer type!");
+			return nullptr;
+		}
+
+		return ptrValue.Ptr;
+	}
+		
 	llvm::Value* generateInitializerListExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID,
 													const TypeSubtypePair& expectedType)
 	{
@@ -1269,6 +1294,10 @@ namespace AlloyCompiler
 			result = generatePointerInitializerExpression(tokenBuffers, nodeBuffers, state, nodeID, expectedType);
 			break;
 
+		case NodeKind::POINTER_MOVE_EXPRESSION:
+			result = generatePointerMoveExpression(tokenBuffers, nodeBuffers, state, nodeID, expectedType);
+			break;
+
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 			result = generateInitializerListExpression(tokenBuffers, nodeBuffers, state, nodeID, expectedType);
 			break;
@@ -1369,6 +1398,7 @@ namespace AlloyCompiler
 		case NodeKind::LITERAL:
 		case NodeKind::CONSTRUCTOR_EXPRESSION:
 		case NodeKind::POINTER_INITIALIZER_EXPRESSION:
+		case NodeKind::POINTER_MOVE_EXPRESSION:
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
 		case NodeKind::ARRAY_ACCESS_EXPRESSION:
@@ -1836,7 +1866,7 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(&arg, allocaInst);
 
 			// add arguments to named values
-			state.NamedValues.InsertValue(arg.getName(), allocaInst, subType);
+			state.NamedValues.InsertValue(arg.getName(), allocaInst, subType, false);
 		}
 
 		// every function has an exit block for cleanup and setting the return value

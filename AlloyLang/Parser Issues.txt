@@ -6,6 +6,22 @@
 	OR
 	const arr : [i64; 3] = { @ptrArray[0], @ptrArray[1], @ptrArray[2] };
 
+and this doesn't work:
+	var ptr : *i64 = new 3;
+	printf("new_ptr = %d", @ptr);
+
+- What is the purpose of the move instruction? Are we just renaming the pointer and what is the scope of the new pointer? 
+E.g.:
+	var old_ptr : *i64 = new 3;
+
+	if (condition) {
+		// old ptr is now invalid and cannot be used
+		var new_ptr : *i64 = move ptr;
+
+		// new_ptr gets deleted here, old_ptr is invalid...
+	}
+
+
 X How do we insert CR or LF in a string ? printf("\n") outputs: \n
 
 X Need to add support for functions with variable arguments using ...

@@ -1,23 +1,13 @@
 		extern fn printf (const str : String, const param : i64) -> i64;
-	
-		fn test (var a : i64, var b : &i64) -> i64
-		{
-			b = a;
-			return a;
-		}
-	
+		
 		fn main () -> i64
 		{				
-			var a : i64 = 3;
-			var b : i64 = 0;
-			test(a, b);
+			var ptr : *i64 = new 3;
 
-			// array of references to i64
-			var refArray : [&i64; 3] = { &a, &b, &a };
+			// change ownership of pointed value to new pointer
+			// old ptr is now invalid and cannot be used
+			var new_ptr : *i64 = move ptr;
 
-			printf("b = %d", refArray[1]);
-			if (b == 3)
-				return 1;
-			else
-				return 0;
+			// printf("new_ptr = %d", @new_ptr);
+			return 0;
 		}

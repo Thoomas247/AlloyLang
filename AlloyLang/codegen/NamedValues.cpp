@@ -1,6 +1,6 @@
+#include "llvm/llvm.hpp"
 #include "NamedValues.hpp"
 
-#include "llvm/llvm.hpp"
 #include "../log/Log.hpp"
 
 
@@ -58,13 +58,10 @@ namespace AlloyCompiler
 		//
 		for (auto& it : m_ScopeStack.back().Values) {
 
-			// TBD: we have to make sure that we do not attempt to free references which are also pointers
-			// only pointers have their type set explicitely
-			if (it.second.type != nullptr) {
-				// llvm::Value* ptr = builder.CreateLoad(it.second.type, it.second.value);
-				//if (ptr->getType()->isPointerTy()) {
-				//	builder.CreateFree(ptr);
-				//}
+			// we have to make sure that we do not attempt to free references which are also pointers
+			// pointers and references have their type set explicitely
+			if (it.second.freeOnExit && it.second.containedType != nullptr) {
+				// builder.CreateFree(it.second.value);
 			}
 		}
 	}
@@ -89,10 +86,33 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	void NamedValues::InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type)
+	bool NamedValues::RemoveValue(const std::string_view& name)
+	{
+		//
+		// remove a value from map, returns true if value was found, false otherwise
+		//
+		bool result = false;
+
+		// look for the value starting from the current scope and going up
+		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
+		{
+			auto& scope = *it;
+			auto found = scope.Values.find(name);
+			if (found != scope.Values.end())
+			{
+				scope.Values.erase(name);
+				result = true;
+				break;
+			}
+		}
+
+		return result;
+	}
+
+	void NamedValues::InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type, bool freeOnExit)
 	{
 		ASSERT(!m_ScopeStack.back().Values.contains(name), "Named value already exists! Should check if it exists first with NamedValues::GetValue(const std::string& name).");
-		ValueTypePair valueTypePair = { value, type };
+		ValueTypePair valueTypePair = { value, type, freeOnExit };
 		m_ScopeStack.back().Values[name] = valueTypePair;
 	}
 
