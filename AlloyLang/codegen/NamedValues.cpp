@@ -61,7 +61,9 @@ namespace AlloyCompiler
 			// we have to make sure that we do not attempt to free references which are also pointers
 			// pointers and references have their type set explicitely
 			if (it.second.freeOnExit && it.second.containedType != nullptr) {
-				// builder.CreateFree(it.second.value);
+				// load the underlying hear pointer created using Malloc and free it
+				llvm::Value* Ptr = builder.CreateLoad(it.second.value->getType(), it.second.value);
+				builder.CreateFree(Ptr);
 			}
 		}
 	}

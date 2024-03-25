@@ -14,8 +14,8 @@ using namespace AlloyCompiler;
 
 int main(int argc, char* argv[])
 {
-	std::string str = TestSrc1;
-	/*
+	std::string str;
+	
 	if (argc > 1) {
 		// read test file provided on the command line
 		std::ifstream file(argv[1]);
@@ -34,7 +34,6 @@ int main(int argc, char* argv[])
 	else {
 		str = TestSrc1;
 	}
-	*/
 
 	// duplicate the test file or string 2^n times
 	const size_t n = 0;// 0'000;

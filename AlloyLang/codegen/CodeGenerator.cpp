@@ -322,7 +322,7 @@ namespace AlloyCompiler
 				&& llvm::isa<llvm::PointerType>(valueOrPtr->getType())) {
 				// the type is set in the case of pointers and references, we need to load the pointed to value
 				llvm::Value* Value = state.Builder->CreateLoad(valueTypePair->containedType, valueOrPtr, "loadtmp");
-				identifierType.containedType = Value->getType();
+				identifierType = { Value->getType(), nullptr };
 				return PtrValuePair{ .Ptr = valueOrPtr, .Value = Value };
 			}
 			else {
@@ -788,11 +788,6 @@ namespace AlloyCompiler
 		const IDENTIFIER& rightNode = nodeBuffers.GetNode(pointerMoveNode.IdentifierID).Identifier;
 		const std::string_view name = tokenBuffers.GetValue(rightNode.IdentifierTokenID).ToStringView();
 		state.NamedValues.RemoveValue(name);
-
-		if (identifierType != expectedType) {
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Wrong pointer type!");
-			return nullptr;
-		}
 
 		return ptrValue.Ptr;
 	}

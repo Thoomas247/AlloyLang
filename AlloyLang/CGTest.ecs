@@ -8,6 +8,6 @@
 			// old ptr is now invalid and cannot be used
 			var new_ptr : *i64 = move ptr;
 
-			// printf("new_ptr = %d", @new_ptr);
+			printf("new_ptr = %d", new_ptr);
 			return 0;
 		}

@@ -252,6 +252,7 @@ namespace unittests
 					const a : TestStruct = TestStruct { a = 2, b = 5 };
 					var ptr1 : *TestStruct = new a;
 					var ptr2 : *[i64] = new [123; 4];
+					var ptr3 : *i64 = new 3;
 			
 					// array of pointers to i64
 					const ptrArray : [*i64; 3] = { new array[1], new a.b, new 12 };
@@ -263,10 +264,14 @@ namespace unittests
 					ptr1.a = ptr1.b + 1;
 					ptr2[1] = ptr2[1] + 1;
 
+					// change ownership of pointed value to new pointer
+					// old ptr is now invalid and cannot be used
+					var new_ptr : *i64 = move ptr3;
+
 					printf("ptr1.a = %d\n", ptr1.a);
 					printf("ptr2[1] = %d\n", ptr2[1]);
-					printf("ptrArray[0] * array[1] * ptrArray[2] = 2 * 5 * 12 = %d", ptrArray[0] * arr[1] * ptrArray[2]);
-					if (ptr1.a == 6 && ptr2[1] == 124 && ptrArray[0] * arr[1] * ptrArray[2] == 120)
+					printf("ptrArray[0] * array[1] * ptrArray[2] * new_ptr = 2 * 5 * 12 * 3 = %d", ptrArray[0] * arr[1] * ptrArray[2] * new_ptr);
+					if (ptr1.a == 6 && ptr2[1] == 124 && ptrArray[0] * arr[1] * ptrArray[2]  * new_ptr == 360)
 						return 1;
 					else
 						return 0;
