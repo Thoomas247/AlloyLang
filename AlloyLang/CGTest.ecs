@@ -1,5 +1,39 @@
 		extern fn printf (const str : String, const param : i64) -> i64;
 		
+		struct CharBuffer
+		{
+			var data : *[i8];
+			var length : u64;
+		}
+
+		fn CharBuffer_new(const size : u64)
+		{
+			var str : CharBuffer = CharBuffer 
+			{
+				data = new [0; size],
+				length = size
+			};
+		}
+
+		fn CharBuffer_resize(var buffer : CharBuffer, const size : u64)
+		{
+			var min_size : u64 = size;
+
+			if (buffer.length < min_size)
+				min_size = buffer.length;
+
+			var new_data : *[i8] = new [0; size + 1];
+
+			for (var i : i64 = 0; i < min_size; i = i + 1)
+			{
+				new_data[i] = buffer.data[i];
+			}
+
+			new_data[min_size] = 0;
+
+			buffer.data = new_data;
+		}
+
 		fn main () -> i64
 		{				
 			var ptr : *i64 = new 3;

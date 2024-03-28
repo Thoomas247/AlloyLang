@@ -975,10 +975,10 @@ namespace AlloyCompiler
 	{
 		TokenID errorInfo = iter.GetCurrentID();
 
-		// parse array identifier
-		NodeID arrayIdentifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+		// parse array expression
+		NodeID arrayExpressionID = parse<EXPRESSION>(nodeBuffers, iter);
 
-		if (arrayIdentifierID == ERROR_NODE_ID)
+		if (arrayExpressionID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
@@ -1025,7 +1025,7 @@ namespace AlloyCompiler
 				.Kind = NodeKind::ARRAY_ACCESS_EXPRESSION,
 				.ArrayAccessExpression = ARRAY_ACCESS_EXPRESSION
 				{
-					.ArrayIdentifierID = arrayIdentifierID,
+					.ArrayExpressionID = arrayExpressionID,
 					.IndexExpressionID = indexExpressionID
 				}
 			},

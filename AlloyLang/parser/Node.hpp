@@ -128,7 +128,7 @@ namespace AlloyCompiler
 
 	struct ARRAY_ACCESS_EXPRESSION
 	{
-		NodeID ArrayIdentifierID;
+		NodeID ArrayExpressionID;
 		NodeID IndexExpressionID;
 	};
 
