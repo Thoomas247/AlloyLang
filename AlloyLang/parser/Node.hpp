@@ -126,16 +126,9 @@ namespace AlloyCompiler
 		NodeID ValueID;
 	};
 
-	struct ARRAY_ACCESS_EXPRESSION
+	struct ENCLOSED_EXPRESSION
 	{
-		NodeID ArrayExpressionID;
-		NodeID IndexExpressionID;
-	};
-
-	struct MEMBER_ACCESS_EXPRESSION
-	{
-		NodeID LeftID; // can be IDENTIFIER or MEMBER_ACCESS_EXPRESSION
-		NodeID RightID;
+		NodeID ExpressionID;
 	};
 
 	struct FUNCTION_CALL_EXPRESSION
@@ -144,9 +137,16 @@ namespace AlloyCompiler
 		VectorRef<NodeID> ArgumentIDs;
 	};
 
-	struct ENCLOSED_EXPRESSION
+	struct ARRAY_ACCESS_EXPRESSION
 	{
-		NodeID ExpressionID;
+		NodeID ArrayExpressionID;
+		NodeID IndexExpressionID;
+	};
+
+	struct MEMBER_ACCESS_EXPRESSION
+	{
+		NodeID LeftID;
+		NodeID RightID;
 	};
 
 	struct BINARY_EXPRESSION
@@ -162,6 +162,12 @@ namespace AlloyCompiler
 		NodeID OperandID;
 	};
 
+	union POSTFIX_EXPRESSION
+	{
+		ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;
+		MEMBER_ACCESS_EXPRESSION MemberAccessExpression;
+	};
+
 	union PRIMARY_EXPRESSION
 	{
 		IDENTIFIER Identifier;
@@ -171,10 +177,8 @@ namespace AlloyCompiler
 		POINTER_MOVE_EXPRESSION PointerMoveExpression;
 		INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 		VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
-		ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;
-		MEMBER_ACCESS_EXPRESSION MemberAccessExpression;
-		FUNCTION_CALL_EXPRESSION FunctionCallExpression;
 		ENCLOSED_EXPRESSION EnclosedExpression;
+		FUNCTION_CALL_EXPRESSION FunctionCallExpression;
 	};
 
 	struct ASSIGNMENT_EXPRESSION
@@ -384,14 +388,15 @@ namespace AlloyCompiler
 		POINTER_MOVE_EXPRESSION,
 		INITIALIZER_LIST_EXPRESSION,
 		VALUE_DEFINITION_EXPRESSION,
+		ENCLOSED_EXPRESSION,
+		FUNCTION_CALL_EXPRESSION,
+
 		ARRAY_ACCESS_EXPRESSION,
 		MEMBER_ACCESS_EXPRESSION,
-		FUNCTION_CALL_EXPRESSION,
-		ENCLOSED_EXPRESSION,
 
 		BINARY_EXPRESSION,
 		UNARY_EXPRESSION,
-
+		//POSTFIX_EXPRESSION,
 		//PRIMARY_EXPRESSION,
 
 		ASSIGNMENT_EXPRESSION,
@@ -447,10 +452,11 @@ namespace AlloyCompiler
 			POINTER_MOVE_EXPRESSION PointerMoveExpression;
 			INITIALIZER_LIST_EXPRESSION InitializerListExpression;
 			VALUE_DEFINITION_EXPRESSION ValueDefinitionExpression;
+			ENCLOSED_EXPRESSION EnclosedExpression;
+			FUNCTION_CALL_EXPRESSION FunctionCallExpression;
+
 			ARRAY_ACCESS_EXPRESSION ArrayAccessExpression;
 			MEMBER_ACCESS_EXPRESSION MemberAccessExpression;
-			FUNCTION_CALL_EXPRESSION FunctionCallExpression;
-			ENCLOSED_EXPRESSION EnclosedExpression;
 
 			BINARY_EXPRESSION BinaryExpression;
 			UNARY_EXPRESSION UnaryExpression;

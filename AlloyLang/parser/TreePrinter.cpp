@@ -230,32 +230,6 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	json print<ARRAY_ACCESS_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
-	{
-		const auto& arrayAccessExpressionNode = nodeBuffers.GetNode(nodeID).ArrayAccessExpression;
-
-		json j;
-		j["kind"] = "ARRAY_ACCESS_EXPRESSION";
-		j["array"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, arrayAccessExpressionNode.ArrayIdentifierID);
-		j["index"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, arrayAccessExpressionNode.IndexExpressionID);
-
-		return j;
-	}
-
-	template <>
-	json print<MEMBER_ACCESS_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
-	{
-		const auto& memberAccessExpressionNode = nodeBuffers.GetNode(nodeID).MemberAccessExpression;
-
-		json j;
-		j["kind"] = "MEMBER_ACCESS_EXPRESSION";
-		j["left"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, memberAccessExpressionNode.LeftID);
-		j["right"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, memberAccessExpressionNode.RightID);
-
-		return j;
-	}
-
-	template <>
 	json print<VALUE_DEFINITION_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& valueDefinitionExpressionNode = nodeBuffers.GetNode(nodeID).ValueDefinitionExpression;
@@ -264,6 +238,18 @@ namespace AlloyCompiler
 		j["kind"] = "VALUE_DEFINITION_EXPRESSION";
 		j["declaration"] = print<VALUE_DECLARATION>(tokenBuffers, nodeBuffers, valueDefinitionExpressionNode.ValueDeclarationID);
 		j["value"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, valueDefinitionExpressionNode.ValueID);
+
+		return j;
+	}
+
+	template <>
+	json print<ENCLOSED_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& enclosedExpressionNode = nodeBuffers.GetNode(nodeID).EnclosedExpression;
+
+		json j;
+		j["kind"] = "ENCLOSED_EXPRESSION";
+		j["expression"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, enclosedExpressionNode.ExpressionID);
 
 		return j;
 	}
@@ -286,13 +272,27 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	json print<ENCLOSED_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	json print<ARRAY_ACCESS_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
-		const auto& enclosedExpressionNode = nodeBuffers.GetNode(nodeID).EnclosedExpression;
+		const auto& arrayAccessExpressionNode = nodeBuffers.GetNode(nodeID).ArrayAccessExpression;
 
 		json j;
-		j["kind"] = "ENCLOSED_EXPRESSION";
-		j["expression"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, enclosedExpressionNode.ExpressionID);
+		j["kind"] = "ARRAY_ACCESS_EXPRESSION";
+		j["array"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, arrayAccessExpressionNode.ArrayExpressionID);
+		j["index"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, arrayAccessExpressionNode.IndexExpressionID);
+
+		return j;
+	}
+
+	template <>
+	json print<MEMBER_ACCESS_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& memberAccessExpressionNode = nodeBuffers.GetNode(nodeID).MemberAccessExpression;
+
+		json j;
+		j["kind"] = "MEMBER_ACCESS_EXPRESSION";
+		j["left"] = print<EXPRESSION>(tokenBuffers, nodeBuffers, memberAccessExpressionNode.LeftID);
+		j["right"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, memberAccessExpressionNode.RightID);
 
 		return j;
 	}
@@ -325,6 +325,25 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<POSTFIX_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& postfixExpressionNode = nodeBuffers.GetNode(nodeID);
+
+		switch (postfixExpressionNode.Kind)
+		{
+		case NodeKind::ARRAY_ACCESS_EXPRESSION:
+			return print<ARRAY_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
+		case NodeKind::MEMBER_ACCESS_EXPRESSION:
+			return print<MEMBER_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
+		default:
+			ASSERT(false, "Unknown postfix expression kind");
+			return json();
+		}
+	}
+
+	template <>
 	json print<PRIMARY_EXPRESSION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& primaryExpressionNode = nodeBuffers.GetNode(nodeID);
@@ -352,17 +371,11 @@ namespace AlloyCompiler
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
 			return print<VALUE_DEFINITION_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
-		case NodeKind::ARRAY_ACCESS_EXPRESSION:
-			return print<ARRAY_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
-
-		case NodeKind::MEMBER_ACCESS_EXPRESSION:
-			return print<MEMBER_ACCESS_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+		case NodeKind::ENCLOSED_EXPRESSION:
+			return print<ENCLOSED_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
 		case NodeKind::FUNCTION_CALL_EXPRESSION:
 			return print<FUNCTION_CALL_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
-
-		case NodeKind::ENCLOSED_EXPRESSION:
-			return print<ENCLOSED_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
 		default:
 			ASSERT(false, "Unknown primary expression kind");
@@ -416,6 +429,10 @@ namespace AlloyCompiler
 		case NodeKind::UNARY_EXPRESSION:
 			return print<UNARY_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
+		case NodeKind::ARRAY_ACCESS_EXPRESSION:
+		case NodeKind::MEMBER_ACCESS_EXPRESSION:
+			return print<POSTFIX_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
+
 		case NodeKind::IDENTIFIER:
 		case NodeKind::LITERAL:
 		case NodeKind::CONSTRUCTOR_EXPRESSION:
@@ -423,10 +440,8 @@ namespace AlloyCompiler
 		case NodeKind::POINTER_MOVE_EXPRESSION:
 		case NodeKind::INITIALIZER_LIST_EXPRESSION:
 		case NodeKind::VALUE_DEFINITION_EXPRESSION:
-		case NodeKind::ARRAY_ACCESS_EXPRESSION:
-		case NodeKind::MEMBER_ACCESS_EXPRESSION:
-		case NodeKind::FUNCTION_CALL_EXPRESSION:
 		case NodeKind::ENCLOSED_EXPRESSION:
+		case NodeKind::FUNCTION_CALL_EXPRESSION:
 			return print<PRIMARY_EXPRESSION>(tokenBuffers, nodeBuffers, nodeID);
 
 		case NodeKind::ASSIGNMENT_EXPRESSION:

@@ -884,7 +884,7 @@ namespace AlloyCompiler
 		llvm::Value* memberIndex = generateExpression(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.IndexExpressionID, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
 		TypeSubtypePair tempType = { nullptr, nullptr };
 
-		PtrValuePair left = generateIdentifier(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.ArrayIdentifierID, tempType);
+		PtrValuePair left = generateIdentifier(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.ArrayExpressionID, tempType);
 
 		if (!left.Ptr)
 		{
@@ -897,7 +897,7 @@ namespace AlloyCompiler
 
 		if (leftType->getTypeID() != llvm::Type::ArrayTyID)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayIdentifierID), "Expected array type!");
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayExpressionID), "Expected array type!");
 			return {};
 		}
 
@@ -915,7 +915,7 @@ namespace AlloyCompiler
 		// array of pointers, we need to load the underlying value
 		if (llvm::isa<llvm::PointerType>(memberValue->getType())) {
 			if (tempType.containedType == nullptr) {
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayIdentifierID), "Array contains pointers of unknown type!");
+				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayExpressionID), "Array contains pointers of unknown type!");
 				return {};
 			}
 

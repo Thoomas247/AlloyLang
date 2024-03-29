@@ -606,6 +606,9 @@ namespace AlloyCompiler
 	NodeID parse<UNARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
 
 	template <>
+	NodeID parse<POSTFIX_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
+
+	template <>
 	NodeID parse<PRIMARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter);
 
 	template <>
@@ -971,48 +974,39 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	NodeID parse<ARRAY_ACCESS_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	NodeID parse<ENCLOSED_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
+		if (iter.GetKind() != TokenKind::open_paren)
+		{
+			unexpectedToken(iter, { "(" });
+			return ERROR_NODE_ID;
+		}
+
 		TokenID errorInfo = iter.GetCurrentID();
 
-		// parse array expression
-		NodeID arrayExpressionID = parse<EXPRESSION>(nodeBuffers, iter);
-
-		if (arrayExpressionID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for opening square bracket
-		if (iter.GetKind() != TokenKind::open_bracket)
-		{
-			unexpectedToken(iter, { "[" });
-			return ERROR_NODE_ID;
-		}
-
-		// consume opening square bracket
+		// consume opening parenthesis
 		if (!iter.Next())
 		{
 			unexpectedEndOfFile(iter, { "expression" });
 			return ERROR_NODE_ID;
 		}
 
-		// parse index expression
-		NodeID indexExpressionID = parse<EXPRESSION>(nodeBuffers, iter);
+		// parse expression
+		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
 
-		if (indexExpressionID == ERROR_NODE_ID)
+		if (expressionID == ERROR_NODE_ID)
 		{
 			return ERROR_NODE_ID;
 		}
 
-		// check for closing square bracket
-		if (iter.GetKind() != TokenKind::close_bracket)
+		// check for closing parenthesis
+		if (iter.GetKind() != TokenKind::close_paren)
 		{
-			unexpectedToken(iter, { "]" });
+			unexpectedToken(iter, { ")" });
 			return ERROR_NODE_ID;
 		}
 
-		// consume closing square bracket
+		// consume closing parenthesis
 		if (!iter.Next())
 		{
 			unexpectedEndOfFile(iter, { "expression" });
@@ -1022,60 +1016,14 @@ namespace AlloyCompiler
 		return nodeBuffers.CreateNode(
 			Node
 			{
-				.Kind = NodeKind::ARRAY_ACCESS_EXPRESSION,
-				.ArrayAccessExpression = ARRAY_ACCESS_EXPRESSION
+				.Kind = NodeKind::ENCLOSED_EXPRESSION,
+				.EnclosedExpression = ENCLOSED_EXPRESSION
 				{
-					.ArrayExpressionID = arrayExpressionID,
-					.IndexExpressionID = indexExpressionID
+					.ExpressionID = expressionID
 				}
 			},
 			errorInfo
 		);
-	}
-
-	template <>
-	NodeID parse<MEMBER_ACCESS_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
-	{
-		NodeID left = parse<IDENTIFIER>(nodeBuffers, iter);
-
-		if (left == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		while (iter.GetKind() == TokenKind::dot)
-		{
-			TokenID opTokenID = iter.GetCurrentID();
-
-			// consume operator
-			if (!iter.Next())
-			{
-				unexpectedEndOfFile(iter, { "identifier" });
-				return ERROR_NODE_ID;
-			}
-
-			// parse right identifier
-			NodeID right = parse<IDENTIFIER>(nodeBuffers, iter);
-
-			if (right == ERROR_NODE_ID)
-			{
-				return ERROR_NODE_ID;
-			}
-
-			left = nodeBuffers.CreateNode(
-				Node{
-					.Kind = NodeKind::MEMBER_ACCESS_EXPRESSION,
-					.MemberAccessExpression = MEMBER_ACCESS_EXPRESSION
-					{
-						.LeftID = left,
-						.RightID = right
-					}
-				},
-				opTokenID
-			);
-		}
-
-		return left;
 	}
 
 	template <>
@@ -1154,57 +1102,10 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	NodeID parse<ENCLOSED_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
-	{
-		if (iter.GetKind() != TokenKind::open_paren)
-		{
-			unexpectedToken(iter, { "(" });
-			return ERROR_NODE_ID;
-		}
+	NodeID parse<ARRAY_ACCESS_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter) = delete;
 
-		TokenID errorInfo = iter.GetCurrentID();
-
-		// consume opening parenthesis
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "expression" });
-			return ERROR_NODE_ID;
-		}
-
-		// parse expression
-		NodeID expressionID = parse<EXPRESSION>(nodeBuffers, iter);
-
-		if (expressionID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
-		// check for closing parenthesis
-		if (iter.GetKind() != TokenKind::close_paren)
-		{
-			unexpectedToken(iter, { ")" });
-			return ERROR_NODE_ID;
-		}
-
-		// consume closing parenthesis
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "expression" });
-			return ERROR_NODE_ID;
-		}
-
-		return nodeBuffers.CreateNode(
-			Node
-			{
-				.Kind = NodeKind::ENCLOSED_EXPRESSION,
-				.EnclosedExpression = ENCLOSED_EXPRESSION
-				{
-					.ExpressionID = expressionID
-				}
-			},
-			errorInfo
-		);
-	}
+	template <>
+	NodeID parse<MEMBER_ACCESS_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter) = delete;
 
 	template <>
 	NodeID parse<BINARY_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
@@ -1426,7 +1327,7 @@ namespace AlloyCompiler
 		if (iter.GetKind() != TokenKind::unary_operator && iter.GetKind() != TokenKind::reference && iter.GetKind() != TokenKind::additive_operator)
 		{
 			// try to parse primary expression
-			return parse<PRIMARY_EXPRESSION>(nodeBuffers, iter);
+			return parse<POSTFIX_EXPRESSION>(nodeBuffers, iter);
 		}
 
 		TokenID operatorTokenID = iter.GetCurrentID();
@@ -1439,7 +1340,7 @@ namespace AlloyCompiler
 		}
 
 		// parse primary expression
-		NodeID primaryExpressionID = parse<PRIMARY_EXPRESSION>(nodeBuffers, iter);
+		NodeID primaryExpressionID = parse<POSTFIX_EXPRESSION>(nodeBuffers, iter);
 
 		if (primaryExpressionID == ERROR_NODE_ID)
 		{
@@ -1458,6 +1359,103 @@ namespace AlloyCompiler
 			},
 			errorInfo
 		);
+	}
+
+	template <>
+	NodeID parse<POSTFIX_EXPRESSION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		NodeID left = parse<PRIMARY_EXPRESSION>(nodeBuffers, iter);
+
+		if (left == ERROR_NODE_ID)
+		{
+			return ERROR_NODE_ID;
+		}
+
+		while (iter.GetKind() == TokenKind::open_bracket || iter.GetKind() == TokenKind::dot)
+		{
+			// handle array access
+			if (iter.GetKind() == TokenKind::open_bracket)
+			{
+				// consume [
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "expression" });
+					return ERROR_NODE_ID;
+				}
+
+				NodeID right = parse<EXPRESSION>(nodeBuffers, iter);
+
+				if (right == ERROR_NODE_ID)
+				{
+					return ERROR_NODE_ID;
+				}
+
+				if (iter.GetKind() != TokenKind::close_bracket)
+				{
+					unexpectedToken(iter, { "]" });
+					return ERROR_NODE_ID;
+				}
+
+				// consume closing brace
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "expression" });
+					return ERROR_NODE_ID;
+				}
+
+				left = nodeBuffers.CreateNode(
+					Node
+					{
+						.Kind = NodeKind::ARRAY_ACCESS_EXPRESSION,
+						.ArrayAccessExpression = ARRAY_ACCESS_EXPRESSION
+						{
+							.ArrayExpressionID = left,
+							.IndexExpressionID = right
+						}
+					},
+					iter.GetCurrentID()
+				);
+			}
+
+			// handle member access
+			else if (iter.GetKind() == TokenKind::dot)
+			{
+				// consume .
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "expression" });
+					return ERROR_NODE_ID;
+				}
+
+				NodeID right = parse<IDENTIFIER>(nodeBuffers, iter);
+
+				if (right == ERROR_NODE_ID)
+				{
+					return ERROR_NODE_ID;
+				}
+
+				left = nodeBuffers.CreateNode(
+					Node
+					{
+						.Kind = NodeKind::MEMBER_ACCESS_EXPRESSION,
+						.MemberAccessExpression = MEMBER_ACCESS_EXPRESSION
+						{
+							.LeftID = left,
+							.RightID = right
+						}
+					},
+					iter.GetCurrentID()
+				);
+			}
+
+			else
+			{
+				unexpectedToken(iter, { "[", "." });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		return left;
 	}
 
 	template <>
@@ -1496,22 +1494,6 @@ namespace AlloyCompiler
 				return parse<CONSTRUCTOR_EXPRESSION>(nodeBuffers, iter);
 			}
 
-			// check if next token is opening square bracket
-			if (iter.GetKind() == TokenKind::open_bracket)
-			{
-				iter.Previous();
-
-				return parse<ARRAY_ACCESS_EXPRESSION>(nodeBuffers, iter);
-			}
-
-			// check if next token is dot operator
-			if (iter.GetKind() == TokenKind::dot)
-			{
-				iter.Previous();
-
-				return parse<MEMBER_ACCESS_EXPRESSION>(nodeBuffers, iter);
-			}
-
 			iter.Previous();
 			return parse<IDENTIFIER>(nodeBuffers, iter);
 		}
@@ -1544,18 +1526,17 @@ namespace AlloyCompiler
 
 		NodeID identifierOrMemberAccessID = ERROR_NODE_ID;
 
-		// check if we have a . after the identifier, denoting a member access expression
-		if (iter.Next() && iter.GetKind() == TokenKind::dot)
+		if (!iter.Next())
 		{
-			iter.Previous();
-			identifierOrMemberAccessID = parse<MEMBER_ACCESS_EXPRESSION>(nodeBuffers, iter);
+			unexpectedEndOfFile(iter, { "=" });
+			return ERROR_NODE_ID;
 		}
 
-		// check if we have a [ after the identifier, denoting an array access expression
-		else if (iter.GetKind() == TokenKind::open_bracket)
+		// check if we have a [ or . after the identifier, denoting a member access or array access expression
+		if (iter.GetKind() == TokenKind::open_bracket || iter.GetKind() == TokenKind::dot)
 		{
 			iter.Previous();
-			identifierOrMemberAccessID = parse<ARRAY_ACCESS_EXPRESSION>(nodeBuffers, iter);
+			identifierOrMemberAccessID = parse<POSTFIX_EXPRESSION>(nodeBuffers, iter);
 		}
 
 		else
