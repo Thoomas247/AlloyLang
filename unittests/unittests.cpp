@@ -165,10 +165,21 @@ namespace unittests
 					var scale : Vector3;
 				}
 
+				fn translate(const point : Vector3, const vector : Vector3) -> Vector3
+				{
+					var result : Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
+					
+					result.x = point.x + vector.x;
+					result.y = point.y + vector.y;
+					result.z = point.z + vector.z;
+					
+					return result;
+				}
+
 				fn main () -> i64
 				{
 					var a : f32 = 32.0;
-					var expected : f32 = 2048.0;
+					var expected : f32 = 20480.0;
 					var result : i64 = 0;
 					var test : Vector3 = 
 						Vector3 
@@ -186,17 +197,19 @@ namespace unittests
 							scale = test
 						};
 
-					test.z = 10.0;
+					const translation : Vector3 = Vector3 { x = 0, y = 0, z = 10 };
+
+					test.z = translate(test, translation).z;
 					test2.rotation.y = 20.0;
 
-					printf("result = %f", test.x * test2.scale.y);
-					if (test.x * test2.scale.y == expected)
+					printf("result = %f", test.x * test2.scale.y * test.z);
+					if (test.x * test2.scale.y * test.z == expected)
 						return 1;
 					else
 						return 0;
 				}
 			)";
-			std::string expected = "result = 2048.000000";
+			std::string expected = "result = 20480.000000";
 
 			RunTest(TestStr, 1);
 		}

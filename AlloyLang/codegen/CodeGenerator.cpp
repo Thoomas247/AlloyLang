@@ -883,13 +883,19 @@ namespace AlloyCompiler
 
 		llvm::Value* memberIndex = generateExpression(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.IndexExpressionID, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
 		TypeSubtypePair tempType = { nullptr, nullptr };
+		PtrValuePair left = { nullptr, nullptr };
 
-		PtrValuePair left = generateIdentifier(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.ArrayExpressionID, tempType);
-
-		if (!left.Ptr)
+		// handle identifier
+		if (nodeBuffers.GetNode(arrayAccessExpressionNode.ArrayExpressionID).Kind == NodeKind::IDENTIFIER)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
-			return {};
+			TypeSubtypePair identifierType = { nullptr, nullptr };
+			left = generateIdentifier(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.ArrayExpressionID, tempType);
+		}
+		else
+		// not an identifier, must be an expression that returns an array
+		{
+			left.Value = generateExpression(tokenBuffers, nodeBuffers, state, arrayAccessExpressionNode.ArrayExpressionID, tempType);
+			left.Ptr = nullptr;		// we don't have a pointer to a variable, so set this to null
 		}
 
 		// get the type of the left
@@ -902,15 +908,22 @@ namespace AlloyCompiler
 		}
 
 		llvm::ArrayType* arrayType = static_cast<llvm::ArrayType*>(leftType);
+		llvm::Value* memberPtr = nullptr;
+		llvm::Value* memberValue = nullptr;
 
-		// struct members are accessed through 2 indices, this is described in detail here:
-		// https://llvm.org/docs/GetElementPtr.html
-		std::vector<llvm::Value*> indices(2);
-		indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
-		indices[1] = memberIndex;
+		if (left.Ptr != nullptr) {
+			// case of an identifier			
+			std::vector<llvm::Value*> indices(2);
+			indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
+			indices[1] = memberIndex;
 
-		llvm::Value* memberPtr = state.Builder->CreateGEP(arrayType, left.Ptr, indices, "memberptr");
-		llvm::Value* memberValue = state.Builder->CreateLoad(arrayType->getElementType(), memberPtr, "loadtmp");
+			memberPtr = state.Builder->CreateGEP(arrayType, left.Ptr, indices, "memberptr");
+			memberValue = state.Builder->CreateLoad(arrayType->getElementType(), memberPtr, "loadtmp");
+		}
+		else {
+			// case of an expression, we don't have a pointer to the array
+			memberValue = state.Builder->CreateExtractElement(left.Value, memberIndex, "extractelm");
+		}
 
 		// array of pointers, we need to load the underlying value
 		if (llvm::isa<llvm::PointerType>(memberValue->getType())) {
@@ -950,11 +963,11 @@ namespace AlloyCompiler
 			TypeSubtypePair identifierType = { nullptr, nullptr };
 			left = generateIdentifier(tokenBuffers, nodeBuffers, state, memberAccessExpressionNode.LeftID, identifierType);
 		}
-
-		if (!left.Ptr)
+		else
+		// neither an identifier nor a nested member access, must be an expression that returns a structure
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
-			return {};
+			left.Value = generateExpression(tokenBuffers, nodeBuffers, state, memberAccessExpressionNode.LeftID, expectedType);
+			left.Ptr = nullptr;		// we don't have a pointer to a variable, so set this to null
 		}
 
 		// get the type of the left
@@ -986,22 +999,25 @@ namespace AlloyCompiler
 			return {};
 		}
 
-		// convert our index to an llvm 32-bit Int
-		llvm::Value* llvmIndex = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberInfo.memberIndex, true));
-
-		// struct members are accessed through 2 indices, this is described in detail here:
-		// https://llvm.org/docs/GetElementPtr.html
-		std::vector<llvm::Value*> indices(2);
-		indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
-		indices[1] = llvmIndex;
-
 		if (llvm::isa<llvm::PointerType>(structType->getTypeAtIndex(memberInfo.memberIndex))) {
 			assert(false);	// TODO: not implemented
 		}
-		llvm::Value* memberPtr = state.Builder->CreateGEP(structType, left.Ptr, indices, "memberptr");
-		llvm::Value* memberValue = state.Builder->CreateLoad(structType->getTypeAtIndex(memberInfo.memberIndex), memberPtr, "loadtmp");
 
-		return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue };
+		if (left.Ptr == nullptr) {
+			// case where the structure is returned by evaluating an expression, we can directly access the structure member
+			std::vector<unsigned int> indices(1);
+			indices[0] = memberInfo.memberIndex;
+			llvm::Value* memberValue = state.Builder->CreateExtractValue(left.Value, indices);
+			return PtrValuePair{ .Ptr = nullptr, .Value = memberValue };
+		}
+		else {
+			// get the member index in the format required by llvm
+			std::vector<llvm::Value*> indices = getGEPIndex(state, memberInfo.memberIndex);
+
+			llvm::Value* memberPtr = state.Builder->CreateGEP(structType, left.Ptr, indices, "memberptr");
+			llvm::Value* memberValue = state.Builder->CreateLoad(structType->getTypeAtIndex(memberInfo.memberIndex), memberPtr, "loadtmp");
+			return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue };
+		}
 	}
 
 	llvm::Value* generateFunctionCallExpression(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state, NodeID nodeID)
