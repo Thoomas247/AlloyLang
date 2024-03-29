@@ -355,13 +355,13 @@ namespace AlloyCompiler
 		}
 
 		// otherwise we must have a type identifier
-		else if (iter.GetKind() != TokenKind::identifier)
+		else if (iter.GetKind() != TokenKind::identifier && iter.GetKind() != TokenKind::open_bracket)
 		{
 			unexpectedToken(iter, { "const", "var", "type identifier" });
 			return ERROR_NODE_ID;
 		}
 
-		// parse identifier
+		// parse type identifier
 		TokenID errorInfo = iter.GetCurrentID();
 		NodeID identifierID = parse<TYPE_IDENTIFIER>(nodeBuffers, iter);
 
