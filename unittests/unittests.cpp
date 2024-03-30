@@ -244,6 +244,66 @@ namespace unittests
 			RunTest(TestStr, 1);
 		}
 
+		TEST_METHOD(ArraysInStructures)
+		{
+			constexpr auto TestStr = R"(
+				extern fn printf (const str : String, const param : f64) -> i64;
+
+				struct Vector3
+				{
+					var x : f64;
+					var y : f64;
+					var z : f64;
+				}
+
+				struct StructWithArray
+				{
+					var x : i64;
+					var array : [f64; 2];
+				}
+
+				fn translate(const point : Vector3, const vector : Vector3) -> Vector3
+				{
+					var result : Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
+					
+					result.x = point.x + vector.x;
+					result.y = point.y + vector.y;
+					result.z = point.z + vector.z;
+					
+					return result;
+				}
+
+				fn main () -> i64
+				{
+					var test : Vector3 = 
+						Vector3 
+						{ 
+							x = 32.0, 
+							y = 64.0, 
+							z = 5.0 
+						};
+
+					var atest : StructWithArray = 
+						StructWithArray
+						{
+							x = 2,
+							array = { 10.0, 20.0 }
+						};
+					test.z = atest.array[0];
+					test.z = translate(test, test).z;
+
+					printf("result = %f", test.z);
+
+					if (test.z == 20.0)
+						return 1;
+					else
+						return 0;
+				}
+			)";
+			std::string expected = "result = 20.0000";
+			RunTest(TestStr, 1);
+		}
+
 		TEST_METHOD(Pointers)
 		{
 			constexpr auto TestStr = R"(

@@ -222,8 +222,8 @@ namespace AlloyCompiler
 
 		// get the correct type of value that we are generating
 		llvm::Type* thisType = identifierType.type;
-		if (thisType && isa<llvm::ArrayType>(thisType)) {
-			thisType = static_cast<llvm::ArrayType *>(thisType)->getArrayElementType();		// for arrays, we want the element type, not the array itself
+		if (thisType && isa<llvm::VectorType>(thisType)) {
+			thisType = static_cast<llvm::VectorType*>(thisType)->getElementType();		// for arrays, we want the element type, not the array itself
 		}
 
 		switch (literalNode.Kind)
@@ -432,7 +432,9 @@ namespace AlloyCompiler
 				}
 			}
 
-			identifierType.type = llvm::ArrayType::get(elementType, arraySize);
+			identifierType.type = llvm::VectorType::get(elementType, 
+														(arraySize == 0 ? 1 : arraySize), 
+														(arraySize == 0 ? true : false) /*scalable*/);
 		}
 
 		// return the identifier type and subtype
@@ -698,8 +700,8 @@ namespace AlloyCompiler
 		}
 
 		// if this is a pointer to an array, we need the underlying element type
-		if (llvm::isa<llvm::ArrayType>(elementType)) {
-			elementType = static_cast<llvm::ArrayType*>(elementType)->getArrayElementType();
+		if (llvm::isa<llvm::VectorType>(elementType)) {
+			elementType = static_cast<llvm::VectorType*>(elementType)->getElementType();
 		}
 		llvm::PointerType* pointerType = llvm::PointerType::get(elementType, 0);	// note that elementType is not actually stored by llvm
 
@@ -802,23 +804,23 @@ namespace AlloyCompiler
 
 		const INITIALIZER_LIST_EXPRESSION& initListExpressionNode = nodeBuffers.GetNode(nodeID).InitializerListExpression;
 
-		if (!expectedType.type || expectedType.type->getTypeID() != llvm::Type::ArrayTyID)
+		if (!expectedType.type || (expectedType.type->getTypeID() != llvm::Type::FixedVectorTyID && expectedType.type->getTypeID() != llvm::Type::ScalableVectorTyID))
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown array type!");
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown vector type!");
 			return nullptr;
 		}
 
-		llvm::ArrayType* arrayType = static_cast<llvm::ArrayType*>(expectedType.type);
+		llvm::VectorType* vectorType = static_cast<llvm::VectorType*>(expectedType.type);
 
 		// create a mutable variable at the end of the insertion block
 		llvm::IRBuilder<> tempBuilder(state.Builder->GetInsertBlock(), state.Builder->GetInsertBlock()->end());
-		llvm::AllocaInst* arrayPtr = tempBuilder.CreateAlloca(arrayType, nullptr);
+		llvm::AllocaInst* arrayPtr = tempBuilder.CreateAlloca(vectorType, nullptr);
 
 		// go through the list of initializers and initialize all members
 		for (int i = 0; i < initListExpressionNode.ValueIDs.size(); i++)
 		{
 			// set the type that we are expecting for each array element
-			TypeSubtypePair identifierType = { arrayType->getElementType(), expectedType.containedType };
+			TypeSubtypePair identifierType = { vectorType->getElementType(), expectedType.containedType };
 
 			llvm::Value* expressionVal = generateExpression(tokenBuffers, nodeBuffers, state, initListExpressionNode.ValueIDs[i], identifierType);
 
@@ -831,7 +833,7 @@ namespace AlloyCompiler
 			// convert our index to the format required by GEP operations
 			std::vector<llvm::Value*> indices = getGEPIndex(state, i);
 
-			llvm::Value* memberPtr = state.Builder->CreateGEP(arrayType, arrayPtr, indices, "memberptr");
+			llvm::Value* memberPtr = state.Builder->CreateGEP(vectorType, arrayPtr, indices, "memberptr");
 
 			state.Builder->CreateStore(expressionVal, memberPtr, "savetmp");
 		}
@@ -901,13 +903,13 @@ namespace AlloyCompiler
 		// get the type of the left
 		llvm::Type* leftType = left.Value->getType();
 
-		if (leftType->getTypeID() != llvm::Type::ArrayTyID)
+		if (leftType->getTypeID() != llvm::Type::FixedVectorTyID && leftType->getTypeID() != llvm::Type::ScalableVectorTyID)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayExpressionID), "Expected array type!");
+			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayExpressionID), "Expected vector type!");
 			return {};
 		}
 
-		llvm::ArrayType* arrayType = static_cast<llvm::ArrayType*>(leftType);
+		llvm::VectorType* vectorType = static_cast<llvm::VectorType*>(leftType);
 		llvm::Value* memberPtr = nullptr;
 		llvm::Value* memberValue = nullptr;
 
@@ -917,12 +919,12 @@ namespace AlloyCompiler
 			indices[0] = llvm::ConstantInt::get(*state.Context, llvm::APInt(32, 0, true));
 			indices[1] = memberIndex;
 
-			memberPtr = state.Builder->CreateGEP(arrayType, left.Ptr, indices, "memberptr");
-			memberValue = state.Builder->CreateLoad(arrayType->getElementType(), memberPtr, "loadtmp");
+			memberPtr = state.Builder->CreateGEP(vectorType, left.Ptr, indices, "memberptr");
+			memberValue = state.Builder->CreateLoad(vectorType->getElementType(), memberPtr, "loadtmp");
 		}
 		else {
 			// case of an expression, we don't have a pointer to the array
-			memberValue = state.Builder->CreateExtractElement(left.Value, memberIndex, "extractelm");
+			memberValue = state.Builder->CreateExtractElement(left.Value, memberIndex, "extractelem");
 		}
 
 		// array of pointers, we need to load the underlying value
