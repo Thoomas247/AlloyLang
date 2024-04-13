@@ -2724,13 +2724,6 @@ namespace AlloyCompiler
 	{
 		TokenID errorInfo = iter.GetCurrentID();
 
-		NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
-
-		if (identifierID == ERROR_NODE_ID)
-		{
-			return ERROR_NODE_ID;
-		}
-
 		if (iter.GetKind() != TokenKind::open_brace)
 		{
 			unexpectedToken(iter, { "{" });
@@ -2781,7 +2774,6 @@ namespace AlloyCompiler
 				.Kind = NodeKind::GROUP_LIST,
 				.GroupList = GROUP_LIST
 				{
-					.IdentifierID = identifierID,
 					.GroupIdentifierIDs = groupIdentifierIDs
 				}
 			},
@@ -2827,10 +2819,36 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
-		VectorRef<NodeID> groupListIDs = nodeBuffers.CreateNodeIDVector();
+		std::unordered_map<std::string_view, NodeID> stageGroupLists = {
+			{ "start",	ERROR_NODE_ID },
+			{ "update", ERROR_NODE_ID },
+			{ "end",	ERROR_NODE_ID }
+		};
 
 		while (iter.GetKind() != TokenKind::close_brace)
 		{
+			if (iter.GetKind() != TokenKind::identifier)
+			{
+				unexpectedToken(iter, { "identifier" });
+				return ERROR_NODE_ID;
+			}
+
+			const std::string_view stageName = iter.GetValue().ToStringView();
+
+			auto it = stageGroupLists.find(stageName);
+
+			if (it == stageGroupLists.end())
+			{
+				logErrorAtPosition(iter, "Invalid application stage '{0}'! Valid stages are 'start', 'update', and 'end'.", stageName);
+				return ERROR_NODE_ID;
+			}
+
+			if (it->second != ERROR_NODE_ID)
+			{
+				logErrorAtPosition(iter, "Application stage '{0}' is already defined!", stageName);
+				return ERROR_NODE_ID;
+			}
+
 			NodeID groupListID = parse<GROUP_LIST>(nodeBuffers, iter);
 
 			if (groupListID == ERROR_NODE_ID)
@@ -2838,7 +2856,7 @@ namespace AlloyCompiler
 				return ERROR_NODE_ID;
 			}
 
-			groupListIDs.push_back(groupListID);
+			it->second = groupListID;
 		}
 
 		// consume closing brace
@@ -2851,7 +2869,9 @@ namespace AlloyCompiler
 				.ApplicationDefinition = APPLICATION_DEFINITION
 				{
 					.IdentifierID = identifierID,
-					.GroupListIDs = groupListIDs
+					.StartGroupListID = stageGroupLists["start"],
+					.UpdateGroupListID = stageGroupLists["update"],
+					.EndGroupListID = stageGroupLists["end"]
 				}
 			},
 			errorInfo

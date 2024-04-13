@@ -320,14 +320,16 @@ namespace AlloyCompiler
 
 	struct GROUP_LIST
 	{
-		NodeID IdentifierID;
 		VectorRef<NodeID> GroupIdentifierIDs;
 	};
 
 	struct APPLICATION_DEFINITION
 	{
 		NodeID IdentifierID;
-		VectorRef<NodeID> GroupListIDs;
+
+		NodeID StartGroupListID;
+		NodeID UpdateGroupListID;
+		NodeID EndGroupListID;
 	};
 
 	union DEFINITION

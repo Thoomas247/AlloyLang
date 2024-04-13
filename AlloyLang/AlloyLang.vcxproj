@@ -166,6 +166,7 @@
     <ClInclude Include="codegen\CodeGenerator.hpp" />
     <ClInclude Include="codegen\llvm\llvm.hpp" />
     <ClInclude Include="codegen\NamedValues.hpp" />
+    <ClInclude Include="ecs\ECSResolver.hpp" />
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
