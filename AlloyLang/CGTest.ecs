@@ -1,98 +1,129 @@
-				extern fn printf (const str : String, const param : f64) -> i64;
+extern fn printf (const str : String, ...) -> i64;
 
-				struct Vector3
-				{
-					var x : f64;
-					var y : f64;
-					var z : f64;
-				}
+struct Vector3
+{
+	var x : f64;
+	var y : f64;
+	var z : f64;
+}
 
-				struct StructWithArray
-				{
-					var x : i64;
-					var array : [f64; 2];
-				}
+fn Vector3_print(const v : &Vector3)
+{
+	printf("[ %f, %f, %f ]", v.x, v.y, v.z);
+}
 
-				fn translate(const point : Vector3, const vector : Vector3) -> Vector3
-				{
-					var result : Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
+fn Vector3_translate(const point : Vector3, const vector : Vector3) -> Vector3
+{
+	var result : Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
 					
-					result.x = point.x + vector.x;
-					result.y = point.y + vector.y;
-					result.z = point.z + vector.z;
+	result.x = point.x + vector.x;
+	result.y = point.y + vector.y;
+	result.z = point.z + vector.z;
 					
-					return result;
-				}
+	return result;
+}
 
-				fn main () -> i64
-				{
-					var test : Vector3 = 
-						Vector3 
-						{ 
-							x = 32.0, 
-							y = 64.0, 
-							z = 5.0 
-						};
+component C_A
+{
+}
 
-					var atest : StructWithArray = 
-						StructWithArray
-						{
-							x = 2,
-							array = { 10.0, 20.0 }
-						};
-					test.z = atest.array[0];
-					test.z = translate(test, test).z;
+component C_B
+{
+}
 
-					printf("result = %f", test.z);
+component C_C
+{
+}
 
-					return 0;
-				}
-/*
-		extern fn printf (const str : String, const param : i64) -> i64;
-		
-		struct CharBuffer
-		{
-			var data : *[i8];
-			var length : u64;
-		}
+component C_D
+{
+}
 
-		fn CharBuffer_new(const size : u64)
-		{
-			var str : CharBuffer = CharBuffer 
-			{
-				data = new [0; size],
-				length = size
-			};
-		}
+resource R_A
+{
+}
 
-		fn CharBuffer_resize(var buffer : CharBuffer, const size : u64)
-		{
-			var min_size : u64 = size;
+resource R_B
+{
+}
 
-			if (buffer.length < min_size)
-				min_size = buffer.length;
+resource R_C
+{
+}
 
-			var new_data : *[i8] = new [0; size + 1];
+resource R_D
+{
+}
 
-			for (var i : i64 = 0; i < min_size; i = i + 1)
-			{
-				new_data[i] = buffer.data[i];
-			}
+query Q_1
+{
+	var R_A;
+}
 
-			new_data[min_size] = 0;
+query Q_2
+{
+	var R_B;
+}
 
-			buffer.data = new_data;
-		}
+query Q_3
+{
+	var R_A;
+}
 
-		fn main () -> i64
-		{				
-			var ptr : *i64 = new 3;
+query Q_4
+{
+	const R_A;
+}
 
-			// change ownership of pointed value to new pointer
-			// old ptr is now invalid and cannot be used
-			var new_ptr : *i64 = move ptr;
+query Q_5
+{
+	const R_A;
+}
 
-			printf("new_ptr = %d", new_ptr);
-			return 0;
-		}
-*/
+system S_1 (Q_1)
+{
+}
+
+system S_2 (Q_2)
+{
+}
+
+system S_3 (Q_3)
+{
+}
+
+system S_4 (Q_4)
+{
+}
+
+system S_5 (Q_5)
+{
+}
+
+
+group G_1
+{
+	S_1, S_2
+}
+
+group G_2
+{
+	S_3, S_4
+}
+
+group G_3
+{
+	S_5
+}
+
+application App
+{
+	start
+	{
+		G_1
+	}
+
+	update
+	{
+	}
+}

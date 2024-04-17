@@ -2,6 +2,69 @@
 
 namespace AlloyCompiler
 {
+	bool ECSElements::AddSystemNodeID(const std::string_view& name, NodeID nodeID)
+	{
+		if (m_SystemNodeIDs.contains(name))
+		{
+			return false;
+		}
+
+		m_SystemNodeIDs[name] = nodeID;
+		return true;
+	}
+
+	bool ECSElements::AddGroupNodeID(const std::string_view& name, NodeID nodeID)
+	{
+		if (m_GroupNodeIDs.contains(name))
+		{
+			return false;
+		}
+
+		m_GroupNodeIDs[name] = nodeID;
+		return true;
+	}
+
+	bool ECSElements::AddQueryNodeID(const std::string_view& name, NodeID nodeID)
+	{
+		if (m_QueryNodeIDs.contains(name))
+		{
+			return false;
+		}
+
+		m_QueryNodeIDs[name] = nodeID;
+		return true;
+	}
+
+	bool ECSElements::AddStructNodeID(const std::string_view& name, NodeID nodeID)
+	{
+		if (m_StructNodeIDs.contains(name))
+		{
+			return false;
+		}
+
+		m_StructNodeIDs[name] = nodeID;
+		return true;
+	}
+
+	const std::unordered_map<std::string_view, NodeID>& ECSElements::GetSystemNodeIDs() const
+	{
+		return m_SystemNodeIDs;
+	}
+
+	const std::unordered_map<std::string_view, NodeID>& ECSElements::GetGroupNodeIDs() const
+	{
+		return m_GroupNodeIDs;
+	}
+
+	const std::unordered_map<std::string_view, NodeID>& ECSElements::GetQueryNodeIDs() const
+	{
+		return m_QueryNodeIDs;
+	}
+
+	const std::unordered_map<std::string_view, NodeID>& ECSElements::GetStructNodeIDs() const
+	{
+		return m_StructNodeIDs;
+	}
 
 	NodeID NodeBuffers::CreateNode(const Node& node, TokenID errorInfo)
 	{
@@ -31,8 +94,24 @@ namespace AlloyCompiler
 		return m_ErrorInfos[(size_t)id];
 	}
 
-	void NodeBuffers::SetRootNodeID(NodeID id) { m_RootNodeID = id; }
+	void NodeBuffers::AddApplicationNodeID(NodeID id)
+	{
+		m_ApplicationNodeIDs.push_back(id);
+	}
 
-	NodeID NodeBuffers::GetRootNodeID() const { return m_RootNodeID; }
+	const std::vector<NodeID>& NodeBuffers::GetApplicationNodeIDs() const
+	{
+		return m_ApplicationNodeIDs;
+	}
+
+	ECSElements& NodeBuffers::GetECSElements()
+	{
+		return m_ECSElements;
+	}
+
+	const ECSElements& NodeBuffers::GetECSElements() const
+	{
+		return m_ECSElements;
+	}
 
 }

@@ -100,6 +100,13 @@ namespace AlloyCompiler
 		logErrorAtPosition(iter, "Unexpected token '{0}'! Expected: {1}.", iter.GetValue().ToStringView(), stringVectorToString(expected));
 	}
 
+	static std::string_view getIdentifierNodeName(const TokenBuffers::Iterator& iter, const NodeBuffers& nodeBuffers, NodeID identifierNodeID)
+	{
+		TokenID identifierTokenID = nodeBuffers.GetNode(identifierNodeID).Identifier.IdentifierTokenID;
+
+		return iter.GetTokenBuffers().GetValue(identifierTokenID).ToStringView();
+	}
+
 #pragma endregion
 
 	template <typename T, typename... Ps>
@@ -2287,7 +2294,7 @@ namespace AlloyCompiler
 		// consume closing brace
 		(void)iter.Next();
 
-		return nodeBuffers.CreateNode(
+		NodeID structNodeID = nodeBuffers.CreateNode(
 			Node
 			{
 				.Kind = NodeKind::STRUCT_DEFINITION,
@@ -2300,6 +2307,13 @@ namespace AlloyCompiler
 			},
 			errorInfo
 		);
+
+		if (type == STRUCT_DEFINITION::Type::Resource || type == STRUCT_DEFINITION::Type::Component)
+		{
+			nodeBuffers.GetECSElements().AddStructNodeID(getIdentifierNodeName(iter, nodeBuffers, identifierID), structNodeID);
+		}
+
+		return structNodeID;
 	}
 
 	template <>
@@ -2525,7 +2539,7 @@ namespace AlloyCompiler
 		// consume closing brace
 		(void)iter.Next();
 
-		return nodeBuffers.CreateNode(
+		NodeID queryNodeID = nodeBuffers.CreateNode(
 			Node
 			{
 				.Kind = NodeKind::QUERY_DEFINITION,
@@ -2538,6 +2552,10 @@ namespace AlloyCompiler
 			},
 			errorInfo
 		);
+
+		nodeBuffers.GetECSElements().AddQueryNodeID(getIdentifierNodeName(iter, nodeBuffers, identifierID), queryNodeID);
+
+		return queryNodeID;
 	}
 
 	template <>
@@ -2621,7 +2639,7 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
-		return nodeBuffers.CreateNode(
+		NodeID systemNodeID = nodeBuffers.CreateNode(
 			Node
 			{
 				.Kind = NodeKind::SYSTEM_DEFINITION,
@@ -2634,6 +2652,10 @@ namespace AlloyCompiler
 			},
 			errorInfo
 		);
+
+		nodeBuffers.GetECSElements().AddSystemNodeID(getIdentifierNodeName(iter, nodeBuffers, identifierID), systemNodeID);
+
+		return systemNodeID;
 	}
 
 	template <>
@@ -2705,7 +2727,7 @@ namespace AlloyCompiler
 		// consume closing brace
 		(void)iter.Next();
 
-		return nodeBuffers.CreateNode(
+		NodeID groupNodeID = nodeBuffers.CreateNode(
 			Node
 			{
 				.Kind = NodeKind::GROUP_DEFINITION,
@@ -2717,6 +2739,10 @@ namespace AlloyCompiler
 			},
 			errorInfo
 		);
+
+		nodeBuffers.GetECSElements().AddGroupNodeID(getIdentifierNodeName(iter, nodeBuffers, identifierID), groupNodeID);
+
+		return groupNodeID;
 	}
 
 	template <>
@@ -2849,6 +2875,13 @@ namespace AlloyCompiler
 				return ERROR_NODE_ID;
 			}
 
+			// consume stage name
+			if (!iter.Next())
+			{
+				unexpectedEndOfFile(iter, { "group list" });
+				return ERROR_NODE_ID;
+			}
+
 			NodeID groupListID = parse<GROUP_LIST>(nodeBuffers, iter);
 
 			if (groupListID == ERROR_NODE_ID)
@@ -2862,7 +2895,7 @@ namespace AlloyCompiler
 		// consume closing brace
 		(void)iter.Next();
 
-		return nodeBuffers.CreateNode(
+		NodeID applicationNodeID = nodeBuffers.CreateNode(
 			Node
 			{
 				.Kind = NodeKind::APPLICATION_DEFINITION,
@@ -2876,6 +2909,10 @@ namespace AlloyCompiler
 			},
 			errorInfo
 		);
+
+		nodeBuffers.AddApplicationNodeID(applicationNodeID);
+
+		return applicationNodeID;
 	}
 
 	template <>
@@ -3036,7 +3073,8 @@ namespace AlloyCompiler
 		NodeBuffers nodeBuffers;
 		TokenBuffers::Iterator tokenIter = tokenBuffers.GetIterator();
 
-		nodeBuffers.SetRootNodeID(parse<PROGRAM>(nodeBuffers, tokenIter));
+		// TODO: use return value to check for errors
+		(void)parse<PROGRAM>(nodeBuffers, tokenIter);
 
 		return nodeBuffers;
 	}

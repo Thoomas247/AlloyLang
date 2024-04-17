@@ -1,6 +1,7 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
 #include "parser/TreePrinter.hpp"
+#include "ecs/ECSResolver.hpp"
 #include "codegen/CodeGenerator.hpp"
 
 #include "log/Log.hpp"
@@ -59,14 +60,19 @@ int main(int argc, char* argv[])
 
 	const uint64_t tokenizeTime = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), 1ll);
 
-	PrintTokens(tokenBuffers);
+	//PrintTokens(tokenBuffers);
 
 	start = std::chrono::high_resolution_clock::now();
 	auto nodeBuffers = Parse(tokenBuffers);
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-	PrintTree(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
+	//PrintTree(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
+
+	start = std::chrono::high_resolution_clock::now();
+	SystemSchedulingInfo systemSchedulingInfo = ResolveApplication(tokenBuffers, nodeBuffers, nodeBuffers.GetApplicationNodeIDs()[0]);
+	end = std::chrono::high_resolution_clock::now();
+	const uint64_t resolutionTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
 	//LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);

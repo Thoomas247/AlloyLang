@@ -16,6 +16,11 @@ namespace AlloyCompiler
 		: m_TokenBuffers(tokenBuffers), m_CurrentID((TokenID)0)
 	{}
 
+	const TokenBuffers& TokenBuffers::Iterator::GetTokenBuffers() const
+	{
+		return m_TokenBuffers;
+	}
+
 	bool TokenBuffers::Iterator::Next()
 	{
 		if (m_CurrentID == m_TokenBuffers.LastTokenID())

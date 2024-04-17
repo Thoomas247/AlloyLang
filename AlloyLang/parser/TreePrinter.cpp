@@ -743,7 +743,6 @@ namespace AlloyCompiler
 
 		json j;
 		j["kind"] = "GROUP_LIST";
-		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, groupListNode.IdentifierID);
 
 		for (const auto& groupID : groupListNode.GroupIdentifierIDs)
 		{
@@ -762,10 +761,9 @@ namespace AlloyCompiler
 		j["kind"] = "APPLICATION_DEFINITION";
 		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, applicationDefinitionNode.IdentifierID);
 
-		for (const auto& groupListID : applicationDefinitionNode.GroupListIDs)
-		{
-			j["group_lists"].push_back(print<GROUP_LIST>(tokenBuffers, nodeBuffers, groupListID));
-		}
+		j["start_groups"] = print<GROUP_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.StartGroupListID);
+		j["update_groups"] = print<GROUP_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.UpdateGroupListID);
+		j["end_groups"] = print<GROUP_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.EndGroupListID);
 
 		return j;
 	}

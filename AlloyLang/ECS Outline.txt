@@ -36,11 +36,10 @@ Query:
 		- Components can be accessed using a for-each loop as well. For example: "for (var component : <component-name> in <query-name>)".
 		- Components can also be accessed through the entity itself. For example: "entity.<component-name>".
 	
-
 	query UpdateTransformsQuery
 	{
 		const WorldSettings;
-		var WorldTransform;	
+		var WorldTransform;
 	}
 
 System:

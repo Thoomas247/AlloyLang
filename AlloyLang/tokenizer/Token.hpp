@@ -261,6 +261,11 @@ namespace AlloyCompiler
 			Iterator(const TokenBuffers& tokenBuffers);
 
 			/// <summary>
+			/// Returns the TokenBuffers being iterated over.
+			/// </summary>
+			const TokenBuffers& GetTokenBuffers() const;
+
+			/// <summary>
 			/// Move to the next token.
 			/// Returns false if there are no more tokens, true otherwise.
 			/// </summary>

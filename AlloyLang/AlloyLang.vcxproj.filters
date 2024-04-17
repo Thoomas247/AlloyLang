@@ -51,6 +51,9 @@
     <ClCompile Include="codegen\NamedValues.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ecs\ECSResolver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tokenizer\Tokenizer.hpp">

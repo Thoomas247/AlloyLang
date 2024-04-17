@@ -155,6 +155,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="ecs\ECSResolver.cpp" />
     <ClCompile Include="parser\Node.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="parser\TreePrinter.cpp" />

@@ -1998,15 +1998,15 @@ namespace AlloyCompiler
 
 	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state)
 	{
-		const NodeID rootNodeID = nodeBuffers.GetRootNodeID();
-
-		ASSERT(nodeBuffers.GetNode(rootNodeID).Kind == NodeKind::PROGRAM, "Root node must be a program node!");
-
-		llvm::Value* program = generateProgram(tokenBuffers, nodeBuffers, state, rootNodeID);
-
-		std::error_code errorCode;
-		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
-		state.Module->print(out, nullptr);
+		//const NodeID rootNodeID = nodeBuffers.GetRootNodeID();
+		//
+		//ASSERT(nodeBuffers.GetNode(rootNodeID).Kind == NodeKind::PROGRAM, "Root node must be a program node!");
+		//
+		//llvm::Value* program = generateProgram(tokenBuffers, nodeBuffers, state, rootNodeID);
+		//
+		//std::error_code errorCode;
+		//llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
+		//state.Module->print(out, nullptr);
 
 		return true;
 	}
