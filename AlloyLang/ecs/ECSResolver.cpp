@@ -32,8 +32,8 @@ namespace AlloyCompiler
 			const IDENTIFIER& groupIdentifierNode = nodeBuffers.GetNode(groupIdentifierID).Identifier;
 			std::string_view groupName = tokenBuffers.GetValue(groupIdentifierNode.IdentifierTokenID).ToStringView();
 
-			auto groupIDIter = nodeBuffers.GetECSElements().GetGroupNodeIDs().find(groupName);
-			if (groupIDIter == nodeBuffers.GetECSElements().GetGroupNodeIDs().end())
+			auto groupIDIter = nodeBuffers.GetNamedNodes().GroupNodeIDs.find(groupName);
+			if (groupIDIter == nodeBuffers.GetNamedNodes().GroupNodeIDs.end())
 			{
 				ASSERT(false, "Group does not exist!"); // TODO: proper error handling
 			}
@@ -50,7 +50,7 @@ namespace AlloyCompiler
 					std::string_view systemName = tokenBuffers.GetValue(systemIdentifierNode.IdentifierTokenID).ToStringView();
 
 					// check that the system exists
-					if (!nodeBuffers.GetECSElements().GetSystemNodeIDs().contains(systemName))
+					if (!nodeBuffers.GetNamedNodes().SystemNodeIDs.contains(systemName))
 					{
 						ASSERT(false, "System does not exist!"); // TODO: proper error handling
 					}
@@ -70,7 +70,7 @@ namespace AlloyCompiler
 	{
 		SystemReadWritesMap systemReadWritesMap;
 
-		for (auto& [systemName, systemID] : nodeBuffers.GetECSElements().GetSystemNodeIDs())
+		for (auto& [systemName, systemID] : nodeBuffers.GetNamedNodes().SystemNodeIDs)
 		{
 			const SYSTEM_DEFINITION& systemDefinitionNode = nodeBuffers.GetNode(systemID).SystemDefinition;
 
@@ -82,8 +82,8 @@ namespace AlloyCompiler
 				const IDENTIFIER& queryIdentifierNode = nodeBuffers.GetNode(queryIdentifierID).Identifier;
 				std::string_view queryName = tokenBuffers.GetValue(queryIdentifierNode.IdentifierTokenID).ToStringView();
 
-				auto queryIDIter = nodeBuffers.GetECSElements().GetQueryNodeIDs().find(queryName);
-				if (queryIDIter == nodeBuffers.GetECSElements().GetQueryNodeIDs().end())
+				auto queryIDIter = nodeBuffers.GetNamedNodes().QueryNodeIDs.find(queryName);
+				if (queryIDIter == nodeBuffers.GetNamedNodes().QueryNodeIDs.end())
 				{
 					ASSERT(false, "Query does not exist!"); // TODO: proper error handling
 				}
@@ -100,8 +100,8 @@ namespace AlloyCompiler
 						const IDENTIFIER& structIdentifierNode = nodeBuffers.GetNode(structIdentifierID).Identifier;
 						std::string_view structName = tokenBuffers.GetValue(structIdentifierNode.IdentifierTokenID).ToStringView();
 
-						auto structIDIter = nodeBuffers.GetECSElements().GetStructNodeIDs().find(structName);
-						if (structIDIter == nodeBuffers.GetECSElements().GetStructNodeIDs().end())
+						auto structIDIter = nodeBuffers.GetNamedNodes().StructNodeIDs.find(structName);
+						if (structIDIter == nodeBuffers.GetNamedNodes().StructNodeIDs.end())
 						{
 							ASSERT(false, "Resource or component does not exist!"); // TODO: proper error handling
 						}
@@ -119,10 +119,15 @@ namespace AlloyCompiler
 						const IDENTIFIER& structIdentifierNode = nodeBuffers.GetNode(structIdentifierID).Identifier;
 						std::string_view structName = tokenBuffers.GetValue(structIdentifierNode.IdentifierTokenID).ToStringView();
 
-						auto structIDIter = nodeBuffers.GetECSElements().GetStructNodeIDs().find(structName);
-						if (structIDIter == nodeBuffers.GetECSElements().GetStructNodeIDs().end())
+						auto structIDIter = nodeBuffers.GetNamedNodes().StructNodeIDs.find(structName);
+						if (structIDIter == nodeBuffers.GetNamedNodes().StructNodeIDs.end())
 						{
 							ASSERT(false, "Resource or component does not exist!"); // TODO: proper error handling
+						}
+
+						else if (nodeBuffers.GetNode(structIDIter->second).StructDefinition.Kind == STRUCT_DEFINITION::Type::Struct)
+						{
+							ASSERT(false, "Query can only contain resources or components!"); // TODO: proper error handling
 						}
 
 						else
@@ -130,7 +135,6 @@ namespace AlloyCompiler
 							systemReadWritesMap[systemName].StructReads.insert(structName);
 						}
 					}
-
 				}
 			}
 		}

@@ -499,24 +499,14 @@ namespace AlloyCompiler
 		};
 	};
 
-	class ECSElements
+	struct NamedNodes
 	{
-	public:
-		bool AddSystemNodeID(const std::string_view& name, NodeID nodeID);
-		bool AddGroupNodeID(const std::string_view& name, NodeID nodeID);
-		bool AddQueryNodeID(const std::string_view& name, NodeID nodeID);
-		bool AddStructNodeID(const std::string_view& name, NodeID nodeID);
-
-		const std::unordered_map<std::string_view, NodeID>& GetSystemNodeIDs() const;
-		const std::unordered_map<std::string_view, NodeID>& GetGroupNodeIDs() const;
-		const std::unordered_map<std::string_view, NodeID>& GetQueryNodeIDs() const;
-		const std::unordered_map<std::string_view, NodeID>& GetStructNodeIDs() const;
-
-	private:
-		std::unordered_map<std::string_view, NodeID> m_GroupNodeIDs;
-		std::unordered_map<std::string_view, NodeID> m_SystemNodeIDs;
-		std::unordered_map<std::string_view, NodeID> m_QueryNodeIDs;
-		std::unordered_map<std::string_view, NodeID> m_StructNodeIDs;
+		std::unordered_map<std::string_view, NodeID> GroupNodeIDs;
+		std::unordered_map<std::string_view, NodeID> SystemNodeIDs;
+		std::unordered_map<std::string_view, NodeID> QueryNodeIDs;
+		std::unordered_map<std::string_view, NodeID> StructNodeIDs;
+		std::unordered_map<std::string_view, NodeID> FunctionDefinitionNodeIDs;
+		std::unordered_map<std::string_view, NodeID> ExternDefinitionNodeIDs;
 	};
 
 	class NodeBuffers
@@ -533,8 +523,8 @@ namespace AlloyCompiler
 		void AddApplicationNodeID(NodeID id);
 		const std::vector<NodeID>& GetApplicationNodeIDs() const;
 
-		ECSElements& GetECSElements();
-		const ECSElements& GetECSElements() const;
+		NamedNodes& GetNamedNodes();
+		const NamedNodes& GetNamedNodes() const;
 
 	private:
 		std::vector<Node> m_Nodes;
@@ -545,6 +535,6 @@ namespace AlloyCompiler
 
 		std::vector<NodeID> m_ApplicationNodeIDs;
 
-		ECSElements m_ECSElements;
+		NamedNodes m_NamedNodes;
 	};
 }

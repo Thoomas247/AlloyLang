@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 	//PrintTokens(tokenBuffers);
 
 	start = std::chrono::high_resolution_clock::now();
-	auto nodeBuffers = Parse(tokenBuffers);
+	NodeBuffers nodeBuffers = Parse(tokenBuffers);
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
@@ -75,20 +75,18 @@ int main(int argc, char* argv[])
 	const uint64_t resolutionTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
-	//LLVMCodeGenerator codegen(tokenBuffers, nodeBuffers);
-	//codegen.Process();	// TBD: implement error handling
 	LLVMState state(true);
 	Generate(tokenBuffers, nodeBuffers, state);
-
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	Log::Print("Tokenize: {0}ms", tokenizeTime);
 	Log::Print("Parse: {0}ms", parseTime);
+	Log::Print("Resolution: {0}ms", resolutionTime);
 	AlloyCompiler::Log::Print("Codegen: {0}ms", codegenTime);
 
-	AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime + codegenTime);
-	AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime + codegenTime) / numKilobytes);
+	AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime + resolutionTime + codegenTime);
+	AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime + resolutionTime + codegenTime) / numKilobytes);
 
 	Log::Print("");
 }

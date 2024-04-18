@@ -2,70 +2,6 @@
 
 namespace AlloyCompiler
 {
-	bool ECSElements::AddSystemNodeID(const std::string_view& name, NodeID nodeID)
-	{
-		if (m_SystemNodeIDs.contains(name))
-		{
-			return false;
-		}
-
-		m_SystemNodeIDs[name] = nodeID;
-		return true;
-	}
-
-	bool ECSElements::AddGroupNodeID(const std::string_view& name, NodeID nodeID)
-	{
-		if (m_GroupNodeIDs.contains(name))
-		{
-			return false;
-		}
-
-		m_GroupNodeIDs[name] = nodeID;
-		return true;
-	}
-
-	bool ECSElements::AddQueryNodeID(const std::string_view& name, NodeID nodeID)
-	{
-		if (m_QueryNodeIDs.contains(name))
-		{
-			return false;
-		}
-
-		m_QueryNodeIDs[name] = nodeID;
-		return true;
-	}
-
-	bool ECSElements::AddStructNodeID(const std::string_view& name, NodeID nodeID)
-	{
-		if (m_StructNodeIDs.contains(name))
-		{
-			return false;
-		}
-
-		m_StructNodeIDs[name] = nodeID;
-		return true;
-	}
-
-	const std::unordered_map<std::string_view, NodeID>& ECSElements::GetSystemNodeIDs() const
-	{
-		return m_SystemNodeIDs;
-	}
-
-	const std::unordered_map<std::string_view, NodeID>& ECSElements::GetGroupNodeIDs() const
-	{
-		return m_GroupNodeIDs;
-	}
-
-	const std::unordered_map<std::string_view, NodeID>& ECSElements::GetQueryNodeIDs() const
-	{
-		return m_QueryNodeIDs;
-	}
-
-	const std::unordered_map<std::string_view, NodeID>& ECSElements::GetStructNodeIDs() const
-	{
-		return m_StructNodeIDs;
-	}
-
 	NodeID NodeBuffers::CreateNode(const Node& node, TokenID errorInfo)
 	{
 		m_Nodes.push_back(node);
@@ -104,14 +40,13 @@ namespace AlloyCompiler
 		return m_ApplicationNodeIDs;
 	}
 
-	ECSElements& NodeBuffers::GetECSElements()
+	NamedNodes& NodeBuffers::GetNamedNodes()
 	{
-		return m_ECSElements;
+		return m_NamedNodes;
 	}
 
-	const ECSElements& NodeBuffers::GetECSElements() const
+	const NamedNodes& NodeBuffers::GetNamedNodes() const
 	{
-		return m_ECSElements;
+		return m_NamedNodes;
 	}
-
 }

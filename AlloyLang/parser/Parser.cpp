@@ -2147,6 +2147,8 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
+		NodeID identifierID = nodeBuffers.GetNode(functionDeclarationID).FunctionDeclaration.IdentifierID;
+
 		// check for semicolon
 		if (iter.GetKind() != TokenKind::semicolon)
 		{
@@ -2161,7 +2163,7 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
-		return nodeBuffers.CreateNode(
+		NodeID externDefinitionID = nodeBuffers.CreateNode(
 			Node
 			{
 				.Kind = NodeKind::EXTERN_DEFINITION,
@@ -2172,6 +2174,10 @@ namespace AlloyCompiler
 			},
 			errorInfo
 		);
+
+		nodeBuffers.GetNamedNodes().ExternDefinitionNodeIDs[getIdentifierNodeName(iter, nodeBuffers, identifierID)] = externDefinitionID;
+
+		return externDefinitionID;
 	}
 
 	template <>
@@ -2308,10 +2314,7 @@ namespace AlloyCompiler
 			errorInfo
 		);
 
-		if (type == STRUCT_DEFINITION::Type::Resource || type == STRUCT_DEFINITION::Type::Component)
-		{
-			nodeBuffers.GetECSElements().AddStructNodeID(getIdentifierNodeName(iter, nodeBuffers, identifierID), structNodeID);
-		}
+		nodeBuffers.GetNamedNodes().StructNodeIDs[getIdentifierNodeName(iter, nodeBuffers, identifierID)] = structNodeID;
 
 		return structNodeID;
 	}
@@ -2415,6 +2418,8 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
+		NodeID identifierID = nodeBuffers.GetNode(declarationID).FunctionDeclaration.IdentifierID;
+
 		// parse body
 		NodeID bodyID = parse<BLOCK_STATEMENT>(nodeBuffers, iter);
 
@@ -2423,7 +2428,7 @@ namespace AlloyCompiler
 			return ERROR_NODE_ID;
 		}
 
-		return nodeBuffers.CreateNode(
+		NodeID functionDefinitionID = nodeBuffers.CreateNode(
 			Node
 			{
 				.Kind = NodeKind::FUNCTION_DEFINITION,
@@ -2435,6 +2440,10 @@ namespace AlloyCompiler
 			},
 			errorInfo
 		);
+
+		nodeBuffers.GetNamedNodes().FunctionDefinitionNodeIDs[getIdentifierNodeName(iter, nodeBuffers, identifierID)] = functionDefinitionID;
+
+		return functionDefinitionID;
 	}
 
 	template <>
@@ -2553,7 +2562,7 @@ namespace AlloyCompiler
 			errorInfo
 		);
 
-		nodeBuffers.GetECSElements().AddQueryNodeID(getIdentifierNodeName(iter, nodeBuffers, identifierID), queryNodeID);
+		nodeBuffers.GetNamedNodes().QueryNodeIDs[getIdentifierNodeName(iter, nodeBuffers, identifierID)] = queryNodeID;
 
 		return queryNodeID;
 	}
@@ -2653,7 +2662,7 @@ namespace AlloyCompiler
 			errorInfo
 		);
 
-		nodeBuffers.GetECSElements().AddSystemNodeID(getIdentifierNodeName(iter, nodeBuffers, identifierID), systemNodeID);
+		nodeBuffers.GetNamedNodes().SystemNodeIDs[getIdentifierNodeName(iter, nodeBuffers, identifierID)] = systemNodeID;
 
 		return systemNodeID;
 	}
@@ -2740,7 +2749,7 @@ namespace AlloyCompiler
 			errorInfo
 		);
 
-		nodeBuffers.GetECSElements().AddGroupNodeID(getIdentifierNodeName(iter, nodeBuffers, identifierID), groupNodeID);
+		nodeBuffers.GetNamedNodes().GroupNodeIDs[getIdentifierNodeName(iter, nodeBuffers, identifierID)] = groupNodeID;
 
 		return groupNodeID;
 	}
