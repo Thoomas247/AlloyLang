@@ -1,10 +1,21 @@
 extern fn printf (const str : String, ...) -> i64;
 
+
+/* Math Utilities */
+
 struct Vector3
 {
 	var x : f64;
 	var y : f64;
 	var z : f64;
+}
+
+struct Quaternion
+{
+	var x : f64;
+	var y : f64;
+	var z : f64;
+	var w : f64;
 }
 
 fn Vector3_print(const v : &Vector3)
@@ -23,107 +34,240 @@ fn Vector3_translate(const point : Vector3, const vector : Vector3) -> Vector3
 	return result;
 }
 
-component C_A
-{
-}
 
-component C_B
-{
-}
+/* Rendering Utilities */
 
-component C_C
+fn draw_mesh(const vertices : *[Vector3], const num_vertices : u32, const indices : *[i32], const num_indices : u32, const color : Vector3)
 {
-}
-
-component C_D
-{
-}
-
-resource R_A
-{
-}
-
-resource R_B
-{
-}
-
-resource R_C
-{
-}
-
-resource R_D
-{
-}
-
-query Q_1
-{
-	var R_A;
-}
-
-query Q_2
-{
-	var R_B;
-}
-
-query Q_3
-{
-	var R_A;
-}
-
-query Q_4
-{
-	const R_A;
-}
-
-query Q_5
-{
-	const R_A;
-}
-
-system S_1 (Q_1)
-{
-}
-
-system S_2 (Q_2)
-{
-}
-
-system S_3 (Q_3)
-{
-}
-
-system S_4 (Q_4)
-{
-}
-
-system S_5 (Q_5)
-{
+	printf("Drawing mesh with %d vertices and %d indices and with color (%lf, %lf, %lf).\n", num_vertices, num_indices, color.x, color.y, color.z);
 }
 
 
-group G_1
+/* Scene Resources */
+
+resource RootEntity
 {
-	S_1, S_2
+	var id : i32;
 }
 
-group G_2
+resource CurrentScene
 {
-	S_3, S_4
+	var id : i32;
 }
 
-group G_3
+
+/* Transform Components */
+
+component LocalTransform
 {
-	S_5
+	var position : Vector3;
+	var rotation : Quaternion;
+	var scale : Vector3;
 }
+
+component WorldTransform
+{
+	var position : Vector3;
+	var rotation : Quaternion;
+	var scale : Vector3;
+}
+
+
+/* Hierarchical Components */
+
+component Parent
+{
+	var parent : i32;
+}
+
+component Child
+{
+	var first_child : i32;
+}
+
+component Sibling
+{
+	var next_sibling : i32;
+}
+
+
+/* Rendering Components */
+
+component Mesh
+{
+	var vertices : *[Vector3];
+	var indices : *[i32];
+}
+
+component Material
+{
+	var shader_index : i32;
+	var color : Vector3;
+}
+
+
+/* Physics Components */
+
+component RigidBody
+{
+	var mass : f64;
+	var velocity : Vector3;
+	var angular_velocity : Vector3;
+}
+
+component Collider
+{
+	var shape : i32;
+}
+
+
+/* AI Components */
+
+// simple flag components to mark entities as enemies or allies
+component EnemyAI
+{
+	require { WorldTransform }
+	exclude { AllyAI }
+}
+
+component AllyAI 
+{
+	exclude { EnemyAI }
+}
+
+
+/* Systems */
+
+query SceneQuery
+{
+	const CurrentScene;
+
+	var WorldTransform;
+}
+
+system load_scene(SceneQuery)
+{
+	printf("Loading scene.\n");
+}
+
+query TransformHierarchyQuery
+{
+	const RootEntity;
+
+	var WorldTransform;
+	const LocalTransform;
+	const Child;
+	const Sibling;
+}
+
+system calculate_world_transforms(TransformHierarchyQuery)
+{
+	printf("Calculating world transforms.\n");
+}
+
+
+query RenderQuery
+{
+	const WorldTransform;
+	const Mesh;
+	const Material;
+}
+
+system render(RenderQuery)
+{
+	printf("Rendering meshes.\n");
+}
+
+
+query PhysicsQuery
+{
+	const WorldTransform;
+	const RigidBody;
+	const Collider;
+}
+
+system update_physics(PhysicsQuery)
+{
+	printf("Updating physics.\n");
+}
+
+
+query EnemyAIQuery
+{
+	var WorldTransform;
+	const EnemyAI;
+}
+
+query AllyAIQuery
+{
+	var WorldTransform;
+	const AllyAI;
+}
+
+system update_enemy_AI(EnemyAIQuery)
+{
+	printf("Updating enemy AI.\n");
+}
+
+system update_ally_AI(AllyAIQuery)
+{
+	printf("Updating ally AI.\n");
+}
+
+system save()
+{
+	printf("Saving game.\n");
+}
+
+
+/* Groups */
+
+group PreStartGroup
+{
+	load_scene
+}
+
+group StartGroup
+{
+	calculate_world_transforms
+}
+
+group UpdateGroup
+{
+	update_physics,
+	update_enemy_AI,
+	update_ally_AI
+}
+
+group RenderGroup
+{
+	render
+}
+
+group EndGroup
+{
+	save
+}
+
+
+/* Application */
 
 application App
 {
 	start
 	{
-		G_1, G_2, G_3
+		PreStartGroup,
+		StartGroup
 	}
 
 	update
 	{
+		UpdateGroup,
+		RenderGroup
+	}
+
+	end
+	{
+		EndGroup
 	}
 }

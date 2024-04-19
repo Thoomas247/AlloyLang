@@ -23,6 +23,9 @@ Component:
 		var position : Vector3;
 		var rotation : Vector3;
 		var scale : Vector3;
+
+		require { /* list of components that this component relies on */  }
+		exclude { /* list of components that this component is incompatible with */ }
 	}
 
 Query:
