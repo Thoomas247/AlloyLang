@@ -74,6 +74,8 @@ int main(int argc, char* argv[])
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t resolutionTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
+	systemSchedulingInfo.Print();
+
 	start = std::chrono::high_resolution_clock::now();
 	LLVMState state(true);
 	Generate(tokenBuffers, nodeBuffers, state);

@@ -120,7 +120,7 @@ application App
 {
 	start
 	{
-		G_1
+		G_1, G_2, G_3
 	}
 
 	update

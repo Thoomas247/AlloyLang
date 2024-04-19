@@ -2536,12 +2536,12 @@ namespace AlloyCompiler
 
 			if (isWrite)
 			{
-				readIdentifierIDs.push_back(identifierID);
+				writeIdentifierIDs.push_back(identifierID);
 			}
 
 			else
 			{
-				writeIdentifierIDs.push_back(identifierID);
+				readIdentifierIDs.push_back(identifierID);
 			}
 		}
 

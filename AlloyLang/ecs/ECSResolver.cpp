@@ -226,7 +226,7 @@ namespace AlloyCompiler
 		// collect the reads and writes of each system
 		SystemReadWritesMap systemReadWritesMap = getSystemReadWrites(tokenBuffers, nodeBuffers);
 
-		// group systems such that they can be executed in parallel (ie no race conditions possible)
+		// group systems such that they can be executed in parallel
 		SystemSchedulingInfo systemSchedulingInfo;
 		systemSchedulingInfo.StartSystemGroups = createSystemGroups(systemReadWritesMap, startStageSystemNames);
 		systemSchedulingInfo.UpdateSystemGroups = createSystemGroups(systemReadWritesMap, updateStageSystemNames);
