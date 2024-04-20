@@ -608,6 +608,23 @@ namespace AlloyCompiler
 	}
 
 	template <>
+	json print<IDENTIFIER_LIST>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
+	{
+		const auto& identifierListNode = nodeBuffers.GetNode(nodeID).IdentifierList;
+
+		json j;
+		j["kind"] = "GROUP_LIST";
+
+		for (const auto& groupID : identifierListNode.IdentifierIDs)
+		{
+			j["identifiers"].push_back(print<IDENTIFIER>(tokenBuffers, nodeBuffers, groupID));
+		}
+
+		return j;
+	}
+
+
+	template <>
 	json print<EXTERN_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& externDefinitionNode = nodeBuffers.GetNode(nodeID).ExternDefinition;
@@ -737,22 +754,6 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	json print<GROUP_LIST>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
-	{
-		const auto& groupListNode = nodeBuffers.GetNode(nodeID).GroupList;
-
-		json j;
-		j["kind"] = "GROUP_LIST";
-
-		for (const auto& groupID : groupListNode.GroupIdentifierIDs)
-		{
-			j["groups"].push_back(print<IDENTIFIER>(tokenBuffers, nodeBuffers, groupID));
-		}
-
-		return j;
-	}
-
-	template <>
 	json print<APPLICATION_DEFINITION>(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID nodeID)
 	{
 		const auto& applicationDefinitionNode = nodeBuffers.GetNode(nodeID).ApplicationDefinition;
@@ -761,9 +762,9 @@ namespace AlloyCompiler
 		j["kind"] = "APPLICATION_DEFINITION";
 		j["name"] = print<IDENTIFIER>(tokenBuffers, nodeBuffers, applicationDefinitionNode.IdentifierID);
 
-		j["start_groups"] = print<GROUP_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.StartGroupListID);
-		j["update_groups"] = print<GROUP_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.UpdateGroupListID);
-		j["end_groups"] = print<GROUP_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.EndGroupListID);
+		j["start_groups"] = print<IDENTIFIER_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.StartGroupListID);
+		j["update_groups"] = print<IDENTIFIER_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.UpdateGroupListID);
+		j["end_groups"] = print<IDENTIFIER_LIST>(tokenBuffers, nodeBuffers, applicationDefinitionNode.EndGroupListID);
 
 		return j;
 	}

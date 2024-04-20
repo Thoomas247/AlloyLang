@@ -25,6 +25,9 @@ system_keyword:					'system' ;
 group_keyword:					'group' ;
 application_keyword:			'application' ;
 
+require_keyword:				'require' ;
+exclude_keyword:				'exclude' ;
+
 for_keyword:					'for' ;
 while_keyword:					'while' ;
 if_keyword:						'if' ;
@@ -119,9 +122,11 @@ RETURN_STATEMENT:				return_keyword [ EXPRESSION ] semicolon ;
 STATEMENT:						VALUE_DEFINITION_STATEMENT | FUNCTION_CALL_STATEMENT | ASSIGNMENT_STATEMENT | FOR_LOOP_STATEMENT | WHILE_LOOP_STATEMENT | IF_STATEMENT | BLOCK_STATEMENT | RETURN_STATEMENT ;
 
 
+IDENTIFIER_LIST:				open_brace [ IDENTIFIER { comma IDENTIFIER } ] close_brace ;
+
 EXTERN_DEFINITION:				extern_keyword FUNCTION_DECLARATION semicolon ;
 VALUE_DEFINITION:				VALUE_DEFINITION_EXPRESSION semicolon ;
-STRUCT_DEFINITION:				( struct_keyword | resource_keyword | component_keyword ) IDENTIFIER open_brace { VALUE_DECLARATION semicolon } close_brace ;
+STRUCT_DEFINITION:				( struct_keyword | resource_keyword | component_keyword ) IDENTIFIER open_brace { ( VALUE_DECLARATION semicolon ) | ( require_keyword | exclude_keyword ) IDENTIFIER_LIST } close_brace ;
 ENUM_DEFINITION:				enum_keyword IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
 FUNCTION_DEFINITION:			FUNCTION_DECLARATION BLOCK_STATEMENT ;
 
@@ -129,9 +134,7 @@ QUERY_DEFINITION:				query_keyword IDENTIFIER open_brace { ( var_keyword | const
 SYSTEM_DEFINITION:				system_keyword IDENTIFIER open_paren [ IDENTIFIER { comma IDENTIFIER } ] close_paren BLOCK_STATEMENT ;
 GROUP_DEFINITION:				group_keyword IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
 
-GROUP_LIST:						open_brace [ IDENTIFIER { comma IDENTIFIER } ] close_brace ;
-
-APPLICATION_DEFINITION:			application_keyword IDENTIFIER open_brace { ( 'start' | 'update' | 'end' ) GROUP_LIST } close_brace ;
+APPLICATION_DEFINITION:			application_keyword IDENTIFIER open_brace { ( 'start' | 'update' | 'end' ) IDENTIFIER_LIST } close_brace ;
 
 DEFINITION:						EXTERN_DEFINITION 
 								| VALUE_DEFINITION 

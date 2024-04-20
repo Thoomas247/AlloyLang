@@ -6,8 +6,10 @@ namespace AlloyCompiler
 {
 	struct SystemReadWrites
 	{
-		std::unordered_set<std::string_view> StructWrites;	// "struct" refers to resource or component
-		std::unordered_set<std::string_view> StructReads;	// "struct" refers to resource or component
+		// "struct" refers to resource or component
+		std::unordered_set<std::string_view> StructWrites;
+		std::unordered_set<std::string_view> StructReads;
+		std::unordered_set<std::string_view> StructExcludes;
 	};
 
 	using SystemReadWritesMap = std::unordered_map<std::string_view, SystemReadWrites>;
@@ -20,12 +22,12 @@ namespace AlloyCompiler
 			return {};
 		}
 
-		ASSERT(nodeBuffers.GetNode(groupListID).Kind == NodeKind::GROUP_LIST, "Invalid groupListID!");
+		ASSERT(nodeBuffers.GetNode(groupListID).Kind == NodeKind::IDENTIFIER_LIST, "Invalid groupListID!");
 
 		std::vector<std::string_view> systemNames;
 
 		// loop through every group in the group list (a list of groups is a stage in the application)
-		for (NodeID groupIdentifierID : nodeBuffers.GetNode(groupListID).GroupList.GroupIdentifierIDs)
+		for (NodeID groupIdentifierID : nodeBuffers.GetNode(groupListID).IdentifierList.IdentifierIDs)
 		{
 			ASSERT(nodeBuffers.GetNode(groupIdentifierID).Kind == NodeKind::IDENTIFIER, "Invalid groupIdentifierID!");
 
@@ -64,6 +66,34 @@ namespace AlloyCompiler
 		}
 
 		return systemNames;
+	}
+
+	void getComponentExcludes(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID structID, SystemReadWrites& systemReadWrites)
+	{
+		const STRUCT_DEFINITION& structNode = nodeBuffers.GetNode(structID).StructDefinition;
+
+		if (structNode.ExcludeIdentifierListID != ERROR_NODE_ID)
+		{
+			const IDENTIFIER_LIST& excludeIdentifierList = nodeBuffers.GetNode(structNode.ExcludeIdentifierListID).IdentifierList;
+
+			// collect excludes
+			for (NodeID excludeIdentifierID : excludeIdentifierList.IdentifierIDs)
+			{
+				const IDENTIFIER& excludeIdentifierNode = nodeBuffers.GetNode(excludeIdentifierID).Identifier;
+				std::string_view excludeName = tokenBuffers.GetValue(excludeIdentifierNode.IdentifierTokenID).ToStringView();
+
+				auto excludeIDIter = nodeBuffers.GetNamedNodes().StructNodeIDs.find(excludeName);
+				if (excludeIDIter == nodeBuffers.GetNamedNodes().StructNodeIDs.end())
+				{
+					ASSERT(false, "Resource or component does not exist!"); // TODO: proper error handling
+				}
+
+				else
+				{
+					systemReadWrites.StructExcludes.insert(excludeName);
+				}
+			}
+		}
 	}
 
 	SystemReadWritesMap getSystemReadWrites(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers)
@@ -110,6 +140,9 @@ namespace AlloyCompiler
 						{
 							systemReadWritesMap[systemName].StructWrites.insert(structName);
 						}
+
+						NodeID structID = structIDIter->second;
+						getComponentExcludes(tokenBuffers, nodeBuffers, structID, systemReadWritesMap[systemName]);
 					}
 
 					// collect reads
@@ -134,6 +167,9 @@ namespace AlloyCompiler
 						{
 							systemReadWritesMap[systemName].StructReads.insert(structName);
 						}
+
+						NodeID structID = structIDIter->second;
+						getComponentExcludes(tokenBuffers, nodeBuffers, structID, systemReadWritesMap[systemName]);
 					}
 				}
 			}

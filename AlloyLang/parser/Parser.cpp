@@ -2121,6 +2121,69 @@ namespace AlloyCompiler
 #pragma region Definitions
 
 	template <>
+	NodeID parse<IDENTIFIER_LIST>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
+	{
+		TokenID errorInfo = iter.GetCurrentID();
+
+		if (iter.GetKind() != TokenKind::open_brace)
+		{
+			unexpectedToken(iter, { "{" });
+			return ERROR_NODE_ID;
+		}
+
+		// consume opening brace
+		if (!iter.Next())
+		{
+			unexpectedEndOfFile(iter, { "identifier" });
+			return ERROR_NODE_ID;
+		}
+
+		VectorRef<NodeID> identifierIDs = nodeBuffers.CreateNodeIDVector();
+
+		while (iter.GetKind() != TokenKind::close_brace)
+		{
+			NodeID identifierID = parse<IDENTIFIER>(nodeBuffers, iter);
+
+			if (identifierID == ERROR_NODE_ID)
+			{
+				return ERROR_NODE_ID;
+			}
+
+			identifierIDs.push_back(identifierID);
+
+			if (iter.GetKind() == TokenKind::comma)
+			{
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "identifier" });
+					return ERROR_NODE_ID;
+				}
+			}
+			else if (iter.GetKind() != TokenKind::close_brace)
+			{
+				unexpectedToken(iter, { ",", "}" });
+				return ERROR_NODE_ID;
+			}
+		}
+
+		// consume closing brace
+		(void)iter.Next();
+
+		return nodeBuffers.CreateNode(
+			Node
+			{
+				.Kind = NodeKind::IDENTIFIER_LIST,
+				.IdentifierList = IDENTIFIER_LIST
+				{
+					.IdentifierIDs = identifierIDs
+				}
+			},
+			errorInfo
+		);
+	}
+
+
+	template <>
 	NodeID parse<EXTERN_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		// check for extern keyword
@@ -2271,30 +2334,89 @@ namespace AlloyCompiler
 		// parse members
 		VectorRef<NodeID> memberIDs = nodeBuffers.CreateNodeIDVector();
 
+		NodeID excludeListID = ERROR_NODE_ID;
+		NodeID requireListID = ERROR_NODE_ID;
+
 		while (iter.GetKind() != TokenKind::close_brace)
 		{
-			NodeID memberID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
-
-			if (memberID == ERROR_NODE_ID)
+			if (type == STRUCT_DEFINITION::Type::Component && iter.GetKind() == TokenKind::exclude_keyword)
 			{
-				return ERROR_NODE_ID;
+				if (excludeListID != ERROR_NODE_ID)
+				{
+					logErrorAtPosition(iter, "Only one exclude list is allowed per component!");
+					return ERROR_NODE_ID;
+				}
+
+				else
+				{
+					// consume exclude keyword
+					if (!iter.Next())
+					{
+						unexpectedEndOfFile(iter, { "identifier" });
+						return ERROR_NODE_ID;
+					}
+
+					excludeListID = parse<IDENTIFIER_LIST>(nodeBuffers, iter);
+
+					if (excludeListID == ERROR_NODE_ID)
+					{
+						return ERROR_NODE_ID;
+					}
+				}
 			}
 
-			// check for semicolon
-			if (iter.GetKind() != TokenKind::semicolon)
+			else if (type == STRUCT_DEFINITION::Type::Component && iter.GetKind() == TokenKind::require_keyword)
 			{
-				unexpectedToken(iter, { ";" });
-				return ERROR_NODE_ID;
+				if (requireListID != ERROR_NODE_ID)
+				{
+					logErrorAtPosition(iter, "Only one require list is allowed per component!");
+					return ERROR_NODE_ID;
+				}
+
+				else
+				{
+					// consume require keyword
+					if (!iter.Next())
+					{
+						unexpectedEndOfFile(iter, { "identifier" });
+						return ERROR_NODE_ID;
+					}
+
+					requireListID = parse<IDENTIFIER_LIST>(nodeBuffers, iter);
+
+					if (requireListID == ERROR_NODE_ID)
+					{
+						return ERROR_NODE_ID;
+					}
+				}
 			}
 
-			// consume semicolon
-			if (!iter.Next())
+			else
 			{
-				unexpectedEndOfFile(iter, { "struct member" });
-				return ERROR_NODE_ID;
-			}
 
-			memberIDs.push_back(memberID);
+				NodeID memberID = parse<VALUE_DECLARATION>(nodeBuffers, iter);
+
+				if (memberID == ERROR_NODE_ID)
+				{
+					return ERROR_NODE_ID;
+				}
+
+				// check for semicolon
+				if (iter.GetKind() != TokenKind::semicolon)
+				{
+					unexpectedToken(iter, { ";" });
+					return ERROR_NODE_ID;
+				}
+
+				// consume semicolon
+				if (!iter.Next())
+				{
+					unexpectedEndOfFile(iter, { "struct member" });
+					return ERROR_NODE_ID;
+				}
+
+				memberIDs.push_back(memberID);
+			}
 		}
 
 		// consume closing brace
@@ -2755,68 +2877,6 @@ namespace AlloyCompiler
 	}
 
 	template <>
-	NodeID parse<GROUP_LIST>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
-	{
-		TokenID errorInfo = iter.GetCurrentID();
-
-		if (iter.GetKind() != TokenKind::open_brace)
-		{
-			unexpectedToken(iter, { "{" });
-			return ERROR_NODE_ID;
-		}
-
-		// consume opening brace
-		if (!iter.Next())
-		{
-			unexpectedEndOfFile(iter, { "identifier" });
-			return ERROR_NODE_ID;
-		}
-
-		VectorRef<NodeID> groupIdentifierIDs = nodeBuffers.CreateNodeIDVector();
-
-		while (iter.GetKind() != TokenKind::close_brace)
-		{
-			NodeID groupID = parse<IDENTIFIER>(nodeBuffers, iter);
-
-			if (groupID == ERROR_NODE_ID)
-			{
-				return ERROR_NODE_ID;
-			}
-
-			groupIdentifierIDs.push_back(groupID);
-
-			if (iter.GetKind() == TokenKind::comma)
-			{
-				if (!iter.Next())
-				{
-					unexpectedEndOfFile(iter, { "identifier" });
-					return ERROR_NODE_ID;
-				}
-			}
-			else if (iter.GetKind() != TokenKind::close_brace)
-			{
-				unexpectedToken(iter, { ",", "}" });
-				return ERROR_NODE_ID;
-			}
-		}
-
-		// consume closing brace
-		(void)iter.Next();
-
-		return nodeBuffers.CreateNode(
-			Node
-			{
-				.Kind = NodeKind::GROUP_LIST,
-				.GroupList = GROUP_LIST
-				{
-					.GroupIdentifierIDs = groupIdentifierIDs
-				}
-			},
-			errorInfo
-		);
-	}
-
-	template <>
 	NodeID parse<APPLICATION_DEFINITION>(NodeBuffers& nodeBuffers, TokenBuffers::Iterator& iter)
 	{
 		TokenID errorInfo = iter.GetCurrentID();
@@ -2891,7 +2951,7 @@ namespace AlloyCompiler
 				return ERROR_NODE_ID;
 			}
 
-			NodeID groupListID = parse<GROUP_LIST>(nodeBuffers, iter);
+			NodeID groupListID = parse<IDENTIFIER_LIST>(nodeBuffers, iter);
 
 			if (groupListID == ERROR_NODE_ID)
 			{

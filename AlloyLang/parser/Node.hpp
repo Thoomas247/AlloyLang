@@ -262,6 +262,11 @@ namespace AlloyCompiler
 
 #pragma region Definitions
 
+	struct IDENTIFIER_LIST
+	{
+		VectorRef<NodeID> IdentifierIDs;
+	};
+
 	struct EXTERN_DEFINITION
 	{
 		NodeID FunctionDeclarationID;
@@ -284,6 +289,8 @@ namespace AlloyCompiler
 		Type Kind;
 		NodeID IdentifierID;
 		VectorRef<NodeID> MemberIDs;
+		NodeID ExcludeIdentifierListID;
+		NodeID RequireIdentifierListID;
 	};
 
 	struct ENUM_DEFINITION
@@ -316,11 +323,6 @@ namespace AlloyCompiler
 	{
 		NodeID IdentifierID;
 		VectorRef<NodeID> SystemIdentifierIDs;
-	};
-
-	struct GROUP_LIST
-	{
-		VectorRef<NodeID> GroupIdentifierIDs;
 	};
 
 	struct APPLICATION_DEFINITION
@@ -416,6 +418,8 @@ namespace AlloyCompiler
 
 		//STATEMENT,
 
+		IDENTIFIER_LIST,
+
 		EXTERN_DEFINITION,
 		VALUE_DEFINITION,
 		STRUCT_DEFINITION,
@@ -424,7 +428,6 @@ namespace AlloyCompiler
 		QUERY_DEFINITION,
 		SYSTEM_DEFINITION,
 		GROUP_DEFINITION,
-		GROUP_LIST,
 		APPLICATION_DEFINITION,
 
 		//DEFINITION,
@@ -480,6 +483,8 @@ namespace AlloyCompiler
 
 			//STATEMENT Statement;
 
+			IDENTIFIER_LIST IdentifierList;
+
 			EXTERN_DEFINITION ExternDefinition;
 			VALUE_DEFINITION ValueDefinition;
 			STRUCT_DEFINITION StructDefinition;
@@ -488,7 +493,6 @@ namespace AlloyCompiler
 			QUERY_DEFINITION QueryDefinition;
 			SYSTEM_DEFINITION SystemDefinition;
 			GROUP_DEFINITION GroupDefinition;
-			GROUP_LIST GroupList;
 			APPLICATION_DEFINITION ApplicationDefinition;
 
 			//DEFINITION Definition;

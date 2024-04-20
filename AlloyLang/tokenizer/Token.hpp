@@ -42,6 +42,9 @@ namespace AlloyCompiler
 		group_keyword,
 		application_keyword,
 
+		require_keyword,
+		exclude_keyword,
+
 		for_keyword,
 		while_keyword,
 		if_keyword,
@@ -111,6 +114,9 @@ namespace AlloyCompiler
 		{ TokenKind::group_keyword, "group_keyword" },
 		{ TokenKind::application_keyword, "application_keyword" },
 
+		{ TokenKind::require_keyword, "require_keyword" },
+		{ TokenKind::exclude_keyword, "exclude_keyword" },
+
 		{ TokenKind::for_keyword, "for_keyword" },
 		{ TokenKind::while_keyword, "while_keyword" },
 		{ TokenKind::if_keyword, "if_keyword" },
@@ -176,6 +182,9 @@ namespace AlloyCompiler
 		{ "system", TokenKind::system_keyword },
 		{ "group", TokenKind::group_keyword },
 		{ "application", TokenKind::application_keyword },
+
+		{ "require", TokenKind::require_keyword },
+		{ "exclude", TokenKind::exclude_keyword },
 
 		{ "for", TokenKind::for_keyword },
 		{ "while", TokenKind::while_keyword },

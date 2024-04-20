@@ -78,16 +78,22 @@ component WorldTransform
 component Parent
 {
 	var parent : i32;
+
+	require { Child, Sibling }
 }
 
 component Child
 {
 	var first_child : i32;
+
+	require { Parent, Sibling }
 }
 
 component Sibling
 {
 	var next_sibling : i32;
+
+	require { Parent, Child }
 }
 
 
