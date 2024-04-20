@@ -12,6 +12,16 @@ Resource:
 		var playerCount : u32;
 	}
 
+	Potential new syntax:
+
+		resource WorldSettings = struct
+		{
+			const gravity : f32;
+			var playerCount : u32;
+		};
+
+		resource Health = u32;
+
 Component:
 	Used to store data that is associated with an entity.
 	Can only contain non-reference types.
@@ -27,6 +37,17 @@ Component:
 		require { /* list of components that this component relies on */  }
 		exclude { /* list of components that this component is incompatible with */ }
 	}
+
+	Potential new syntax:
+
+		#[require(LocalTransform, OtherComponent)]
+		#[exclude(AnotherComponent)]
+		component WorldTransform = struct
+		{
+			var position : Vector3;
+			var rotation : Vector3;
+			var scale : Vector3;
+		};
 
 Query:
 	Used to specify which resources or components a system will access.
@@ -49,6 +70,7 @@ System:
 	Similar to functions, but can only access queried resources or components.
 	Systems can use multiple queries.
 
+	#[inline]	// example of an attribute, in this case inline tells us this function must run on its own, not in parallel
 	system UpdateTransforms(UpdateTransformsQuery)
 	{
 		for (var entity : Entity in UpdateTransformsQuery)
