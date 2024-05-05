@@ -172,6 +172,7 @@
     <ClInclude Include="node\Node.hpp" />
     <ClInclude Include="node\NodeAllocator.hpp" />
     <ClInclude Include="node\nodes\DeclarationNode.hpp" />
+    <ClInclude Include="node\nodes\ExpressionNode.hpp" />
     <ClInclude Include="node\nodes\IdentifierNode.hpp" />
     <ClInclude Include="node\nodes\LiteralNode.hpp" />
     <ClInclude Include="parser\Node.hpp" />

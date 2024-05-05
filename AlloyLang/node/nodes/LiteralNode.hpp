@@ -3,6 +3,10 @@
 
 namespace AlloyCompiler
 {
+
+	/// <summary>
+	/// LITERAL:	INTEGER_LITERAL | FLOAT_LITERAL | BOOLEAN_LITERAL | STRING_LITERAL | CHARACTER_LITERAL ;
+	/// </summary>
 	class LiteralNode : public Node
 	{
 	public:
@@ -10,6 +14,9 @@ namespace AlloyCompiler
 		~LiteralNode() override = 0;
 	};
 
+	/// <summary>
+	/// INTEGER_LITERAL:	integer_literal ;
+	/// </summary>
 	class IntegerLiteralNode : public LiteralNode
 	{
 	public:
@@ -43,6 +50,9 @@ namespace AlloyCompiler
 		};
 	};
 
+	/// <summary>
+	/// FLOAT_LITERAL:		float_literal;
+	/// </summary>
 	class FloatLiteralNode : public LiteralNode
 	{
 	public:
@@ -57,6 +67,9 @@ namespace AlloyCompiler
 		double Value;
 	};
 
+	/// <summary>
+	/// BOOLEAN_LITERAL:	boolean_literal ;
+	/// </summary>
 	class BooleanLiteralNode : public LiteralNode
 	{
 	public:
@@ -71,6 +84,9 @@ namespace AlloyCompiler
 		bool Value;
 	};
 
+	/// <summary>
+	/// STRING_LITERAL:		string_literal ;
+	/// </summary>
 	class StringLiteralNode : public LiteralNode
 	{
 	public:
@@ -85,6 +101,9 @@ namespace AlloyCompiler
 		std::string_view Value;
 	};
 
+	/// <summary>
+	/// CHARACTER_LITERAL:	character_literal ;
+	/// </summary>
 	class CharacterLiteralNode : public LiteralNode
 	{
 	public:

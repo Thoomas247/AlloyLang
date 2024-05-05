@@ -3,6 +3,9 @@
 
 namespace AlloyCompiler
 {
+	/// <summary>
+	/// IDENTIFIER_BASE:	IDENTIFIER | TYPE_IDENTIFIER ;
+	/// </summary>
 	class IdentifierBaseNode : public Node
 	{
 	public:
@@ -10,6 +13,9 @@ namespace AlloyCompiler
 		~IdentifierBaseNode() override = 0;
 	};
 
+	/// <summary>
+	/// IDENTIFER:	identifier ;
+	/// </summary>
 	class IdentifierNode : public IdentifierBaseNode
 	{
 	public:
@@ -24,6 +30,9 @@ namespace AlloyCompiler
 		std::string_view Identifier;
 	};
 
+	/// <summary>
+	/// TYPE_IDENTIFIER:	[ reference | pointer ] ( IDENTIFIER | ( open_bracket TYPE_IDENTIFIER [ semicolon integer_literal ] close_bracket ) ) ;
+	/// </summary>
 	class TypeIdentifierNode : public IdentifierBaseNode
 	{
 	public:
