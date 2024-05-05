@@ -96,6 +96,51 @@ namespace AlloyCompiler
 		}
 	}
 
+	const STRUCT_DEFINITION& getComponentByName(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, const std::string_view name)
+	{
+		auto it = nodeBuffers.GetNamedNodes().StructNodeIDs.find(name);
+		ASSERT(it != nodeBuffers.GetNamedNodes().StructNodeIDs.end(), "Component '{0}' does not exist!", name);
+
+		const NodeID componentID = it->second;
+
+		const Node& node = nodeBuffers.GetNode(componentID);
+		ASSERT(node.Kind == NodeKind::STRUCT_DEFINITION, "Expected a struct definition!");
+
+		return node.StructDefinition;
+	}
+
+	bool componentSetsAreMutuallyExclusive(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, 
+		const std::unordered_set<std::string_view> componentSetA, const std::unordered_set<std::string_view> componentSetB)
+	{
+		// check if sets have intersection
+		bool setsHaveIntersection = false;
+		for (auto& componentA : componentSetA)
+		{
+			if (componentSetB.contains(componentA))
+			{
+				setsHaveIntersection = true;
+				break;
+			}
+		}
+
+		// if sets have no intersection, they are mutually exclusive
+		if (!setsHaveIntersection)
+		{
+			return true;
+		}
+
+		// if sets do have an intersection, check if the intersection is empty by checking for excludes
+		for (auto& componentA : componentSetA)
+		{
+			auto it = nodeBuffers.GetNamedNodes().StructNodeIDs.find(componentA);
+			ASSERT(it != nodeBuffers.GetNamedNodes().StructNodeIDs.end(), "Component '{0}' does not exist!", componentA);
+
+
+		}
+	
+	}
+
+
 	SystemReadWritesMap getSystemReadWrites(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers)
 	{
 		SystemReadWritesMap systemReadWritesMap;

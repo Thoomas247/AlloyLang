@@ -95,6 +95,21 @@
     <ClInclude Include="ecs\ECSResolver.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="node\NodeAllocator.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\Node.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\nodes\LiteralNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\nodes\IdentifierNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\nodes\DeclarationNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.ecs" />
