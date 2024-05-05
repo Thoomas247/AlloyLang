@@ -101,16 +101,25 @@
     <ClInclude Include="node\Node.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="node\nodes\LiteralNode.hpp">
+    <ClInclude Include="node\nodes\TypeNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="node\nodes\IdentifierNode.hpp">
+    <ClInclude Include="node\nodes\VariableNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="node\nodes\DeclarationNode.hpp">
+    <ClInclude Include="node\nodes\FunctionNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="node\nodes\ExpressionNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\nodes\ECSNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\nodes\StatementNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\NodeEnums.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

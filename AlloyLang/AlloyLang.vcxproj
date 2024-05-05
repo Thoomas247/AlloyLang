@@ -171,10 +171,13 @@
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="node\Node.hpp" />
     <ClInclude Include="node\NodeAllocator.hpp" />
-    <ClInclude Include="node\nodes\DeclarationNode.hpp" />
+    <ClInclude Include="node\nodes\ECSNode.hpp" />
     <ClInclude Include="node\nodes\ExpressionNode.hpp" />
-    <ClInclude Include="node\nodes\IdentifierNode.hpp" />
-    <ClInclude Include="node\nodes\LiteralNode.hpp" />
+    <ClInclude Include="node\nodes\FunctionNode.hpp" />
+    <ClInclude Include="node\NodeEnums.hpp" />
+    <ClInclude Include="node\nodes\StatementNode.hpp" />
+    <ClInclude Include="node\nodes\TypeNode.hpp" />
+    <ClInclude Include="node\nodes\VariableNode.hpp" />
     <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
     <ClInclude Include="parser\TreePrinter.hpp" />

@@ -15,6 +15,8 @@ struct_keyword:					'struct' ;
 enum_keyword:					'enum' ;
 function_keyword:				'fn' ;
 
+type_keyword:					'type' ;
+
 variable_keyword:				'var' ;
 constant_keyword:				'const' ;
 
@@ -71,85 +73,126 @@ character_literal:				'\'' [ (* character regex *) ] '\'' ;
 
 (* -- AST NODE DEFINITIONS -- *)
 
-LITERAL:						integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
 
-IDENTIFIER:						identifier ;
-TYPE_IDENTIFIER:				[ reference | pointer ] ( IDENTIFIER | ( open_bracket TYPE_IDENTIFIER [ semicolon integer_literal ] close_bracket ) ) ;
+	(* - Types - *)
 
-TYPE_DECLARATION:				[ variable | constant ] TYPE_IDENTIFIER ;
-VALUE_DECLARATION:				( variable | constant ) IDENTIFIER colon TYPE_IDENTIFIER ;
-FUNCTION_DECLARATION:			function IDENTIFIER open_paren [ VALUE_DECLARATION { comma VALUE_DECLARATION } ] close_paren [ arrow TYPE_DECLARATION ] ;
+	TYPE:						[ reference | pointer ] ( NAMED_TYPE | STRUCT_TYPE | ARRAY_TYPE ) ;
 
-CONSTRUCTOR_EXPRESSION:			IDENTIFIER open_brace ( IDENTIFIER assignment_operator EXPRESSION ) { comma IDENTIFIER assignment_operator EXPRESSION } close_brace ;
-POINTER_INITIALIZER_EXPRESSION:	new_keyword ( EXPRESSION | ( open_bracket EXPRESSION semicolon EXPRESSION close_bracket ) ) ;
-POINTER_MOVE_EXPRESSION:		move_keyword IDENTIFIER ;
-INITIALIZER_LIST_EXPRESSION:	open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
-VALUE_DEFINITION_EXPRESSION:	VALUE_DECLARATION assignment_operator EXPRESSION ;
-ENCLOSED_EXPRESSION:			open_paren EXPRESSION close_paren ;
-FUNCTION_CALL_EXPRESSION:		IDENTIFIER open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ; (* TODO: make POSTFIX_EXPRESSION? *)
+		NAMED_TYPE:					identifier ;
+		STRUCT_TYPE:				struct_keyword open_brace [ STRUCT_MEMBER { comma STRUCT_MEMBER } ] close_brace ;
+			STRUCT_MEMBER:				identifier colon TYPE ;
+		ARRAY_TYPE:					open_bracket TYPE [ semicolon integer_literal ] close_bracket ;
 
-ARRAY_ACCESS_EXPRESSION:		PRIMARY_EXPRESSION open_bracket EXPRESSION close_bracket ;
-MEMBER_ACCESS_EXPRESSION:		PRIMARY_EXPRESSION dot IDENTIFIER ;
-
-BINARY_EXPRESSION:				EXPRESSION binary_operator EXPRESSION ;
-UNARY_EXPRESSION:				unary_operator POSTFIX_EXPRESSION ;
-POSTFIX_EXPRESSION:				ARRAY_ACCESS_EXPRESSION | MEMBER_ACCESS_EXPRESSION ;
-
-PRIMARY_EXPRESSION:				IDENTIFIER 
-								| LITERAL 
-								| CONSTRUCTOR_EXPRESSION
-								| POINTER_INITIALIZER_EXPRESSION
-								| POINTER_MOVE_EXPRESSION
-								| INITIALIZER_LIST_EXPRESSION 
-								| VALUE_DEFINITION_EXPRESSION 
-								| ENCLOSED_EXPRESSION 
-								| FUNCTION_CALL_EXPRESSION
-								;
-
-ASSIGNMENT_EXPRESSION:			( POSTFIX_EXPRESSION | IDENTIFIER ) assignment_operator EXPRESSION ;
-
-EXPRESSION:						BINARY_EXPRESSION | UNARY_EXPRESSION | PRIMARY_EXPRESSION | ASSIGNMENT_EXPRESSION ;
-
-VALUE_DEFINITION_STATEMENT:		VALUE_DEFINITION_EXPRESSION semicolon ;
-FUNCTION_CALL_STATEMENT:		FUNCTION_CALL_EXPRESSION semicolon ;
-ASSIGNMENT_STATEMENT:			ASSIGNMENT_EXPRESSION semicolon ;
-FOR_LOOP_STATEMENT:				for_keyword open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT ;
-WHILE_LOOP_STATEMENT:			while_keyword ENCLOSED_EXPRESSION STATEMENT ;
-IF_STATEMENT:					if_keyword ENCLOSED_EXPRESSION STATEMENT [ else_keyword STATEMENT ] ;
-BLOCK_STATEMENT:				open_brace { STATEMENT } close_brace ;
-RETURN_STATEMENT:				return_keyword [ EXPRESSION ] semicolon ;
-
-STATEMENT:						VALUE_DEFINITION_STATEMENT | FUNCTION_CALL_STATEMENT | ASSIGNMENT_STATEMENT | FOR_LOOP_STATEMENT | WHILE_LOOP_STATEMENT | IF_STATEMENT | BLOCK_STATEMENT | RETURN_STATEMENT ;
+	NAMED_TYPE_DEFINITION:		type_keyword identifier assignment_operator TYPE semicolon ;
 
 
-IDENTIFIER_LIST:				open_brace [ IDENTIFIER { comma IDENTIFIER } ] close_brace ;
+	(* - Variables - *)
 
-EXTERN_DEFINITION:				extern_keyword FUNCTION_DECLARATION semicolon ;
-VALUE_DEFINITION:				VALUE_DEFINITION_EXPRESSION semicolon ;
-STRUCT_DEFINITION:				( struct_keyword | resource_keyword | component_keyword ) IDENTIFIER open_brace { ( VALUE_DECLARATION semicolon ) | ( require_keyword | exclude_keyword ) IDENTIFIER_LIST } close_brace ;
-ENUM_DEFINITION:				enum_keyword IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
-FUNCTION_DEFINITION:			FUNCTION_DECLARATION BLOCK_STATEMENT ;
-
-QUERY_DEFINITION:				query_keyword IDENTIFIER open_brace { ( var_keyword | const_keyword ) IDENTIFIER semicolon } close_brace ;
-SYSTEM_DEFINITION:				system_keyword IDENTIFIER open_paren [ IDENTIFIER { comma IDENTIFIER } ] close_paren BLOCK_STATEMENT ;
-GROUP_DEFINITION:				group_keyword IDENTIFIER open_brace IDENTIFIER { comma IDENTIFIER } close_brace ;
-
-APPLICATION_DEFINITION:			application_keyword IDENTIFIER open_brace { ( 'start' | 'update' | 'end' ) IDENTIFIER_LIST } close_brace ;
-
-DEFINITION:						EXTERN_DEFINITION 
-								| VALUE_DEFINITION 
-								| STRUCT_DEFINITION 
-								| ENUM_DEFINITION 
-								| FUNCTION_DEFINITION 
-								| QUERY_DEFINITION
-								| SYSTEM_DEFINITION
-								| GROUP_DEFINITION
-								| APPLICATION_DEFINITION
-								;
-
-QUALIFIED_DEFINITION:			[ export | public ] DEFINITION ;
+	NAMED_VARIABLE:				identifier ;
+	NAMED_VARIABLE_DECLARATION	( variable | constant ) identifier colon TYPE ;
+	NAMED_VARIABLE_DEFINITION	NAMED_VARIABLE_DECLARATION assignment_operator EXPRESSION ;
 
 
-MODULE:							{ QUALIFIED_DEFINITION } ;
+	(* - Functions - *)
 
-PROGRAM:						{ MODULE } ;
+	NAMED_FUNCTION:				identifier ;
+	NAMED_FUNCTION_DEFINITION:	FUNCTION_SIGNATURE STATEMENT_BLOCK ;
+	EXTERN_FUNCTION_DEFINITION:	extern_keyword FUNCTION_SIGNATURE semicolon ;
+
+	FUNCTION_SIGNATURE:			function identifier open_paren [ NAMED_VARIABLE_DECLARATION { comma NAMED_VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
+		RETURN_TYPE:				[ variable | constant ] TYPE ;
+
+	FUNCTION_CALL:				NAMED_FUNCTION open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
+
+	(* - Expressions - *)
+
+	EXPRESSION:			PRIMARY 
+						| POSTFIX 
+						| UNARY 
+						| BINARY 
+						| ASSIGNMENT
+						;
+
+		PRIMARY:			LITERAL 
+							| NAMED_VARIABLE
+							| NAMED_VARIABLE_DEFINITION
+							| FUNCTION_CALL 
+							| CONSTRUCTOR
+							| POINTER_INIT
+							| POINTER_MOVE
+							| INITIALIZER_LIST
+							| ENCLOSED_EXPRESSION
+							; 
+			LITERAL:				integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
+			CONSTRUCTOR:			NAMED_TYPE open_brace [ identifier assignment_operator EXPRESSION { comma identifier assignment_operator EXPRESSION } ] close_brace ;
+			POINTER_INIT:			new_keyword ( EXPRESSION | ( open_bracket EXPRESSION semicolon EXPRESSION close_bracket ) ) ;
+			POINTER_MOVE:			move_keyword NAMED_VARIABLE ;
+			INITIALIZER_LIST:		open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
+			ENCLOSED_EXPRESSION:	open_paren EXPRESSION close_paren ;
+
+		POSTFIX:		ARRAY_ACCESS | MEMBER_ACCESS ;
+			ARRAY_ACCESS:			EXPRESSION open_bracket EXPRESSION close_bracket ;
+			MEMBER_ACCESS:			EXPRESSION dot identifier ;
+			
+
+		UNARY:			unary_operator EXPRESSION ;
+		BINARY:			EXPRESSION binary_operator EXPRESSION ;
+
+		ASSIGNMENT:		ASSIGNABLE assignment_operator EXPRESSION ;
+			ASSIGNABLE:				NAMED_VARIABLE | POSTFIX ;
+
+
+	(* - Statements - *)
+
+	STATEMENT:		( NAMED_VARIABLE_DEFINITION semicolon )
+					| ( FUNCTION_CALL semicolon )
+					| ( ASSIGNMENT semicolon )
+					| FOR_LOOP
+					| WHILE_LOOP
+					| IF_STATEMENT
+					| STATEMENT_BLOCK
+					| RETURN
+					;
+
+		FOR_LOOP:			for_keyword open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT ;
+		WHILE_LOOP:			while_keyword ENCLOSED_EXPRESSION STATEMENT ;
+		IF_STATEMENT:		if_keyword ENCLOSED_EXPRESSION STATEMENT [ else_keyword STATEMENT ] ;
+		STATEMENT_BLOCK:	open_brace { STATEMENT } close_brace ;
+		RETURN:				return_keyword [ EXPRESSION ] semicolon ;
+
+
+	(* - ECS Constructs - *)
+
+	NAMED_COMPONENT:			identifier ;
+	NAMED_COMPONENT_DEFINITION:	component_keyword identifier assignment_operator TYPE semicolon ;
+
+	NAMED_RESOURCE:				identifier ;
+	NAMED_RESOURCE_DEFINITION:	resource_keyword identifier assignment_operator TYPE semicolon ;
+
+	NAMED_QUERY:				identifier ;
+	NAMED_QUERY_DEFINITION:		query_keyword identifier open_brace { ( var_keyword | const_keyword ) QUERYABLE semicolon } close_brace ;
+		QUERYABLE:					NAMED_COMPONENT | NAMED_RESOURCE ;
+
+	NAMED_SYSTEM:				identifier ;
+	NAMED_SYSTEM_DEFINITION:	system_keyword identifier open_paren [ NAMED_QUERY { comma NAMED_QUERY } ] close_paren STATEMENT_BLOCK ;
+
+	NAMED_GROUP:				identifier ;
+	NAMED_GROUP_DEFINITION:		group_keyword identifier open_brace NAMED_SYSTEM { comma NAMED_SYSTEM } close_brace ;
+
+	APPLICATION_DEFINITION:		application_keyword identifier open_brace { ( 'start' | 'update' | 'end' ) NAMED_GROUP_LIST } close_brace ;
+		NAMED_GROUP_LIST:			open_brace [ NAMED_GROUP { comma NAMED_GROUP } ] close_brace ;
+
+
+	(* - Definitions - *)
+
+	DEFINITION:		NAMED_TYPE_DEFINITION
+					| NAMED_VARIABLE_DEFINITION
+					| NAMED_FUNCTION_DEFINITION
+					| EXTERN_FUNCTION_DEFINITION
+					| NAMED_COMPONENT_DEFINITION
+					| NAMED_RESOURCE_DEFINITION
+					| NAMED_QUERY_DEFINITION
+					| NAMED_SYSTEM_DEFINITION
+					| NAMED_GROUP_DEFINITION
+					| APPLICATION_DEFINITION
+					;
