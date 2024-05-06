@@ -2,12 +2,8 @@
 #include "../log/Log.hpp"
 #include "Node.hpp"
 
-
 namespace AlloyCompiler
 {
-	template <typename T>
-	concept NodeType = std::is_base_of_v<Node, T>;
-
 	class NodeAllocator
 	{
 	public:
@@ -27,7 +23,7 @@ namespace AlloyCompiler
 			m_pMemBlock = nullptr;
 		}
 
-		template<NodeType N, typename... Args>
+		template<typename N, typename... Args>
 		N* Allocate(Args&&... args)
 		{
 			ASSERT((m_pCurrentIndex + sizeof(N)) < m_pEnd, "Allocator is full!");

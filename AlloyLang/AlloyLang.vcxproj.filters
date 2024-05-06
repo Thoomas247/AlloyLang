@@ -54,6 +54,9 @@
     <ClCompile Include="ecs\ECSResolver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="node\Parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tokenizer\Tokenizer.hpp">
@@ -119,7 +122,13 @@
     <ClInclude Include="node\nodes\StatementNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="node\NodeEnums.hpp">
+    <ClInclude Include="node\Parser.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\nodes\VariantNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="node\Nodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

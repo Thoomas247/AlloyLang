@@ -5,20 +5,21 @@
 namespace AlloyCompiler
 {
 	struct TYPE;
+	struct EXPRESSION;
 
-	struct NAMED_VARIABLE : DEFINITION, ASSIGNABLE, PRIMARY
+	struct NAMED_VARIABLE
 	{
 		const std::string_view Name;
 	};
 
-	struct NAMED_VARIABLE_DECLARATION : NODE
+	struct NAMED_VARIABLE_DECLARATION
 	{
 		const VariableType VarType;
 		const std::string_view Name;
 		const TYPE* pType;
 	};
 
-	struct NAMED_VARIABLE_DEFINITION : STATEMENT, PRIMARY
+	struct NAMED_VARIABLE_DEFINITION
 	{
 		const NAMED_VARIABLE_DECLARATION* pDeclaration;
 		const EXPRESSION* pValue;

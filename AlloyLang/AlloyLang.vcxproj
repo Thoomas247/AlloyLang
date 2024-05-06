@@ -156,6 +156,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="ecs\ECSResolver.cpp" />
+    <ClCompile Include="node\Parser.cpp" />
     <ClCompile Include="parser\Node.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="parser\TreePrinter.cpp" />
@@ -171,13 +172,15 @@
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="node\Node.hpp" />
     <ClInclude Include="node\NodeAllocator.hpp" />
+    <ClInclude Include="node\Nodes.hpp" />
     <ClInclude Include="node\nodes\ECSNode.hpp" />
     <ClInclude Include="node\nodes\ExpressionNode.hpp" />
     <ClInclude Include="node\nodes\FunctionNode.hpp" />
-    <ClInclude Include="node\NodeEnums.hpp" />
     <ClInclude Include="node\nodes\StatementNode.hpp" />
     <ClInclude Include="node\nodes\TypeNode.hpp" />
     <ClInclude Include="node\nodes\VariableNode.hpp" />
+    <ClInclude Include="node\nodes\VariantNode.hpp" />
+    <ClInclude Include="node\Parser.hpp" />
     <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
     <ClInclude Include="parser\TreePrinter.hpp" />
