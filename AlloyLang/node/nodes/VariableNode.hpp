@@ -7,11 +7,6 @@ namespace AlloyCompiler
 	struct TYPE;
 	struct EXPRESSION;
 
-	struct NAMED_VARIABLE
-	{
-		const std::string_view Name;
-	};
-
 	struct NAMED_VARIABLE_DECLARATION
 	{
 		const VariableType VarType;

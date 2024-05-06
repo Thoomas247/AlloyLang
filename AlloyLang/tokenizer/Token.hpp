@@ -32,6 +32,8 @@ namespace AlloyCompiler
 		enum_keyword,
 		function_keyword,
 
+		type_keyword,
+
 		variable_keyword,
 		constant_keyword,
 
@@ -104,6 +106,8 @@ namespace AlloyCompiler
 		{ TokenKind::enum_keyword, "enum_keyword" },
 		{ TokenKind::function_keyword, "function_keyword" },
 
+		{ TokenKind::type_keyword, "type_keyword" },
+
 		{ TokenKind::variable_keyword, "variable_keyword" },
 		{ TokenKind::constant_keyword, "constant_keyword" },
 
@@ -172,6 +176,8 @@ namespace AlloyCompiler
 		{ "struct", TokenKind::struct_keyword },
 		{ "enum", TokenKind::enum_keyword },
 		{ "fn", TokenKind::function_keyword },
+
+		{ "type", TokenKind::type_keyword },
 
 		{ "var", TokenKind::variable_keyword },
 		{ "const", TokenKind::constant_keyword },
@@ -298,7 +304,7 @@ namespace AlloyCompiler
 			/// <summary>
 			/// Returns the string value of the current token.
 			/// </summary>
-			const SmallStringView& GetValue() const;
+			const std::string_view& GetValue() const;
 
 			/// <summary>
 			/// Returns the location in the file of the current token.
@@ -328,7 +334,7 @@ namespace AlloyCompiler
 		/// <summary>
 		/// Creates a new token and returns its ID.
 		/// </summary>
-		TokenID AddToken(TokenKind kind, const SmallStringView& value, const Location& location);
+		TokenID AddToken(TokenKind kind, const std::string_view& value, const Location& location);
 
 		/// <summary>
 		/// Returns the ID of the last token added.
@@ -343,7 +349,7 @@ namespace AlloyCompiler
 		/// <summary>
 		/// Returns the string value of the token with the given ID.
 		/// </summary>
-		const SmallStringView& GetValue(TokenID id) const;
+		const std::string_view& GetValue(TokenID id) const;
 
 		/// <summary>
 		/// Returns the location in the file of the token with the given ID.
@@ -359,7 +365,7 @@ namespace AlloyCompiler
 		const Source& m_Source;
 
 		std::vector<TokenKind> m_Kinds;
-		std::vector<SmallStringView> m_Values;
+		std::vector<std::string_view> m_Values;
 		std::vector<Location> m_Locations;
 	};
 }

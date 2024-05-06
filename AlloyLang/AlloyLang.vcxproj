@@ -188,7 +188,6 @@
     <ClInclude Include="tokenizer\Source.hpp" />
     <ClInclude Include="tokenizer\Token.hpp" />
     <ClInclude Include="tokenizer\Tokenizer.hpp" />
-    <ClInclude Include="util\SmallStringView.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.ecs" />

@@ -71,9 +71,6 @@
     <ClInclude Include="TestString.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="util\SmallStringView.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="tokenizer\Source.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

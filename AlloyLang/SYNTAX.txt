@@ -85,7 +85,6 @@
 
 	(* - Variables - *)
 
-	NAMED_VARIABLE:				identifier ;
 	NAMED_VARIABLE_DECLARATION	( variable | constant ) identifier colon TYPE ;
 	NAMED_VARIABLE_DEFINITION	NAMED_VARIABLE_DECLARATION assignment_operator EXPRESSION ;
 
@@ -111,7 +110,7 @@
 						;
 
 		PRIMARY:			LITERAL 
-							| NAMED_VARIABLE
+							| identifier
 							| NAMED_VARIABLE_DEFINITION
 							| FUNCTION_CALL 
 							| CONSTRUCTOR
@@ -123,7 +122,7 @@
 			LITERAL:				integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
 			CONSTRUCTOR:			NAMED_TYPE open_brace [ identifier assignment_operator EXPRESSION { comma identifier assignment_operator EXPRESSION } ] close_brace ;
 			POINTER_INIT:			new_keyword ( EXPRESSION | ( open_bracket EXPRESSION semicolon EXPRESSION close_bracket ) ) ;
-			POINTER_MOVE:			move_keyword NAMED_VARIABLE ;
+			POINTER_MOVE:			move_keyword identifier ;
 			INITIALIZER_LIST:		open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
 			ENCLOSED_EXPRESSION:	open_paren EXPRESSION close_paren ;
 
@@ -136,7 +135,7 @@
 		BINARY:			EXPRESSION binary_operator EXPRESSION ;
 
 		ASSIGNMENT:		ASSIGNABLE assignment_operator EXPRESSION ;
-			ASSIGNABLE:				NAMED_VARIABLE | POSTFIX ;
+			ASSIGNABLE:				identifier | POSTFIX ;
 
 
 	(* - Statements - *)
@@ -160,24 +159,13 @@
 
 	(* - ECS Constructs - *)
 
-	NAMED_COMPONENT:			identifier ;
 	NAMED_COMPONENT_DEFINITION:	component_keyword identifier assignment_operator TYPE semicolon ;
-
-	NAMED_RESOURCE:				identifier ;
 	NAMED_RESOURCE_DEFINITION:	resource_keyword identifier assignment_operator TYPE semicolon ;
+	NAMED_QUERY_DEFINITION:		query_keyword identifier open_brace { ( var_keyword | const_keyword ) identifier semicolon } close_brace ;
+	NAMED_SYSTEM_DEFINITION:	system_keyword identifier open_paren [ identifier { comma identifier } ] close_paren STATEMENT_BLOCK ;
+	NAMED_GROUP_DEFINITION:		group_keyword identifier open_brace identifier { comma identifier } close_brace ;
 
-	NAMED_QUERY:				identifier ;
-	NAMED_QUERY_DEFINITION:		query_keyword identifier open_brace { ( var_keyword | const_keyword ) QUERYABLE semicolon } close_brace ;
-		QUERYABLE:					NAMED_COMPONENT | NAMED_RESOURCE ;
-
-	NAMED_SYSTEM:				identifier ;
-	NAMED_SYSTEM_DEFINITION:	system_keyword identifier open_paren [ NAMED_QUERY { comma NAMED_QUERY } ] close_paren STATEMENT_BLOCK ;
-
-	NAMED_GROUP:				identifier ;
-	NAMED_GROUP_DEFINITION:		group_keyword identifier open_brace NAMED_SYSTEM { comma NAMED_SYSTEM } close_brace ;
-
-	APPLICATION_DEFINITION:		application_keyword identifier open_brace { ( 'start' | 'update' | 'end' ) NAMED_GROUP_LIST } close_brace ;
-		NAMED_GROUP_LIST:			open_brace [ NAMED_GROUP { comma NAMED_GROUP } ] close_brace ;
+	APPLICATION_DEFINITION:		application_keyword identifier open_brace { ( 'start' | 'update' | 'end' ) open_brace [ identifier { comma identifier } ] close_brace } close_brace ;
 
 
 	(* - Definitions - *)

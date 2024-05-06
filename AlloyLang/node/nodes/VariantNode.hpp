@@ -40,55 +40,33 @@ namespace AlloyCompiler
 	};
 
 	/// <summary>
-	/// Type-safe alternative to unions to store nodes.
-	/// Checks that the type being accessed is the type stored in the union.
+	/// Type-safe pointer to a node of any type.
 	/// </summary>
-	template <typename... Ts>
 	struct VariantNode
 	{
 	public:
-		VariantNode()
-			: m_CurrentKind(NodeKind::None), m_Data({})
+		template <typename T>
+		VariantNode(T* pNode)
+			: m_CurrentKind(NodeInfo::Kind<T>()), m_pNode(pNode)
 		{
-
 		}
 
 		template <typename T>
-		VariantNode(T&& value)
-			: m_CurrentKind(NodeKind::None), m_Data({})
+		T* Get() const
 		{
-			Set<T>(value);
+			ASSERT(m_Kind == NodeInfo::Kind<T>(), "Variant holds a different type to the given type!");
+
+			return (T*)m_pNode;
 		}
 
 		template <typename T>
-		void Set(T&& value)
+		bool Is() const
 		{
-			ASSERT((std::is_same_v<T, Ts> || ...), "This variant cannot hold the given type!");
-
-			getDataAs<T>() = value;
-			m_CurrentKind = NodeInfo::Kind<T>();
-		}
-
-		template <typename T>
-		T& Get()
-		{
-			ASSERT(m_CurrentKind == NodeInfo::Kind<T>(), "Variant holds a different type to the given type!");
-
-			return getDataAs<T>();
+			return m_Kind == NodeInfo::Kind<T>();
 		}
 
 	private:
-		template <typename T>
-		T& getDataAs()
-		{
-			return static_cast<T>(m_Data);
-		}
-
-	private:
-		static constexpr size_t MAX_SIZE = std::max({ sizeof(Ts)... });
-
-	private:
-		NodeKind m_CurrentKind;	// the current kind of the variant node
-		char m_Data[MAX_SIZE];	// to match the size of our largest type
+		NodeKind m_Kind;	// the kind of the variant node
+		void* m_pNode;		// points to the variant node
 	};
 }

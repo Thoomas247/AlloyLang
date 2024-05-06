@@ -46,7 +46,7 @@ namespace AlloyCompiler
 		return m_TokenBuffers.GetKind(m_CurrentID);
 	}
 
-	const SmallStringView& TokenBuffers::Iterator::GetValue() const
+	const std::string_view& TokenBuffers::Iterator::GetValue() const
 	{
 		return m_TokenBuffers.GetValue(m_CurrentID);
 	}
@@ -76,7 +76,7 @@ namespace AlloyCompiler
 	{
 	}
 
-	TokenID TokenBuffers::AddToken(TokenKind kind, const SmallStringView& value, const Location& location)
+	TokenID TokenBuffers::AddToken(TokenKind kind, const std::string_view& value, const Location& location)
 	{
 		m_Kinds.push_back(kind);
 		m_Values.push_back(value);
@@ -95,7 +95,7 @@ namespace AlloyCompiler
 		return m_Kinds[(size_t)id];
 	}
 
-	const SmallStringView& TokenBuffers::GetValue(TokenID id) const
+	const std::string_view& TokenBuffers::GetValue(TokenID id) const
 	{
 		ASSERT((size_t)id < m_Values.size(), "Invalid ID!")
 

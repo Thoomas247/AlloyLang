@@ -7,6 +7,8 @@ namespace AlloyCompiler
 {
 	struct NamedNodes
 	{
+		std::unordered_map<std::string_view, APPLICATION_DEFINITION*> ApplicationDefinitions;
+
 		std::unordered_map<std::string_view, NAMED_GROUP_DEFINITION*> GroupDefinitions;
 		std::unordered_map<std::string_view, NAMED_SYSTEM_DEFINITION*> SystemDefinitions;
 		std::unordered_map<std::string_view, NAMED_QUERY_DEFINITION*> QueryDefinitions;

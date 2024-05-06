@@ -11,37 +11,37 @@ namespace AlloyCompiler
 
 	struct NAMED_FUNCTION
 	{
-		const std::string_view Name;
+		std::string_view Name;
 	};
 
 	struct FUNCTION_SIGNATURE 
 	{
-		const std::string_view Name;
-		const std::vector<NAMED_VARIABLE_DECLARATION*> Parameters;
-		const RETURN_TYPE* pReturnType;	// optional
+		std::string_view Name;
+		std::vector<NAMED_VARIABLE_DECLARATION*> Parameters;
+		RETURN_TYPE* pReturnType;	// optional
 	};
 
 	struct NAMED_FUNCTION_DEFINITION 
 	{
-		const FUNCTION_SIGNATURE* pSignature;
-		const STATEMENT_BLOCK* pBlock;
+		FUNCTION_SIGNATURE* pSignature;
+		STATEMENT_BLOCK* pBody;
 	};
 
 	struct EXTERN_FUNCTION_DEFINITION
 	{
-		const FUNCTION_SIGNATURE* pSignature;
+		FUNCTION_SIGNATURE* pSignature;
 	};
 
 	struct RETURN_TYPE
 	{
-		const VariableType VarType;
-		const TYPE* pType;
+		VariableType VarType;
+		TYPE* pType;
 	};
 
 	struct FUNCTION_CALL
 	{
-		const NAMED_FUNCTION* pFunction;
-		const std::vector<EXPRESSION*> Arguments;
+		NAMED_FUNCTION* pFunction;
+		std::vector<EXPRESSION*> Arguments;
 	};
 
 }

@@ -23,8 +23,8 @@ namespace AlloyCompiler
 			m_pMemBlock = nullptr;
 		}
 
-		template<typename N, typename... Args>
-		N* Allocate(Args&&... args)
+		template<typename N>
+		N* Create(const N& value)
 		{
 			ASSERT((m_pCurrentIndex + sizeof(N)) < m_pEnd, "Allocator is full!");
 
@@ -34,8 +34,8 @@ namespace AlloyCompiler
 			// set the location for the next node
 			m_pCurrentIndex += sizeof(N);
 
-			// create the node in-place
-			*pNode = N(args);
+			// copy the value into the node
+			*pNode = value;
 
 			return pNode;
 		}
