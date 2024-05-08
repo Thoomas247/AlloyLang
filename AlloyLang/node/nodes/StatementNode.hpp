@@ -4,9 +4,6 @@
 
 namespace AlloyCompiler
 {
-	struct EXPRESSION;
-	struct STATEMENT;
-
 	struct FOR_LOOP
 	{
 		EXPRESSION* pInitialization;
@@ -17,7 +14,7 @@ namespace AlloyCompiler
 
 	struct WHILE_LOOP
 	{
-		ENCLOSED_EXPRESSION* pCondition;
+		EXPRESSION* pCondition;
 		STATEMENT* pStatement;
 	};
 

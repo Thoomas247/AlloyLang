@@ -46,6 +46,16 @@ namespace AlloyCompiler
 		return m_TokenBuffers.GetKind(m_CurrentTokenID);
 	}
 
+	TokenKind Parser::peek() const
+	{
+		if (isEOF())
+		{
+			return TokenKind::end_of_file;
+		}
+
+		return m_TokenBuffers.GetKind(m_CurrentTokenID + 1);
+	}
+
 	std::string_view Parser::value() const
 	{
 		return m_TokenBuffers.GetValue(m_CurrentTokenID);
@@ -63,24 +73,110 @@ namespace AlloyCompiler
 		return SUCCESS;
 	}
 
-	Parser::Result Parser::expect(TokenKind tokenKind, std::string_view* pValueStringView)
+#pragma endregion
+
+#pragma region Statements
+
+	template<>
+	STATEMENT* Parser::parse();
+
+	template<>
+	FOR_LOOP* Parser::parse()
 	{
-		if (m_TokenBuffers.GetKind(m_CurrentTokenID) != tokenKind)
+		if (expect<TokenKind::for_keyword>() != SUCCESS)
 		{
-			logErrorAtPosition("Expected token of kind {0}.", TOKEN_KIND_NAMES.at(tokenKind));
-			return UNEXPECTED_TOKEN;
+			return nullptr;
 		}
 
-		if (pValueStringView != nullptr)
+		if (expect<TokenKind::open_paren>() != SUCCESS)
 		{
-			*pValueStringView = m_TokenBuffers.GetValue(m_CurrentTokenID);
+			return nullptr;
 		}
 
-		++m_CurrentTokenID;
-		return SUCCESS;
+		EXPRESSION* pInitialization = parse<EXPRESSION>();
+
+		if (pInitialization == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expect<TokenKind::semicolon>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pCondition = parse<EXPRESSION>();
+
+		if (pCondition == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expect<TokenKind::semicolon>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pIncrement = parse<EXPRESSION>();
+
+		if (pIncrement == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expect<TokenKind::close_paren>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		STATEMENT* pBody = parse<STATEMENT>();
+
+		if (pBody == nullptr)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			FOR_LOOP
+			{
+				.pInitialization = pInitialization,
+				.pCondition = pCondition,
+				.pIncrement = pIncrement,
+				.pBody = pBody
+			}
+		);
 	}
 
-#pragma endregion
+	template<>
+	WHILE_LOOP* Parser::parse()
+	{
+		if (expect<TokenKind::while_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		ENCLOSED_EXPRESSION* pCondition = parse<ENCLOSED_EXPRESSION>();
+
+		if (pCondition == nullptr)
+		{
+			return nullptr;
+		}
+
+		STATEMENT* pStatement = parse<STATEMENT>();
+
+		if (pStatement == nullptr)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			WHILE_LOOP
+			{
+				.pCondition = pCondition->pExpression,
+				.pStatement = pStatement,
+			}
+		);
+	}
 
 	template<>
 	IF_STATEMENT* Parser::parse()
@@ -195,6 +291,133 @@ namespace AlloyCompiler
 			}
 		);
 	}
+
+	template<>
+	STATEMENT* Parser::parse()
+	{
+		switch (kind())
+		{
+		case TokenKind::variable_keyword:
+		case TokenKind::constant_keyword:
+		{
+			NAMED_VARIABLE_DEFINITION* pVariableDefinition = parse<NAMED_VARIABLE_DEFINITION>();
+			if (pVariableDefinition == nullptr)
+			{
+				return nullptr;
+			}
+
+			if (expect<TokenKind::semicolon>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			return createNode(STATEMENT(pVariableDefinition));
+		}
+
+		case TokenKind::identifier:
+		{
+			STATEMENT* pStatement = nullptr;
+
+			// handle function call
+			if (peek() == TokenKind::open_paren)
+			{
+				FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>();
+				if (pFunctionCall == nullptr)
+				{
+					return nullptr;
+				}
+
+				pStatement = createNode(STATEMENT(pFunctionCall));
+			}
+			// handle assignment
+			else
+			{
+				ASSIGNMENT* pAssignment = parse<ASSIGNMENT>();
+				if (pAssignment == nullptr)
+				{
+					return nullptr;
+				}
+
+				pStatement = createNode(STATEMENT(pAssignment));
+			}
+
+			if (expect<TokenKind::semicolon>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			return pStatement;
+		}
+
+		case TokenKind::for_keyword:
+		{
+			FOR_LOOP* pForLoop = parse<FOR_LOOP>();
+			if (pForLoop == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(STATEMENT(pForLoop));
+		}
+
+		case TokenKind::while_keyword:
+		{
+			WHILE_LOOP* pWhileLoop = parse<WHILE_LOOP>();
+			if (pWhileLoop == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(STATEMENT(pWhileLoop));
+		}
+
+		case TokenKind::if_keyword:
+		{
+			IF_STATEMENT* pIfStatement = parse<IF_STATEMENT>();
+			if (pIfStatement == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(STATEMENT(pIfStatement));
+		}
+
+		case TokenKind::open_brace:
+		{
+			STATEMENT_BLOCK* pStatementBlock = parse<STATEMENT_BLOCK>();
+			if (pStatementBlock == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(STATEMENT(pStatementBlock));
+		}
+
+		case TokenKind::return_keyword:
+		{
+			RETURN* pReturn = parse<RETURN>();
+			if (pReturn == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(STATEMENT(pReturn));
+		}
+
+		default:
+			expect<TokenKind::variable_keyword
+				, TokenKind::constant_keyword
+				, TokenKind::identifier
+				, TokenKind::for_keyword
+				, TokenKind::while_keyword
+				, TokenKind::if_keyword
+				, TokenKind::open_brace
+				, TokenKind::return_keyword>();
+			return nullptr;
+		}
+	}
+
+#pragma endregion
 
 #pragma region ECS Constructs
 

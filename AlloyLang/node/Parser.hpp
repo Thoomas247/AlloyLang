@@ -59,6 +59,7 @@ namespace AlloyCompiler
 		bool isEOF() const;
 		bool hasNext() const;
 		TokenKind kind() const;
+		TokenKind peek() const;
 		std::string_view value() const;
 
 		/// <summary>

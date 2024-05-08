@@ -1,6 +1,7 @@
 #pragma once
 #include "../log/Log.hpp"
 #include "../tokenizer/Token.hpp"
+#include "nodes/VariantNode.hpp"
 
 namespace AlloyCompiler
 {
@@ -21,4 +22,7 @@ namespace AlloyCompiler
 	{
 		None = -1
 	};
+
+	using EXPRESSION = VariantNode;
+	using STATEMENT = VariantNode;
 }
