@@ -132,13 +132,13 @@ namespace AlloyCompiler
 		}
 
 		// get the operator string
-		auto tokenString = iter.CreateSmallStringView(start, iter.CurrentIndex());
+		auto tokenString = iter.CreateStringView(start, iter.CurrentIndex());
 
 		// check if the operator is in the known symbols map
-		ASSERT(KNOWN_SYMBOLS.contains(tokenString.ToStringView()), "Unknown operator: {0}", tokenString.ToStringView());
+		ASSERT(KNOWN_SYMBOLS.contains(tokenString), "Unknown operator: {0}", tokenString);
 
 		// get the token kind
-		TokenKind kind = KNOWN_SYMBOLS.at(tokenString.ToStringView());
+		TokenKind kind = KNOWN_SYMBOLS.at(tokenString);
 
 		tokenBuffers.AddToken(kind, tokenString, location);
 
@@ -153,7 +153,7 @@ namespace AlloyCompiler
 		if (it == KNOWN_SYMBOLS.end())
 			return false;
 
-		tokenBuffers.AddToken(it->second, iter.CreateSmallStringView(iter.CurrentIndex(), iter.CurrentIndex() + 1), iter.CurrentLocation());
+		tokenBuffers.AddToken(it->second, iter.CreateStringView(iter.CurrentIndex(), iter.CurrentIndex() + 1), iter.CurrentLocation());
 
 		// consume the delimiter
 		iter.NextChar();
@@ -180,10 +180,10 @@ namespace AlloyCompiler
 		}
 
 		// store the word
-		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
+		auto value = iter.CreateStringView(start, iter.CurrentIndex());
 
 		// check if word is any keyword
-		auto it = KNOWN_SYMBOLS.find(value.ToStringView());
+		auto it = KNOWN_SYMBOLS.find(value);
 		if (it != KNOWN_SYMBOLS.end())
 			tokenBuffers.AddToken(it->second, value, location);
 
@@ -225,7 +225,7 @@ namespace AlloyCompiler
 		} while (iter.CurrentChar() != '"');
 
 		// store the string
-		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
+		auto value = iter.CreateStringView(start, iter.CurrentIndex());
 
 		// consume the ending quote
 		iter.NextChar();
@@ -270,7 +270,7 @@ namespace AlloyCompiler
 		}
 
 		// store the character
-		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
+		auto value = iter.CreateStringView(start, iter.CurrentIndex());
 
 		// consume ending quote
 		if (!iter.NextChar())
@@ -304,7 +304,7 @@ namespace AlloyCompiler
 				{
 					logError(iter,
 						"Invalid float literal: {0}. Expected only one decimal point in float literal.",
-						iter.CreateSmallStringView(start, iter.CurrentIndex()).ToStringView());
+						iter.CreateStringView(start, iter.CurrentIndex()));
 					return false;
 				}
 
@@ -316,7 +316,7 @@ namespace AlloyCompiler
 		}
 
 		// store the number
-		auto value = iter.CreateSmallStringView(start, iter.CurrentIndex());
+		auto value = iter.CreateStringView(start, iter.CurrentIndex());
 
 		// check if number is a float or int
 		if (hasDot)
@@ -370,6 +370,8 @@ namespace AlloyCompiler
 
 		} while (iter.HasNext());
 
+		tokenBuffers.AddToken(TokenKind::end_of_file, iter.CreateStringView(iter.CurrentIndex(), iter.CurrentIndex()), iter.CurrentLocation());
+
 		return tokenBuffers;
 	}
 
@@ -379,7 +381,7 @@ namespace AlloyCompiler
 
 		do
 		{
-			Log::Print("{0} ({1})", TOKEN_KIND_NAMES.at(iter.GetKind()), iter.GetValue().ToStringView());
+			Log::Print("{0} ({1})", TOKEN_KIND_NAMES.at(iter.GetKind()), iter.GetValue());
 		} while (iter.Next());
 	}
 }

@@ -9,32 +9,32 @@ namespace AlloyCompiler
 
 	struct FOR_LOOP
 	{
-		const EXPRESSION* pCondition;
-		const EXPRESSION* pIncrement;
-		const EXPRESSION* pEnd;
-		const STATEMENT* pStatement;
+		EXPRESSION* pInitialization;
+		EXPRESSION* pCondition;
+		EXPRESSION* pIncrement;
+		STATEMENT* pBody;
 	};
 
 	struct WHILE_LOOP
 	{
-		const EXPRESSION* pCondition;
-		const STATEMENT* pStatement;
+		ENCLOSED_EXPRESSION* pCondition;
+		STATEMENT* pStatement;
 	};
 
 	struct IF_STATEMENT 
 	{
-		const EXPRESSION* pCondition;
-		const STATEMENT* pStatement;
-		const STATEMENT* pElseStatement;
+		EXPRESSION* pCondition;
+		STATEMENT* pStatement;
+		STATEMENT* pElseStatement;
 	};
 
 	struct STATEMENT_BLOCK
 	{
-		const std::vector<STATEMENT*> Statements;
+		std::vector<STATEMENT*> Statements;
 	};
 
 	struct RETURN
 	{
-		const EXPRESSION* pValue;
+		EXPRESSION* pValue;
 	};
 }

@@ -2,308 +2,344 @@
 
 namespace AlloyCompiler
 {
-	template<typename ...Args>
-	constexpr void logErrorAtPosition(TokenBuffers::Iterator& iter, const std::string& format, Args && ...args)
+
+#pragma region Util
+
+	std::string Parser::tokenKindVectorToString(const std::vector<TokenKind>& tokens) const
 	{
-		Log::Error("Error at location ({0} : {1}):", iter.GetLocation().Line, iter.GetLocation().Column);
-		Log::Error("\t{0}", iter.GetLine());
-		Log::Error("\t{0}^", std::string(iter.GetLocation().Column - 1, ' '));
-		Log::Error("\t{0}{1}", std::string(iter.GetLocation().Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+		// handle 0 tokens
+		if (tokens.empty())
+		{
+			return "";
+		}
+
+		// handle 1 token
+		if (tokens.size() == 1)
+		{
+			return "'" + TOKEN_KIND_NAMES.at(tokens[0]) + "'";
+		}
+
+		// handle 2 or more tokens
+		std::string result;
+		for (size_t i = 0; i < tokens.size() - 1; ++i)
+		{
+			result += "'" + TOKEN_KIND_NAMES.at(tokens[i]) + "', ";
+		}
+
+		result += "or '" + TOKEN_KIND_NAMES.at(tokens[tokens.size() - 1]) + "'";
+
+		return result;
 	}
 
-	struct ParsingState
+	bool Parser::isEOF() const
 	{
-		constexpr static auto NUM_NODES_FACTOR = 1.5;
+		return m_CurrentTokenID > m_TokenBuffers.LastTokenID();
+	}
 
-		NamedNodes NamedNodes;
-		NodeAllocator Allocator;
-		TokenBuffers::Iterator TokenIter;
+	bool Parser::hasNext() const
+	{
+		return !isEOF();
+	}
 
-		ParsingState(const TokenBuffers& tokenBuffers)
-			: NamedNodes()
-			, Allocator((size_t)((size_t)tokenBuffers.LastTokenID() * NUM_NODES_FACTOR))
-			, TokenIter(tokenBuffers.GetIterator())
+	TokenKind Parser::kind() const
+	{
+		return m_TokenBuffers.GetKind(m_CurrentTokenID);
+	}
+
+	std::string_view Parser::value() const
+	{
+		return m_TokenBuffers.GetValue(m_CurrentTokenID);
+	}
+
+	Parser::Result Parser::eat()
+	{
+		if (isEOF())
 		{
+			logErrorAtPosition("Unexpected end of file.");
+			return EOF_REACHED;
 		}
-	};
 
-	template <typename T, typename... Ts>
-	T* parse(ParsingState&, Ts...) = delete;
+		++m_CurrentTokenID;
+		return SUCCESS;
+	}
 
+	Parser::Result Parser::expect(TokenKind tokenKind, std::string_view* pValueStringView)
+	{
+		if (m_TokenBuffers.GetKind(m_CurrentTokenID) != tokenKind)
+		{
+			logErrorAtPosition("Expected token of kind {0}.", TOKEN_KIND_NAMES.at(tokenKind));
+			return UNEXPECTED_TOKEN;
+		}
 
+		if (pValueStringView != nullptr)
+		{
+			*pValueStringView = m_TokenBuffers.GetValue(m_CurrentTokenID);
+		}
+
+		++m_CurrentTokenID;
+		return SUCCESS;
+	}
+
+#pragma endregion
+
+	template<>
+	IF_STATEMENT* Parser::parse()
+	{
+		if (expect<TokenKind::if_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		ENCLOSED_EXPRESSION* pCondition = parse<ENCLOSED_EXPRESSION>();
+
+		if (pCondition == nullptr)
+		{
+			return nullptr;
+		}
+
+		STATEMENT* pStatement = parse<STATEMENT>();
+
+		if (pStatement == nullptr)
+		{
+			return nullptr;
+		}
+
+		STATEMENT* pElseStatement = nullptr;
+		if (kind() == TokenKind::else_keyword)
+		{
+			if (eat() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			pElseStatement = parse<STATEMENT>();
+
+			if (pElseStatement == nullptr)
+			{
+				return nullptr;
+			}
+		}
+
+		return createNode(
+			IF_STATEMENT
+			{
+				.pCondition = pCondition->pExpression,
+				.pStatement = pStatement,
+				.pElseStatement = pElseStatement
+			}
+		);
+	}
+
+	template<>
+	STATEMENT_BLOCK* Parser::parse()
+	{
+		if (expect<TokenKind::open_brace>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<STATEMENT*> statements;
+		while (kind() != TokenKind::close_brace)
+		{
+			STATEMENT* pStatement = parse<STATEMENT>();
+
+			if (pStatement == nullptr)
+			{
+				return nullptr;
+			}
+
+			statements.push_back(pStatement);
+		}
+
+		if (eat() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			STATEMENT_BLOCK
+			{
+				.Statements = std::move(statements)
+			}
+		);
+	}
+
+	template<>
+	RETURN* Parser::parse()
+	{
+		if (expect<TokenKind::return_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pExpression = nullptr;
+		if (kind() != TokenKind::semicolon)
+		{
+			pExpression = parse<EXPRESSION>();
+
+			if (pExpression == nullptr)
+			{
+				return nullptr;
+			}
+		}
+
+		if (expect<TokenKind::semicolon>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			RETURN
+			{
+				.pValue = pExpression
+			}
+		);
+	}
 
 #pragma region ECS Constructs
 
-	template <>
-	NAMED_GROUP_DEFINITION* parse(ParsingState& state)
+	template<>
+	NAMED_COMPONENT_DEFINITION* Parser::parse()
 	{
-		// check for group keyword
-		if (state.TokenIter.GetKind() != TokenKind::group_keyword)
+		if (expect<TokenKind::component_keyword>() != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find 'group' keyword!");
 			return nullptr;
 		}
 
-		// check for identifier
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::identifier)
+		std::string_view name;
+		if (expect<TokenKind::identifier>(&name) != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find group name!");
 			return nullptr;
 		}
 
-		// get the group name
-		std::string_view groupName = state.TokenIter.GetValue();
-
-		// check if we already have a group with the same name
-		if (state.NamedNodes.GroupDefinitions.contains(groupName))
+		if (namedNodeExists<NAMED_COMPONENT_DEFINITION>(name))
 		{
-			logErrorAtPosition(state.TokenIter, "Group '{0}' is already defined!", groupName);
+			logErrorAtPosition("Component '{0}' is already defined.", name);
 			return nullptr;
 		}
 
-		// check for open brace
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::open_brace)
+		if (expect<TokenKind::assignment_operator>() != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find a '{0}' after the group name!", "{");
 			return nullptr;
 		}
 
-		// consume open brace
-		if (!state.TokenIter.Next())
+		TYPE* pType = parse<TYPE>();
+
+		if (pType == nullptr)
 		{
-			logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected group definition.");
 			return nullptr;
 		}
 
-		std::vector<std::string_view> systemNames;
-
-		while (state.TokenIter.GetKind() != TokenKind::close_brace)
+		if (expect<TokenKind::semicolon>() != SUCCESS)
 		{
-			// check for identifier
-			if (state.TokenIter.GetKind() != TokenKind::identifier)
+			return nullptr;
+		}
+
+		NAMED_COMPONENT_DEFINITION* pComponentDefinition = createNode(
+			NAMED_COMPONENT_DEFINITION
 			{
-				logErrorAtPosition(state.TokenIter, "Expected to find system name!");
-				return nullptr;
-			}
-
-			// get the system name
-			std::string_view systemName = state.TokenIter.GetValue();
-
-			systemNames.push_back(systemName);
-
-			if (!state.TokenIter.Next() || (state.TokenIter.GetKind() != TokenKind::comma && state.TokenIter.GetKind() != TokenKind::close_brace))
-			{
-				logErrorAtPosition(state.TokenIter, "Expected to find a ',' or '}' after system name!");
-				return nullptr;
-			}
-
-			if (state.TokenIter.GetKind() == TokenKind::comma)
-			{
-				// consume comma
-				if (!state.TokenIter.Next())
-				{
-					logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected group definition.");
-					return nullptr;
-				}
-			}
-		}
-
-		// consume closing brace
-		(void)state.TokenIter.Next();
-
-		NAMED_GROUP_DEFINITION* pGroupDefinition = state.Allocator.Create(
-			NAMED_GROUP_DEFINITION
-			{
-				.Name = groupName,
-				.SystemNames = systemNames
+				.Name = name,
+				.pType = pType
 			}
 		);
 
-		state.NamedNodes.GroupDefinitions[groupName] = pGroupDefinition;
+		addNamedNode(name, pComponentDefinition);
 
-		return pGroupDefinition;
+		return pComponentDefinition;
 	}
 
-	template <>
-	NAMED_SYSTEM_DEFINITION* parse(ParsingState& state)
+	template<>
+	NAMED_RESOURCE_DEFINITION* Parser::parse()
 	{
-		// check for system keyword
-		if (state.TokenIter.GetKind() != TokenKind::system_keyword)
+		if (expect<TokenKind::resource_keyword>() != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find 'system' keyword!");
 			return nullptr;
 		}
 
-		// check for identifier
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::identifier)
+		std::string_view name;
+		if (expect<TokenKind::identifier>(&name) != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find system name!");
 			return nullptr;
 		}
 
-		// get the system name
-		std::string_view systemName = state.TokenIter.GetValue();
-
-		// check if we already have a system with the same name
-		if (state.NamedNodes.SystemDefinitions.contains(systemName))
+		if (namedNodeExists<NAMED_RESOURCE_DEFINITION>(name))
 		{
-			logErrorAtPosition(state.TokenIter, "System '{0}' is already defined!", systemName);
+			logErrorAtPosition("Resource '{0}' is already defined.", name);
 			return nullptr;
 		}
 
-		// check for open parenthesis
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::open_paren)
+		if (expect<TokenKind::assignment_operator>() != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find a '(' after the system name!");
 			return nullptr;
 		}
 
-		// consume open parenthesis
-		if (!state.TokenIter.Next())
+		TYPE* pType = parse<TYPE>();
+
+		if (pType == nullptr)
 		{
-			logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected system definition.");
 			return nullptr;
 		}
 
-		// collect query names
-
-		std::vector<std::string_view> queryNames;
-
-		while (state.TokenIter.GetKind() != TokenKind::close_paren)
+		if (expect<TokenKind::semicolon>() != SUCCESS)
 		{
-			// check for identifier
-			if (state.TokenIter.GetKind() != TokenKind::identifier)
+			return nullptr;
+		}
+
+		NAMED_RESOURCE_DEFINITION* pResourceDefinition = createNode(
+			NAMED_RESOURCE_DEFINITION
 			{
-				logErrorAtPosition(state.TokenIter, "Expected to find query name!");
-				return nullptr;
-			}
-
-			// get the query name
-			std::string_view queryName = state.TokenIter.GetValue();
-
-			queryNames.push_back(queryName);
-
-			if (!state.TokenIter.Next() || (state.TokenIter.GetKind() != TokenKind::comma && state.TokenIter.GetKind() != TokenKind::close_paren))
-			{
-				logErrorAtPosition(state.TokenIter, "Expected to find a ',' or ')' after query name!");
-				return nullptr;
-			}
-
-			if (state.TokenIter.GetKind() == TokenKind::comma)
-			{
-				// consume comma
-				if (!state.TokenIter.Next())
-				{
-					logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected system definition.");
-					return nullptr;
-				}
-			}
-		}
-
-		// consume closing parenthesis
-		(void)state.TokenIter.Next();
-
-		// parse body
-		STATEMENT_BLOCK* pBody = parse<STATEMENT_BLOCK>(state);
-
-		if (pBody == nullptr)
-		{
-			return nullptr;
-		}
-
-		NAMED_SYSTEM_DEFINITION* pSystemDefinition = state.Allocator.Create(
-			NAMED_SYSTEM_DEFINITION
-			{
-				.Name = systemName,
-				.QueryNames = queryNames,
-				.pBody = pBody
+				.Name = name,
+				.pType = pType
 			}
 		);
 
-		state.NamedNodes.SystemDefinitions[systemName] = pSystemDefinition;
+		addNamedNode(name, pResourceDefinition);
 
-		return pSystemDefinition;
+		return pResourceDefinition;
 	}
 
-	template <>
-	NAMED_QUERY_DEFINITION* parse(ParsingState& state)
+	template<>
+	NAMED_QUERY_DEFINITION* Parser::parse()
 	{
-		// check for query keyword
-		if (state.TokenIter.GetKind() != TokenKind::query_keyword)
+		if (expect<TokenKind::query_keyword>() != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find 'query' keyword!");
 			return nullptr;
 		}
 
-		// check for identifier
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::identifier)
+		std::string_view name;
+		if (expect<TokenKind::identifier>(&name) != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find query name!");
 			return nullptr;
 		}
 
-		// get the query name
-		std::string_view queryName = state.TokenIter.GetValue();
-
-		// check if we already have a query with the same name
-		if (state.NamedNodes.QueryDefinitions.contains(queryName))
+		if (namedNodeExists<NAMED_QUERY_DEFINITION>(name))
 		{
-			logErrorAtPosition(state.TokenIter, "Query '{0}' is already defined!", queryName);
+			logErrorAtPosition("Query '{0}' is already defined.", name);
 			return nullptr;
 		}
 
-		// check for open brace
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::open_brace)
+		if (expect<TokenKind::open_brace>() != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find a '{0}' after the query name!", "{");
 			return nullptr;
 		}
 
-		// consume open brace
-		if (!state.TokenIter.Next())
+		std::vector<std::string_view> reads, writes;
+		while (kind() != TokenKind::close_brace)
 		{
-			logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected query definition.");
-			return nullptr;
-		}
+			TokenKind readOrWrite;
 
-		std::vector<std::string_view> reads;
-		std::vector<std::string_view> writes;
-
-		while (state.TokenIter.GetKind() != TokenKind::close_brace)
-		{
-			bool isWrite = false;
-
-			if (state.TokenIter.GetKind() == TokenKind::constant_keyword)
+			if (expect<TokenKind::variable_keyword, TokenKind::constant_keyword>(&readOrWrite) != SUCCESS)
 			{
-				isWrite = false;
-			}
-			else if (state.TokenIter.GetKind() == TokenKind::variable_keyword)
-			{
-				isWrite = true;
-			}
-			else
-			{
-				logErrorAtPosition(state.TokenIter, "Expected to find 'var' or 'const' keyword!");
 				return nullptr;
 			}
 
-			// check for identifier
-			if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::identifier)
+			std::string_view componentName;
+			if (expect<TokenKind::identifier>(&componentName) != SUCCESS)
 			{
-				logErrorAtPosition(state.TokenIter, "Expected to find component name!");
 				return nullptr;
 			}
 
-			std::string_view componentName = state.TokenIter.GetValue();
-
-			// consume component name
-			if (!state.TokenIter.Next())
-			{
-				logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected queryable definition.");
-				return nullptr;
-			}
-
-			if (isWrite)
+			if (readOrWrite == TokenKind::variable_keyword)
 			{
 				writes.push_back(componentName);
 			}
@@ -312,386 +348,340 @@ namespace AlloyCompiler
 				reads.push_back(componentName);
 			}
 
-			// check for semicolon
-			if (state.TokenIter.GetKind() != TokenKind::semicolon)
+			if (expect<TokenKind::semicolon>() != SUCCESS)
 			{
-				logErrorAtPosition(state.TokenIter, "Expected to find a ';' after component or resource name!");
-				return nullptr;
-			}
-
-			// consume semicolon
-			if (!state.TokenIter.Next())
-			{
-				logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected query definition.");
 				return nullptr;
 			}
 		}
 
-		// consume closing brace
-		(void)state.TokenIter.Next();
+		if (eat() != SUCCESS)
+		{
+			return nullptr;
+		}
 
-		NAMED_QUERY_DEFINITION* pQueryDefinition = state.Allocator.Create(
+		NAMED_QUERY_DEFINITION* pQueryDefinition = createNode(
 			NAMED_QUERY_DEFINITION
 			{
-				.Name = queryName,
+				.Name = name,
 				.ComponentReadNames = reads,
-				.ComponentWriteNames = writes,
+				.ComponentWriteNames = writes
 			}
 		);
 
-		state.NamedNodes.QueryDefinitions[queryName] = pQueryDefinition;
+		addNamedNode(name, pQueryDefinition);
 
 		return pQueryDefinition;
 	}
 
-	template <>
-	NAMED_TYPE_DEFINITION* parse(ParsingState& state)
+	template<>
+	NAMED_SYSTEM_DEFINITION* Parser::parse()
 	{
-		// check for type keyword
-		if (state.TokenIter.GetKind() != TokenKind::type_keyword)
-		{
-			logErrorAtPosition(state.TokenIter, "Expected to find 'type' keyword!");
-			return nullptr;
-		}
-
-		// check for identifier
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::identifier)
-		{
-			logErrorAtPosition(state.TokenIter, "Expected to find type name!");
-			return nullptr;
-		}
-
-		// get the type name
-		std::string_view typeName = state.TokenIter.GetValue();
-
-		// check if we already have a type with the same name
-		if (state.NamedNodes.TypeDefinitions.contains(typeName))
-		{
-			logErrorAtPosition(state.TokenIter, "Type '{0}' is already defined!", typeName);
-			return nullptr;
-		}
-
-		// check for assignment operator
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::assignment_operator)
-		{
-			logErrorAtPosition(state.TokenIter, "Expected to find an '=' after the type name!");
-			return nullptr;
-		}
-
-		// consume assignment operator
-		if (!state.TokenIter.Next())
-		{
-			logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected type definition.");
-			return nullptr;
-		}
-
-		// parse type
-		TYPE* pType = parse<TYPE>(state);
-
-		if (pType == nullptr)
+		if (expect<TokenKind::system_keyword>() != SUCCESS)
 		{
 			return nullptr;
 		}
 
-		// check for semicolon
-		if (state.TokenIter.GetKind() != TokenKind::semicolon)
+		std::string_view name;
+		if (expect<TokenKind::identifier>(&name) != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find a ';' after type definition!");
 			return nullptr;
 		}
 
-		// consume semicolon
-		(void)state.TokenIter.Next();
+		if (namedNodeExists<NAMED_SYSTEM_DEFINITION>(name))
+		{
+			logErrorAtPosition("System '{0}' is already defined.", name);
+			return nullptr;
+		}
 
-		NAMED_TYPE_DEFINITION* pTypeDefinition = state.Allocator.Create(
-			NAMED_TYPE_DEFINITION
+		if (expect<TokenKind::open_paren>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<std::string_view> queryNames;
+		while (kind() != TokenKind::close_paren)
+		{
+			std::string_view queryName;
+			if (expect<TokenKind::identifier>(&queryName) != SUCCESS)
 			{
-				.Name = typeName,
-				.pType = pType
+				return nullptr;
 			}
-		);
 
-		state.NamedNodes.TypeDefinitions[typeName] = pTypeDefinition;
+			queryNames.push_back(queryName);
 
-		return pTypeDefinition;
-	}
+			if (kind() == TokenKind::comma)
+			{
+				if (eat() != SUCCESS)
+				{
+					return nullptr;
+				}
+			}
+		}
 
-	template <>
-	NAMED_FUNCTION_DEFINITION* parse(ParsingState& state)
-	{
-		// parse function signature
-		FUNCTION_SIGNATURE* pSignature = parse<FUNCTION_SIGNATURE>(state, /*allowVarArgs*/false);
-
-		if (pSignature == nullptr)
+		// consume closing paren
+		if (eat() != SUCCESS)
 		{
 			return nullptr;
 		}
 
-		std::string_view functionName = pSignature->Name;
-
-		// check if we already have a function with the same name
-		if (state.NamedNodes.FunctionDefinitions.contains(functionName) || state.NamedNodes.ExternDefinitions.contains(functionName))
-		{
-			logErrorAtPosition(state.TokenIter, "Function with name '{0}' already exists!", functionName);
-			return nullptr;
-		}
-
-		// parse body
-		STATEMENT_BLOCK* pBody = parse<STATEMENT_BLOCK>(state);
+		STATEMENT_BLOCK* pBody = parse<STATEMENT_BLOCK>();
 
 		if (pBody == nullptr)
 		{
 			return nullptr;
 		}
 
-		NAMED_FUNCTION_DEFINITION* pFunctionDefinition = state.Allocator.Create(
-			NAMED_FUNCTION_DEFINITION
+		NAMED_SYSTEM_DEFINITION* pSystemDefinition = createNode(
+			NAMED_SYSTEM_DEFINITION
 			{
-				.pSignature = pSignature,
+				.Name = name,
+				.QueryNames = queryNames,
 				.pBody = pBody
 			}
 		);
 
-		state.NamedNodes.FunctionDefinitions[functionName] = pFunctionDefinition;
+		addNamedNode(name, pSystemDefinition);
 
-		return pFunctionDefinition;
+		return pSystemDefinition;
 	}
 
-	template <>
-	EXTERN_FUNCTION_DEFINITION* parse(ParsingState& state)
+	template<>
+	NAMED_GROUP_DEFINITION* Parser::parse()
 	{
-		// check for extern keyword
-		if (state.TokenIter.GetKind() != TokenKind::extern_keyword)
-		{
-			logErrorAtPosition(state.TokenIter, "Expected to find 'extern' keyword!");
-			return nullptr;
-		}
-
-		// consume extern keyword
-		if (!state.TokenIter.Next())
-		{
-			logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected extern definition.");
-			return nullptr;
-		}
-
-		// parse function signature
-		FUNCTION_SIGNATURE* pSignature = parse<FUNCTION_SIGNATURE>(state, /*allowVarArgs*/true);
-
-		if (pSignature == nullptr)
+		if (expect<TokenKind::group_keyword>() != SUCCESS)
 		{
 			return nullptr;
 		}
 
-		std::string_view externName = pSignature->Name;
-
-		// check if we already have an extern with the same name
-		if (state.NamedNodes.ExternDefinitions.contains(externName) || state.NamedNodes.FunctionDefinitions.contains(externName))
+		std::string_view name;
+		if (expect<TokenKind::identifier>(&name) != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Function with name '{0}' already exists!", externName);
 			return nullptr;
 		}
 
-		// check for semicolon
-		if (state.TokenIter.GetKind() != TokenKind::semicolon)
+		if (namedNodeExists<NAMED_GROUP_DEFINITION>(name))
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find a ';' after extern definition!");
+			logErrorAtPosition("Group '{0}' is already defined.", name);
 			return nullptr;
 		}
 
-		// consume semicolon
-		(void)state.TokenIter.Next();
+		if (expect<TokenKind::open_brace>() != SUCCESS)
+		{
+			return nullptr;
+		}
 
-		EXTERN_FUNCTION_DEFINITION* pExternDefinition = state.Allocator.Create(
-			EXTERN_FUNCTION_DEFINITION
+		std::vector<std::string_view> systemNames;
+		while (kind() != TokenKind::close_brace)
+		{
+			std::string_view systemName;
+			if (expect<TokenKind::identifier>(&systemName) != SUCCESS)
 			{
-				.pSignature = pSignature
+				return nullptr;
+			}
+
+			systemNames.push_back(systemName);
+
+			if (kind() == TokenKind::comma)
+			{
+				if (eat() != SUCCESS)
+				{
+					return nullptr;
+				}
+			}
+		}
+
+		// eat closing brace
+		if (eat() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		NAMED_GROUP_DEFINITION* pGroupDefinition = createNode(
+			NAMED_GROUP_DEFINITION
+			{
+				.Name = name,
+				.SystemNames = systemNames
 			}
 		);
 
-		state.NamedNodes.ExternDefinitions[externName] = pExternDefinition;
+		addNamedNode(name, pGroupDefinition);
 
-		return pExternDefinition;
+		return pGroupDefinition;
 	}
 
-	template <>
-	APPLICATION_DEFINITION* parse(ParsingState& state)
+	template<>
+	APPLICATION_DEFINITION* Parser::parse()
 	{
-		if (state.TokenIter.GetKind() != TokenKind::application_keyword)
+		if (expect<TokenKind::application_keyword>() != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find 'application' keyword!");
 			return nullptr;
 		}
 
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::identifier)
+		std::string_view name;
+		if (expect<TokenKind::identifier>(&name) != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find application name!");
 			return nullptr;
 		}
 
-		// get the application name
-		std::string_view applicationName = state.TokenIter.GetValue();
-
-		// check if we already have an application with the same name
-		if (state.NamedNodes.ApplicationDefinitions.contains(applicationName))
+		if (namedNodeExists<APPLICATION_DEFINITION>(name))
 		{
-			logErrorAtPosition(state.TokenIter, "Application '{0}' is already defined!", applicationName);
+			logErrorAtPosition("Application '{0}' is already defined.", name);
 			return nullptr;
 		}
 
-		if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::open_brace)
+		if (expect<TokenKind::open_brace>() != SUCCESS)
 		{
-			logErrorAtPosition(state.TokenIter, "Expected to find a {0} after the application name!", "{");
 			return nullptr;
 		}
 
-		if (!state.TokenIter.Next())
+		std::vector<std::string_view> startGroups, updateGroups, endGroups;
+		bool startFound = false, updateFound = false, endFound = false;
+
+		while (kind() != TokenKind::close_brace)
 		{
-			logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected application definition.");
-			return nullptr;
-		}
-
-		std::unordered_map<std::string_view, std::pair<bool, std::vector<std::string_view>>> stageGroupLists = {
-			{ "start",	{ false, {} } },
-			{ "update", { false, {} } },
-			{ "end",	{ false, {} } }
-		};
-
-		while (state.TokenIter.GetKind() != TokenKind::close_brace)
-		{
-			if (state.TokenIter.GetKind() != TokenKind::identifier)
+			std::string_view stageName;
+			if (expect<TokenKind::identifier>(&stageName) != SUCCESS)
 			{
-				logErrorAtPosition(state.TokenIter, "Expected to find stage identifier!");
 				return nullptr;
 			}
 
-			const std::string_view stageName = state.TokenIter.GetValue();
-
-			auto it = stageGroupLists.find(stageName);
-
-			// check that stage name is valid
-			if (it == stageGroupLists.end())
+			if (expect<TokenKind::open_brace>() != SUCCESS)
 			{
-				logErrorAtPosition(state.TokenIter, "Invalid application stage '{0}'! Valid stages are 'start', 'update', and 'end'.", stageName);
 				return nullptr;
 			}
 
-			// check that stage name is not duplicate
-			if (it->second.first == true)
+			// based on the name of the stage, determine which vector we are inserting into
+			std::vector<std::string_view>* pDstGroups = nullptr;
+
+			bool stageRedefinition = false;
+
+			if (stageName == "start")
 			{
-				logErrorAtPosition(state.TokenIter, "Application stage '{0}' is already defined!", stageName);
-				return nullptr;
-			}
+				pDstGroups = &startGroups;
 
-			if (!state.TokenIter.Next() || state.TokenIter.GetKind() != TokenKind::open_brace)
-			{
-				logErrorAtPosition(state.TokenIter, "Expected to find a {0} after the stage name!", "{");
-				return nullptr;
-			}
-
-			if (!state.TokenIter.Next())
-			{
-				logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected to find a list of group names!");
-				return nullptr;
-			}
-
-			// collect group names
-
-			std::vector<std::string_view>& groupNames = it->second.second;
-
-			while (state.TokenIter.GetKind() != TokenKind::close_brace)
-			{
-				if (state.TokenIter.GetKind() != TokenKind::identifier)
+				if (startFound)
 				{
-					logErrorAtPosition(state.TokenIter, "Expected to find group name!");
+					stageRedefinition = true;
+				}
+
+				startFound = true;
+			}
+			else if (stageName == "update")
+			{
+				pDstGroups = &updateGroups;
+
+				if (updateFound)
+				{
+					stageRedefinition = true;
+				}
+
+				updateFound = true;
+			}
+			else if (stageName == "end")
+			{
+				pDstGroups = &endGroups;
+
+				if (endFound)
+				{
+					stageRedefinition = true;
+				}
+
+				endFound = true;
+			}
+			else
+			{
+				logErrorAtPosition("Invalid application stage name '{0}'. Valid stages are 'start', 'update' and 'end'.", stageName);
+				return nullptr;
+			}
+
+			if (stageRedefinition)
+			{
+				logErrorAtPosition("Application stage '{0}' is already defined.", stageName);
+				return nullptr;
+			}
+
+			while (kind() != TokenKind::close_brace)
+			{
+				std::string_view groupName;
+				if (expect<TokenKind::identifier>(&groupName) != SUCCESS)
+				{
 					return nullptr;
 				}
 
-				const std::string_view groupName = state.TokenIter.GetValue();
+				pDstGroups->push_back(groupName);
 
-				groupNames.push_back(groupName);
-
-				if (!state.TokenIter.Next() || (state.TokenIter.GetKind() != TokenKind::comma && state.TokenIter.GetKind() != TokenKind::close_brace))
+				if (kind() == TokenKind::comma)
 				{
-					logErrorAtPosition(state.TokenIter, "Expected to find a ',' or '}' after group name!");
-					return nullptr;
-				}
-
-				if (state.TokenIter.GetKind() == TokenKind::comma)
-				{
-					// consume comma
-					if (!state.TokenIter.Next())
+					if (eat() != SUCCESS)
 					{
-						logErrorAtPosition(state.TokenIter, "Unexpected end of file! Expected to find a list of group names!");
 						return nullptr;
 					}
 				}
 			}
+
+			// eat closing brace
+			if (eat() != SUCCESS)
+			{
+				return nullptr;
+			}
 		}
 
-		// consume closing brace
-		(void)state.TokenIter.Next();
+		// eat closing brace
+		if (eat() != SUCCESS)
+		{
+			return nullptr;
+		}
 
-		APPLICATION_DEFINITION* pApplicationDefinition = state.Allocator.Create(
+		APPLICATION_DEFINITION* pApplicationDefinition = createNode(
 			APPLICATION_DEFINITION
 			{
-				.Name = applicationName,
-				.StartGroupNames = stageGroupLists["start"].second,
-				.UpdateGroupNames = stageGroupLists["update"].second,
-				.EndGroupNames = stageGroupLists["end"].second
+				.Name = name,
+				.StartGroupNames = std::move(startGroups),
+				.UpdateGroupNames = std::move(updateGroups),
+				.EndGroupNames = std::move(endGroups)
 			}
 		);
 
-		state.NamedNodes.ApplicationDefinitions[applicationName] = pApplicationDefinition;
+		addNamedNode(name, pApplicationDefinition);
 
 		return pApplicationDefinition;
 	}
 
 #pragma endregion
 
-#pragma region Definitions
-
-	DEFINITION* parse_DEFINITION(ParsingState& state)
+	NamedNodes Parser::Parse()
 	{
-		// TODO
-	}
-
-#pragma endregion
-
-
-	NamedNodes Parse(const TokenBuffers& tokenBuffers)
-	{
-		ParsingState state(tokenBuffers);
-		
-		while (state.TokenIter.HasNext())
+		while (!isEOF())
 		{
-			switch (state.TokenIter.GetKind())
+			switch (kind())
 			{
 			case TokenKind::group_keyword:
-				parse<NAMED_GROUP_DEFINITION>(state);
+				parse<NAMED_GROUP_DEFINITION>();
 
 			case TokenKind::system_keyword:
-				parse<NAMED_SYSTEM_DEFINITION>(state);
+				parse<NAMED_SYSTEM_DEFINITION>();
 
 			case TokenKind::query_keyword:
-				parse<NAMED_QUERY_DEFINITION>(state);
+				parse<NAMED_QUERY_DEFINITION>();
 
 			case TokenKind::type_keyword:
-				parse<NAMED_TYPE_DEFINITION>(state);
+				parse<NAMED_TYPE_DEFINITION>();
 
 			case TokenKind::function_keyword:
-				parse<NAMED_FUNCTION_DEFINITION>(state);
+				parse<NAMED_FUNCTION_DEFINITION>();
 
 			case TokenKind::extern_keyword:
-				parse<EXTERN_FUNCTION_DEFINITION>(state);
+				parse<EXTERN_FUNCTION_DEFINITION>();
 
 			case TokenKind::application_keyword:
-				parse<APPLICATION_DEFINITION>(state);
+				parse<APPLICATION_DEFINITION>();
 
 			default:
 				break;
 			}
 		}
 
-		return state.NamedNodes;
+		return std::move(m_NamedNodes);
 	}
+
 }

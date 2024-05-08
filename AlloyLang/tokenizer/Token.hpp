@@ -8,7 +8,7 @@ namespace AlloyCompiler
 	/// <summary>
 	/// Unique ID for a token. All token data is accessed through this ID.
 	/// </summary>
-	enum class TokenID : uint32_t {};
+	using TokenID = uint32_t;
 
 	/// <summary>
 	/// Represents an invalid token ID.
@@ -21,6 +21,8 @@ namespace AlloyCompiler
 	enum class TokenKind : uint8_t
 	{
 		none = 0,
+
+		end_of_file,
 
 		identifier,
 
@@ -338,6 +340,7 @@ namespace AlloyCompiler
 
 		/// <summary>
 		/// Returns the ID of the last token added.
+		/// This is the token before EOF.
 		/// </summary>
 		TokenID LastTokenID() const;
 

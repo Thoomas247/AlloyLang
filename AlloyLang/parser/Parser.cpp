@@ -1,4 +1,12 @@
 #include "Parser.hpp"
+#include "Parser.hpp"
+#include "Parser.hpp"
+#include "Parser.hpp"
+#include "Parser.hpp"
+#include "Parser.hpp"
+#include "Parser.hpp"
+#include "Parser.hpp"
+#include "Parser.hpp"
 
 namespace AlloyCompiler
 {

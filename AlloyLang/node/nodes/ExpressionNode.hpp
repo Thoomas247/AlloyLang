@@ -16,58 +16,58 @@ namespace AlloyCompiler
 
 	struct CONSTRUCTOR 
 	{
-		const NAMED_TYPE* pType;
-		const std::vector<std::pair<std::string_view, EXPRESSION*>> Arguments;
+		NAMED_TYPE* pType;
+		std::vector<std::pair<std::string_view, EXPRESSION*>> Arguments;
 	};
 
 	struct POINTER_INIT
 	{
-		const EXPRESSION* pValue;
-		const EXPRESSION* pSize;	// nullptr if not an array
+		EXPRESSION* pValue;
+		EXPRESSION* pSize;	// nullptr if not an array
 	};
 
 	struct POINTER_MOVE
 	{
-		const NAMED_VARIABLE* pVariable;
+		NAMED_VARIABLE* pVariable;
 	};
 
 	struct INITIALIZER_LIST
 	{
-		const std::vector<EXPRESSION*> Values;
+		std::vector<EXPRESSION*> Values;
 	};
 
 	struct ENCLOSED_EXPRESSION
 	{
-		const EXPRESSION* pExpression;
+		EXPRESSION* pExpression;
 	};
 
 	struct ARRAY_ACCESS
 	{
-		const EXPRESSION* pArray;
-		const EXPRESSION* pIndex;
+		EXPRESSION* pArray;
+		EXPRESSION* pIndex;
 	};
 
 	struct MEMBER_ACCESS
 	{
-		const EXPRESSION* pObject;
-		const std::string_view MemberName;
+		EXPRESSION* pObject;
+		std::string_view MemberName;
 	};
 
 	struct UNARY
 	{
-		const EXPRESSION* pValue;
+		EXPRESSION* pValue;
 	};
 
 	struct BINARY
 	{
-		const TokenID OperatorTokenID;
-		const EXPRESSION* pLeft;
-		const EXPRESSION* pRight;
+		TokenID OperatorTokenID;
+		EXPRESSION* pLeft;
+		EXPRESSION* pRight;
 	};
 
 	struct ASSIGNMENT
 	{
-		const ASSIGNABLE* pAssignable;
-		const EXPRESSION* pValue;
+		ASSIGNABLE* pAssignable;
+		EXPRESSION* pValue;
 	};
 }

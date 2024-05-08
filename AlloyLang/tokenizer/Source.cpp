@@ -60,9 +60,9 @@ namespace AlloyCompiler
 		return Location(m_LineStarts.top(), m_Line, m_Column);
 	}
 
-	SmallStringView Source::Iterator::CreateSmallStringView(size_t start, size_t end) const
+	std::string_view Source::Iterator::CreateStringView(size_t start, size_t end) const
 	{
-		return m_Source.CreateSmallStringView(start, end);
+		return m_Source.CreateStringView(start, end);
 	}
 
 	Source::Source(const std::string_view& source)
@@ -96,7 +96,7 @@ namespace AlloyCompiler
 		return m_SourceView.substr(startIndex, end - startIndex);
 	}
 
-	SmallStringView Source::CreateSmallStringView(size_t start, size_t end) const
+	std::string_view Source::CreateStringView(size_t start, size_t end) const
 	{
 		return m_SourceView.substr(start, end - start);
 	}

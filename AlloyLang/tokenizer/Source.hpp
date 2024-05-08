@@ -3,7 +3,6 @@
 #include <stack>
 
 #include "../log/Log.hpp"
-#include "../util/SmallStringView.hpp"
 
 namespace AlloyCompiler
 {
@@ -64,9 +63,9 @@ namespace AlloyCompiler
 			Location CurrentLocation() const;
 
 			/// <summary>
-			/// Creates a SmallStringView from the given start and end indices.
+			/// Creates a std::string_view from the given start and end indices.
 			/// </summary>
-			SmallStringView CreateSmallStringView(size_t start, size_t end) const;
+			std::string_view CreateStringView(size_t start, size_t end) const;
 
 		private:
 			const Source& m_Source;
@@ -101,9 +100,9 @@ namespace AlloyCompiler
 		std::string_view GetLine(size_t startIndex) const;
 
 		/// <summary>
-		/// Creates a SmallStringView from the given start and end indices.
+		/// Creates a std::string_view from the given start and end indices.
 		/// </summary>
-		SmallStringView CreateSmallStringView(size_t start, size_t end) const;
+		std::string_view CreateStringView(size_t start, size_t end) const;
 
 	private:
 		std::string_view m_SourceView;

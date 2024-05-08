@@ -65,6 +65,11 @@ namespace AlloyCompiler
 			return m_Kind == NodeInfo::Kind<T>();
 		}
 
+		NodeKind GetKind() const
+		{
+			return m_Kind;
+		}
+
 	private:
 		NodeKind m_Kind;	// the kind of the variant node
 		void* m_pNode;		// points to the variant node
