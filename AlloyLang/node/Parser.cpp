@@ -31,6 +31,34 @@ namespace AlloyCompiler
 		return result;
 	}
 
+	std::string Parser::stringVectorToString(const std::vector<std::string>& tokens) const
+	{
+		// handle 0 tokens
+		if (tokens.empty())
+		{
+			return "";
+		}
+
+		// handle 1 token
+		if (tokens.size() == 1)
+		{
+			return "'" + tokens[0] + "'";
+		}
+
+		// handle 2 or more tokens
+		std::string result;
+		for (size_t i = 0; i < tokens.size() - 1; ++i)
+		{
+			result += "'" + tokens[i] + "', ";
+		}
+
+		result += "or '" + tokens[tokens.size() - 1] + "'";
+
+		return result;
+	}
+
+
+
 	bool Parser::isEOF() const
 	{
 		return m_CurrentTokenID > m_TokenBuffers.LastTokenID();
@@ -73,7 +101,292 @@ namespace AlloyCompiler
 		return SUCCESS;
 	}
 
+	Parser::Result Parser::expectValue(const std::vector<std::string>& values, std::string_view* pValueStringView)
+	{
+		bool found = false;
+		for (const std::string& value : values)
+		{
+			if (value == m_TokenBuffers.GetValue(m_CurrentTokenID))
+			{
+				found = true;
+				break;
+			}
+		}
+
+		if (!found)
+		{
+			logErrorAtPosition("Expected {0}.", stringVectorToString(values));
+			return UNEXPECTED_VALUE;
+		}
+
+		if (pValueStringView != nullptr)
+		{
+			*pValueStringView = m_TokenBuffers.GetValue(m_CurrentTokenID);
+		}
+
+		++m_CurrentTokenID;
+		return SUCCESS;
+	}
+
 #pragma endregion
+
+	template<>
+	POINTER_MOVE* Parser::parse()
+	{
+		if (expect<TokenKind::move_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		// TODO: pointer could be struct member, array member, ... need to fix!
+		NAMED_VARIABLE* pNamedVariable = parse<NAMED_VARIABLE>();
+
+		if (pNamedVariable == nullptr)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			POINTER_MOVE
+			{
+				.pVariable = pNamedVariable
+			}
+		);
+	}
+
+	template<>
+	INITIALIZER_LIST* Parser::parse()
+	{
+		if (expect<TokenKind::open_brace>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<EXPRESSION*> values;
+		while (kind() != TokenKind::close_brace)
+		{
+			EXPRESSION* pExpression = parse<EXPRESSION>();
+
+			if (pExpression == nullptr)
+			{
+				return nullptr;
+			}
+
+			values.push_back(pExpression);
+
+			if (kind() == TokenKind::comma)
+			{
+				if (eat() != SUCCESS)
+				{
+					return nullptr;
+				}
+			}
+		}
+
+		if (eat() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			INITIALIZER_LIST
+			{
+				.Values = std::move(values)
+			}
+		);
+	}
+
+	template<>
+	ENCLOSED_EXPRESSION* Parser::parse()
+	{
+		if (expect<TokenKind::open_paren>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pExpression = parse<EXPRESSION>();
+
+		if (pExpression == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expect<TokenKind::close_paren>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			ENCLOSED_EXPRESSION
+			{
+				.pExpression = pExpression
+			}
+		);
+	}
+
+	template<>
+	POSTFIX* Parser::parse()
+	{
+		// even though left size can be any expression in the syntax, due to the order we parse expressions in
+		// we can only have a primary expression at this point
+		PRIMARY* pPrimaryExpression = parse<PRIMARY>();
+
+		if (pPrimaryExpression == nullptr)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pLeft = createNode(EXPRESSION(pPrimaryExpression));
+
+		while (kind() == TokenKind::open_bracket || kind() == TokenKind::dot)
+		{
+			// POSTFIX node to insert either ARRAY_ACCESS or MEMBER_ACCESS into
+			POSTFIX* pPostfix = createNode(POSTFIX());
+
+			if (kind() == TokenKind::open_bracket)
+			{
+				(void)expect<TokenKind::open_bracket>();
+
+				EXPRESSION* pRight = parse<EXPRESSION>();
+
+				if (pRight != nullptr)
+				{
+					return nullptr;
+				}
+
+				if (expect<TokenKind::close_bracket>() != SUCCESS)
+				{
+					return nullptr;
+				}
+
+				// set the POSTFIX expression to an ARRAY_ACCESS
+				pPostfix->Set(
+					createNode(ARRAY_ACCESS
+						{
+							.pArray = pLeft,
+							.pIndex = pRight
+						}
+					)
+				);
+			}
+
+			else
+			{
+				(void)expect<TokenKind::dot>();
+
+				std::string_view memberName;
+				if (expect<TokenKind::identifier>(&memberName) != SUCCESS)
+				{
+					return nullptr;
+				}
+
+				// set the POSTFIX expression to an MEMBER_ACCESS
+				pPostfix->Set(
+					createNode(MEMBER_ACCESS
+						{
+							.pObject = pLeft,
+							.MemberName = memberName
+						}
+					)
+				);
+			}
+
+			// set the left to our newly-parsed POSTFIX expression
+			pLeft->Set(pPostfix);
+		}
+
+		return pLeft;	// if no POSTFIX was found, this returns a PRIMARY wrapped in an EXPRESSION as expected
+	}
+
+	template<>
+	UNARY* Parser::parse()
+	{
+		// operator '-' is ambiguous (can be binary or unary) so we expect based on value instead of kind
+		std::string_view op;
+		if (expectValue({ "!", "-" }, &op) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pExpression = parse<EXPRESSION>();
+
+		if (pExpression == nullptr)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			UNARY
+			{
+				.Operator = op,
+				.pExpression = pExpression
+			}
+		);
+	}
+
+	template<>
+	BINARY* Parser::parse()
+	{
+		EXPRESSION* pLeft = parse<EXPRESSION>();
+
+		if (pLeft == nullptr)
+		{
+			return nullptr;
+		}
+
+		std::string_view op;
+		if (expect<TokenKind::binary_operator>(&op) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pRight = parse<EXPRESSION>();
+
+		if (pRight == nullptr)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			BINARY
+			{
+				.Operator = op,
+				.pLeft = pLeft,
+				.pRight = pRight
+			}
+		);
+	}
+
+	template<>
+	ASSIGNMENT* Parser::parse()
+	{
+		EXPRESSION* pVariable = parse<EXPRESSION>();
+
+		if (pVariable == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expect<TokenKind::assignment_operator>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pValue = parse<EXPRESSION>();
+
+		if (pValue == nullptr)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			ASSIGNMENT
+			{
+				.pVariable = pVariable,
+				.pValue = pValue
+			}
+		);
+	}
 
 #pragma region Statements
 

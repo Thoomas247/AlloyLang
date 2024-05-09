@@ -24,5 +24,8 @@ namespace AlloyCompiler
 	};
 
 	using EXPRESSION = VariantNode;
+	using PRIMARY = VariantNode;
 	using STATEMENT = VariantNode;
+	using POSTFIX = VariantNode;
+	
 }

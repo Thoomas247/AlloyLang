@@ -5,18 +5,22 @@
 namespace AlloyCompiler
 {
 	struct TYPE;
-	struct EXPRESSION;
+
+	struct NAMED_VARIABLE
+	{
+		std::string_view Name;
+	};
 
 	struct NAMED_VARIABLE_DECLARATION
 	{
-		const VariableType VarType;
-		const std::string_view Name;
-		const TYPE* pType;
+		VariableType VarType;
+		std::string_view Name;
+		TYPE* pType;
 	};
 
 	struct NAMED_VARIABLE_DEFINITION
 	{
-		const NAMED_VARIABLE_DECLARATION* pDeclaration;
-		const EXPRESSION* pValue;
+		NAMED_VARIABLE_DECLARATION* pDeclaration;
+		EXPRESSION* pValue;
 	};
 }

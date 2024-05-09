@@ -37,11 +37,13 @@ namespace AlloyCompiler
 		{
 			SUCCESS = 0,
 			EOF_REACHED,
-			UNEXPECTED_TOKEN,
+			UNEXPECTED_KIND,
+			UNEXPECTED_VALUE
 		};
 
 	private:
 		std::string tokenKindVectorToString(const std::vector<TokenKind>& tokens) const;
+		std::string stringVectorToString(const std::vector<std::string>& tokens) const;
 
 		template<typename... Args>
 		constexpr void logErrorAtPosition(const std::string& format, Args&&... args);
@@ -72,11 +74,13 @@ namespace AlloyCompiler
 		/// If pTokenValue is not nullptr, it will be set to the kind of the current token.
 		/// If pValueView is not nullptr, it will be set to the value of the current token.
 		/// </summary>
-		template<TokenKind... Tokens>
+		template<TokenKind ...Tokens>
 		Result expect(TokenKind* pTokenValue = nullptr, std::string_view* pValueStringView = nullptr);
 
-		template<TokenKind... Tokens>
+		template<TokenKind ...Tokens>
 		Result expect(std::string_view* pValueStringView, TokenKind* pTokenValue = nullptr);
+
+		Result expectValue(const std::vector<std::string>& values, std::string_view* pValueStringView = nullptr);
 
 	private:
 		NamedNodes m_NamedNodes;
@@ -110,7 +114,7 @@ namespace AlloyCompiler
 		if ((m_TokenBuffers.GetKind(m_CurrentTokenID) != Tokens || ...))
 		{
 			logErrorAtPosition("Expected token of kind {0}.", tokenKindVectorToString({ (Tokens, ...) }));
-			return UNEXPECTED_TOKEN;
+			return UNEXPECTED_KIND;
 		}
 
 		if (pTokenValue != nullptr)

@@ -6,8 +6,6 @@ namespace AlloyCompiler
 {
 	struct NAMED_TYPE;
 	struct NAMED_VARIABLE;
-	struct EXPRESSION;
-	struct ASSIGNABLE;
 
 	struct LITERAL
 	{
@@ -55,19 +53,20 @@ namespace AlloyCompiler
 
 	struct UNARY
 	{
-		EXPRESSION* pValue;
+		std::string_view Operator;
+		EXPRESSION* pExpression;
 	};
 
 	struct BINARY
 	{
-		TokenID OperatorTokenID;
+		std::string_view Operator;
 		EXPRESSION* pLeft;
 		EXPRESSION* pRight;
 	};
 
 	struct ASSIGNMENT
 	{
-		ASSIGNABLE* pAssignable;
+		EXPRESSION* pVariable;
 		EXPRESSION* pValue;
 	};
 }

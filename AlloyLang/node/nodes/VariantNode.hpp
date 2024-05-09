@@ -45,10 +45,21 @@ namespace AlloyCompiler
 	struct VariantNode
 	{
 	public:
+		VariantNode()
+			: m_Kind(NodeKind::None), m_pNode(nullptr)
+		{}
+
 		template <typename T>
 		VariantNode(T* pNode)
-			: m_CurrentKind(NodeInfo::Kind<T>()), m_pNode(pNode)
 		{
+			Set(pNode);
+		}
+
+		template <typename T>
+		void Set(T* pNode)
+		{
+			m_Kind = NodeInfo::Kind<T>();
+			m_pNode = pNode;
 		}
 
 		template <typename T>

@@ -26,9 +26,6 @@ namespace AlloyCompiler
 
 		identifier,
 
-		export_label,
-		public_label,
-
 		extern_keyword,
 		struct_keyword,
 		enum_keyword,
@@ -45,9 +42,6 @@ namespace AlloyCompiler
 		system_keyword,
 		group_keyword,
 		application_keyword,
-
-		require_keyword,
-		exclude_keyword,
 
 		for_keyword,
 		while_keyword,
@@ -77,12 +71,8 @@ namespace AlloyCompiler
 
 		assignment_operator,
 
-		logical_operator,
-		relational_operator,
-		additive_operator,
-		multiplicative_operator,
-
 		unary_operator,
+		binary_operator,
 
 		integer_literal,
 		float_literal,
@@ -100,9 +90,6 @@ namespace AlloyCompiler
 
 		{ TokenKind::identifier, "identifier" },
 
-		{ TokenKind::export_label, "export_label" },
-		{ TokenKind::public_label, "public_label" },
-
 		{ TokenKind::extern_keyword, "extern_keyword"},
 		{ TokenKind::struct_keyword, "struct_keyword" },
 		{ TokenKind::enum_keyword, "enum_keyword" },
@@ -119,9 +106,6 @@ namespace AlloyCompiler
 		{ TokenKind::system_keyword, "system_keyword" },
 		{ TokenKind::group_keyword, "group_keyword" },
 		{ TokenKind::application_keyword, "application_keyword" },
-
-		{ TokenKind::require_keyword, "require_keyword" },
-		{ TokenKind::exclude_keyword, "exclude_keyword" },
 
 		{ TokenKind::for_keyword, "for_keyword" },
 		{ TokenKind::while_keyword, "while_keyword" },
@@ -151,12 +135,8 @@ namespace AlloyCompiler
 
 		{ TokenKind::assignment_operator, "assignment_operator" },
 
-		{ TokenKind::logical_operator, "logical_operator" },
-		{ TokenKind::relational_operator, "relational_operator" },
-		{ TokenKind::additive_operator, "additive_operator" },
-		{ TokenKind::multiplicative_operator, "multiplicative_operator" },
-
 		{ TokenKind::unary_operator, "unary_operator" },
+		{ TokenKind::binary_operator, "binary_operator" },
 
 		{ TokenKind::integer_literal, "integer_literal" },
 		{ TokenKind::float_literal, "float_literal" },
@@ -171,9 +151,6 @@ namespace AlloyCompiler
 	/// </summary>
 	const std::unordered_map<std::string_view, TokenKind> KNOWN_SYMBOLS =
 	{
-		{ "exp", TokenKind::export_label },
-		{ "pub", TokenKind::public_label },
-
 		{ "extern", TokenKind::extern_keyword },
 		{ "struct", TokenKind::struct_keyword },
 		{ "enum", TokenKind::enum_keyword },
@@ -190,9 +167,6 @@ namespace AlloyCompiler
 		{ "system", TokenKind::system_keyword },
 		{ "group", TokenKind::group_keyword },
 		{ "application", TokenKind::application_keyword },
-
-		{ "require", TokenKind::require_keyword },
-		{ "exclude", TokenKind::exclude_keyword },
 
 		{ "for", TokenKind::for_keyword },
 		{ "while", TokenKind::while_keyword },
@@ -222,19 +196,19 @@ namespace AlloyCompiler
 
 		{ "=", TokenKind::assignment_operator },
 
-		{ "&&", TokenKind::logical_operator },
-		{ "||", TokenKind::logical_operator },
-		{ "==", TokenKind::relational_operator },
-		{ "!=", TokenKind::relational_operator },
-		{ "<", TokenKind::relational_operator },
-		{ ">", TokenKind::relational_operator },
-		{ "<=", TokenKind::relational_operator },
-		{ ">=", TokenKind::relational_operator },
-		{ "+", TokenKind::additive_operator },
-		{ "-", TokenKind::additive_operator },
-		{ "*", TokenKind::multiplicative_operator },
-		{ "/", TokenKind::multiplicative_operator },
-		{ "%", TokenKind::multiplicative_operator },
+		{ "&&", TokenKind::binary_operator },
+		{ "||", TokenKind::binary_operator },
+		{ "==", TokenKind::binary_operator },
+		{ "!=", TokenKind::binary_operator },
+		{ "<", TokenKind::binary_operator },
+		{ ">", TokenKind::binary_operator },
+		{ "<=", TokenKind::binary_operator },
+		{ ">=", TokenKind::binary_operator },
+		{ "+", TokenKind::binary_operator },
+		{ "-", TokenKind::binary_operator },
+		{ "*", TokenKind::binary_operator },
+		{ "/", TokenKind::binary_operator },
+		{ "%", TokenKind::binary_operator },
 
 		{ "!", TokenKind::unary_operator },
 		//{ "-", TokenKind::unary_operator },
