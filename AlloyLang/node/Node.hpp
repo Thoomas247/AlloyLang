@@ -21,6 +21,13 @@ namespace AlloyCompiler
 		Pointer
 	};
 
+	enum class ReturnType : uint8_t
+	{
+		Copy,
+		Variable,
+		Constant
+	};
+
 	enum class VariableType : uint8_t
 	{
 		Variable,

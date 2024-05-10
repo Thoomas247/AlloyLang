@@ -29,7 +29,7 @@ namespace AlloyCompiler
 
 	struct RETURN_TYPE
 	{
-		VariableType VarType;
+		ReturnType RetType;
 		TYPE* pType;
 	};
 

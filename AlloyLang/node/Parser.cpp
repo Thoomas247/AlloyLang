@@ -130,7 +130,155 @@ namespace AlloyCompiler
 
 #pragma endregion
 
+	/*
+	NAMED_FUNCTION_DEFINITION:	FUNCTION_SIGNATURE STATEMENT_BLOCK ;
+	EXTERN_FUNCTION_DEFINITION:	extern_keyword FUNCTION_SIGNATURE semicolon ;
 
+	FUNCTION_SIGNATURE:			function identifier open_paren [ NAMED_VARIABLE_DECLARATION { comma NAMED_VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
+		RETURN_TYPE:				[ variable | constant ] TYPE ;
+
+	FUNCTION_CALL:				identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
+	*/
+
+	template<>
+	RETURN_TYPE* Parser::parse()
+	{
+		ReturnType retType = ReturnType::Copy;
+
+		if (kind() == TokenKind::variable_keyword)
+		{
+			retType = ReturnType::Variable;
+		}
+		else if (kind() == TokenKind::constant_keyword)
+		{
+			retType = ReturnType::Constant;
+		}
+
+		if (retType != ReturnType::Copy)
+		{
+			(void)eat();
+		}
+
+		TYPE* pType = parse<TYPE>();
+
+		if (pType == nullptr)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			RETURN_TYPE
+			{
+				.RetType = retType,
+				.pType = pType
+			}
+		);
+	}
+
+	template<>
+	FUNCTION_SIGNATURE* Parser::parse()
+	{
+		if (expect<TokenKind::function_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::string_view name;
+		if (expect<TokenKind::identifier>(&name))
+		{
+			return nullptr;
+		}
+
+		if (expect<TokenKind::open_paren>())
+		{
+			return nullptr;
+		}
+
+		std::vector<NAMED_VARIABLE_DECLARATION*> parameters;
+		while (kind() != TokenKind::close_paren)
+		{
+			NAMED_VARIABLE_DECLARATION* pVariableDeclaration = parse<NAMED_VARIABLE_DECLARATION>();
+
+			if (pVariableDeclaration == nullptr)
+			{
+				return nullptr;
+			}
+
+			parameters.push_back(pVariableDeclaration);
+
+			if (kind() == TokenKind::comma)
+			{
+				(void)eat();
+			}
+		}
+
+		(void)eat();
+
+		RETURN_TYPE* pReturnType = nullptr;
+		if (kind() == TokenKind::arrow)
+		{
+			(void)eat();
+
+			pReturnType = parse<RETURN_TYPE>();
+
+			if (pReturnType == nullptr)
+			{
+				return nullptr;
+			}
+		}
+
+		return createNode(
+			FUNCTION_SIGNATURE
+			{
+				.Name = name,
+				.Parameters = parameters,
+				.pReturnType = pReturnType
+			}
+		);
+	}
+
+	template<>
+	FUNCTION_CALL* Parser::parse()
+	{
+		std::string_view functionName;
+		if (expect<TokenKind::identifier>(&functionName) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		if (expect<TokenKind::open_paren>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<EXPRESSION*> arguments;
+		while (kind() != TokenKind::close_paren)
+		{
+			EXPRESSION* pArgument = parse<EXPRESSION>();
+
+			if (pExpression == nullptr)
+			{
+				return nullptr;
+			}
+
+			arguments.push_back(pArgument);
+
+			if (kind() == TokenKind::comma)
+			{
+				(void)eat();
+			}
+		}
+
+		(void)eat();
+
+		return createNode(
+			FUNCTION_CALL
+			{
+				.Function = functionName,
+				.Arguments = arguments
+			}
+		);
+	}
 
 #pragma region Expressions
 
