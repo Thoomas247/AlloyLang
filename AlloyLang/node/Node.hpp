@@ -5,6 +5,15 @@
 
 namespace AlloyCompiler
 {
+	enum class LiteralType : uint8_t
+	{
+		Integer,
+		Float,
+		Boolean,
+		String,
+		Character
+	};
+
 	enum class TypeModifier : uint8_t
 	{
 		None,
@@ -23,9 +32,14 @@ namespace AlloyCompiler
 		None = -1
 	};
 
-	using EXPRESSION = VariantNode;
-	using PRIMARY = VariantNode;
-	using STATEMENT = VariantNode;
-	using POSTFIX = VariantNode;
+	using PRIMARY = VariantNode<LITERAL, NAMED_VARIABLE, NAMED_VARIABLE_DEFINITION, FUNCTION_CALL, CONSTRUCTOR, 
+		POINTER_INIT, POINTER_MOVE, INITIALIZER_LIST, ENCLOSED_EXPRESSION>;
+
+	using STATEMENT = VariantNode<NAMED_VARIABLE_DEFINITION, FUNCTION_CALL, ASSIGNMENT, FOR_LOOP, WHILE_LOOP,
+		IF_STATEMENT, STATEMENT_BLOCK, RETURN>;
+
+	using POSTFIX = VariantNode<ARRAY_ACCESS, MEMBER_ACCESS>;
+
+	using EXPRESSION = VariantNode<PRIMARY, POSTFIX, UNARY, BINARY, ASSIGNMENT>;
 	
 }

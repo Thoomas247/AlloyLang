@@ -130,6 +130,178 @@ namespace AlloyCompiler
 
 #pragma endregion
 
+
+
+#pragma region Expressions
+
+	template<>
+	EXPRESSION* Parser::parse();
+
+	template<>
+	LITERAL* Parser::parse()
+	{
+		using enum TokenKind;
+
+		TokenKind kind;
+		std::string_view value;
+		if (expect<integer_literal,
+			float_literal,
+			boolean_literal,
+			string_literal,
+			character_literal>(&kind, &value) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		LiteralType literalType;
+		switch (kind)
+		{
+		case integer_literal:
+			literalType = LiteralType::Integer;
+			break;
+
+		case float_literal:
+			literalType = LiteralType::Float;
+			break;
+
+		case boolean_literal:
+			literalType = LiteralType::Boolean;
+			break;
+
+		case string_literal:
+			literalType = LiteralType::String;
+			break;
+
+		case character_literal:
+			literalType = LiteralType::Character;
+			break;
+		}
+
+		return createNode(
+			LITERAL
+			{
+				.Type = literalType,
+				.Value = value
+			}
+		);
+	}
+
+	template<>
+	CONSTRUCTOR* Parser::parse()
+	{
+		NAMED_TYPE* pNamedType = parse<NAMED_TYPE>();
+
+		if (pNamedType == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expect<TokenKind::open_brace>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<std::pair<std::string_view, EXPRESSION*>> arguments;
+		while (kind() != TokenKind::close_brace)
+		{
+			std::string_view memberName;
+			if (expect<TokenKind::identifier>(&memberName) != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			if (expect<TokenKind::assignment_operator>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			EXPRESSION* pValue = parse<EXPRESSION>();
+
+			if (pValue == nullptr)
+			{
+				return nullptr;
+			}
+
+			arguments.push_back({ memberName, pValue });
+
+			if (kind() == TokenKind::comma)
+			{
+				(void)eat();
+			}
+		}
+
+		// eat closing brace
+		(void)eat();
+
+		return createNode(
+			CONSTRUCTOR
+			{
+				.pType = pNamedType,
+				.Arguments = std::move(arguments)
+			}
+		);
+	}
+
+	template<>
+	POINTER_INIT* Parser::parse()
+	{
+		if (expect<TokenKind::new_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pValue = nullptr;
+		EXPRESSION* pSize = nullptr;
+
+		// handle array allocation
+		if (kind() == TokenKind::open_bracket)
+		{
+			(void)eat();
+
+			pValue = parse<EXPRESSION>();
+
+			if (pValue == nullptr)
+			{
+				return nullptr;
+			}
+
+			if (expect<TokenKind::semicolon>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			pSize = parse<EXPRESSION>();
+
+			if (pSize == nullptr)
+			{
+				return nullptr;
+			}
+
+			if (expect<TokenKind::close_bracket>() != SUCCESS)
+			{
+				return nullptr;
+			}
+		}
+
+		else
+		{
+			pValue = parse<EXPRESSION>();
+
+			if (pValue == nullptr)
+			{
+				return nullptr;
+			}
+		}
+
+		return createNode(
+			POINTER_INIT
+			{
+				.pValue = pValue,
+				.pSize = pSize
+			}
+		);
+	}
+
 	template<>
 	POINTER_MOVE* Parser::parse()
 	{
@@ -224,19 +396,147 @@ namespace AlloyCompiler
 		);
 	}
 
-	template<>
-	POSTFIX* Parser::parse()
+	EXPRESSION* Parser::parse_PRIMARY()
+	{
+		using enum TokenKind;
+
+		switch (kind())
+		{
+		case integer_literal:
+		case float_literal:
+		case boolean_literal:
+		case string_literal:
+		case character_literal:
+		{
+			LITERAL* pLiteral = parse<LITERAL>();
+
+			if (pLiteral == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(PRIMARY(pLiteral));
+		}
+
+		case identifier:
+		{
+			// NAMED_VARIABLE_DEFINITION
+			if (peek() == variable_keyword || peek() == constant_keyword)
+			{
+				NAMED_VARIABLE_DEFINITION* pVariableDefinition = parse<NAMED_VARIABLE_DEFINITION>();
+
+				if (pVariableDefinition == nullptr)
+				{
+					return nullptr;
+				}
+
+				return createNode(PRIMARY(pVariableDefinition));
+			}
+
+			// FUNCTION_CALL
+			if (peek() == open_paren)
+			{
+				FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>();
+
+				if (pFunctionCall == nullptr)
+				{
+					return nullptr;
+				}
+
+				return createNode(PRIMARY(pFunctionCall));
+			}
+
+			// CONSTRUCTOR
+			if (peek() == open_brace)
+			{
+				CONSTRUCTOR* pConstructor = parse<CONSTRUCTOR>();
+
+				if (pConstructor == nullptr)
+				{
+					return nullptr;
+				}
+
+				return createNode(PRIMARY(pConstructor));
+			}
+
+			// NAMED_VARIABLE
+			NAMED_VARIABLE* pNamedVariable = parse<NAMED_VARIABLE>();
+
+			if (pNamedVariable == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(PRIMARY(pNamedVariable));
+		}
+
+		case new_keyword:
+		{
+			POINTER_INIT* pPointerInit = parse<POINTER_INIT>();
+
+			if (pPointerInit == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(PRIMARY(pPointerInit));
+		}
+
+		case move_keyword:
+		{
+			POINTER_MOVE* pPointerMove = parse<POINTER_MOVE>();
+
+			if (pPointerMove == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(PRIMARY(pPointerMove));
+		}
+
+		case open_brace:
+		{
+			INITIALIZER_LIST* pInitializerList = parse<INITIALIZER_LIST>();
+
+			if (pInitializerList == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(PRIMARY(pInitializerList));
+		}
+
+		case open_paren:
+		{
+			ENCLOSED_EXPRESSION* pEnclosedExpression = parse<ENCLOSED_EXPRESSION>();
+
+			if (pEnclosedExpression == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(PRIMARY(pEnclosedExpression));
+		}
+
+		default:
+		{
+			(void)expect<integer_literal, float_literal, boolean_literal, string_literal, character_literal,
+				identifier, new_keyword, move_keyword, open_brace, open_paren>();
+			return nullptr;
+		}
+		}
+	}
+
+	EXPRESSION* Parser::parse_POSTFIX()
 	{
 		// even though left size can be any expression in the syntax, due to the order we parse expressions in
 		// we can only have a primary expression at this point
-		PRIMARY* pPrimaryExpression = parse<PRIMARY>();
+		EXPRESSION* pLeft = parse_PRIMARY();
 
-		if (pPrimaryExpression == nullptr)
+		if (pLeft == nullptr)
 		{
 			return nullptr;
 		}
-
-		EXPRESSION* pLeft = createNode(EXPRESSION(pPrimaryExpression));
 
 		while (kind() == TokenKind::open_bracket || kind() == TokenKind::dot)
 		{
@@ -298,63 +598,225 @@ namespace AlloyCompiler
 		return pLeft;	// if no POSTFIX was found, this returns a PRIMARY wrapped in an EXPRESSION as expected
 	}
 
-	template<>
-	UNARY* Parser::parse()
+	EXPRESSION* Parser::parse_UNARY()
 	{
-		// operator '-' is ambiguous (can be binary or unary) so we expect based on value instead of kind
-		std::string_view op;
-		if (expectValue({ "!", "-" }, &op) != SUCCESS)
+		// operators '-' and '&' are ambiguous so we expect based on value instead of kind
+		
+		if (value() != "!" && value() != "-" && value() != "&")
 		{
-			return nullptr;
+			return parse_POSTFIX();
 		}
 
-		EXPRESSION* pExpression = parse<EXPRESSION>();
-
+		std::string_view op;
+		(void)expectValue({ "!", "-", "&" }, &op);
+	
+		EXPRESSION* pExpression = parse_POSTFIX();
+	
 		if (pExpression == nullptr)
 		{
 			return nullptr;
 		}
 
-		return createNode(
+		UNARY* pUnary = createNode(
 			UNARY
 			{
 				.Operator = op,
 				.pExpression = pExpression
 			}
 		);
+	
+		return createNode(EXPRESSION(pUnary));
 	}
 
-	template<>
-	BINARY* Parser::parse()
+	EXPRESSION* Parser::parse_BINARY()
 	{
-		EXPRESSION* pLeft = parse<EXPRESSION>();
-
-		if (pLeft == nullptr)
-		{
-			return nullptr;
-		}
-
-		std::string_view op;
-		if (expect<TokenKind::binary_operator>(&op) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		EXPRESSION* pRight = parse<EXPRESSION>();
-
-		if (pRight == nullptr)
-		{
-			return nullptr;
-		}
-
-		return createNode(
-			BINARY
+		// handles *, / and %
+		auto tryParseMultiplicativeExpression = [&]() -> EXPRESSION*
 			{
-				.Operator = op,
-				.pLeft = pLeft,
-				.pRight = pRight
-			}
-		);
+				EXPRESSION* pLeft = parse_UNARY();
+
+				if (pLeft == nullptr)
+				{
+					return nullptr;
+				}
+
+				while (value() == "*" || value() == "/" || value() == "%")
+				{
+					std::string_view op;
+					(void)expect<TokenKind::binary_operator>(&op);
+
+					EXPRESSION* pRight = parse_UNARY();
+
+					if (pRight == nullptr)
+					{
+						return nullptr;
+					}
+
+					BINARY* pBinary = createNode(
+						BINARY
+						{
+							.Operator = op,
+							.pLeft = pLeft,
+							.pRight = pRight
+						}
+					);
+
+					pLeft = createNode(EXPRESSION(pBinary));
+				}
+
+				return pLeft;
+			};
+
+		// handles + and -
+		auto tryParseAdditiveExpression = [&]() -> EXPRESSION*
+			{
+				EXPRESSION* pLeft = tryParseMultiplicativeExpression();
+
+				if (pLeft == nullptr)
+				{
+					return nullptr;
+				}
+
+				while (value() == "+" || value() == "-")
+				{
+					std::string_view op;
+					(void)expect<TokenKind::binary_operator>(&op);
+
+					EXPRESSION* pRight = tryParseMultiplicativeExpression();
+
+					if (pRight == nullptr)
+					{
+						return nullptr;
+					}
+
+					BINARY* pBinary = createNode(
+						BINARY
+						{
+							.Operator = op,
+							.pLeft = pLeft,
+							.pRight = pRight
+						}
+					);
+
+					pLeft = createNode(EXPRESSION(pBinary));
+				}
+
+				return pLeft;
+			};
+
+		// handles ==, !=, <, <=, >, >=
+		auto tryParseRelationalExpression = [&]() -> EXPRESSION*
+			{
+				EXPRESSION* pLeft = tryParseAdditiveExpression();
+
+				if (pLeft == nullptr)
+				{
+					return nullptr;
+				}
+
+				while (value() == "==" || value() == "!=" || value() == "<" || value() == "<=" 
+					|| value() == ">" || value() == ">=")
+				{
+					std::string_view op;
+					(void)expect<TokenKind::binary_operator>(&op);
+
+					EXPRESSION* pRight = tryParseAdditiveExpression();
+
+					if (pRight == nullptr)
+					{
+						return nullptr;
+					}
+
+					BINARY* pBinary = createNode(
+						BINARY
+						{
+							.Operator = op,
+							.pLeft = pLeft,
+							.pRight = pRight
+						}
+					);
+
+					pLeft = createNode(EXPRESSION(pBinary));
+				}
+
+				return pLeft;
+			};
+
+		// handles && and ||
+		auto tryParseLogicalExpression = [&]() -> EXPRESSION*
+			{
+				EXPRESSION* pLeft = tryParseRelationalExpression();
+
+				if (pLeft == nullptr)
+				{
+					return nullptr;
+				}
+
+				while (value() == "&&" || value() == "||")
+				{
+					std::string_view op;
+					(void)expect<TokenKind::binary_operator>(&op);
+
+					EXPRESSION* pRight = tryParseRelationalExpression();
+
+					if (pRight == nullptr)
+					{
+						return nullptr;
+					}
+
+					BINARY* pBinary = createNode(
+						BINARY
+						{
+							.Operator = op,
+							.pLeft = pLeft,
+							.pRight = pRight
+						}
+					);
+
+					pLeft = createNode(EXPRESSION(pBinary));
+				}
+
+				return pLeft;
+			};
+
+		// handles =
+		auto tryParseAssignmentExpression = [&]() -> EXPRESSION*
+			{
+				EXPRESSION* pLeft = tryParseLogicalExpression();
+
+				if (pLeft == nullptr)
+				{
+					return nullptr;
+				}
+
+				while (value() == "=")
+				{
+					std::string_view op;
+					(void)expect<TokenKind::binary_operator>(&op);
+
+					EXPRESSION* pRight = tryParseLogicalExpression();
+
+					if (pRight == nullptr)
+					{
+						return nullptr;
+					}
+
+					BINARY* pBinary = createNode(
+						BINARY
+						{
+							.Operator = op,
+							.pLeft = pLeft,
+							.pRight = pRight
+						}
+					);
+
+					pLeft = createNode(EXPRESSION(pBinary));
+				}
+
+				return pLeft;
+			};
+
+		return tryParseAssignmentExpression();
 	}
 
 	template<>
@@ -387,6 +849,14 @@ namespace AlloyCompiler
 			}
 		);
 	}
+
+	template<>
+	EXPRESSION* Parser::parse()
+	{
+		return parse_BINARY();
+	}
+
+#pragma endregion
 
 #pragma region Statements
 

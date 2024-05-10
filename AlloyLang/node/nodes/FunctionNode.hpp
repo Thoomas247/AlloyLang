@@ -9,11 +9,6 @@ namespace AlloyCompiler
 	struct STATEMENT_BLOCK;
 	struct TYPE;
 
-	struct NAMED_FUNCTION
-	{
-		std::string_view Name;
-	};
-
 	struct FUNCTION_SIGNATURE 
 	{
 		std::string_view Name;
@@ -40,7 +35,7 @@ namespace AlloyCompiler
 
 	struct FUNCTION_CALL
 	{
-		NAMED_FUNCTION* pFunction;
+		std::string_view Function;
 		std::vector<EXPRESSION*> Arguments;
 	};
 

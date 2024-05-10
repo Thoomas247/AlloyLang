@@ -9,7 +9,8 @@ namespace AlloyCompiler
 
 	struct LITERAL
 	{
-
+		LiteralType Type;
+		std::string_view Value;
 	};
 
 	struct CONSTRUCTOR 

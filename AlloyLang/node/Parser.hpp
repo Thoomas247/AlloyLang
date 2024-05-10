@@ -51,6 +51,11 @@ namespace AlloyCompiler
 		template <typename T, typename... Ts>
 		T* parse(Ts...) = delete;
 
+		EXPRESSION* parse_PRIMARY();
+		EXPRESSION* parse_POSTFIX();
+		EXPRESSION* parse_UNARY();
+		EXPRESSION* parse_BINARY();
+
 		template <typename T>
 		T* createNode(const T& node);
 		template <typename T>

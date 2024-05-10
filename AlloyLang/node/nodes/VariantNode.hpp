@@ -42,6 +42,7 @@ namespace AlloyCompiler
 	/// <summary>
 	/// Type-safe pointer to a node of any type.
 	/// </summary>
+	template<typename ... Ts>
 	struct VariantNode
 	{
 	public:
@@ -58,6 +59,8 @@ namespace AlloyCompiler
 		template <typename T>
 		void Set(T* pNode)
 		{
+			ASSERT((std::is_same_v<T, Ts> || ...), "Variant node cannot hold the given type!");
+
 			m_Kind = NodeInfo::Kind<T>();
 			m_pNode = pNode;
 		}
