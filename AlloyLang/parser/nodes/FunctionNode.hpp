@@ -1,17 +1,18 @@
 #pragma once
 
 #include "../Node.hpp"
-#include "ExpressionNode.hpp"
+#include "VariantNodes.hpp"
 
 namespace AlloyCompiler
 {
 	struct NAMED_VARIABLE_DECLARATION;
 	struct STATEMENT_BLOCK;
-	struct TYPE;
+	struct RETURN_TYPE;
 
 	struct FUNCTION_SIGNATURE 
 	{
 		std::string_view Name;
+		bool IsVarArg;
 		std::vector<NAMED_VARIABLE_DECLARATION*> Parameters;
 		RETURN_TYPE* pReturnType;	// optional
 	};

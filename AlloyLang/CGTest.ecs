@@ -3,20 +3,20 @@ extern fn printf (const str : String, ...) -> i64;
 
 /* Math Utilities */
 
-struct Vector3
+type Vector3 = struct
 {
-	var x : f64;
-	var y : f64;
-	var z : f64;
-}
+	x : f64,
+	y : f64,
+	z : f64,
+};
 
-struct Quaternion
+type Quaternion = struct
 {
-	var x : f64;
-	var y : f64;
-	var z : f64;
-	var w : f64;
-}
+	x : f64,
+	y : f64,
+	z : f64,
+	w : f64,
+};
 
 fn Vector3_print(const v : &Vector3)
 {

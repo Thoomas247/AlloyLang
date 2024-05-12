@@ -29,13 +29,13 @@ namespace AlloyCompiler
 			ASSERT((m_pCurrentIndex + sizeof(N)) < m_pEnd, "Allocator is full!");
 
 			// this is the location we want the node to go into
-			N* pNode = static_cast<N*>(m_pCurrentIndex);
+			N* pNode = (N*)m_pCurrentIndex;
 			
 			// set the location for the next node
 			m_pCurrentIndex += sizeof(N);
 
 			// copy the value into the node
-			*pNode = value;
+			std::memcpy(pNode, &value, sizeof(N));
 
 			return pNode;
 		}

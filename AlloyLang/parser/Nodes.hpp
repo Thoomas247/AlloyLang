@@ -6,4 +6,4 @@
 #include "nodes/StatementNode.hpp"
 #include "nodes/TypeNode.hpp"
 #include "nodes/VariableNode.hpp"
-#include "nodes/VariantNode.hpp"
+#include "nodes/VariantNodes.hpp"

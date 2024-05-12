@@ -66,9 +66,8 @@
 	TYPE:						[ reference | pointer ] ( NAMED_TYPE | STRUCT_TYPE | ARRAY_TYPE ) ;
 
 		NAMED_TYPE:					identifier ;
-		STRUCT_TYPE:				struct_keyword open_brace [ STRUCT_MEMBER { comma STRUCT_MEMBER } ] close_brace ;
-			STRUCT_MEMBER:				identifier colon TYPE ;
-		ARRAY_TYPE:					open_bracket TYPE [ semicolon integer_literal ] close_bracket ;
+		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { comma identifier colon TYPE } ] close_brace ;
+		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
 
 	NAMED_TYPE_DEFINITION:		type_keyword identifier assignment_operator TYPE semicolon ;
 
@@ -83,11 +82,11 @@
 
 	(* - Functions - *)
 
-	NAMED_FUNCTION_DEFINITION:	FUNCTION_SIGNATURE STATEMENT_BLOCK ;
-	EXTERN_FUNCTION_DEFINITION:	extern_keyword FUNCTION_SIGNATURE semicolon ;
-
 	FUNCTION_SIGNATURE:			function identifier open_paren [ NAMED_VARIABLE_DECLARATION { comma NAMED_VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
 		RETURN_TYPE:				[ variable | constant ] TYPE ;
+
+	NAMED_FUNCTION_DEFINITION:	FUNCTION_SIGNATURE STATEMENT_BLOCK ;
+	EXTERN_FUNCTION_DEFINITION:	extern_keyword FUNCTION_SIGNATURE semicolon ;
 
 	FUNCTION_CALL:				identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
 

@@ -1,16 +1,14 @@
 #pragma once
 
-#include "../Node.hpp"
-
-#include "nodes/ECSNode.hpp"
-#include "nodes/ExpressionNode.hpp"
-#include "nodes/FunctionNode.hpp"
-#include "nodes/StatementNode.hpp"
-#include "nodes/TypeNode.hpp"
-#include "nodes/VariableNode.hpp"
+#include "Node.hpp"
 
 namespace AlloyCompiler
 {
+	enum class NodeKind : uint8_t
+	{
+		None = std::numeric_limits<uint8_t>::max()
+	};
+
 	/// <summary>
 	/// Helper class to create a unique ID per Node type.
 	/// </summary>
@@ -24,14 +22,13 @@ namespace AlloyCompiler
 		}
 
 	private:
-		inline static NodeKind s_Counter = (NodeKind)0;
+		using UnderlyingType = std::underlying_type_t<NodeKind>;
+		inline static UnderlyingType s_Counter = 0;
 
 		template <typename T>
 		static NodeKind getKind()
 		{
-			using UnderlyingType = std::underlying_type_t<NodeKind>;
-
-			static NodeKind kind = static_cast<NodeKind>(++static_cast<UnderlyingType>(s_Counter));
+			static NodeKind kind = static_cast<NodeKind>(++s_Counter);
 
 			ASSERT(kind != NodeKind::None, "NodeKind overflow!");
 

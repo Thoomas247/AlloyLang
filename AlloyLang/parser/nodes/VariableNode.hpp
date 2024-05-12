@@ -1,11 +1,10 @@
 #pragma once
 
 #include "../Node.hpp"
+#include "VariantNodes.hpp"
 
 namespace AlloyCompiler
 {
-	struct TYPE;
-
 	struct NAMED_VARIABLE
 	{
 		std::string_view Name;

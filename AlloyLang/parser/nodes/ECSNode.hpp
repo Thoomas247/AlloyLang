@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Node.hpp"
+#include "VariantNodes.hpp"
 
 namespace AlloyCompiler
 {

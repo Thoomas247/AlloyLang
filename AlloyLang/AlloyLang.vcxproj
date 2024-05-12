@@ -131,59 +131,25 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="codegen\CodeGenerator.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">llvm.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">llvm.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">llvm.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="codegen\llvm\llvm.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">llvm.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">llvm.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">llvm.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="codegen\NamedValues.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">llvm.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">llvm.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">llvm.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="ecs\ECSResolver.cpp" />
-    <ClCompile Include="node\Parser.cpp" />
-    <ClCompile Include="parser\Node.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
-    <ClCompile Include="parser\TreePrinter.cpp" />
     <ClCompile Include="tokenizer\Source.cpp" />
     <ClCompile Include="tokenizer\Token.cpp" />
     <ClCompile Include="tokenizer\Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="codegen\CodeGenerator.hpp" />
-    <ClInclude Include="codegen\llvm\llvm.hpp" />
-    <ClInclude Include="codegen\NamedValues.hpp" />
-    <ClInclude Include="ecs\ECSResolver.hpp" />
     <ClInclude Include="log\Log.hpp" />
-    <ClInclude Include="node\Node.hpp" />
-    <ClInclude Include="node\NodeAllocator.hpp" />
-    <ClInclude Include="node\Nodes.hpp" />
-    <ClInclude Include="node\nodes\ECSNode.hpp" />
-    <ClInclude Include="node\nodes\ExpressionNode.hpp" />
-    <ClInclude Include="node\nodes\FunctionNode.hpp" />
-    <ClInclude Include="node\nodes\StatementNode.hpp" />
-    <ClInclude Include="node\nodes\TypeNode.hpp" />
-    <ClInclude Include="node\nodes\VariableNode.hpp" />
-    <ClInclude Include="node\nodes\VariantNode.hpp" />
-    <ClInclude Include="node\Parser.hpp" />
     <ClInclude Include="parser\Node.hpp" />
+    <ClInclude Include="parser\NodeAllocator.hpp" />
+    <ClInclude Include="parser\Nodes.hpp" />
+    <ClInclude Include="parser\nodes\ECSNode.hpp" />
+    <ClInclude Include="parser\nodes\ExpressionNode.hpp" />
+    <ClInclude Include="parser\nodes\FunctionNode.hpp" />
+    <ClInclude Include="parser\nodes\StatementNode.hpp" />
+    <ClInclude Include="parser\nodes\TypeNode.hpp" />
+    <ClInclude Include="parser\nodes\VariableNode.hpp" />
+    <ClInclude Include="parser\nodes\VariantNodes.hpp" />
+    <ClInclude Include="parser\VariantNode.hpp" />
     <ClInclude Include="parser\Parser.hpp" />
-    <ClInclude Include="parser\TreePrinter.hpp" />
     <ClInclude Include="TestString.hpp" />
     <ClInclude Include="tokenizer\Source.hpp" />
     <ClInclude Include="tokenizer\Token.hpp" />
