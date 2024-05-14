@@ -52,6 +52,8 @@ namespace AlloyCompiler
 		new_keyword,
 		move_keyword,
 
+		pound,
+
 		reference,
 		//pointer,
 
@@ -84,65 +86,67 @@ namespace AlloyCompiler
 	/// <summary>
 	/// Maps TokenKind enum values to their string representation.
 	/// </summary>
-	const std::unordered_map<TokenKind, std::string> TOKEN_KIND_NAMES =
+	const std::unordered_map<TokenKind, std::string> TOKEN_KIND_VALUES =
 	{
 		{ TokenKind::none, "none" },
 
 		{ TokenKind::identifier, "identifier" },
 
-		{ TokenKind::extern_keyword, "extern_keyword"},
-		{ TokenKind::struct_keyword, "struct_keyword" },
-		{ TokenKind::enum_keyword, "enum_keyword" },
-		{ TokenKind::function_keyword, "function_keyword" },
+		{ TokenKind::extern_keyword,		"extern"},
+		{ TokenKind::struct_keyword,		"struct" },
+		{ TokenKind::enum_keyword,			"enum" },
+		{ TokenKind::function_keyword,		"fn" },
 
-		{ TokenKind::type_keyword, "type_keyword" },
+		{ TokenKind::type_keyword,			"type" },
 
-		{ TokenKind::variable_keyword, "variable_keyword" },
-		{ TokenKind::constant_keyword, "constant_keyword" },
+		{ TokenKind::pound,					"#" },
 
-		{ TokenKind::resource_keyword, "resource_keyword" },
-		{ TokenKind::component_keyword, "component_keyword" },
-		{ TokenKind::query_keyword, "query_keyword" },
-		{ TokenKind::system_keyword, "system_keyword" },
-		{ TokenKind::group_keyword, "group_keyword" },
-		{ TokenKind::application_keyword, "application_keyword" },
+		{ TokenKind::variable_keyword,		"var" },
+		{ TokenKind::constant_keyword,		"const" },
 
-		{ TokenKind::for_keyword, "for_keyword" },
-		{ TokenKind::while_keyword, "while_keyword" },
-		{ TokenKind::if_keyword, "if_keyword" },
-		{ TokenKind::else_keyword, "else_keyword" },
-		{ TokenKind::return_keyword, "return_keyword" },
+		{ TokenKind::resource_keyword,		"resource" },
+		{ TokenKind::component_keyword,		"component" },
+		{ TokenKind::query_keyword,			"query" },
+		{ TokenKind::system_keyword,		"system" },
+		{ TokenKind::group_keyword,			"group" },
+		{ TokenKind::application_keyword,	"application" },
 
-		{ TokenKind::new_keyword, "new_keyword" },
-		{ TokenKind::move_keyword, "move_keyword" },
+		{ TokenKind::for_keyword,			"for" },
+		{ TokenKind::while_keyword,			"while" },
+		{ TokenKind::if_keyword,			"if" },
+		{ TokenKind::else_keyword,			"else" },
+		{ TokenKind::return_keyword,		"return" },
 
-		{ TokenKind::reference, "reference" },
-		//{ TokenKind::pointer, "pointer" },
+		{ TokenKind::new_keyword,			"new" },
+		{ TokenKind::move_keyword,			"move" },
 
-		{ TokenKind::comma, "comma" },
-		{ TokenKind::colon, "colon" },
-		{ TokenKind::semicolon, "semicolon" },
-		{ TokenKind::dot, "dot" },
-		{ TokenKind::arrow, "arrow" },
-		{ TokenKind::ellipsis, "ellipsis" },
+		{ TokenKind::reference,				"&" },
+		//{ TokenKind::pointer,				"*" },
 
-		{ TokenKind::open_paren, "open_paren" },
-		{ TokenKind::close_paren, "close_paren" },
-		{ TokenKind::open_brace, "open_brace" },
-		{ TokenKind::close_brace, "close_brace" },
-		{ TokenKind::open_bracket, "open_bracket" },
-		{ TokenKind::close_bracket, "close_bracket" },
+		{ TokenKind::comma,					"," },
+		{ TokenKind::colon,					":" },
+		{ TokenKind::semicolon,				";" },
+		{ TokenKind::dot,					"." },
+		{ TokenKind::arrow,					"->" },
+		{ TokenKind::ellipsis,				"..." },
 
-		{ TokenKind::assignment_operator, "assignment_operator" },
+		{ TokenKind::open_paren,			"(" },
+		{ TokenKind::close_paren,			")" },
+		{ TokenKind::open_brace,			"{" },
+		{ TokenKind::close_brace,			"}" },
+		{ TokenKind::open_bracket,			"[" },
+		{ TokenKind::close_bracket,			"]" },
 
-		{ TokenKind::unary_operator, "unary_operator" },
-		{ TokenKind::binary_operator, "binary_operator" },
+		{ TokenKind::assignment_operator,	"=" },
 
-		{ TokenKind::integer_literal, "integer_literal" },
-		{ TokenKind::float_literal, "float_literal" },
-		{ TokenKind::boolean_literal, "boolean_literal" },
-		{ TokenKind::string_literal, "string_literal" },
-		{ TokenKind::character_literal, "character_literal" }
+		{ TokenKind::unary_operator,		"unary operator" },
+		{ TokenKind::binary_operator,		"binary operator" },
+
+		{ TokenKind::integer_literal,		"integer literal" },
+		{ TokenKind::float_literal,			"float literal" },
+		{ TokenKind::boolean_literal,		"boolean literal" },
+		{ TokenKind::string_literal,		"string literal" },
+		{ TokenKind::character_literal,		"character literal" }
 	};
 
 	/// <summary>
@@ -176,6 +180,8 @@ namespace AlloyCompiler
 
 		{ "new", TokenKind::new_keyword },
 		{ "move", TokenKind::move_keyword },
+
+		{ "#", TokenKind::pound },
 
 		{ "&", TokenKind::reference },
 		//{ "*", TokenKind::pointer },
@@ -244,70 +250,6 @@ namespace AlloyCompiler
 	{
 	public:
 		/// <summary>
-		/// Utility class to iterate over the tokens in a TokenBuffers.
-		/// </summary>
-		class Iterator
-		{
-		public:
-			Iterator(const TokenBuffers& tokenBuffers);
-
-			/// <summary>
-			/// Returns the TokenBuffers being iterated over.
-			/// </summary>
-			const TokenBuffers& GetTokenBuffers() const;
-
-			/// <summary>
-			/// Move to the next token.
-			/// Returns false if there are no more tokens, true otherwise.
-			/// </summary>
-			[[nodiscard]] bool Next();
-
-			/// <summary>
-			/// Returns true if Next() will return true when next called.
-			/// </summary>
-			[[nodiscard]] bool HasNext() const;
-
-			/// <summary>
-			/// Move back to the previous token.
-			/// </summary>
-			void Previous();
-
-			/// <summary>
-			/// Returns the kind of the current token.
-			/// </summary>
-			TokenKind GetKind() const;
-
-			/// <summary>
-			/// Returns the string value of the current token.
-			/// </summary>
-			const std::string_view& GetValue() const;
-
-			/// <summary>
-			/// Returns the location in the file of the current token.
-			/// </summary>
-			const Location& GetLocation() const;
-
-			/// <summary>
-			/// Returns the string value of the line the current token is on.
-			/// </summary>
-			std::string_view GetLine() const;
-
-			/// <summary>
-			/// Returns the ID of the current token.
-			/// </summary>
-			TokenID GetCurrentID() const;
-
-		private:
-			const TokenBuffers& m_TokenBuffers;
-			TokenID m_CurrentID;
-		};
-
-	public:
-		TokenBuffers(const Source& source);
-
-		Iterator GetIterator() const;
-
-		/// <summary>
 		/// Creates a new token and returns its ID.
 		/// </summary>
 		TokenID AddToken(TokenKind kind, const std::string_view& value, const Location& location);
@@ -333,14 +275,7 @@ namespace AlloyCompiler
 		/// </summary>
 		const Location& GetLocation(TokenID id) const;
 
-		/// <summary>
-		/// Returns the string value of the line starting at the given character index.
-		/// </summary>
-		std::string_view GetLine(size_t startIndex) const;
-
 	private:
-		const Source& m_Source;
-
 		std::vector<TokenKind> m_Kinds;
 		std::vector<std::string_view> m_Values;
 		std::vector<Location> m_Locations;

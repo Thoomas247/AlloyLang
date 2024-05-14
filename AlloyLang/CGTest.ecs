@@ -5,17 +5,17 @@ extern fn printf (const str : String, ...) -> i64;
 
 type Vector3 = struct
 {
-	x : f64,
-	y : f64,
-	z : f64,
+	var x: f64,
+	var y: f64,
+	var z: f64,
 };
 
 type Quaternion = struct
 {
-	x : f64,
-	y : f64,
-	z : f64,
-	w : f64,
+	var x: f64,
+	var y: f64,
+	var z: f64,
+	var w: f64,
 };
 
 fn Vector3_print(const v : &Vector3)
@@ -25,7 +25,7 @@ fn Vector3_print(const v : &Vector3)
 
 fn Vector3_translate(const point : Vector3, const vector : Vector3) -> Vector3
 {
-	var result : Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
+	var result: Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
 					
 	result.x = point.x + vector.x;
 	result.y = point.y + vector.y;
@@ -47,12 +47,12 @@ fn draw_mesh(const vertices : *[Vector3], const num_vertices : u32, const indice
 
 resource RootEntity = struct
 {
-	id : i32,
+	var id: i32,
 };
 
 resource CurrentScene = struct
 {
-	id : i32,
+	var id: i32,
 };
 
 
@@ -60,40 +60,35 @@ resource CurrentScene = struct
 
 component LocalTransform = struct
 {
-	var position : Vector3;
-	var rotation : Quaternion;
-	var scale : Vector3;
+	var position: Vector3,
+	var rotation: Quaternion,
+	var scale: Vector3,
 };
 
 component WorldTransform = struct
 {
-	var position : Vector3;
-	var rotation : Quaternion;
-	var scale : Vector3;
+	var position: Vector3,
+	var rotation: Quaternion,
+	var scale: Vector3,
 };
 
 
 /* Hierarchical Components */
 
+#[requires(Child, Sibling)]
 component Parent = struct
 {
-	var parent : i32;
-
-	require { Child, Sibling }
+	var parent: i32,
 };
 
 component Child = struct
 {
-	var first_child : i32;
-
-	require { Parent, Sibling }
+	var first_child: i32,
 };
 
 component Sibling = struct
 {
-	var next_sibling : i32;
-
-	require { Parent, Child }
+	var next_sibling: i32,
 };
 
 
@@ -101,14 +96,14 @@ component Sibling = struct
 
 component Mesh = struct
 {
-	var vertices : *[Vector3];
-	var indices : *[i32];
+	var vertices: *[Vector3],
+	var indices: *[i32],
 };
 
 component Material = struct
 {
-	var shader_index : i32;
-	var color : Vector3;
+	var shader_index: i32,
+	var color: Vector3,
 };
 
 
@@ -116,14 +111,14 @@ component Material = struct
 
 component RigidBody = struct
 {
-	var mass : f64;
-	var velocity : Vector3;
-	var angular_velocity : Vector3;
+	var mass: f64,
+	var velocity : Vector3,
+	var angular_velocity : Vector3,
 };
 
 component Collider = struct
 {
-	var shape : i32;
+	const shape : i32,
 };
 
 
@@ -139,6 +134,7 @@ query SceneQuery
 	var WorldTransform;
 }
 
+#[inline]
 system load_scene(SceneQuery)
 {
 	printf("Loading scene.\n");

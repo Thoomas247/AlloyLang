@@ -54,7 +54,8 @@ int main(int argc, char* argv[])
 	Log::Print("Compiling {0} kB...", numKilobytes);
 
 	auto start = std::chrono::high_resolution_clock::now();
-	TokenBuffers tokenBuffers = Tokenize(source);
+	Tokenizer tokenizer(source);
+	TokenBuffers tokenBuffers = tokenizer.Tokenize();
 	auto end = std::chrono::high_resolution_clock::now();
 
 	const uint64_t tokenizeTime = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), 1ll);
@@ -62,7 +63,7 @@ int main(int argc, char* argv[])
 	//PrintTokens(tokenBuffers);
 
 	start = std::chrono::high_resolution_clock::now();
-	Parser parser(tokenBuffers);
+	Parser parser(source, tokenBuffers);
 	NamedNodes namedNodes = parser.Parse();
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

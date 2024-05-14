@@ -30,6 +30,8 @@
 	new_keyword:					'new' ;
 	move_keyword:					'move' ;
 
+	pound:							'#' ;
+
 	reference:						'&' ;
 	pointer:						'*' ;
 
@@ -66,7 +68,7 @@
 	TYPE:						[ reference | pointer ] ( NAMED_TYPE | STRUCT_TYPE | ARRAY_TYPE ) ;
 
 		NAMED_TYPE:					identifier ;
-		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { comma identifier colon TYPE } ] close_brace ;
+		STRUCT_TYPE:				struct_keyword open_brace [ NAMED_VARIABLE_DECLARATION { NAMED_VARIABLE_DECLARATION } ] close_brace ;
 		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
 
 	NAMED_TYPE_DEFINITION:		type_keyword identifier assignment_operator TYPE semicolon ;
@@ -78,6 +80,11 @@
 
 	NAMED_VARIABLE_DECLARATION:	( variable | constant ) identifier colon TYPE ;
 	NAMED_VARIABLE_DEFINITION:	NAMED_VARIABLE_DECLARATION assignment_operator EXPRESSION ;
+
+
+	(* - Annotations - *)
+
+	ANNOTATION:					pound open_bracket identifier [ open_paren [ identifier { comma identifier } ] ] close_bracket ;
 
 
 	(* - Functions - *)
@@ -159,8 +166,7 @@
 
 	(* - Definitions - *)
 
-	DEFINITION:		NAMED_TYPE_DEFINITION
-					| NAMED_VARIABLE_DEFINITION
+	TOP_LEVEL:		NAMED_TYPE_DEFINITION
 					| NAMED_FUNCTION_DEFINITION
 					| EXTERN_FUNCTION_DEFINITION
 					| NAMED_COMPONENT_DEFINITION

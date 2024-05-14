@@ -6,83 +6,189 @@
 
 namespace AlloyCompiler
 {
-
-	template <typename... Args>
-	inline constexpr void logError(Source::Iterator& iter, const std::string& format, Args&&... args)
+	Tokenizer::Tokenizer(const Source& source)
+		: m_TokenBuffers(), m_Source(source), m_CharIndex(0), m_Line(1), m_Column(1), m_LineStarts({ 0 })
 	{
-		Log::Error("Error at location ({0} : {1}):", iter.CurrentLocation().Line, iter.CurrentLocation().Column);
-		Log::Error("\t{0}", std::vformat(format, std::make_format_args(args...)));
-
-		iter.NextChar();
 	}
 
-	bool trySkipWhitespace(Source::Iterator& iter)
+	TokenBuffers Tokenizer::Tokenize()
 	{
-		// check if we have a whitespace
-		if (!isspace(iter.CurrentChar()))
-			return false;
-
 		do
 		{
-			if (!iter.NextChar())
-			{
-				break;
-			}
-		} while (isspace(iter.CurrentChar()));
+			// skip whitespace
+			if (trySkipWhitespace())
+				continue;
+
+			// skip comments
+			if (trySkipComment())
+				continue;
+
+			// check for any operators
+			if (tryGetOperator())
+				continue;
+
+			// check for any delimiters
+			if (tryGetDelimiter())
+				continue;
+
+			// check for keywords
+			if (tryGetKeyword())
+				continue;
+
+			// check for string literals
+			if (tryGetStringLiteral())
+				continue;
+
+			// check for character literals
+			if (tryGetCharLiteral())
+				continue;
+
+			// check for any numbers
+			if (tryGetNumberLiteral())
+				continue;
+
+			logErrorAtPosition("Unexpected symbol '{0}'!", current());
+
+		} while (hasNext());
+
+		addToken(TokenKind::end_of_file, createStringView(index(), index()), location());
+
+		return m_TokenBuffers;
+	}
+
+	void Tokenizer::addToken(TokenKind kind, const std::string_view& value, const Location& location)
+	{
+		m_TokenBuffers.AddToken(kind, value, location);
+	}
+
+	bool Tokenizer::hasNext() const
+	{
+		return m_CharIndex < m_Source.GetSize() - 1;
+	}
+
+	bool Tokenizer::eat()
+	{
+		// check if we have a new line
+		if (current() == '\n')
+		{
+			m_LineStarts.push(m_CharIndex + 1);
+			++m_Line;
+			m_Column = 1;
+		}
+
+		// check if we have a tab
+		else if (current() == '\t')
+		{
+			m_Column += NUM_SPACES_PER_TAB;
+		}
+		else
+		{
+			++m_Column;
+		}
+
+		++m_CharIndex;
+
+		// check that we haven't reached the end of the file
+		if (m_CharIndex >= m_Source.GetSize())
+			return false;
 
 		return true;
 	}
 
-	bool trySkipComment(Source::Iterator& iter)
+	char Tokenizer::current() const
 	{
-		if (iter.CurrentChar() != '/' || !iter.HasNext())
+		return m_Source.GetChar(m_CharIndex);
+	}
+
+	char Tokenizer::peek() const
+	{
+		ASSERT(hasNext(), "Tokenizer::peek() called when there is no next character!");
+
+		return m_Source.GetChar((size_t)m_CharIndex + 1);
+	}
+
+	size_t Tokenizer::index() const
+	{
+		return (size_t)m_CharIndex;
+	}
+
+	Location Tokenizer::location() const
+	{
+		return Location(m_LineStarts.top(), m_Line, m_Column);
+	}
+
+	std::string_view Tokenizer::createStringView(size_t start, size_t end) const
+	{
+		return m_Source.CreateStringView(start, end);
+	}
+
+	bool Tokenizer::trySkipWhitespace()
+	{
+		// check if we have a whitespace
+		if (!isspace(current()))
+			return false;
+
+		do
+		{
+			if (!eat())
+			{
+				break;
+			}
+		} while (isspace(current()));
+
+		return true;
+	}
+
+	bool Tokenizer::trySkipComment()
+	{
+		if (current() != '/' || !hasNext())
 		{
 			return false;
 		}
 
 		// check if we have a single line comment
-		if (iter.PeekNext() == '/')
+		if (peek() == '/')
 		{
 			// consume first two characters
-			iter.NextChar();
-			iter.NextChar();
+			eat();
+			eat();
 
 			// consume characters until the end of the line
-			while (iter.HasNext() && iter.CurrentChar() != '\n')
+			while (hasNext() && current() != '\n')
 			{
-				iter.NextChar();
+				eat();
 			}
 
 			return true;
 		}
 
 		// check if we have a multi line comment
-		else if (iter.PeekNext() == '*')
+		else if (peek() == '*')
 		{
 			// consume the first two characters
-			iter.NextChar();
-			iter.NextChar();
+			eat();
+			eat();
 
 			size_t depth = 1;
-			while (iter.HasNext() && depth > 0)
+			while (hasNext() && depth > 0)
 			{
-				if (iter.CurrentChar() == '/' && iter.PeekNext() == '*')
+				if (current() == '/' && peek() == '*')
 				{
 					++depth;
-					iter.NextChar();
+					eat();
 				}
-				else if (iter.CurrentChar() == '*' && iter.PeekNext() == '/')
+				else if (current() == '*' && peek() == '/')
 				{
 					--depth;
-					iter.NextChar();
+					eat();
 				}
 
-				iter.NextChar();
+				eat();
 			}
 
 			if (depth > 0)
 			{
-				logError(iter, "Unexpected end of file! Missing '*/'.");
+				logErrorAtPosition("Unexpected end of file! Missing '*/'.");
 			}
 
 			return true;
@@ -93,46 +199,46 @@ namespace AlloyCompiler
 		}
 	}
 
-	bool tryGetOperator(Source::Iterator& iter, TokenBuffers& tokenBuffers)
+	bool Tokenizer::tryGetOperator()
 	{
 		// look for the current character in the operators map
-		auto it = OPERATOR_COMBINATIONS.find(iter.CurrentChar());
+		auto it = OPERATOR_COMBINATIONS.find(current());
 		if (it == OPERATOR_COMBINATIONS.end())
 			return false;
 
 		// store the starting index and position
-		size_t start = iter.CurrentIndex();
-		const Location& location = iter.CurrentLocation();
+		size_t start = index();
+		const Location& loc = location();
 
 		// special case for '...' since it is 3 characters long
-		if (iter.CurrentChar() == '.')
+		if (current() == '.')
 		{
-			iter.NextChar();	// consume .
+			eat();	// consume .
 
-			if (iter.CurrentChar() == '.' && iter.PeekNext() == '.')
+			if (current() == '.' && peek() == '.')
 			{
-				iter.NextChar();
-				iter.NextChar();
+				eat();
+				eat();
 			}
 		}
 
 		// check all other 2 character operators
 		else
 		{
-			iter.NextChar();	// consume any first character
+			eat();	// consume any first character
 
 			for (char c : it->second)
 			{
-				if (iter.CurrentChar() == c)
+				if (current() == c)
 				{
-					iter.NextChar();
+					eat();
 					break;
 				}
 			}
 		}
 
 		// get the operator string
-		auto tokenString = iter.CreateStringView(start, iter.CurrentIndex());
+		auto tokenString = createStringView(start, index());
 
 		// check if the operator is in the known symbols map
 		ASSERT(KNOWN_SYMBOLS.contains(tokenString), "Unknown operator: {0}", tokenString);
@@ -140,171 +246,171 @@ namespace AlloyCompiler
 		// get the token kind
 		TokenKind kind = KNOWN_SYMBOLS.at(tokenString);
 
-		tokenBuffers.AddToken(kind, tokenString, location);
+		addToken(kind, tokenString, loc);
 
 		return true;
 	}
 
-	bool tryGetDelimiter(Source::Iterator& iter, TokenBuffers& tokenBuffers)
+	bool Tokenizer::tryGetDelimiter()
 	{
 		// try to find the current character in the map
-		auto it = KNOWN_SYMBOLS.find(std::string(1, iter.CurrentChar()));
+		auto it = KNOWN_SYMBOLS.find(std::string(1, current()));
 
 		if (it == KNOWN_SYMBOLS.end())
 			return false;
 
-		tokenBuffers.AddToken(it->second, iter.CreateStringView(iter.CurrentIndex(), iter.CurrentIndex() + 1), iter.CurrentLocation());
+		addToken(it->second, createStringView(index(), index() + 1), location());
 
 		// consume the delimiter
-		iter.NextChar();
+		eat();
 
 		return true;
 	}
 
-	bool tryGetKeyword(Source::Iterator& iter, TokenBuffers& tokenBuffers)
+	bool Tokenizer::tryGetKeyword()
 	{
-		if (!isalpha(iter.CurrentChar()) && iter.CurrentChar() != '_')
+		if (!isalpha(current()) && current() != '_')
 			return false;
 
 		// get the start index and location
-		size_t start = iter.CurrentIndex();
-		const Location& location = iter.CurrentLocation();
+		size_t start = index();
+		const Location& loc = location();
 
 		// consume the first character
-		iter.NextChar();
+		eat();
 
 		// keep going until the end of the word
-		while (isalnum(iter.CurrentChar()) || iter.CurrentChar() == '_')
+		while (isalnum(current()) || current() == '_')
 		{
-			iter.NextChar();
+			eat();
 		}
 
 		// store the word
-		auto value = iter.CreateStringView(start, iter.CurrentIndex());
+		auto value = createStringView(start, index());
 
 		// check if word is any keyword
 		auto it = KNOWN_SYMBOLS.find(value);
 		if (it != KNOWN_SYMBOLS.end())
-			tokenBuffers.AddToken(it->second, value, location);
+			addToken(it->second, value, loc);
 
 		// otherwise, it's an identifier
 		else
-			tokenBuffers.AddToken(TokenKind::identifier, value, location);
+			addToken(TokenKind::identifier, value, loc);
 
 		return true;
 	}
 
-	bool tryGetStringLiteral(Source::Iterator& iter, TokenBuffers& tokenBuffers)
+	bool Tokenizer::tryGetStringLiteral()
 	{
-		if (iter.CurrentChar() != '"')
+		if (current() != '"')
 			return false;
 
 		// get the start index and location
-		size_t start = iter.CurrentIndex() + 1;
-		const Location& location = iter.CurrentLocation();
+		size_t start = index() + 1;
+		const Location& loc = location();
 
 		// keep going until the end of the string
 		do
 		{
-			if (!iter.NextChar())
+			if (!eat())
 			{
-				logError(iter, "Unexpected end of file!");
+				logErrorAtPosition("Unexpected end of file!");
 				return false;
 			}
 
 			// check for escape character
-			if (iter.CurrentChar() == '\\')
+			if (current() == '\\')
 			{
-				if (!iter.NextChar())
+				if (!eat())
 				{
-					logError(iter, "Unexpected end of file!");
+					logErrorAtPosition("Unexpected end of file!");
 					return false;
 				}
 			}
 
-		} while (iter.CurrentChar() != '"');
+		} while (current() != '"');
 
 		// store the string
-		auto value = iter.CreateStringView(start, iter.CurrentIndex());
+		auto value = createStringView(start, index());
 
 		// consume the ending quote
-		iter.NextChar();
+		eat();
 
-		tokenBuffers.AddToken(TokenKind::string_literal, value, location);
+		addToken(TokenKind::string_literal, value, loc);
 		return true;
 	}
 
-	bool tryGetCharLiteral(Source::Iterator& iter, TokenBuffers& tokenBuffers)
+	bool Tokenizer::tryGetCharLiteral()
 	{
-		if (iter.CurrentChar() != '\'')
+		if (current() != '\'')
 			return false;
 
-		// get the  location
-		const Location& location = iter.CurrentLocation();
+		// get the location
+		const Location& loc = location();
 
 		// consume starting quote
-		if (!iter.NextChar())
+		if (!eat())
 		{
-			logError(iter, "Unexpected end of file!");
+			logErrorAtPosition("Unexpected end of file!");
 			return false;
 		}
 
 		// get the start index
-		const size_t start = iter.CurrentIndex();
+		const size_t start = index();
 
 		// check for escape character
-		if (iter.CurrentChar() == '\\')
+		if (current() == '\\')
 		{
-			if (!iter.NextChar())
+			if (!eat())
 			{
-				logError(iter, "Unexpected end of file!");
+				logErrorAtPosition("Unexpected end of file!");
 				return false;
 			}
 		}
 
 		// consume the character
-		if (!iter.NextChar())
+		if (!eat())
 		{
-			logError(iter, "Unexpected end of file!");
+			logErrorAtPosition("Unexpected end of file!");
 			return false;
 		}
 
 		// store the character
-		auto value = iter.CreateStringView(start, iter.CurrentIndex());
+		auto value = createStringView(start, index());
 
 		// consume ending quote
-		if (!iter.NextChar())
+		if (!eat())
 		{
-			logError(iter, "Unexpected end of file!");
+			logErrorAtPosition("Unexpected end of file!");
 			return false;
 		}
 
-		tokenBuffers.AddToken(TokenKind::character_literal, value, location);
+		addToken(TokenKind::character_literal, value, loc);
 
 		return true;
 	}
 
-	bool tryGetNumberLiteral(Source::Iterator& iter, TokenBuffers& tokenBuffers)
+	bool Tokenizer::tryGetNumberLiteral()
 	{
-		if (!isdigit(iter.CurrentChar()))
+		if (!isdigit(current()))
 			return false;
 
 		// get the start index and location
-		size_t start = iter.CurrentIndex();
-		const Location& location = iter.CurrentLocation();
+		size_t start = index();
+		const Location& loc = location();
 
 		bool hasDot = false;
 
 		// keep going until the end of the number
-		while (isdigit(iter.CurrentChar()) || iter.CurrentChar() == '.')
+		while (isdigit(current()) || current() == '.')
 		{
-			if (iter.CurrentChar() == '.')
+			if (current() == '.')
 			{
 				if (hasDot)
 				{
-					logError(iter,
+					logErrorAtPosition(
 						"Invalid float literal: {0}. Expected only one decimal point in float literal.",
-						iter.CreateStringView(start, iter.CurrentIndex()));
+						createStringView(start, index()));
 					return false;
 				}
 
@@ -312,78 +418,22 @@ namespace AlloyCompiler
 			}
 
 			// consume the digit or dot
-			iter.NextChar();
+			eat();
 		}
 
 		// store the number
-		auto value = iter.CreateStringView(start, iter.CurrentIndex());
+		auto value = createStringView(start, index());
 
 		// check if number is a float or int
 		if (hasDot)
-			tokenBuffers.AddToken(TokenKind::float_literal, value, location);
+			addToken(TokenKind::float_literal, value, loc);
 		else
-			tokenBuffers.AddToken(TokenKind::integer_literal, value, location);
+			addToken(TokenKind::integer_literal, value, loc);
 
 		return true;
 	}
 
-	TokenBuffers Tokenize(const Source& source)
-	{
-		Source::Iterator iter = source.GetIterator();
-		TokenBuffers tokenBuffers(source);
 
-		do
-		{
-			// skip whitespace
-			if (trySkipWhitespace(iter))
-				continue;
-
-			// skip comments
-			if (trySkipComment(iter))
-				continue;
-
-			// check for any operators
-			if (tryGetOperator(iter, tokenBuffers))
-				continue;
-
-			// check for any delimiters
-			if (tryGetDelimiter(iter, tokenBuffers))
-				continue;
-
-			// check for keywords
-			if (tryGetKeyword(iter, tokenBuffers))
-				continue;
-
-			// check for string literals
-			if (tryGetStringLiteral(iter, tokenBuffers))
-				continue;
-
-			// check for character literals
-			if (tryGetCharLiteral(iter, tokenBuffers))
-				continue;
-
-			// check for any numbers
-			if (tryGetNumberLiteral(iter, tokenBuffers))
-				continue;
-
-			logError(iter, "Unexpected symbol '{0}'!", iter.CurrentChar());
-
-		} while (iter.HasNext());
-
-		tokenBuffers.AddToken(TokenKind::end_of_file, iter.CreateStringView(iter.CurrentIndex(), iter.CurrentIndex()), iter.CurrentLocation());
-
-		return tokenBuffers;
-	}
-
-	void PrintTokens(const TokenBuffers& tokenBuffers)
-	{
-		TokenBuffers::Iterator iter(tokenBuffers);
-
-		do
-		{
-			Log::Print("{0} ({1})", TOKEN_KIND_NAMES.at(iter.GetKind()), iter.GetValue());
-		} while (iter.Next());
-	}
 }
 
 

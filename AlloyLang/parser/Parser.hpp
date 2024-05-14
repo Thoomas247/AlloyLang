@@ -22,9 +22,10 @@ namespace AlloyCompiler
 	class Parser
 	{
 	public:
-		Parser(const TokenBuffers& tokenBuffers)
+		Parser(const Source& source, const TokenBuffers& tokenBuffers)
 			: m_NamedNodes()
 			, m_NodeAllocator(tokenBuffers.LastTokenID() * 120) // TODO: remove magic number
+			, m_Source(source)
 			, m_TokenBuffers(tokenBuffers)
 			, m_CurrentTokenID(0)
 		{
@@ -91,6 +92,7 @@ namespace AlloyCompiler
 		NamedNodes m_NamedNodes;
 		NodeAllocator m_NodeAllocator;
 
+		const Source& m_Source;
 		const TokenBuffers& m_TokenBuffers;
 		TokenID m_CurrentTokenID;
 	};
@@ -99,9 +101,9 @@ namespace AlloyCompiler
 	constexpr void Parser::logErrorAtPosition(const std::string& format, Args&&... args)
 	{
 		const Location& location = m_TokenBuffers.GetLocation(m_CurrentTokenID);
-		const std::string_view line = m_TokenBuffers.GetLine(location.LineStart);
+		const std::string_view line = m_Source.GetLine(location.LineStart);
 
-		Log::Error("[{0} : {1}] ERROR:", location.Line, location.Column);
+		Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
 		Log::Error("\t{0}", line);
 		Log::Error("\t{0}^", std::string(location.Column - 1, ' '));
 		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));

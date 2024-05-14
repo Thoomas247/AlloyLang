@@ -12,7 +12,7 @@ namespace AlloyCompiler
 
 	struct STRUCT_TYPE
 	{
-		std::vector<std::pair<std::string_view, TYPE*>> Members;
+		std::vector<NAMED_VARIABLE_DECLARATION*> Members;
 	};
 
 	struct ARRAY_TYPE

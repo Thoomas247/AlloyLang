@@ -131,17 +131,20 @@ namespace AlloyCompiler
 		// handle 1 token
 		if (tokens.size() == 1)
 		{
-			return "'" + TOKEN_KIND_NAMES.at(tokens[0]) + "'";
+			return "'" + TOKEN_KIND_VALUES.at(tokens[0]) + "'";
 		}
 
 		// handle 2 or more tokens
 		std::string result;
-		for (size_t i = 0; i < tokens.size() - 1; ++i)
+		for (size_t i = 0; i < tokens.size() - 2; ++i)	// exclude last 2 because we print them without a comma
 		{
-			result += "'" + TOKEN_KIND_NAMES.at(tokens[i]) + "', ";
+			result += "'" + TOKEN_KIND_VALUES.at(tokens[i]) + "', ";
 		}
 
-		result += "or '" + TOKEN_KIND_NAMES.at(tokens[tokens.size() - 1]) + "'";
+		const std::string& lastTokenName = TOKEN_KIND_VALUES.at(tokens[tokens.size() - 1]);
+		const std::string& secondToLastTokenName = TOKEN_KIND_VALUES.at(tokens[tokens.size() - 2]);
+
+		result += "'" + secondToLastTokenName + "' or '" + lastTokenName + "'";
 
 		return result;
 	}
@@ -162,19 +165,19 @@ namespace AlloyCompiler
 
 		// handle 2 or more tokens
 		std::string result;
-		for (size_t i = 0; i < tokens.size() - 1; ++i)
+		for (size_t i = 0; i < tokens.size() - 2; ++i)	// exclude last 2 because we print them without a comma
 		{
 			result += "'" + tokens[i] + "', ";
 		}
 
-		result += "or '" + tokens[tokens.size() - 1] + "'";
+		result += "'" + tokens[tokens.size() - 2] + "' or '" + tokens[tokens.size() - 1] + "'";
 
 		return result;
 	}
 
 	bool Parser::isEOF() const
 	{
-		return m_CurrentTokenID > m_TokenBuffers.LastTokenID();
+		return m_CurrentTokenID >= m_TokenBuffers.LastTokenID();
 	}
 
 	bool Parser::hasNext() const
@@ -267,6 +270,9 @@ namespace AlloyCompiler
 	}
 
 	template<>
+	NAMED_VARIABLE_DECLARATION* Parser::parse<NAMED_VARIABLE_DECLARATION>();
+
+	template<>
 	STRUCT_TYPE* Parser::parse()
 	{
 		if (expect<TokenKind::struct_keyword>() != SUCCESS)
@@ -279,28 +285,17 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		std::vector<std::pair<std::string_view, TYPE*>> members;
+		std::vector<NAMED_VARIABLE_DECLARATION*> members;
 		while (kind() != TokenKind::close_brace)
 		{
-			std::string_view memberName;
-			if (expect<TokenKind::identifier>(&memberName) != SUCCESS)
+			NAMED_VARIABLE_DECLARATION* pMember = parse<NAMED_VARIABLE_DECLARATION>();
+
+			if (pMember == nullptr)
 			{
 				return nullptr;
 			}
 
-			if (expect<TokenKind::colon>() != SUCCESS)
-			{
-				return nullptr;
-			}
-
-			TYPE* pType = parse<TYPE>();
-
-			if (pType == nullptr)
-			{
-				return nullptr;
-			}
-
-			members.push_back({ memberName, pType });
+			members.push_back(pMember);
 
 			if (kind() == TokenKind::comma)
 			{
@@ -739,6 +734,15 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		if (namedNodeExists<NAMED_FUNCTION_DEFINITION>(pFunctionSignature->Name))
+		{
+			if (namedNodeExists<EXTERN_FUNCTION_DEFINITION>(pFunctionSignature->Name))
+			{
+				logErrorAtPosition("Function '{0}' is already defined.", pFunctionSignature->Name);
+				return nullptr;
+			}
+		}
+
 		STATEMENT_BLOCK* pBody = parse<STATEMENT_BLOCK>();
 
 		if (pBody == nullptr)
@@ -746,13 +750,17 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		return createNode(
+		NAMED_FUNCTION_DEFINITION* pFunctionDefinition = createNode(
 			NAMED_FUNCTION_DEFINITION
 			{
 				.pSignature = pFunctionSignature,
 				.pBody = pBody
 			}
 		);
+
+		addNamedNode(pFunctionSignature->Name, pFunctionDefinition);
+
+		return pFunctionDefinition;
 	}
 
 	template<>
@@ -770,17 +778,27 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		if (namedNodeExists<EXTERN_FUNCTION_DEFINITION>(pFunctionSignature->Name))
+		{
+			logErrorAtPosition("Extern function '{0}' is already defined.", pFunctionSignature->Name);
+			return nullptr;
+		}
+
 		if (expect<TokenKind::semicolon>() != SUCCESS)
 		{
 			return nullptr;
 		}
 
-		return createNode(
+		EXTERN_FUNCTION_DEFINITION* pExternFunctionDefinition = createNode(
 			EXTERN_FUNCTION_DEFINITION
 			{
 				.pSignature = pFunctionSignature
 			}
 		);
+
+		addNamedNode(pFunctionSignature->Name, pExternFunctionDefinition);
+
+		return pExternFunctionDefinition;
 	}
 
 	template<>
