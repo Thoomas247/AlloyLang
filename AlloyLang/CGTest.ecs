@@ -45,101 +45,89 @@ fn draw_mesh(const vertices : *[Vector3], const num_vertices : u32, const indice
 
 /* Scene Resources */
 
-resource RootEntity
+resource RootEntity = struct
 {
-	var id : i32;
-}
+	id : i32,
+};
 
-resource CurrentScene
+resource CurrentScene = struct
 {
-	var id : i32;
-}
+	id : i32,
+};
 
 
 /* Transform Components */
 
-component LocalTransform
+component LocalTransform = struct
 {
 	var position : Vector3;
 	var rotation : Quaternion;
 	var scale : Vector3;
-}
+};
 
-component WorldTransform
+component WorldTransform = struct
 {
 	var position : Vector3;
 	var rotation : Quaternion;
 	var scale : Vector3;
-}
+};
 
 
 /* Hierarchical Components */
 
-component Parent
+component Parent = struct
 {
 	var parent : i32;
 
 	require { Child, Sibling }
-}
+};
 
-component Child
+component Child = struct
 {
 	var first_child : i32;
 
 	require { Parent, Sibling }
-}
+};
 
-component Sibling
+component Sibling = struct
 {
 	var next_sibling : i32;
 
 	require { Parent, Child }
-}
+};
 
 
 /* Rendering Components */
 
-component Mesh
+component Mesh = struct
 {
 	var vertices : *[Vector3];
 	var indices : *[i32];
-}
+};
 
-component Material
+component Material = struct
 {
 	var shader_index : i32;
 	var color : Vector3;
-}
+};
 
 
 /* Physics Components */
 
-component RigidBody
+component RigidBody = struct
 {
 	var mass : f64;
 	var velocity : Vector3;
 	var angular_velocity : Vector3;
-}
+};
 
-component Collider
+component Collider = struct
 {
 	var shape : i32;
-}
+};
 
 
 /* AI Components */
-
-// simple flag components to mark entities as enemies or allies
-component EnemyAI
-{
-	require { WorldTransform }
-	exclude { AllyAI }
-}
-
-component AllyAI 
-{
-	exclude { EnemyAI }
-}
 
 
 /* Systems */

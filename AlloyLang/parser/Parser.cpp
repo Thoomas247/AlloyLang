@@ -1528,32 +1528,15 @@ namespace AlloyCompiler
 	template<>
 	ASSIGNMENT* Parser::parse()
 	{
-		EXPRESSION* pVariable = parse<EXPRESSION>();
+		EXPRESSION* pAssignment = parse<EXPRESSION>();
 
-		if (pVariable == nullptr)
+		if (!pAssignment->Is<ASSIGNMENT>())
 		{
+			logErrorAtPosition("Expected an assignment.");
 			return nullptr;
 		}
 
-		if (expect<TokenKind::assignment_operator>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		EXPRESSION* pValue = parse<EXPRESSION>();
-
-		if (pValue == nullptr)
-		{
-			return nullptr;
-		}
-
-		return createNode(
-			ASSIGNMENT
-			{
-				.pVariable = pVariable,
-				.pValue = pValue
-			}
-		);
+		return pAssignment->Get<ASSIGNMENT>();
 	}
 
 	template<>
@@ -2369,18 +2352,6 @@ namespace AlloyCompiler
 		{
 			switch (kind())
 			{
-			case group_keyword:
-				(void)parse<NAMED_GROUP_DEFINITION>();
-				break;
-
-			case system_keyword:
-				(void)parse<NAMED_SYSTEM_DEFINITION>();
-				break;
-
-			case query_keyword:
-				(void)parse<NAMED_QUERY_DEFINITION>();
-				break;
-
 			case type_keyword:
 				(void)parse<NAMED_TYPE_DEFINITION>();
 				break;
@@ -2393,12 +2364,34 @@ namespace AlloyCompiler
 				(void)parse<EXTERN_FUNCTION_DEFINITION>();
 				break;
 
+			case component_keyword:
+				(void)parse<NAMED_COMPONENT_DEFINITION>();
+				break;
+
+			case resource_keyword:
+				(void)parse<NAMED_RESOURCE_DEFINITION>();
+				break;
+
+			case query_keyword:
+				(void)parse<NAMED_QUERY_DEFINITION>();
+				break;
+
+			case system_keyword:
+				(void)parse<NAMED_SYSTEM_DEFINITION>();
+				break;
+
+			case group_keyword:
+				(void)parse<NAMED_GROUP_DEFINITION>();
+				break;
+
 			case application_keyword:
 				(void)parse<APPLICATION_DEFINITION>();
 				break;
 
 			default:
-				(void)expect<group_keyword, system_keyword, query_keyword, type_keyword, function_keyword, function_keyword, extern_keyword, application_keyword>();
+				(void)expect<type_keyword, function_keyword, extern_keyword, 
+					component_keyword, resource_keyword, query_keyword, system_keyword, 
+					group_keyword, application_keyword>();
 				(void)eat();
 				break;
 			}
