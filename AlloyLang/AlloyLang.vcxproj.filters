@@ -89,6 +89,9 @@
     <ClInclude Include="parser\nodes\VariantNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="parser\Annotation.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.ecs" />

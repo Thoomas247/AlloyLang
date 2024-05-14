@@ -141,6 +141,7 @@
     <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\NodeAllocator.hpp" />
     <ClInclude Include="parser\Nodes.hpp" />
+    <ClInclude Include="parser\Annotation.hpp" />
     <ClInclude Include="parser\nodes\ECSNode.hpp" />
     <ClInclude Include="parser\nodes\ExpressionNode.hpp" />
     <ClInclude Include="parser\nodes\FunctionNode.hpp" />

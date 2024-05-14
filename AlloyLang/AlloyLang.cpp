@@ -35,17 +35,6 @@ int main(int argc, char* argv[])
 		str = TestSrc1;
 	}
 
-	// duplicate the test file or string 2^n times
-	const size_t n = 0;// 0'000;
-	if (n > 0) {
-		str.reserve(str.size() * pow(2, n));
-
-		for (size_t i = 0; i < n; i++)
-		{
-			str += str;
-		}
-	}
-
 	Source source(str);
 
 	const uint64_t numBytes = str.size();

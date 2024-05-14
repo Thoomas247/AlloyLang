@@ -244,6 +244,22 @@ namespace AlloyCompiler
 		return SUCCESS;
 	}
 
+	Parser::Result Parser::checkAnnotations(const std::unordered_set<std::string_view>& validAnnotations)
+	{
+		Result result = SUCCESS;
+
+		for (auto& [name, args] : m_CurrentAnnotations)
+		{
+			if (!validAnnotations.contains(name))
+			{
+				logErrorAtPosition("Annotation '{0}' is not valid here.", name);
+				result = INVALID_ANNOTATION;
+			}
+		}
+
+		return result;
+	}
+
 #pragma endregion
 
 #pragma region Types
@@ -254,6 +270,11 @@ namespace AlloyCompiler
 	template<>
 	NAMED_TYPE* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		std::string_view name;
 		if (expect<TokenKind::identifier>(&name) != SUCCESS)
 		{
@@ -600,6 +621,94 @@ namespace AlloyCompiler
 
 #pragma endregion
 
+#pragma region Annotations
+
+	Parser::Result Parser::getAnnotation()
+	{
+		Result result;
+
+		result = expect<TokenKind::pound>();
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		result = expect<TokenKind::open_bracket>();
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		std::string_view name;
+		result = expect<TokenKind::identifier>(&name);
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		auto it = ANNOTATION_NAMES.find(name);
+		if (it == ANNOTATION_NAMES.end())
+		{
+			logErrorAtPosition("Unknown annotation '{0}'.", name);
+			return UNKNOWN_ANNOTATION;
+		}
+
+		AnnotationArgs arguments;
+		if (kind() == TokenKind::open_paren)
+		{
+			(void)eat();
+
+			while (kind() != TokenKind::close_paren)
+			{
+				std::string_view argument;
+				result = expect<TokenKind::identifier>(&argument);
+				if (result != SUCCESS)
+				{
+					return result;
+				}
+
+				arguments.push_back(argument);
+
+				if (kind() == TokenKind::comma)
+				{
+					(void)eat();
+				}
+			}
+
+			(void)eat();
+		}
+
+		if (it->second == AnnotationKind::NoArgs && arguments.size() != 0)
+		{
+			logErrorAtPosition("Annotation '{0}' does not take any arguments.", name);
+			return INVALID_ANNOTATION;
+		}
+
+		if (it->second == AnnotationKind::SingleArg && arguments.size() != 1)
+		{
+			logErrorAtPosition("Annotation '{0}' only takes one argument.", name);
+			return INVALID_ANNOTATION;
+		}
+
+		if (it->second == AnnotationKind::MultiArgs && arguments.size() == 1)
+		{
+			logErrorAtPosition("Annotation '{0}' must have at least one argument.", name);
+			return INVALID_ANNOTATION;
+		}
+
+		if (m_CurrentAnnotations.contains(name))
+		{
+			logErrorAtPosition("Duplicate annotation '{0}'.", name);
+			return DUPLICATE_ANNOTATION;
+		}
+
+		m_CurrentAnnotations[name] = arguments;
+
+		return SUCCESS;
+	}
+
+#pragma endregion
+
 #pragma region Functions
 
 	template<>
@@ -727,6 +836,11 @@ namespace AlloyCompiler
 	template<>
 	NAMED_FUNCTION_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		FUNCTION_SIGNATURE* pFunctionSignature = parse<FUNCTION_SIGNATURE>(/*allowVarArg*/false);
 
 		if (pFunctionSignature == nullptr)
@@ -766,6 +880,11 @@ namespace AlloyCompiler
 	template<>
 	EXTERN_FUNCTION_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		if (expect<TokenKind::extern_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -1914,6 +2033,11 @@ namespace AlloyCompiler
 	template<>
 	NAMED_COMPONENT_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ "exclude" }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		if (expect<TokenKind::component_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -1964,6 +2088,11 @@ namespace AlloyCompiler
 	template<>
 	NAMED_RESOURCE_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		if (expect<TokenKind::resource_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -2014,6 +2143,11 @@ namespace AlloyCompiler
 	template<>
 	NAMED_QUERY_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		if (expect<TokenKind::query_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -2089,6 +2223,11 @@ namespace AlloyCompiler
 	template<>
 	NAMED_SYSTEM_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		if (expect<TokenKind::system_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -2161,6 +2300,11 @@ namespace AlloyCompiler
 	template<>
 	NAMED_GROUP_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		if (expect<TokenKind::group_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -2225,6 +2369,11 @@ namespace AlloyCompiler
 	template<>
 	APPLICATION_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		if (expect<TokenKind::application_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -2370,6 +2519,10 @@ namespace AlloyCompiler
 		{
 			switch (kind())
 			{
+			case pound:
+				(void)getAnnotation();
+				break;
+
 			case type_keyword:
 				(void)parse<NAMED_TYPE_DEFINITION>();
 				break;

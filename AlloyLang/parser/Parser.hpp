@@ -2,6 +2,9 @@
 
 #include "NodeAllocator.hpp"
 #include "Nodes.hpp"
+#include "Annotation.hpp"
+
+#include <unordered_set>
 
 namespace AlloyCompiler
 {
@@ -24,6 +27,7 @@ namespace AlloyCompiler
 	public:
 		Parser(const Source& source, const TokenBuffers& tokenBuffers)
 			: m_NamedNodes()
+			, m_CurrentAnnotations()
 			, m_NodeAllocator(tokenBuffers.LastTokenID() * 120) // TODO: remove magic number
 			, m_Source(source)
 			, m_TokenBuffers(tokenBuffers)
@@ -39,7 +43,10 @@ namespace AlloyCompiler
 			SUCCESS = 0,
 			EOF_REACHED,
 			UNEXPECTED_KIND,
-			UNEXPECTED_VALUE
+			UNEXPECTED_VALUE,
+			UNKNOWN_ANNOTATION,
+			INVALID_ANNOTATION,
+			DUPLICATE_ANNOTATION
 		};
 
 	private:
@@ -51,6 +58,8 @@ namespace AlloyCompiler
 
 		template <typename T, typename... Ts>
 		T* parse(Ts...) = delete;
+
+		Result getAnnotation();
 
 		EXPRESSION* parse_PRIMARY();
 		EXPRESSION* parse_POSTFIX();
@@ -88,8 +97,11 @@ namespace AlloyCompiler
 
 		Result expectValue(const std::vector<std::string>& values, std::string_view* pValueStringView = nullptr);
 
+		Result checkAnnotations(const std::unordered_set<std::string_view>& validAnnotations);
+
 	private:
 		NamedNodes m_NamedNodes;
+		AnnotationMap m_CurrentAnnotations;
 		NodeAllocator m_NodeAllocator;
 
 		const Source& m_Source;
