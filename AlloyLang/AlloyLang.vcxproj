@@ -131,12 +131,14 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="ecs\ECSResolver.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="tokenizer\Source.cpp" />
     <ClCompile Include="tokenizer\Token.cpp" />
     <ClCompile Include="tokenizer\Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ecs\ECSResolver.hpp" />
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\NodeAllocator.hpp" />

@@ -22,6 +22,5 @@ namespace AlloyCompiler
 	};
 
 	using AnnotationArgs = std::vector<std::string_view>;
-
 	using AnnotationMap = std::unordered_map<std::string_view, AnnotationArgs>;
 }

@@ -4,315 +4,69 @@
 
 namespace AlloyCompiler
 {
-	struct SystemReadWrites
-	{
-		// "struct" refers to resource or component
-		std::unordered_set<std::string_view> StructWrites;
-		std::unordered_set<std::string_view> StructReads;
-		std::unordered_set<std::string_view> StructExcludes;
-	};
-
-	using SystemReadWritesMap = std::unordered_map<std::string_view, SystemReadWrites>;
-
-	std::vector<std::string_view> getSystemNamesInStage(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID groupListID)
-	{
-		// handle stage not being used
-		if (groupListID == ERROR_NODE_ID)
-		{
-			return {};
-		}
-
-		ASSERT(nodeBuffers.GetNode(groupListID).Kind == NodeKind::IDENTIFIER_LIST, "Invalid groupListID!");
-
-		std::vector<std::string_view> systemNames;
-
-		// loop through every group in the group list (a list of groups is a stage in the application)
-		for (NodeID groupIdentifierID : nodeBuffers.GetNode(groupListID).IdentifierList.IdentifierIDs)
-		{
-			ASSERT(nodeBuffers.GetNode(groupIdentifierID).Kind == NodeKind::IDENTIFIER, "Invalid groupIdentifierID!");
-
-			const IDENTIFIER& groupIdentifierNode = nodeBuffers.GetNode(groupIdentifierID).Identifier;
-			std::string_view groupName = tokenBuffers.GetValue(groupIdentifierNode.IdentifierTokenID).ToStringView();
-
-			auto groupIDIter = nodeBuffers.GetNamedNodes().GroupNodeIDs.find(groupName);
-			if (groupIDIter == nodeBuffers.GetNamedNodes().GroupNodeIDs.end())
-			{
-				ASSERT(false, "Group does not exist!"); // TODO: proper error handling
-			}
-
-			else
-			{
-				NodeID groupID = groupIDIter->second;
-				const GROUP_DEFINITION& groupNode = nodeBuffers.GetNode(groupID).GroupDefinition;
-
-				// loop through every system in the group
-				for (NodeID systemIdentifierID : groupNode.SystemIdentifierIDs)
-				{
-					const IDENTIFIER& systemIdentifierNode = nodeBuffers.GetNode(systemIdentifierID).Identifier;
-					std::string_view systemName = tokenBuffers.GetValue(systemIdentifierNode.IdentifierTokenID).ToStringView();
-
-					// check that the system exists
-					if (!nodeBuffers.GetNamedNodes().SystemNodeIDs.contains(systemName))
-					{
-						ASSERT(false, "System does not exist!"); // TODO: proper error handling
-					}
-
-					else
-					{
-						systemNames.push_back(systemName);
-					}
-				}
-			}
-		}
-
-		return systemNames;
-	}
-
-	void getComponentExcludes(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID structID, SystemReadWrites& systemReadWrites)
-	{
-		const STRUCT_DEFINITION& structNode = nodeBuffers.GetNode(structID).StructDefinition;
-
-		if (structNode.ExcludeIdentifierListID != ERROR_NODE_ID)
-		{
-			const IDENTIFIER_LIST& excludeIdentifierList = nodeBuffers.GetNode(structNode.ExcludeIdentifierListID).IdentifierList;
-
-			// collect excludes
-			for (NodeID excludeIdentifierID : excludeIdentifierList.IdentifierIDs)
-			{
-				const IDENTIFIER& excludeIdentifierNode = nodeBuffers.GetNode(excludeIdentifierID).Identifier;
-				std::string_view excludeName = tokenBuffers.GetValue(excludeIdentifierNode.IdentifierTokenID).ToStringView();
-
-				auto excludeIDIter = nodeBuffers.GetNamedNodes().StructNodeIDs.find(excludeName);
-				if (excludeIDIter == nodeBuffers.GetNamedNodes().StructNodeIDs.end())
-				{
-					ASSERT(false, "Resource or component does not exist!"); // TODO: proper error handling
-				}
-
-				else
-				{
-					systemReadWrites.StructExcludes.insert(excludeName);
-				}
-			}
-		}
-	}
-
-	const STRUCT_DEFINITION& getComponentByName(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, const std::string_view name)
-	{
-		auto it = nodeBuffers.GetNamedNodes().StructNodeIDs.find(name);
-		ASSERT(it != nodeBuffers.GetNamedNodes().StructNodeIDs.end(), "Component '{0}' does not exist!", name);
-
-		const NodeID componentID = it->second;
-
-		const Node& node = nodeBuffers.GetNode(componentID);
-		ASSERT(node.Kind == NodeKind::STRUCT_DEFINITION, "Expected a struct definition!");
-
-		return node.StructDefinition;
-	}
-
-	bool componentSetsAreMutuallyExclusive(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, 
-		const std::unordered_set<std::string_view> componentSetA, const std::unordered_set<std::string_view> componentSetB)
-	{
-		// check if sets have intersection
-		bool setsHaveIntersection = false;
-		for (auto& componentA : componentSetA)
-		{
-			if (componentSetB.contains(componentA))
-			{
-				setsHaveIntersection = true;
-				break;
-			}
-		}
-
-		// if sets have no intersection, they are mutually exclusive
-		if (!setsHaveIntersection)
-		{
-			return true;
-		}
-
-		// if sets do have an intersection, check if the intersection is empty by checking for excludes
-		for (auto& componentA : componentSetA)
-		{
-			auto it = nodeBuffers.GetNamedNodes().StructNodeIDs.find(componentA);
-			ASSERT(it != nodeBuffers.GetNamedNodes().StructNodeIDs.end(), "Component '{0}' does not exist!", componentA);
-
-
-		}
 	
+	SystemInputNames ECSResolver::getSystemInputNames(NAMED_SYSTEM_DEFINITION* pSystem)
+	{
+
 	}
 
-
-	SystemReadWritesMap getSystemReadWrites(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers)
+	SystemGroup ECSResolver::getSystemsInStage(const std::vector<std::string_view>& groupNames)
 	{
-		SystemReadWritesMap systemReadWritesMap;
+		SystemGroup systems;
 
-		for (auto& [systemName, systemID] : nodeBuffers.GetNamedNodes().SystemNodeIDs)
+		for (const std::string_view& groupName : groupNames)
 		{
-			const SYSTEM_DEFINITION& systemDefinitionNode = nodeBuffers.GetNode(systemID).SystemDefinition;
-
-			// initialize here so that systems with no inputs still get added to the map
-			systemReadWritesMap[systemName] = SystemReadWrites();
-
-			for (NodeID queryIdentifierID : systemDefinitionNode.QueryIdentifierIDs)
+			auto groupIt = m_NamedNodes.GroupDefinitions.find(groupName);
+			if (groupIt == m_NamedNodes.GroupDefinitions.end())
 			{
-				const IDENTIFIER& queryIdentifierNode = nodeBuffers.GetNode(queryIdentifierID).Identifier;
-				std::string_view queryName = tokenBuffers.GetValue(queryIdentifierNode.IdentifierTokenID).ToStringView();
+				ASSERT(false, "Group is not defined!");	// TODO: proper error handling
+			}
 
-				auto queryIDIter = nodeBuffers.GetNamedNodes().QueryNodeIDs.find(queryName);
-				if (queryIDIter == nodeBuffers.GetNamedNodes().QueryNodeIDs.end())
+			NAMED_GROUP_DEFINITION* pGroup = groupIt->second;
+			for (const std::string_view& systemName : pGroup->SystemNames)
+			{
+				auto systemIt = m_NamedNodes.SystemDefinitions.find(systemName);
+				if (systemIt == m_NamedNodes.SystemDefinitions.end())
 				{
-					ASSERT(false, "Query does not exist!"); // TODO: proper error handling
+					ASSERT(false, "System is not defined!"); // TODO: proper error handling
 				}
 
-				else
-				{
-					NodeID queryID = queryIDIter->second;
-					const QUERY_DEFINITION& queryNode = nodeBuffers.GetNode(queryID).QueryDefinition;
-
-					// collect writes
-					for (NodeID structIdentifierID : queryNode.WriteIdentifierIDs)
-					{
-						// "struct" here can be either component or resource
-						const IDENTIFIER& structIdentifierNode = nodeBuffers.GetNode(structIdentifierID).Identifier;
-						std::string_view structName = tokenBuffers.GetValue(structIdentifierNode.IdentifierTokenID).ToStringView();
-
-						auto structIDIter = nodeBuffers.GetNamedNodes().StructNodeIDs.find(structName);
-						if (structIDIter == nodeBuffers.GetNamedNodes().StructNodeIDs.end())
-						{
-							ASSERT(false, "Resource or component does not exist!"); // TODO: proper error handling
-						}
-
-						else
-						{
-							systemReadWritesMap[systemName].StructWrites.insert(structName);
-						}
-
-						NodeID structID = structIDIter->second;
-						getComponentExcludes(tokenBuffers, nodeBuffers, structID, systemReadWritesMap[systemName]);
-					}
-
-					// collect reads
-					for (NodeID structIdentifierID : queryNode.ReadIdentifierIDs)
-					{
-						// "struct" here can be either component or resource
-						const IDENTIFIER& structIdentifierNode = nodeBuffers.GetNode(structIdentifierID).Identifier;
-						std::string_view structName = tokenBuffers.GetValue(structIdentifierNode.IdentifierTokenID).ToStringView();
-
-						auto structIDIter = nodeBuffers.GetNamedNodes().StructNodeIDs.find(structName);
-						if (structIDIter == nodeBuffers.GetNamedNodes().StructNodeIDs.end())
-						{
-							ASSERT(false, "Resource or component does not exist!"); // TODO: proper error handling
-						}
-
-						else if (nodeBuffers.GetNode(structIDIter->second).StructDefinition.Kind == STRUCT_DEFINITION::Type::Struct)
-						{
-							ASSERT(false, "Query can only contain resources or components!"); // TODO: proper error handling
-						}
-
-						else
-						{
-							systemReadWritesMap[systemName].StructReads.insert(structName);
-						}
-
-						NodeID structID = structIDIter->second;
-						getComponentExcludes(tokenBuffers, nodeBuffers, structID, systemReadWritesMap[systemName]);
-					}
-				}
+				systems.push_back(systemIt->second);
 			}
 		}
 
-		return systemReadWritesMap;
+		return systems;
 	}
 
-	std::vector<SystemGroup> createSystemGroups(const SystemReadWritesMap& systemReadWritesMap, const std::vector<std::string_view>& systemNames)
+	std::vector<SystemGroup> ECSResolver::createSystemGroups(const SystemGroup& systems)
 	{
 		std::vector<SystemGroup> systemGroups;
 
-		auto systemNameIter = systemNames.begin();
-		std::vector<std::string_view>* pCurrentGroup = &systemGroups.emplace_back();
+		SystemGroup* pCurrentGroup = &systemGroups.emplace_back();
+		SystemInputNames currentGroupInputs;
 
-		std::unordered_set<std::string_view> structReadsInGroup;
-		std::unordered_set<std::string_view> structWritesInGroup;
-
-		while (systemNameIter != systemNames.end())
+		for (size_t systemIndex = 0; systemIndex < systems.size(); systemIndex++)
 		{
-			const std::string_view& systemName = *systemNameIter;
-			const SystemReadWrites& systemReadWrites = systemReadWritesMap.at(systemName);
+			NAMED_SYSTEM_DEFINITION* pSystem = systems[systemIndex];
 
-			bool fitsInGroup = true;
+			SystemInputNames currentSystemInputs = getSystemInputNames(pSystem);
 
-			// check for collisions with this system's writes
-			for (auto& writeName : systemReadWrites.StructWrites)
-			{
-				// writes collide with either reads or writes
-				if (structReadsInGroup.contains(writeName) || structWritesInGroup.contains(writeName))
-				{
-					fitsInGroup = false;
-					break;
-				}
 
-				else
-				{
-					structWritesInGroup.insert(writeName);
-				}
-			}
-
-			if (fitsInGroup)
-			{
-				// check for collisions with this system's reads
-				for (auto& readName : systemReadWrites.StructReads)
-				{
-					// reads collide only with writes
-					if (structWritesInGroup.contains(readName))
-					{
-						fitsInGroup = false;
-						break;
-					}
-
-					else
-					{
-						structReadsInGroup.insert(readName);
-					}
-				}
-			}
-
-			if (fitsInGroup)
-			{
-				// advance to the next system but stay in this group
-				pCurrentGroup->push_back(systemName);
-				systemNameIter++;
-			}
-
-			else
-			{
-				// advance to the next group but stay on this system
-				pCurrentGroup = &systemGroups.emplace_back();
-
-				structReadsInGroup.clear();
-				structWritesInGroup.clear();
-			}
 		}
 
 		return systemGroups;
 	}
 
-	SystemSchedulingInfo ResolveApplication(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID applicationNodeID)
+	SystemSchedulingInfo ECSResolver::ResolveScheduling()
 	{
-		const APPLICATION_DEFINITION& applicationNode = nodeBuffers.GetNode(applicationNodeID).ApplicationDefinition;
+		APPLICATION_DEFINITION* pApplication = m_NamedNodes.ApplicationDefinitions.begin()->second;
 
 		// collect the systems in each stage, in the order they are grouped in
-		std::vector<std::string_view> startStageSystemNames = getSystemNamesInStage(tokenBuffers, nodeBuffers, applicationNode.StartGroupListID);
-		std::vector<std::string_view> updateStageSystemNames = getSystemNamesInStage(tokenBuffers, nodeBuffers, applicationNode.UpdateGroupListID);
-		std::vector<std::string_view> endStageSystemNames = getSystemNamesInStage(tokenBuffers, nodeBuffers, applicationNode.EndGroupListID);
+		std::vector<std::string_view> startStageSystemNames = getSystemNamesInStage(pApplication->StartGroupNames);
+		std::vector<std::string_view> updateStageSystemNames = getSystemNamesInStage(pApplication->UpdateGroupNames);
+		std::vector<std::string_view> endStageSystemNames = getSystemNamesInStage(pApplication->EndGroupNames);
 
-		// collect the reads and writes of each system
-		SystemReadWritesMap systemReadWritesMap = getSystemReadWrites(tokenBuffers, nodeBuffers);
 
-		// group systems such that they can be executed in parallel
-		SystemSchedulingInfo systemSchedulingInfo;
-		systemSchedulingInfo.StartSystemGroups = createSystemGroups(systemReadWritesMap, startStageSystemNames);
-		systemSchedulingInfo.UpdateSystemGroups = createSystemGroups(systemReadWritesMap, updateStageSystemNames);
-		systemSchedulingInfo.EndSystemGroups = createSystemGroups(systemReadWritesMap, endStageSystemNames);
-
-		return systemSchedulingInfo;
+		return SystemSchedulingInfo();
 	}
 }

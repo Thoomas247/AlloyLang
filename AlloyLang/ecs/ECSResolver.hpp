@@ -1,9 +1,9 @@
 #pragma once
-#include "../parser/Node.hpp"
+#include "../parser/Parser.hpp"
 
 namespace AlloyCompiler
 {
-	using SystemGroup = std::vector<std::string_view>;
+	using SystemGroup = std::vector<NAMED_SYSTEM_DEFINITION*>;
 
 	struct SystemSchedulingInfo
 	{
@@ -53,5 +53,39 @@ namespace AlloyCompiler
 		}
 	};
 
-	SystemSchedulingInfo ResolveApplication(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, NodeID applicationNodeID);
+	struct SystemInputNames
+	{
+		std::unordered_set<std::string_view> ResourceWrites;
+		std::unordered_set<std::string_view> ResourceReads;
+
+		std::unordered_set<std::string_view> ComponentWrites;
+		std::unordered_set<std::string_view> ComponentReads;
+
+		void Clear()
+		{
+			ResourceWrites.clear();
+			ResourceReads.clear();
+
+			ComponentWrites.clear();
+			ComponentReads.clear();
+		}
+	};
+
+	class ECSResolver
+	{
+	public:
+		ECSResolver(const NamedNodes& namedNodes)
+			: m_NamedNodes(namedNodes)
+		{}
+
+		SystemSchedulingInfo ResolveScheduling();
+
+	private:
+		SystemInputNames getSystemInputNames(NAMED_SYSTEM_DEFINITION* pSystem);
+		SystemGroup getSystemsInStage(const std::vector<std::string_view>& groupNames);
+		std::vector<SystemGroup> createSystemGroups(const SystemGroup& systems);
+
+	private:
+		const NamedNodes& m_NamedNodes;
+	};
 }
