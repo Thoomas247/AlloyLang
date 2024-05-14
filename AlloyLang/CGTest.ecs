@@ -75,7 +75,6 @@ component WorldTransform = struct
 
 /* Hierarchical Components */
 
-#[requires(Child, Sibling)]
 component Parent = struct
 {
 	var parent: i32,
@@ -124,6 +123,11 @@ component Collider = struct
 
 /* AI Components */
 
+#[exclude(Enemy)]
+component Ally = i32;
+
+#[exclude(Ally)]
+component Enemy = i32;
 
 /* Systems */
 

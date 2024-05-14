@@ -14,7 +14,11 @@ namespace AlloyCompiler
 	
 	const std::unordered_map<std::string_view, AnnotationKind> ANNOTATION_NAMES =
 	{
-		{ "exclude", AnnotationKind::MultiArgs }
+		// component annotations
+		{ "exclude", AnnotationKind::MultiArgs },
+
+		// system annotations
+		{ "inline", AnnotationKind::NoArgs },
 	};
 
 	using AnnotationArgs = std::vector<std::string_view>;

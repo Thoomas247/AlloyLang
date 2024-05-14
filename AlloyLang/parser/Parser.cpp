@@ -209,7 +209,7 @@ namespace AlloyCompiler
 	{
 		if (isEOF())
 		{
-			logErrorAtPosition("Unexpected end of file.");
+			logErrorAtCurrentPosition("Unexpected end of file.");
 			return EOF_REACHED;
 		}
 
@@ -231,7 +231,7 @@ namespace AlloyCompiler
 
 		if (!found)
 		{
-			logErrorAtPosition("Expected {0}.", stringVectorToString(values));
+			logErrorAtCurrentPosition("Expected {0}.", stringVectorToString(values));
 			return UNEXPECTED_VALUE;
 		}
 
@@ -252,12 +252,29 @@ namespace AlloyCompiler
 		{
 			if (!validAnnotations.contains(name))
 			{
-				logErrorAtPosition("Annotation '{0}' is not valid here.", name);
+				logErrorAtCurrentPosition("Annotation '{0}' is not valid here.", name);
 				result = INVALID_ANNOTATION;
 			}
 		}
 
 		return result;
+	}
+
+	bool Parser::consumeAnnotation(const std::string_view& name, AnnotationArgs* pArgs)
+	{
+		if (!m_CurrentAnnotations.contains(name))
+		{
+			return false;
+		}
+
+		if (pArgs != nullptr)
+		{
+			*pArgs = std::move(m_CurrentAnnotations[name]);
+		}
+
+		m_CurrentAnnotations.erase(name);
+
+		return true;
 	}
 
 #pragma endregion
@@ -270,11 +287,6 @@ namespace AlloyCompiler
 	template<>
 	NAMED_TYPE* Parser::parse()
 	{
-		if (checkAnnotations({ }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
 		std::string_view name;
 		if (expect<TokenKind::identifier>(&name) != SUCCESS)
 		{
@@ -372,7 +384,7 @@ namespace AlloyCompiler
 
 			if (pSizeLiteral->Type != LiteralType::Integer)
 			{
-				logErrorAtPosition("Array size must be an integer.");
+				logErrorAtCurrentPosition("Array size must be an integer.");
 				return nullptr;
 			}
 		}
@@ -470,6 +482,11 @@ namespace AlloyCompiler
 	template<>
 	NAMED_TYPE_DEFINITION* Parser::parse()
 	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
 		if (expect<TokenKind::type_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -483,7 +500,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<NAMED_TYPE_DEFINITION>(name))
 		{
-			logErrorAtPosition("Type '{0}' is already defined.", name);
+			logErrorAtCurrentPosition("Type '{0}' is already defined.", name);
 			return nullptr;
 		}
 
@@ -649,7 +666,7 @@ namespace AlloyCompiler
 		auto it = ANNOTATION_NAMES.find(name);
 		if (it == ANNOTATION_NAMES.end())
 		{
-			logErrorAtPosition("Unknown annotation '{0}'.", name);
+			logErrorAtPreviousPosition("Unknown annotation '{0}'.", name);
 			return UNKNOWN_ANNOTATION;
 		}
 
@@ -680,26 +697,32 @@ namespace AlloyCompiler
 
 		if (it->second == AnnotationKind::NoArgs && arguments.size() != 0)
 		{
-			logErrorAtPosition("Annotation '{0}' does not take any arguments.", name);
+			logErrorAtCurrentPosition("Annotation '{0}' does not take any arguments.", name);
 			return INVALID_ANNOTATION;
 		}
 
 		if (it->second == AnnotationKind::SingleArg && arguments.size() != 1)
 		{
-			logErrorAtPosition("Annotation '{0}' only takes one argument.", name);
+			logErrorAtCurrentPosition("Annotation '{0}' only takes one argument.", name);
 			return INVALID_ANNOTATION;
 		}
 
-		if (it->second == AnnotationKind::MultiArgs && arguments.size() == 1)
+		if (it->second == AnnotationKind::MultiArgs && arguments.size() < 1)
 		{
-			logErrorAtPosition("Annotation '{0}' must have at least one argument.", name);
+			logErrorAtCurrentPosition("Annotation '{0}' must have at least one argument.", name);
 			return INVALID_ANNOTATION;
 		}
 
 		if (m_CurrentAnnotations.contains(name))
 		{
-			logErrorAtPosition("Duplicate annotation '{0}'.", name);
+			logErrorAtCurrentPosition("Duplicate annotation '{0}'.", name);
 			return DUPLICATE_ANNOTATION;
+		}
+
+		result = expect<TokenKind::close_bracket>();
+		if (result != SUCCESS)
+		{
+			return result;
 		}
 
 		m_CurrentAnnotations[name] = arguments;
@@ -775,7 +798,7 @@ namespace AlloyCompiler
 
 				if (!allowVarArg)
 				{
-					logErrorAtPosition("Only extern functions can have variable arguments.");
+					logErrorAtCurrentPosition("Only extern functions can have variable arguments.");
 					return nullptr;
 				}
 
@@ -783,7 +806,7 @@ namespace AlloyCompiler
 
 				if (kind() != TokenKind::close_paren)
 				{
-					logErrorAtPosition("Variable argument specifier '...' must be the last parameter.");
+					logErrorAtCurrentPosition("Variable argument specifier '...' must be the last parameter.");
 					return nullptr;
 				}
 
@@ -852,7 +875,7 @@ namespace AlloyCompiler
 		{
 			if (namedNodeExists<EXTERN_FUNCTION_DEFINITION>(pFunctionSignature->Name))
 			{
-				logErrorAtPosition("Function '{0}' is already defined.", pFunctionSignature->Name);
+				logErrorAtCurrentPosition("Function '{0}' is already defined.", pFunctionSignature->Name);
 				return nullptr;
 			}
 		}
@@ -899,7 +922,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<EXTERN_FUNCTION_DEFINITION>(pFunctionSignature->Name))
 		{
-			logErrorAtPosition("Extern function '{0}' is already defined.", pFunctionSignature->Name);
+			logErrorAtCurrentPosition("Extern function '{0}' is already defined.", pFunctionSignature->Name);
 			return nullptr;
 		}
 
@@ -1669,7 +1692,7 @@ namespace AlloyCompiler
 
 		if (!pAssignment->Is<ASSIGNMENT>())
 		{
-			logErrorAtPosition("Expected an assignment.");
+			logErrorAtCurrentPosition("Expected an assignment.");
 			return nullptr;
 		}
 
@@ -2038,6 +2061,9 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		std::vector<std::string_view> excludes;
+		consumeAnnotation("exclude", &excludes);
+
 		if (expect<TokenKind::component_keyword>() != SUCCESS)
 		{
 			return nullptr;
@@ -2051,7 +2077,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<NAMED_COMPONENT_DEFINITION>(name))
 		{
-			logErrorAtPosition("Component '{0}' is already defined.", name);
+			logErrorAtCurrentPosition("Component '{0}' is already defined.", name);
 			return nullptr;
 		}
 
@@ -2076,7 +2102,8 @@ namespace AlloyCompiler
 			NAMED_COMPONENT_DEFINITION
 			{
 				.Name = name,
-				.pType = pType
+				.pType = pType,
+				.Excludes = std::move(excludes)
 			}
 		);
 
@@ -2106,7 +2133,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<NAMED_RESOURCE_DEFINITION>(name))
 		{
-			logErrorAtPosition("Resource '{0}' is already defined.", name);
+			logErrorAtCurrentPosition("Resource '{0}' is already defined.", name);
 			return nullptr;
 		}
 
@@ -2161,7 +2188,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<NAMED_QUERY_DEFINITION>(name))
 		{
-			logErrorAtPosition("Query '{0}' is already defined.", name);
+			logErrorAtCurrentPosition("Query '{0}' is already defined.", name);
 			return nullptr;
 		}
 
@@ -2223,10 +2250,12 @@ namespace AlloyCompiler
 	template<>
 	NAMED_SYSTEM_DEFINITION* Parser::parse()
 	{
-		if (checkAnnotations({ }) != SUCCESS)
+		if (checkAnnotations({ "inline" }) != SUCCESS)
 		{
 			return nullptr;
 		}
+
+		bool isInline = consumeAnnotation("inline");
 
 		if (expect<TokenKind::system_keyword>() != SUCCESS)
 		{
@@ -2241,7 +2270,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<NAMED_SYSTEM_DEFINITION>(name))
 		{
-			logErrorAtPosition("System '{0}' is already defined.", name);
+			logErrorAtCurrentPosition("System '{0}' is already defined.", name);
 			return nullptr;
 		}
 
@@ -2288,7 +2317,9 @@ namespace AlloyCompiler
 			{
 				.Name = name,
 				.QueryNames = queryNames,
-				.pBody = pBody
+				.pBody = pBody,
+
+				.IsInline = isInline
 			}
 		);
 
@@ -2318,7 +2349,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<NAMED_GROUP_DEFINITION>(name))
 		{
-			logErrorAtPosition("Group '{0}' is already defined.", name);
+			logErrorAtCurrentPosition("Group '{0}' is already defined.", name);
 			return nullptr;
 		}
 
@@ -2387,7 +2418,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<APPLICATION_DEFINITION>(name))
 		{
-			logErrorAtPosition("Application '{0}' is already defined.", name);
+			logErrorAtCurrentPosition("Application '{0}' is already defined.", name);
 			return nullptr;
 		}
 
@@ -2452,13 +2483,13 @@ namespace AlloyCompiler
 			}
 			else
 			{
-				logErrorAtPosition("Invalid application stage name '{0}'. Valid stages are 'start', 'update' and 'end'.", stageName);
+				logErrorAtCurrentPosition("Invalid application stage name '{0}'. Valid stages are 'start', 'update' and 'end'.", stageName);
 				return nullptr;
 			}
 
 			if (stageRedefinition)
 			{
-				logErrorAtPosition("Application stage '{0}' is already defined.", stageName);
+				logErrorAtCurrentPosition("Application stage '{0}' is already defined.", stageName);
 				return nullptr;
 			}
 

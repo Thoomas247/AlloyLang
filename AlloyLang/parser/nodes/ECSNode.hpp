@@ -12,6 +12,8 @@ namespace AlloyCompiler
 	{
 		std::string_view Name;
 		TYPE* pType;
+
+		std::vector<std::string_view> Excludes;
 	};
 
 	struct NAMED_RESOURCE_DEFINITION
@@ -32,6 +34,8 @@ namespace AlloyCompiler
 		std::string_view Name;
 		std::vector<std::string_view> QueryNames;
 		STATEMENT_BLOCK* pBody;
+
+		bool IsInline;
 	};
 
 	struct NAMED_GROUP_DEFINITION

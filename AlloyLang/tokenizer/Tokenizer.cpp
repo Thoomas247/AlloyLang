@@ -47,7 +47,7 @@ namespace AlloyCompiler
 			if (tryGetNumberLiteral())
 				continue;
 
-			logErrorAtPosition("Unexpected symbol '{0}'!", current());
+			logErrorAtCurrentPosition("Unexpected symbol '{0}'!", current());
 
 		} while (hasNext());
 
@@ -188,7 +188,7 @@ namespace AlloyCompiler
 
 			if (depth > 0)
 			{
-				logErrorAtPosition("Unexpected end of file! Missing '*/'.");
+				logErrorAtCurrentPosition("Unexpected end of file! Missing '*/'.");
 			}
 
 			return true;
@@ -314,7 +314,7 @@ namespace AlloyCompiler
 		{
 			if (!eat())
 			{
-				logErrorAtPosition("Unexpected end of file!");
+				logErrorAtCurrentPosition("Unexpected end of file!");
 				return false;
 			}
 
@@ -323,7 +323,7 @@ namespace AlloyCompiler
 			{
 				if (!eat())
 				{
-					logErrorAtPosition("Unexpected end of file!");
+					logErrorAtCurrentPosition("Unexpected end of file!");
 					return false;
 				}
 			}
@@ -351,7 +351,7 @@ namespace AlloyCompiler
 		// consume starting quote
 		if (!eat())
 		{
-			logErrorAtPosition("Unexpected end of file!");
+			logErrorAtCurrentPosition("Unexpected end of file!");
 			return false;
 		}
 
@@ -363,7 +363,7 @@ namespace AlloyCompiler
 		{
 			if (!eat())
 			{
-				logErrorAtPosition("Unexpected end of file!");
+				logErrorAtCurrentPosition("Unexpected end of file!");
 				return false;
 			}
 		}
@@ -371,7 +371,7 @@ namespace AlloyCompiler
 		// consume the character
 		if (!eat())
 		{
-			logErrorAtPosition("Unexpected end of file!");
+			logErrorAtCurrentPosition("Unexpected end of file!");
 			return false;
 		}
 
@@ -381,7 +381,7 @@ namespace AlloyCompiler
 		// consume ending quote
 		if (!eat())
 		{
-			logErrorAtPosition("Unexpected end of file!");
+			logErrorAtCurrentPosition("Unexpected end of file!");
 			return false;
 		}
 
@@ -408,7 +408,7 @@ namespace AlloyCompiler
 			{
 				if (hasDot)
 				{
-					logErrorAtPosition(
+					logErrorAtCurrentPosition(
 						"Invalid float literal: {0}. Expected only one decimal point in float literal.",
 						createStringView(start, index()));
 					return false;

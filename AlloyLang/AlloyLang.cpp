@@ -57,8 +57,6 @@ int main(int argc, char* argv[])
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-	//PrintTree(tokenBuffers, nodeBuffers, nodeBuffers.GetRootNodeID());
-
 	start = std::chrono::high_resolution_clock::now();
 	//SystemSchedulingInfo systemSchedulingInfo = ResolveApplication(tokenBuffers, nodeBuffers, nodeBuffers.GetApplicationNodeIDs()[0]);
 	//end = std::chrono::high_resolution_clock::now();

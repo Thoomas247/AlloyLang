@@ -54,7 +54,10 @@ namespace AlloyCompiler
 		std::string stringVectorToString(const std::vector<std::string>& tokens) const;
 
 		template<typename... Args>
-		constexpr void logErrorAtPosition(const std::string& format, Args&&... args);
+		constexpr void logErrorAtCurrentPosition(const std::string& format, Args&&... args);
+
+		template<typename... Args>
+		constexpr void logErrorAtPreviousPosition(const std::string& format, Args&&... args);
 
 		template <typename T, typename... Ts>
 		T* parse(Ts...) = delete;
@@ -97,7 +100,16 @@ namespace AlloyCompiler
 
 		Result expectValue(const std::vector<std::string>& values, std::string_view* pValueStringView = nullptr);
 
+		/// <summary>
+		/// Checks that no annotations beyond the given annotations are current.
+		/// </summary>
 		Result checkAnnotations(const std::unordered_set<std::string_view>& validAnnotations);
+
+		/// <summary>
+		/// If annotation exists, removes it and returns true.
+		/// If pArgs is not nullptr, fills it in with this annotation's arguments, if any.
+		/// </summary>
+		bool consumeAnnotation(const std::string_view& name, AnnotationArgs* pArgs = nullptr);
 
 	private:
 		NamedNodes m_NamedNodes;
@@ -110,15 +122,26 @@ namespace AlloyCompiler
 	};
 
 	template<typename... Args>
-	constexpr void Parser::logErrorAtPosition(const std::string& format, Args&&... args)
+	constexpr void Parser::logErrorAtCurrentPosition(const std::string& format, Args&&... args)
 	{
 		const Location& location = m_TokenBuffers.GetLocation(m_CurrentTokenID);
+		const size_t tokenSize = m_TokenBuffers.GetValue(m_CurrentTokenID).size();
 		const std::string_view line = m_Source.GetLine(location.LineStart);
 
 		Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
 		Log::Error("\t{0}", line);
-		Log::Error("\t{0}^", std::string(location.Column - 1, ' '));
+		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
 		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+	}
+
+	template<typename ...Args>
+	constexpr void Parser::logErrorAtPreviousPosition(const std::string& format, Args && ...args)
+	{
+		ASSERT(m_CurrentTokenID != 0, "Cannot go back to previous position!");
+
+		m_CurrentTokenID--;
+		logErrorAtCurrentPosition(format, args...);
+		m_CurrentTokenID++;
 	}
 
 	template<typename T>
@@ -135,7 +158,7 @@ namespace AlloyCompiler
 		if (!isExpectedToken)
 		{
 			const std::vector<TokenKind> tokenKinds = { Tokens... };
-			logErrorAtPosition("Expected token of kind {0}.", tokenKindVectorToString(tokenKinds));
+			logErrorAtCurrentPosition("Expected token of kind {0}.", tokenKindVectorToString(tokenKinds));
 			return UNEXPECTED_KIND;
 		}
 

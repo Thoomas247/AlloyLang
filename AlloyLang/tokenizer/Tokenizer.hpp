@@ -12,7 +12,7 @@ namespace AlloyCompiler
 
 	private:
 		template<typename... Args>
-		constexpr void logErrorAtPosition(const std::string& format, Args&&... args);
+		constexpr void logErrorAtCurrentPosition(const std::string& format, Args&&... args);
 
 		void addToken(TokenKind kind, const std::string_view& value, const Location& location);
 
@@ -45,7 +45,7 @@ namespace AlloyCompiler
 	};
 
 	template<typename ...Args>
-	inline constexpr void Tokenizer::logErrorAtPosition(const std::string& format, Args && ...args)
+	constexpr void Tokenizer::logErrorAtCurrentPosition(const std::string& format, Args && ...args)
 	{
 		Log::Error("Error at location ({0} : {1}):", location().Line, location().Column);
 		Log::Error("\t{0}", std::vformat(format, std::make_format_args(args...)));

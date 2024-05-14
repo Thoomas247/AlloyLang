@@ -12,7 +12,7 @@ namespace AlloyCompiler
 	};
 
 	template<typename ...Args>
-	constexpr void logErrorAtPosition(const TokenBuffers& tokenBuffers, TokenID tokenID, const std::string& format, Args && ...args)
+	constexpr void logErrorAtCurrentPosition(const TokenBuffers& tokenBuffers, TokenID tokenID, const std::string& format, Args && ...args)
 	{
 		const Location& location = tokenBuffers.GetLocation(tokenID);
 
@@ -299,7 +299,7 @@ namespace AlloyCompiler
 									TypeSubtypePair& identifierType)
 	{
 		if (nodeBuffers.GetNode(nodeID).Kind != NodeKind::IDENTIFIER) {
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Expected IDENTIFIER!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Expected IDENTIFIER!");
 			return {};
 		}
 
@@ -340,7 +340,7 @@ namespace AlloyCompiler
 			return PtrValuePair{ .Ptr = globalVar, .Value = value };
 		}
 
-		logErrorAtPosition(tokenBuffers, node.IdentifierTokenID, "Unknown variable name '{0}'!", name);
+		logErrorAtCurrentPosition(tokenBuffers, node.IdentifierTokenID, "Unknown variable name '{0}'!", name);
 		return {};
 	}
 
@@ -368,7 +368,7 @@ namespace AlloyCompiler
 
 			if (!identifierType.type)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.IdentifierOrTypeIdentifierID),
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.IdentifierOrTypeIdentifierID),
 					"Unknown type name '{0}'!", name);
 				identifierType = { nullptr, nullptr };
 				goto exit;
@@ -392,7 +392,7 @@ namespace AlloyCompiler
 
 				if (arraySize == 0)
 				{
-					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.ArraySizeID), "Array size must be greater than 0!");
+					logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(typeIdentifierNode.ArraySizeID), "Array size must be greater than 0!");
 					identifierType = { nullptr, nullptr };
 					goto exit;
 				}
@@ -405,7 +405,7 @@ namespace AlloyCompiler
 
 			if (identifierType.type == nullptr)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(elementTypeIdentifierNode), "Unknown array element type!");
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(elementTypeIdentifierNode), "Unknown array element type!");
 				identifierType = { nullptr, nullptr };
 				goto exit;
 			}
@@ -473,7 +473,7 @@ namespace AlloyCompiler
 
 		if (!identifierType.type)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Variable '{0}' type error!", name);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Variable '{0}' type error!", name);
 			return nullptr;
 		}
 
@@ -526,7 +526,7 @@ namespace AlloyCompiler
 		// check if function already exists
 		if (state.Module->getFunction(name))
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' already defined!", name);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' already defined!", name);
 			return nullptr;
 		}
 
@@ -543,7 +543,7 @@ namespace AlloyCompiler
 
 			if (!identifierType.type)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' parameter type error!", name);
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' parameter type error!", name);
 				return nullptr;
 			}
 
@@ -570,7 +570,7 @@ namespace AlloyCompiler
 
 		if (!returnType)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' return type error!", name);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' return type error!", name);
 			return nullptr;
 		}
 
@@ -621,7 +621,7 @@ namespace AlloyCompiler
 
 		if (!structType || structType->getTypeID() != llvm::Type::StructTyID)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.StructIdentifierID), "Unknown struct type '{0}'!", structName);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.StructIdentifierID), "Unknown struct type '{0}'!", structName);
 			return nullptr;
 		}
 
@@ -640,13 +640,13 @@ namespace AlloyCompiler
 
 			if (memberInfo.memberIndex == -1)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.MemberIdentifierIDs[i]), "Type '{0}' is not a struct!", structName);
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.MemberIdentifierIDs[i]), "Type '{0}' is not a struct!", structName);
 				return nullptr;
 			}
 
 			if (memberInfo.memberIndex == -2)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.MemberIdentifierIDs[i]), "Struct '{0}' does not have a member '{1}'!", structName, memberName);
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(constructorExpressionNode.MemberIdentifierIDs[i]), "Struct '{0}' does not have a member '{1}'!", structName, memberName);
 				return nullptr;
 			}
 
@@ -657,7 +657,7 @@ namespace AlloyCompiler
 
 			if (!expressionVal)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating '{0}.{1}'!", structName, memberName);
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating '{0}.{1}'!", structName, memberName);
 				return nullptr;
 			}
 
@@ -695,7 +695,7 @@ namespace AlloyCompiler
 		}
 
 		if (elementType == nullptr) {
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown element type!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown element type!");
 			return nullptr;
 		}
 
@@ -806,7 +806,7 @@ namespace AlloyCompiler
 
 		if (!expectedType.type || (expectedType.type->getTypeID() != llvm::Type::FixedVectorTyID && expectedType.type->getTypeID() != llvm::Type::ScalableVectorTyID))
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown vector type!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Unknown vector type!");
 			return nullptr;
 		}
 
@@ -826,7 +826,7 @@ namespace AlloyCompiler
 
 			if (!expressionVal)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 				return nullptr;
 			}
 
@@ -854,7 +854,7 @@ namespace AlloyCompiler
 
 		if (!declarationVal)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -863,7 +863,7 @@ namespace AlloyCompiler
 
 		if (!value)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -905,7 +905,7 @@ namespace AlloyCompiler
 
 		if (leftType->getTypeID() != llvm::Type::FixedVectorTyID && leftType->getTypeID() != llvm::Type::ScalableVectorTyID)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayExpressionID), "Expected vector type!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayExpressionID), "Expected vector type!");
 			return {};
 		}
 
@@ -930,7 +930,7 @@ namespace AlloyCompiler
 		// array of pointers, we need to load the underlying value
 		if (llvm::isa<llvm::PointerType>(memberValue->getType())) {
 			if (tempType.containedType == nullptr) {
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayExpressionID), "Array contains pointers of unknown type!");
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(arrayAccessExpressionNode.ArrayExpressionID), "Array contains pointers of unknown type!");
 				return {};
 			}
 
@@ -977,7 +977,7 @@ namespace AlloyCompiler
 
 		if (leftType->getTypeID() != llvm::Type::StructTyID)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.LeftID), "Expected struct type!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.LeftID), "Expected struct type!");
 			return {};
 		}
 
@@ -991,13 +991,13 @@ namespace AlloyCompiler
 
 		if (memberInfo.memberIndex == -1)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.RightID), "Type '{0}' is not a struct type!", structName);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.RightID), "Type '{0}' is not a struct type!", structName);
 			return {};
 		}
 
 		if (memberInfo.memberIndex == -2)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.RightID), "Struct '{0}' does not have a member '{1}'!", structName, memberName);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(memberAccessExpressionNode.RightID), "Struct '{0}' does not have a member '{1}'!", structName, memberName);
 			return {};
 		}
 
@@ -1036,14 +1036,14 @@ namespace AlloyCompiler
 
 		if (!calleeFunc)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Cannot find function '{0}'!", functionName);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Cannot find function '{0}'!", functionName);
 			return nullptr;
 		}
 
 		// if the function was found, check for argument mismatch
 		if (calleeFunc->arg_size() != functionCallExpressionNode.ArgumentIDs.size())
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' argument mismatch!", functionName);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Function '{0}' argument mismatch!", functionName);
 			return nullptr;
 		}
 
@@ -1060,7 +1060,7 @@ namespace AlloyCompiler
 			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)) {
 				// we need an identifier to pass it byref
 				if (nodeBuffers.GetNode(argumentID).Kind != NodeKind::IDENTIFIER) {
-					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
+					logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
 						"Function argument {0} expects an lvalue!", i + 1);
 					return nullptr;
 				}
@@ -1082,7 +1082,7 @@ namespace AlloyCompiler
 
 				if (argVal == nullptr)
 				{
-					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
+					logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 					return nullptr;
 				}
 
@@ -1090,7 +1090,7 @@ namespace AlloyCompiler
 
 				if (argVal->getType() != calleeFunc->getArg(i)->getType())
 				{
-					logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
+					logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(argumentID),
 						"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
 						state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
 						state.NamedValues.GetTypeName(argVal->getType()));
@@ -1122,7 +1122,7 @@ namespace AlloyCompiler
 
 		if (!leftVal || !rightVal)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -1132,7 +1132,7 @@ namespace AlloyCompiler
 		// check that types match
 		if (leftType != rightType)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Binary operator must be applied to matching types! Current types are '{0}' and '{1}'.",
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Binary operator must be applied to matching types! Current types are '{0}' and '{1}'.",
 				state.NamedValues.GetTypeName(leftType), state.NamedValues.GetTypeName(rightType));
 			return nullptr;
 		}
@@ -1372,7 +1372,7 @@ namespace AlloyCompiler
 
 		if (!ptr)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating identifier!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating identifier!");
 			return nullptr;
 		}
 
@@ -1380,7 +1380,7 @@ namespace AlloyCompiler
 
 		if (!expressionVal)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -1475,7 +1475,7 @@ namespace AlloyCompiler
 
 			if (initVal == nullptr)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.InitExpressionID), "Error evaluating expression!");
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.InitExpressionID), "Error evaluating expression!");
 				return nullptr;
 			}
 		}
@@ -1494,7 +1494,7 @@ namespace AlloyCompiler
 
 		if (bodyVal == nullptr)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.BodyID), "Error evaluating expression!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.BodyID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -1505,7 +1505,7 @@ namespace AlloyCompiler
 
 			if (stepVal == nullptr)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.IncrementExpressionID), "Error evaluating expression!");
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.IncrementExpressionID), "Error evaluating expression!");
 				return nullptr;
 			}
 		}
@@ -1515,7 +1515,7 @@ namespace AlloyCompiler
 
 		if (conditionVal == nullptr)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.ConditionExpressionID), "Error evaluating expression!");
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(forLoopStatementNode.ConditionExpressionID), "Error evaluating expression!");
 			return nullptr;
 		}
 
@@ -1676,7 +1676,7 @@ namespace AlloyCompiler
 		{
 			if (state.CurrentReturnValue != nullptr)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID),
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID),
 					"Function expects a return value of type '{0}'!", state.NamedValues.GetTypeName(state.CurrentReturnValue->getType()));
 
 				return nullptr;
@@ -1701,7 +1701,7 @@ namespace AlloyCompiler
 		if (state.CurrentReturnValue == nullptr
 			|| expressionValue->getType() != state.CurrentReturnValue->getAllocatedType())
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID),
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID),
 				"Function has return type '{0}' but provided return value is of type '{1}'!",
 				state.CurrentReturnValue == nullptr ? "void" : state.NamedValues.GetTypeName(state.CurrentReturnValue->getType()),
 				state.NamedValues.GetTypeName(expressionValue->getType()));
@@ -1791,7 +1791,7 @@ namespace AlloyCompiler
 
 			if (!identifierType.type)
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(valueDeclaration.TypeIdentifierID), "Invalid structure member type for structure '{0}'!", name);
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(valueDeclaration.TypeIdentifierID), "Invalid structure member type for structure '{0}'!", name);
 				return nullptr;
 			}
 
@@ -1808,7 +1808,7 @@ namespace AlloyCompiler
 
 		if (!structType)
 		{
-			logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Invalid structure type for structure '{0}'!", name);
+			logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Invalid structure type for structure '{0}'!", name);
 			return nullptr;
 		}
 
@@ -1857,7 +1857,7 @@ namespace AlloyCompiler
 			// check that we do not have a named value with the same name
 			if (state.NamedValues.GetValue(arg.getName().str()))
 			{
-				logErrorAtPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Variable '{0}' already defined!", arg.getName().str());
+				logErrorAtCurrentPosition(tokenBuffers, nodeBuffers.GetErrorInfo(nodeID), "Variable '{0}' already defined!", arg.getName().str());
 
 				func->eraseFromParent();
 				state.NamedValues.FreeHeapPointers(*state.Builder);
