@@ -158,7 +158,7 @@
 	NAMED_COMPONENT_DEFINITION:	component_keyword identifier assignment_operator TYPE semicolon ;
 	NAMED_RESOURCE_DEFINITION:	resource_keyword identifier assignment_operator TYPE semicolon ;
 	NAMED_QUERY_DEFINITION:		query_keyword identifier open_brace { ( var_keyword | const_keyword ) identifier semicolon } close_brace ;
-	NAMED_SYSTEM_DEFINITION:	system_keyword identifier open_paren [ identifier { comma identifier } ] close_paren STATEMENT_BLOCK ;
+	NAMED_SYSTEM_DEFINITION:	system_keyword identifier open_paren [ [ var_keyword | const_keyword ] identifier { comma [ var_keyword | const_keyword ] identifier } ] close_paren STATEMENT_BLOCK ;
 	NAMED_GROUP_DEFINITION:		group_keyword identifier open_brace identifier { comma identifier } close_brace ;
 
 	APPLICATION_DEFINITION:		application_keyword identifier open_brace { ( 'start' | 'update' | 'end' ) open_brace [ identifier { comma identifier } ] close_brace } close_brace ;

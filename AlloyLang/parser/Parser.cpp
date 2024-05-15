@@ -2279,16 +2279,47 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		std::vector<std::string_view> resourceReads;
+		std::vector<std::string_view> resourceWrites;
 		std::vector<std::string_view> queryNames;
 		while (kind() != TokenKind::close_paren)
 		{
-			std::string_view queryName;
-			if (expect<TokenKind::identifier>(&queryName) != SUCCESS)
+			if (kind() == TokenKind::constant_keyword)
 			{
-				return nullptr;
+				(void)eat();
+
+				std::string_view resourceReadName;
+				if (expect<TokenKind::identifier>(&resourceReadName) != SUCCESS)
+				{
+					return nullptr;
+				}
+
+				resourceReads.push_back(resourceReadName);
 			}
 
-			queryNames.push_back(queryName);
+			else if (kind() == TokenKind::variable_keyword)
+			{
+				(void)eat();
+
+				std::string_view resourceWriteName;
+				if (expect<TokenKind::identifier>(&resourceWriteName) != SUCCESS)
+				{
+					return nullptr;
+				}
+
+				resourceWrites.push_back(resourceWriteName);
+			}
+
+			else
+			{
+				std::string_view queryName;
+				if (expect<TokenKind::identifier>(&queryName) != SUCCESS)
+				{
+					return nullptr;
+				}
+
+				queryNames.push_back(queryName);
+			}
 
 			if (kind() == TokenKind::comma)
 			{
@@ -2316,7 +2347,9 @@ namespace AlloyCompiler
 			NAMED_SYSTEM_DEFINITION
 			{
 				.Name = name,
-				.QueryNames = queryNames,
+				.ResourceReads = std::move(resourceReads),
+				.ResourceWrites = std::move(resourceWrites),
+				.QueryNames = std::move(queryNames),
 				.pBody = pBody,
 
 				.IsInline = isInline

@@ -69,6 +69,15 @@ namespace AlloyCompiler
 			ComponentWrites.clear();
 			ComponentReads.clear();
 		}
+
+		void AddAll(const SystemInputNames& other)
+		{
+			ResourceWrites.insert_range(other.ResourceWrites);
+			ResourceReads.insert_range(other.ResourceReads);
+
+			ComponentWrites.insert_range(other.ComponentWrites);
+			ComponentReads.insert_range(other.ComponentReads);
+		}
 	};
 
 	class ECSResolver
@@ -82,6 +91,8 @@ namespace AlloyCompiler
 
 	private:
 		SystemInputNames getSystemInputNames(NAMED_SYSTEM_DEFINITION* pSystem);
+		bool resourceInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs);
+		bool componentInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs);
 		SystemGroup getSystemsInStage(const std::vector<std::string_view>& groupNames);
 		std::vector<SystemGroup> createSystemGroups(const SystemGroup& systems);
 

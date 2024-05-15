@@ -32,6 +32,8 @@ namespace AlloyCompiler
 	struct NAMED_SYSTEM_DEFINITION
 	{
 		std::string_view Name;
+		std::vector<std::string_view> ResourceReads;
+		std::vector<std::string_view> ResourceWrites;
 		std::vector<std::string_view> QueryNames;
 		STATEMENT_BLOCK* pBody;
 
