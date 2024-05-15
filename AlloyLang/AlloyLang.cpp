@@ -1,6 +1,6 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
-//#include "ecs/ECSResolver.hpp"
+#include "ecs/ECSResolver.hpp"
 //#include "codegen/CodeGenerator.hpp"
 
 #include "log/Log.hpp"
@@ -15,7 +15,7 @@ using namespace AlloyCompiler;
 int main(int argc, char* argv[])
 {
 	std::string str;
-	
+
 	if (argc > 1) {
 		// read test file provided on the command line
 		std::ifstream file(argv[1]);
@@ -58,11 +58,12 @@ int main(int argc, char* argv[])
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
-	//SystemSchedulingInfo systemSchedulingInfo = ResolveApplication(tokenBuffers, nodeBuffers, nodeBuffers.GetApplicationNodeIDs()[0]);
-	//end = std::chrono::high_resolution_clock::now();
+	ECSResolver ecsResolver(namedNodes);
+	SystemSchedulingInfo systemSchedulingInfo = ecsResolver.ResolveScheduling();
+	end = std::chrono::high_resolution_clock::now();
 	const uint64_t resolutionTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-	//systemSchedulingInfo.Print();
+	systemSchedulingInfo.Print();
 
 	start = std::chrono::high_resolution_clock::now();
 	//LLVMState state(true);

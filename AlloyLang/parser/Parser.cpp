@@ -299,7 +299,7 @@ namespace AlloyCompiler
 				.Name = name
 			}
 		);
-	
+
 	}
 
 	template<>
@@ -349,7 +349,7 @@ namespace AlloyCompiler
 				.Members = std::move(members)
 			}
 		);
-		
+
 	}
 
 	template<>
@@ -586,7 +586,7 @@ namespace AlloyCompiler
 		}
 
 		TYPE* pType = parse<TYPE>();
-		
+
 		if (pType == nullptr)
 		{
 			return nullptr;
@@ -1469,7 +1469,7 @@ namespace AlloyCompiler
 	EXPRESSION* Parser::parse_UNARY()
 	{
 		// operators '-' and '&' are ambiguous so we expect based on value instead of kind
-		
+
 		if (value() != "!" && value() != "-" && value() != "&")
 		{
 			return parse_POSTFIX();
@@ -1477,9 +1477,9 @@ namespace AlloyCompiler
 
 		std::string_view op;
 		(void)expectValue({ "!", "-", "&" }, &op);
-	
+
 		EXPRESSION* pExpression = parse_POSTFIX();
-	
+
 		if (pExpression == nullptr)
 		{
 			return nullptr;
@@ -1492,7 +1492,7 @@ namespace AlloyCompiler
 				.pExpression = pExpression
 			}
 		);
-	
+
 		return createNode(EXPRESSION(pUnary));
 	}
 
@@ -1582,7 +1582,7 @@ namespace AlloyCompiler
 					return nullptr;
 				}
 
-				while (value() == "==" || value() == "!=" || value() == "<" || value() == "<=" 
+				while (value() == "==" || value() == "!=" || value() == "<" || value() == "<="
 					|| value() == ">" || value() == ">=")
 				{
 					std::string_view op;
@@ -2624,8 +2624,8 @@ namespace AlloyCompiler
 				break;
 
 			default:
-				(void)expect<type_keyword, function_keyword, extern_keyword, 
-					component_keyword, resource_keyword, query_keyword, system_keyword, 
+				(void)expect<type_keyword, function_keyword, extern_keyword,
+					component_keyword, resource_keyword, query_keyword, system_keyword,
 					group_keyword, application_keyword>();
 				(void)eat();
 				break;

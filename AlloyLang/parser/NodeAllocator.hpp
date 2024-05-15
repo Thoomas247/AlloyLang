@@ -9,8 +9,14 @@ namespace AlloyCompiler
 	public:
 		NodeAllocator(size_t size)
 			: m_pMemBlock(new char[size]), m_pCurrentIndex(m_pMemBlock), m_pEnd(m_pMemBlock + size)
-		{
+		{}
 
+		NodeAllocator(const NodeAllocator&) = delete;
+
+		NodeAllocator(NodeAllocator&& other) noexcept
+			: m_pMemBlock(other.m_pMemBlock), m_pCurrentIndex(other.m_pCurrentIndex), m_pEnd(other.m_pEnd)
+		{
+			other.m_pMemBlock = nullptr;
 		}
 
 		~NodeAllocator()
@@ -30,7 +36,7 @@ namespace AlloyCompiler
 
 			// this is the location we want the node to go into
 			N* pNode = (N*)m_pCurrentIndex;
-			
+
 			// set the location for the next node
 			m_pCurrentIndex += sizeof(N);
 

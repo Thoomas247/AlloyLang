@@ -10,6 +10,8 @@ namespace AlloyCompiler
 {
 	struct NamedNodes
 	{
+		NodeAllocator Allocator;
+
 		std::unordered_map<std::string_view, APPLICATION_DEFINITION*> ApplicationDefinitions;
 
 		std::unordered_map<std::string_view, NAMED_GROUP_DEFINITION*> GroupDefinitions;
@@ -20,15 +22,18 @@ namespace AlloyCompiler
 		std::unordered_map<std::string_view, NAMED_TYPE_DEFINITION*> TypeDefinitions;
 		std::unordered_map<std::string_view, NAMED_FUNCTION_DEFINITION*> FunctionDefinitions;
 		std::unordered_map<std::string_view, EXTERN_FUNCTION_DEFINITION*> ExternDefinitions;
+
+		NamedNodes(size_t allocatorSize)
+			: Allocator(allocatorSize)
+		{}
 	};
 
 	class Parser
 	{
 	public:
 		Parser(const Source& source, const TokenBuffers& tokenBuffers)
-			: m_NamedNodes()
+			: m_NamedNodes(tokenBuffers.LastTokenID() * 120) // TODO: remove magic number
 			, m_CurrentAnnotations()
-			, m_NodeAllocator(tokenBuffers.LastTokenID() * 120) // TODO: remove magic number
 			, m_Source(source)
 			, m_TokenBuffers(tokenBuffers)
 			, m_CurrentTokenID(0)
@@ -114,7 +119,6 @@ namespace AlloyCompiler
 	private:
 		NamedNodes m_NamedNodes;
 		AnnotationMap m_CurrentAnnotations;
-		NodeAllocator m_NodeAllocator;
 
 		const Source& m_Source;
 		const TokenBuffers& m_TokenBuffers;
@@ -147,7 +151,7 @@ namespace AlloyCompiler
 	template<typename T>
 	T* Parser::createNode(const T& node)
 	{
-		return m_NodeAllocator.Create<T>(node);
+		return m_NamedNodes.Allocator.Create<T>(node);
 	}
 
 	template<TokenKind ...Tokens>

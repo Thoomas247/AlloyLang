@@ -34,9 +34,9 @@ namespace AlloyCompiler
 
 	const std::string_view& TokenBuffers::GetValue(TokenID id) const
 	{
-		ASSERT((size_t)id < m_Values.size(), "Invalid ID!")
+		ASSERT((size_t)id < m_Values.size(), "Invalid ID!");
 
-			return m_Values[(size_t)id];
+		return m_Values[(size_t)id];
 	}
 
 	const Location& TokenBuffers::GetLocation(TokenID id) const

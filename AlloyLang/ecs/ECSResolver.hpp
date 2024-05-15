@@ -19,9 +19,9 @@ namespace AlloyCompiler
 			{
 				Log::Print("\tGroup {0}:", i);
 
-				for (const std::string_view& systemName : StartSystemGroups[i])
+				for (NAMED_SYSTEM_DEFINITION* pSystem : StartSystemGroups[i])
 				{
-					Log::Print("\t\t{0}", systemName);
+					Log::Print("\t\t{0}", pSystem->Name);
 				}
 			}
 
@@ -31,9 +31,9 @@ namespace AlloyCompiler
 			{
 				Log::Print("\tGroup {0}:", i);
 
-				for (const std::string_view& systemName : UpdateSystemGroups[i])
+				for (NAMED_SYSTEM_DEFINITION* pSystem : UpdateSystemGroups[i])
 				{
-					Log::Print("\t\t{0}", systemName);
+					Log::Print("\t\t{0}", pSystem->Name);
 				}
 			}
 
@@ -43,9 +43,9 @@ namespace AlloyCompiler
 			{
 				Log::Print("\tGroup {0}:", i);
 
-				for (const std::string_view& systemName : EndSystemGroups[i])
+				for (NAMED_SYSTEM_DEFINITION* pSystem : EndSystemGroups[i])
 				{
-					Log::Print("\t\t{0}", systemName);
+					Log::Print("\t\t{0}", pSystem->Name);
 				}
 			}
 

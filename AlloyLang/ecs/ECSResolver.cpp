@@ -4,7 +4,7 @@
 
 namespace AlloyCompiler
 {
-	
+
 	SystemInputNames ECSResolver::getSystemInputNames(NAMED_SYSTEM_DEFINITION* pSystem)
 	{
 		SystemInputNames inputNames;
@@ -97,7 +97,7 @@ namespace AlloyCompiler
 	{
 		for (const std::string_view& resourceWrite : currentSystemInputs.ResourceWrites)
 		{
-			if (currentGroupInputs.ResourceReads.contains(resourceWrite) || currentGroupInputs.ResourceWrites.contains(resourceWrite))
+			if (currentGroupInputs.ResourceWrites.contains(resourceWrite) || currentGroupInputs.ResourceReads.contains(resourceWrite))
 			{
 				return false;
 			}
@@ -116,7 +116,23 @@ namespace AlloyCompiler
 
 	bool ECSResolver::componentInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs)
 	{
+		for (const std::string_view& componentWrite : currentSystemInputs.ComponentWrites)
+		{
+			if (currentGroupInputs.ComponentWrites.contains(componentWrite) || currentGroupInputs.ComponentReads.contains(componentWrite))
+			{
+				return false;
+			}
+		}
 
+		for (const std::string_view& componentRead : currentSystemInputs.ComponentReads)
+		{
+			if (currentGroupInputs.ComponentWrites.contains(componentRead))
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	std::vector<SystemGroup> ECSResolver::createSystemGroups(const SystemGroup& systems)
@@ -148,7 +164,7 @@ namespace AlloyCompiler
 				// go to next system and stay in same group
 				pCurrentGroup->push_back(pSystem);
 				currentGroupInputs.AddAll(currentSystemInputs);
-				systemIndex++;	
+				systemIndex++;
 			}
 			else
 			{
