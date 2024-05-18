@@ -12,7 +12,7 @@ namespace AlloyCompiler
 		for (const std::string_view& resourceRead : pSystem->ResourceReads)
 		{
 			auto resourceIt = m_NamedNodes.ResourceDefinitions.find(resourceRead);
-			if (resourceIt != m_NamedNodes.ResourceDefinitions.end())
+			if (resourceIt == m_NamedNodes.ResourceDefinitions.end())
 			{
 				ASSERT(false, "Resource is not defined!");
 			}
@@ -23,7 +23,7 @@ namespace AlloyCompiler
 		for (const std::string_view& resourceWrite : pSystem->ResourceWrites)
 		{
 			auto resourceIt = m_NamedNodes.ResourceDefinitions.find(resourceWrite);
-			if (resourceIt != m_NamedNodes.ResourceDefinitions.end())
+			if (resourceIt == m_NamedNodes.ResourceDefinitions.end())
 			{
 				ASSERT(false, "Resource is not defined!");
 			}
@@ -34,7 +34,7 @@ namespace AlloyCompiler
 		for (const std::string_view& queryName : pSystem->QueryNames)
 		{
 			auto queryIt = m_NamedNodes.QueryDefinitions.find(queryName);
-			if (queryIt != m_NamedNodes.QueryDefinitions.end())
+			if (queryIt == m_NamedNodes.QueryDefinitions.end())
 			{
 				ASSERT(false, "Query is not defined!");
 			}

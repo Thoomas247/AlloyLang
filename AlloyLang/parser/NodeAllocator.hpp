@@ -8,13 +8,13 @@ namespace AlloyCompiler
 	{
 	public:
 		NodeAllocator(size_t size)
-			: m_pMemBlock(new char[size]), m_pCurrentIndex(m_pMemBlock), m_pEnd(m_pMemBlock + size)
+			: m_pMemBlock(new char[size]), m_pCurrent(m_pMemBlock), m_pEnd(m_pMemBlock + size)
 		{}
 
 		NodeAllocator(const NodeAllocator&) = delete;
 
 		NodeAllocator(NodeAllocator&& other) noexcept
-			: m_pMemBlock(other.m_pMemBlock), m_pCurrentIndex(other.m_pCurrentIndex), m_pEnd(other.m_pEnd)
+			: m_pMemBlock(other.m_pMemBlock), m_pCurrent(other.m_pCurrent), m_pEnd(other.m_pEnd)
 		{
 			other.m_pMemBlock = nullptr;
 		}
@@ -32,23 +32,34 @@ namespace AlloyCompiler
 		template<typename N>
 		N* Create(const N& value)
 		{
-			ASSERT((m_pCurrentIndex + sizeof(N)) < m_pEnd, "Allocator is full!");
+			// allign the current pointer as needed by N
+			const uintptr_t offset = (uintptr_t)(m_pCurrent) & (alignof(N) - 1);
+			if (offset != 0)
+			{
+				m_pCurrent += alignof(N) - offset;
+			}
+
+			ASSERT((m_pCurrent + sizeof(N)) < m_pEnd, "Allocator is full!");
 
 			// this is the location we want the node to go into
-			N* pNode = (N*)m_pCurrentIndex;
+			N* pNode = (N*)m_pCurrent;
 
 			// set the location for the next node
-			m_pCurrentIndex += sizeof(N);
+			m_pCurrent += sizeof(N);
 
-			// copy the value into the node
+			// move the value into the allocated memory
+			// cannot simply use operator= for some reason
 			std::memcpy(pNode, &value, sizeof(N));
+			std::memset((void*)&value, 0, sizeof(N));
+
+			//*pNode = value;
 
 			return pNode;
 		}
 
 	private:
 		char* m_pMemBlock;
-		char* m_pCurrentIndex;
+		char* m_pCurrent;
 		char* m_pEnd;
 	};
 }

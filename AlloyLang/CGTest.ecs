@@ -133,8 +133,6 @@ component Enemy = i32;
 
 query SceneQuery
 {
-	const CurrentScene;
-
 	var WorldTransform;
 }
 
@@ -146,8 +144,6 @@ system load_scene(SceneQuery)
 
 query TransformHierarchyQuery
 {
-	const RootEntity;
-
 	var WorldTransform;
 	const LocalTransform;
 	const Child;
@@ -167,7 +163,7 @@ query RenderQuery
 	const Material;
 }
 
-system render(RenderQuery)
+system render(const CurrentScene, RenderQuery)
 {
 	printf("Rendering meshes.\n");
 }
@@ -183,29 +179,6 @@ query PhysicsQuery
 system update_physics(PhysicsQuery)
 {
 	printf("Updating physics.\n");
-}
-
-
-query EnemyAIQuery
-{
-	var WorldTransform;
-	const EnemyAI;
-}
-
-query AllyAIQuery
-{
-	var WorldTransform;
-	const AllyAI;
-}
-
-system update_enemy_AI(EnemyAIQuery)
-{
-	printf("Updating enemy AI.\n");
-}
-
-system update_ally_AI(AllyAIQuery)
-{
-	printf("Updating ally AI.\n");
 }
 
 system save()
@@ -229,8 +202,6 @@ group StartGroup
 group UpdateGroup
 {
 	update_physics,
-	update_enemy_AI,
-	update_ally_AI
 }
 
 group RenderGroup
