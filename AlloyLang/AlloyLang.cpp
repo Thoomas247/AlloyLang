@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
-	ECSResolver ecsResolver(namedNodes);
+	ECSResolver ecsResolver(source, namedNodes);
 	SystemSchedulingInfo systemSchedulingInfo = ecsResolver.ResolveScheduling();
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t resolutionTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

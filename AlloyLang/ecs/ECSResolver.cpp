@@ -14,10 +14,13 @@ namespace AlloyCompiler
 			auto resourceIt = m_NamedNodes.ResourceDefinitions.find(pResourceRead->Value);
 			if (resourceIt == m_NamedNodes.ResourceDefinitions.end())
 			{
-				ASSERT(false, "Resource is not defined!");
+				logErrorAtToken(pResourceRead, "Resource '{0}' is not defined!", pResourceRead->Value);
 			}
 
-			inputNames.ResourceReads.insert(pResourceRead->Value);
+			else
+			{
+				inputNames.ResourceReads.insert(pResourceRead->Value);
+			}
 		}
 
 		for (Token* pResourceWrite : pSystem->ResourceWrites)
@@ -25,10 +28,13 @@ namespace AlloyCompiler
 			auto resourceIt = m_NamedNodes.ResourceDefinitions.find(pResourceWrite->Value);
 			if (resourceIt == m_NamedNodes.ResourceDefinitions.end())
 			{
-				ASSERT(false, "Resource is not defined!");
+				logErrorAtToken(pResourceWrite, "Resource '{0}' is not defined!", pResourceWrite->Value);
 			}
 
-			inputNames.ResourceWrites.insert(pResourceWrite->Value);
+			else
+			{
+				inputNames.ResourceWrites.insert(pResourceWrite->Value);
+			}
 		}
 
 		for (Token* pQueryName : pSystem->QueryNames)
@@ -36,29 +42,39 @@ namespace AlloyCompiler
 			auto queryIt = m_NamedNodes.QueryDefinitions.find(pQueryName->Value);
 			if (queryIt == m_NamedNodes.QueryDefinitions.end())
 			{
-				ASSERT(false, "Query is not defined!");
+				logErrorAtToken(pQueryName, "Query '{0}' is not defined!", pQueryName->Value);
 			}
 
-			NAMED_QUERY_DEFINITION* pQuery = queryIt->second;
-
-			for (Token* pComponentReadName : pQuery->ComponentReadNames)
+			else
 			{
-				if (!m_NamedNodes.ComponentDefinitions.contains(pComponentReadName->Value))
+
+				NAMED_QUERY_DEFINITION* pQuery = queryIt->second;
+
+				for (Token* pComponentReadName : pQuery->ComponentReadNames)
 				{
-					ASSERT(false, "Component is not defined!");
+					if (!m_NamedNodes.ComponentDefinitions.contains(pComponentReadName->Value))
+					{
+						logErrorAtToken(pComponentReadName, "Component '{0}' is not defined!", pComponentReadName->Value);
+					}
+
+					else
+					{
+						inputNames.ComponentReads.emplace(pComponentReadName->Value);
+					}
 				}
 
-				inputNames.ComponentReads.emplace(pComponentReadName->Value);
-			}
-
-			for (Token* pComponentWriteName : pQuery->ComponentWriteNames)
-			{
-				if (!m_NamedNodes.ComponentDefinitions.contains(pComponentWriteName->Value))
+				for (Token* pComponentWriteName : pQuery->ComponentWriteNames)
 				{
-					ASSERT(false, "Component is not defined!");
-				}
+					if (!m_NamedNodes.ComponentDefinitions.contains(pComponentWriteName->Value))
+					{
+						logErrorAtToken(pComponentWriteName, "Component '{0}' is not defined!", pComponentWriteName->Value);
+					}
 
-				inputNames.ComponentWrites.emplace(pComponentWriteName->Value);
+					else
+					{
+						inputNames.ComponentWrites.emplace(pComponentWriteName->Value);
+					}
+				}
 			}
 		}
 
@@ -74,19 +90,25 @@ namespace AlloyCompiler
 			auto groupIt = m_NamedNodes.GroupDefinitions.find(pGroupName->Value);
 			if (groupIt == m_NamedNodes.GroupDefinitions.end())
 			{
-				ASSERT(false, "Group is not defined!");	// TODO: proper error handling
+				logErrorAtToken(pGroupName, "Group '{0}' is not defined!", pGroupName->Value);
 			}
 
-			NAMED_GROUP_DEFINITION* pGroup = groupIt->second;
-			for (Token* pSystemName : pGroup->SystemNames)
+			else
 			{
-				auto systemIt = m_NamedNodes.SystemDefinitions.find(pSystemName->Value);
-				if (systemIt == m_NamedNodes.SystemDefinitions.end())
+				NAMED_GROUP_DEFINITION* pGroup = groupIt->second;
+				for (Token* pSystemName : pGroup->SystemNames)
 				{
-					ASSERT(false, "System is not defined!"); // TODO: proper error handling
-				}
+					auto systemIt = m_NamedNodes.SystemDefinitions.find(pSystemName->Value);
+					if (systemIt == m_NamedNodes.SystemDefinitions.end())
+					{
+						logErrorAtToken(pSystemName, "System '{0}' is not defined!", pSystemName->Value);
+					}
 
-				systems.push_back(systemIt->second);
+					else
+					{
+						systems.push_back(systemIt->second);
+					}
+				}
 			}
 		}
 

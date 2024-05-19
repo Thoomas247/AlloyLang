@@ -83,13 +83,16 @@ namespace AlloyCompiler
 	class ECSResolver
 	{
 	public:
-		ECSResolver(const NamedNodes& namedNodes)
-			: m_NamedNodes(namedNodes)
+		ECSResolver(const Source& source, const NamedNodes& namedNodes)
+			: m_Source(source), m_NamedNodes(namedNodes)
 		{}
 
 		SystemSchedulingInfo ResolveScheduling();
 
 	private:
+		template<typename... Args>
+		constexpr void logErrorAtToken(Token* pToken, const std::string& format, Args&&... args);
+
 		SystemInputNames getSystemInputNames(NAMED_SYSTEM_DEFINITION* pSystem);
 		bool resourceInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs);
 		bool componentInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs);
@@ -97,6 +100,20 @@ namespace AlloyCompiler
 		std::vector<SystemGroup> createSystemGroups(const SystemGroup& systems);
 
 	private:
+		const Source& m_Source;
 		const NamedNodes& m_NamedNodes;
 	};
+
+	template<typename ...Args>
+	constexpr void ECSResolver::logErrorAtToken(Token* pToken, const std::string& format, Args&& ...args)
+	{
+		const Location& location = pToken->Location;
+		const size_t tokenSize = pToken->Value.size();
+		const std::string_view line = m_Source.GetLine(location.LineStart);
+
+		Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
+		Log::Error("\t{0}", line);
+		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
+		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+	}
 }
