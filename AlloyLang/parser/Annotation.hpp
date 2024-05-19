@@ -2,6 +2,8 @@
 #include <unordered_map>
 #include <string_view>
 
+#include "Node.hpp"
+
 namespace AlloyCompiler
 {
 
@@ -21,6 +23,6 @@ namespace AlloyCompiler
 		{ "inline", AnnotationKind::NoArgs },
 	};
 
-	using AnnotationArgs = std::vector<std::string_view>;
+	using AnnotationArgs = std::vector<Token*>;
 	using AnnotationMap = std::unordered_map<std::string_view, AnnotationArgs>;
 }

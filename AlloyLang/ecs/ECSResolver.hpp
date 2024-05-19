@@ -21,7 +21,7 @@ namespace AlloyCompiler
 
 				for (NAMED_SYSTEM_DEFINITION* pSystem : StartSystemGroups[i])
 				{
-					Log::Print("\t\t{0}", pSystem->Name);
+					Log::Print("\t\t{0}", pSystem->pNameToken->Value);
 				}
 			}
 
@@ -33,7 +33,7 @@ namespace AlloyCompiler
 
 				for (NAMED_SYSTEM_DEFINITION* pSystem : UpdateSystemGroups[i])
 				{
-					Log::Print("\t\t{0}", pSystem->Name);
+					Log::Print("\t\t{0}", pSystem->pNameToken->Value);
 				}
 			}
 
@@ -45,7 +45,7 @@ namespace AlloyCompiler
 
 				for (NAMED_SYSTEM_DEFINITION* pSystem : EndSystemGroups[i])
 				{
-					Log::Print("\t\t{0}", pSystem->Name);
+					Log::Print("\t\t{0}", pSystem->pNameToken->Value);
 				}
 			}
 
@@ -93,7 +93,7 @@ namespace AlloyCompiler
 		SystemInputNames getSystemInputNames(NAMED_SYSTEM_DEFINITION* pSystem);
 		bool resourceInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs);
 		bool componentInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs);
-		SystemGroup getSystemsInStage(const std::vector<std::string_view>& groupNames);
+		SystemGroup getSystemsInStage(const std::vector<Token*>& groupNames);
 		std::vector<SystemGroup> createSystemGroups(const SystemGroup& systems);
 
 	private:

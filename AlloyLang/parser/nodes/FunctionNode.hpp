@@ -11,7 +11,7 @@ namespace AlloyCompiler
 
 	struct FUNCTION_SIGNATURE 
 	{
-		std::string_view Name;
+		Token* pNameToken;
 		bool IsVarArg;
 		std::vector<NAMED_VARIABLE_DECLARATION*> Parameters;
 		RETURN_TYPE* pReturnType;	// optional
@@ -36,7 +36,7 @@ namespace AlloyCompiler
 
 	struct FUNCTION_CALL
 	{
-		std::string_view Function;
+		Token* pFunctionNameToken;
 		std::vector<EXPRESSION*> Arguments;
 	};
 

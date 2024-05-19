@@ -7,7 +7,7 @@ namespace AlloyCompiler
 {
 	struct NAMED_TYPE
 	{
-		std::string_view Name;
+		Token* pNameToken;
 	};
 
 	struct STRUCT_TYPE
@@ -29,7 +29,7 @@ namespace AlloyCompiler
 
 	struct NAMED_TYPE_DEFINITION
 	{
-		std::string_view Name;
+		Token* pNameToken;
 		TYPE* pType;
 	};
 }

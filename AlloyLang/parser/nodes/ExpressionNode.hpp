@@ -11,13 +11,13 @@ namespace AlloyCompiler
 	struct LITERAL
 	{
 		LiteralType Type;
-		std::string_view Value;
+		Token* pValueToken;
 	};
 
 	struct CONSTRUCTOR 
 	{
 		NAMED_TYPE* pType;
-		std::vector<std::pair<std::string_view, EXPRESSION*>> Arguments;
+		std::vector<std::pair<Token*, EXPRESSION*>> Arguments;	// Token* contains name of member
 	};
 
 	struct POINTER_INIT
@@ -50,18 +50,18 @@ namespace AlloyCompiler
 	struct MEMBER_ACCESS
 	{
 		EXPRESSION* pObject;
-		std::string_view MemberName;
+		Token* pMemberNameToken;
 	};
 
 	struct UNARY
 	{
-		std::string_view Operator;
+		Token* pOpToken;
 		EXPRESSION* pExpression;
 	};
 
 	struct BINARY
 	{
-		std::string_view Operator;
+		Token* pOpToken;
 		EXPRESSION* pLeft;
 		EXPRESSION* pRight;
 	};

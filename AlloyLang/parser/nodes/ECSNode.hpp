@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Node.hpp"
+#include "../Annotation.hpp"
 #include "VariantNodes.hpp"
 
 namespace AlloyCompiler
@@ -10,31 +11,28 @@ namespace AlloyCompiler
 
 	struct NAMED_COMPONENT_DEFINITION
 	{
-		std::string_view Name;
+		Token* pNameToken;
 		TYPE* pType;
 
-		std::vector<std::string_view> Excludes;
+		AnnotationArgs Excludes;
 	};
 
 	struct NAMED_RESOURCE_DEFINITION
 	{
-		std::string_view Name;
+		Token* pNameToken;
 		TYPE* pType;
 	};
 
 	struct NAMED_QUERY_DEFINITION
 	{
-		std::string_view Name;
-		std::vector<std::string_view> ComponentReadNames;
-		std::vector<std::string_view> ComponentWriteNames;
+		Token* pNameToken;
+		std::vector<Token*> ComponentReadNames, ComponentWriteNames;
 	};
 
 	struct NAMED_SYSTEM_DEFINITION
 	{
-		std::string_view Name;
-		std::vector<std::string_view> ResourceReads;
-		std::vector<std::string_view> ResourceWrites;
-		std::vector<std::string_view> QueryNames;
+		Token* pNameToken;
+		std::vector<Token*> ResourceReads, ResourceWrites, QueryNames;
 		STATEMENT_BLOCK* pBody;
 
 		bool IsInline;
@@ -42,15 +40,13 @@ namespace AlloyCompiler
 
 	struct NAMED_GROUP_DEFINITION
 	{
-		std::string_view Name;
-		std::vector<std::string_view> SystemNames;
+		Token* pNameToken;
+		std::vector<Token*> SystemNames;
 	};
 
 	struct APPLICATION_DEFINITION
 	{
-		std::string_view Name;
-		std::vector<std::string_view> StartGroupNames;
-		std::vector<std::string_view> UpdateGroupNames;
-		std::vector<std::string_view> EndGroupNames;
+		Token* pNameToken;
+		std::vector<Token*> StartGroupNames, UpdateGroupNames, EndGroupNames;
 	};
 }

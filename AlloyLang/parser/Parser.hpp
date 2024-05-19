@@ -31,12 +31,12 @@ namespace AlloyCompiler
 	class Parser
 	{
 	public:
-		Parser(const Source& source, const TokenBuffers& tokenBuffers)
-			: m_NamedNodes(tokenBuffers.LastTokenID() * 120) // TODO: remove magic number
+		Parser(const Source& source, TokenBuffers& tokenBuffers)
+			: m_NamedNodes(tokenBuffers.NumTokens() * 120) // TODO: remove magic number
 			, m_CurrentAnnotations()
 			, m_Source(source)
 			, m_TokenBuffers(tokenBuffers)
-			, m_CurrentTokenID(0)
+			, m_CurrentTokenIndex(0)
 		{
 		}
 
@@ -83,9 +83,9 @@ namespace AlloyCompiler
 
 		bool isEOF() const;
 		bool hasNext() const;
-		TokenKind kind() const;
-		TokenKind peek() const;
-		std::string_view value() const;
+
+		Token* token();
+		Token* peekToken();
 
 		/// <summary>
 		/// Moves onto the next token if current token is not EOF.
@@ -98,12 +98,9 @@ namespace AlloyCompiler
 		/// If pValueView is not nullptr, it will be set to the value of the current token.
 		/// </summary>
 		template<TokenKind ...Tokens>
-		Result expect(TokenKind* pTokenValue = nullptr, std::string_view* pValueStringView = nullptr);
+		Result expectKind(Token** ppToken = nullptr);
 
-		template<TokenKind ...Tokens>
-		Result expect(std::string_view* pValueStringView, TokenKind* pTokenValue = nullptr);
-
-		Result expectValue(const std::vector<std::string>& values, std::string_view* pValueStringView = nullptr);
+		Result expectValue(const std::vector<std::string>& values, Token** ppToken = nullptr);
 
 		/// <summary>
 		/// Checks that no annotations beyond the given annotations are current.
@@ -121,15 +118,17 @@ namespace AlloyCompiler
 		AnnotationMap m_CurrentAnnotations;
 
 		const Source& m_Source;
-		const TokenBuffers& m_TokenBuffers;
-		TokenID m_CurrentTokenID;
+		TokenBuffers& m_TokenBuffers;
+		size_t m_CurrentTokenIndex;
 	};
 
 	template<typename... Args>
 	constexpr void Parser::logErrorAtCurrentPosition(const std::string& format, Args&&... args)
 	{
-		const Location& location = m_TokenBuffers.GetLocation(m_CurrentTokenID);
-		const size_t tokenSize = m_TokenBuffers.GetValue(m_CurrentTokenID).size();
+		const Token* pToken = m_TokenBuffers.GetToken(m_CurrentTokenIndex);
+
+		const Location& location = pToken->Location;
+		const size_t tokenSize = pToken->Value.size();
 		const std::string_view line = m_Source.GetLine(location.LineStart);
 
 		Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
@@ -141,11 +140,11 @@ namespace AlloyCompiler
 	template<typename ...Args>
 	constexpr void Parser::logErrorAtPreviousPosition(const std::string& format, Args && ...args)
 	{
-		ASSERT(m_CurrentTokenID != 0, "Cannot go back to previous position!");
+		ASSERT(m_CurrentTokenIndex != 0, "Cannot go back to previous position!");
 
-		m_CurrentTokenID--;
+		m_CurrentTokenIndex--;
 		logErrorAtCurrentPosition(format, args...);
-		m_CurrentTokenID++;
+		m_CurrentTokenIndex++;
 	}
 
 	template<typename T>
@@ -155,9 +154,9 @@ namespace AlloyCompiler
 	}
 
 	template<TokenKind ...Tokens>
-	Parser::Result Parser::expect(TokenKind* pTokenValue, std::string_view* pValueStringView)
+	Parser::Result Parser::expectKind(Token** ppToken)
 	{
-		const bool isExpectedToken = ((m_TokenBuffers.GetKind(m_CurrentTokenID) == Tokens) || ...);
+		const bool isExpectedToken = ((m_TokenBuffers.GetToken(m_CurrentTokenIndex)->Kind == Tokens) || ...);
 
 		if (!isExpectedToken)
 		{
@@ -166,23 +165,12 @@ namespace AlloyCompiler
 			return UNEXPECTED_KIND;
 		}
 
-		if (pTokenValue != nullptr)
+		if (ppToken != nullptr)
 		{
-			*pTokenValue = m_TokenBuffers.GetKind(m_CurrentTokenID);
+			*ppToken = m_TokenBuffers.GetToken(m_CurrentTokenIndex);
 		}
 
-		if (pValueStringView != nullptr)
-		{
-			*pValueStringView = m_TokenBuffers.GetValue(m_CurrentTokenID);
-		}
-
-		++m_CurrentTokenID;
+		++m_CurrentTokenIndex;
 		return SUCCESS;
-	}
-
-	template<TokenKind ...Tokens>
-	Parser::Result Parser::expect(std::string_view* pValueStringView, TokenKind* pTokenValue)
-	{
-		return expect<Tokens...>(pTokenValue, pValueStringView);
 	}
 }

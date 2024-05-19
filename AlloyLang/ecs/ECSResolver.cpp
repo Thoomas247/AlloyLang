@@ -9,31 +9,31 @@ namespace AlloyCompiler
 	{
 		SystemInputNames inputNames;
 
-		for (const std::string_view& resourceRead : pSystem->ResourceReads)
+		for (Token* pResourceRead : pSystem->ResourceReads)
 		{
-			auto resourceIt = m_NamedNodes.ResourceDefinitions.find(resourceRead);
+			auto resourceIt = m_NamedNodes.ResourceDefinitions.find(pResourceRead->Value);
 			if (resourceIt == m_NamedNodes.ResourceDefinitions.end())
 			{
 				ASSERT(false, "Resource is not defined!");
 			}
 
-			inputNames.ResourceReads.insert(resourceRead);
+			inputNames.ResourceReads.insert(pResourceRead->Value);
 		}
 
-		for (const std::string_view& resourceWrite : pSystem->ResourceWrites)
+		for (Token* pResourceWrite : pSystem->ResourceWrites)
 		{
-			auto resourceIt = m_NamedNodes.ResourceDefinitions.find(resourceWrite);
+			auto resourceIt = m_NamedNodes.ResourceDefinitions.find(pResourceWrite->Value);
 			if (resourceIt == m_NamedNodes.ResourceDefinitions.end())
 			{
 				ASSERT(false, "Resource is not defined!");
 			}
 
-			inputNames.ResourceWrites.insert(resourceWrite);
+			inputNames.ResourceWrites.insert(pResourceWrite->Value);
 		}
 
-		for (const std::string_view& queryName : pSystem->QueryNames)
+		for (Token* pQueryName : pSystem->QueryNames)
 		{
-			auto queryIt = m_NamedNodes.QueryDefinitions.find(queryName);
+			auto queryIt = m_NamedNodes.QueryDefinitions.find(pQueryName->Value);
 			if (queryIt == m_NamedNodes.QueryDefinitions.end())
 			{
 				ASSERT(false, "Query is not defined!");
@@ -41,46 +41,46 @@ namespace AlloyCompiler
 
 			NAMED_QUERY_DEFINITION* pQuery = queryIt->second;
 
-			for (const std::string_view& componentReadName : pQuery->ComponentReadNames)
+			for (Token* pComponentReadName : pQuery->ComponentReadNames)
 			{
-				if (!m_NamedNodes.ComponentDefinitions.contains(componentReadName))
+				if (!m_NamedNodes.ComponentDefinitions.contains(pComponentReadName->Value))
 				{
 					ASSERT(false, "Component is not defined!");
 				}
 
-				inputNames.ComponentReads.emplace(componentReadName);
+				inputNames.ComponentReads.emplace(pComponentReadName->Value);
 			}
 
-			for (const std::string_view& componentWriteName : pQuery->ComponentWriteNames)
+			for (Token* pComponentWriteName : pQuery->ComponentWriteNames)
 			{
-				if (!m_NamedNodes.ComponentDefinitions.contains(componentWriteName))
+				if (!m_NamedNodes.ComponentDefinitions.contains(pComponentWriteName->Value))
 				{
 					ASSERT(false, "Component is not defined!");
 				}
 
-				inputNames.ComponentWrites.emplace(componentWriteName);
+				inputNames.ComponentWrites.emplace(pComponentWriteName->Value);
 			}
 		}
 
 		return inputNames;
 	}
 
-	SystemGroup ECSResolver::getSystemsInStage(const std::vector<std::string_view>& groupNames)
+	SystemGroup ECSResolver::getSystemsInStage(const std::vector<Token*>& groupNames)
 	{
 		SystemGroup systems;
 
-		for (const std::string_view& groupName : groupNames)
+		for (Token* pGroupName : groupNames)
 		{
-			auto groupIt = m_NamedNodes.GroupDefinitions.find(groupName);
+			auto groupIt = m_NamedNodes.GroupDefinitions.find(pGroupName->Value);
 			if (groupIt == m_NamedNodes.GroupDefinitions.end())
 			{
 				ASSERT(false, "Group is not defined!");	// TODO: proper error handling
 			}
 
 			NAMED_GROUP_DEFINITION* pGroup = groupIt->second;
-			for (const std::string_view& systemName : pGroup->SystemNames)
+			for (Token* pSystemName : pGroup->SystemNames)
 			{
-				auto systemIt = m_NamedNodes.SystemDefinitions.find(systemName);
+				auto systemIt = m_NamedNodes.SystemDefinitions.find(pSystemName->Value);
 				if (systemIt == m_NamedNodes.SystemDefinitions.end())
 				{
 					ASSERT(false, "System is not defined!"); // TODO: proper error handling

@@ -6,16 +6,6 @@
 namespace AlloyCompiler
 {
 	/// <summary>
-	/// Unique ID for a token. All token data is accessed through this ID.
-	/// </summary>
-	using TokenID = uint32_t;
-
-	/// <summary>
-	/// Represents an invalid token ID.
-	/// </summary>
-	constexpr TokenID ERROR_TOKEN_ID = (TokenID)std::numeric_limits<uint32_t>::max();
-
-	/// <summary>
 	/// TokenKind enum to match SYNTAX.txt.
 	/// </summary>
 	enum class TokenKind : uint8_t
@@ -81,6 +71,13 @@ namespace AlloyCompiler
 		boolean_literal,
 		string_literal,
 		character_literal
+	};
+
+	struct Token
+	{
+		std::string_view Value;
+		Location Location;
+		TokenKind Kind;
 	};
 
 	/// <summary>
@@ -250,34 +247,21 @@ namespace AlloyCompiler
 	{
 	public:
 		/// <summary>
-		/// Creates a new token and returns its ID.
+		/// Creates a new token.
 		/// </summary>
-		TokenID AddToken(TokenKind kind, const std::string_view& value, const Location& location);
+		void AddToken(TokenKind kind, const std::string_view& value, const Location& location);
 
 		/// <summary>
-		/// Returns the ID of the last token added.
-		/// This is the token before EOF.
+		/// Returns the token at the given index.
 		/// </summary>
-		TokenID LastTokenID() const;
+		Token* GetToken(size_t index);
 
 		/// <summary>
-		/// Returns the kind of the token with the given ID.
+		/// Returns the number of tokens.
 		/// </summary>
-		TokenKind GetKind(TokenID id) const;
-
-		/// <summary>
-		/// Returns the string value of the token with the given ID.
-		/// </summary>
-		const std::string_view& GetValue(TokenID id) const;
-
-		/// <summary>
-		/// Returns the location in the file of the token with the given ID.
-		/// </summary>
-		const Location& GetLocation(TokenID id) const;
+		size_t NumTokens() const;
 
 	private:
-		std::vector<TokenKind> m_Kinds;
-		std::vector<std::string_view> m_Values;
-		std::vector<Location> m_Locations;
+		std::vector<Token> m_Tokens;
 	};
 }

@@ -4,6 +4,7 @@
 
 namespace AlloyCompiler
 {
+
 	class Tokenizer
 	{
 	public:

@@ -7,13 +7,13 @@ namespace AlloyCompiler
 {
 	struct NAMED_VARIABLE
 	{
-		std::string_view Name;
+		Token* pNameToken;
 	};
 
 	struct NAMED_VARIABLE_DECLARATION
 	{
 		VariableType VarType;
-		std::string_view Name;
+		Token* pNameToken;
 		TYPE* pType;
 	};
 
