@@ -68,7 +68,7 @@
 	TYPE:						[ reference | pointer ] ( NAMED_TYPE | STRUCT_TYPE | ARRAY_TYPE ) ;
 
 		NAMED_TYPE:					identifier ;
-		STRUCT_TYPE:				struct_keyword open_brace [ NAMED_VARIABLE_DECLARATION { NAMED_VARIABLE_DECLARATION } ] close_brace ;
+		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { identifier colon TYPE } ] close_brace ;
 		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
 
 	NAMED_TYPE_DEFINITION:		type_keyword identifier assignment_operator TYPE semicolon ;

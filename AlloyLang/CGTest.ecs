@@ -5,17 +5,17 @@ extern fn printf (const str : String, ...) -> i64;
 
 type Vector3 = struct
 {
-	var x: f64,
-	var y: f64,
-	var z: f64,
+	x: f64,
+	y: f64,
+	z: f64,
 };
 
 type Quaternion = struct
 {
-	var x: f64,
-	var y: f64,
-	var z: f64,
-	var w: f64,
+	x: f64,
+	y: f64,
+	z: f64,
+	w: f64,
 };
 
 fn Vector3_print(const v : &Vector3)
@@ -47,12 +47,12 @@ fn draw_mesh(const vertices : *[Vector3], const num_vertices : u32, const indice
 
 resource RootEntity = struct
 {
-	var id: i32,
+	id: i32,
 };
 
 resource CurrentScene = struct
 {
-	var id: i32,
+	id: i32,
 };
 
 
@@ -60,16 +60,16 @@ resource CurrentScene = struct
 
 component LocalTransform = struct
 {
-	var position: Vector3,
-	var rotation: Quaternion,
-	var scale: Vector3,
+	position: Vector3,
+	rotation: Quaternion,
+	scale: Vector3,
 };
 
 component WorldTransform = struct
 {
-	var position: Vector3,
-	var rotation: Quaternion,
-	var scale: Vector3,
+	position: Vector3,
+	rotation: Quaternion,
+	scale: Vector3,
 };
 
 
@@ -77,17 +77,17 @@ component WorldTransform = struct
 
 component Parent = struct
 {
-	var parent: i32,
+	parent: i32,
 };
 
 component Child = struct
 {
-	var first_child: i32,
+	first_child: i32,
 };
 
 component Sibling = struct
 {
-	var next_sibling: i32,
+	next_sibling: i32,
 };
 
 
@@ -95,14 +95,14 @@ component Sibling = struct
 
 component Mesh = struct
 {
-	var vertices: *[Vector3],
-	var indices: *[i32],
+	vertices: *[Vector3],
+	indices: *[i32],
 };
 
 component Material = struct
 {
-	var shader_index: i32,
-	var color: Vector3,
+	shader_index: i32,
+	color: Vector3,
 };
 
 
@@ -110,14 +110,14 @@ component Material = struct
 
 component RigidBody = struct
 {
-	var mass: f64,
-	var velocity : Vector3,
-	var angular_velocity : Vector3,
+	mass: f64,
+	velocity : Vector3,
+	angular_velocity : Vector3,
 };
 
 component Collider = struct
 {
-	const shape : i32,
+	shape : i32,
 };
 
 

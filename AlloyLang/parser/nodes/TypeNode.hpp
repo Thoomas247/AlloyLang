@@ -12,7 +12,7 @@ namespace AlloyCompiler
 
 	struct STRUCT_TYPE
 	{
-		std::vector<NAMED_VARIABLE_DECLARATION*> Members;
+		std::vector<std::pair<Token*, TYPE*>> Members;
 	};
 
 	struct ARRAY_TYPE

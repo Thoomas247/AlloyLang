@@ -308,17 +308,28 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		std::vector<NAMED_VARIABLE_DECLARATION*> members;
+		std::vector<std::pair<Token*, TYPE*>> members;
 		while (token()->Kind != TokenKind::close_brace)
 		{
-			NAMED_VARIABLE_DECLARATION* pMember = parse<NAMED_VARIABLE_DECLARATION>();
-
-			if (pMember == nullptr)
+			Token* pMemberNameToken;
+			if (expectKind<TokenKind::identifier>(&pMemberNameToken) != SUCCESS)
 			{
 				return nullptr;
 			}
 
-			members.push_back(pMember);
+			if (expectKind<TokenKind::colon>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			TYPE* pType = parse<TYPE>();
+
+			if (pType == nullptr)
+			{
+				return nullptr;
+			}
+
+			members.push_back({ pMemberNameToken, pType });
 
 			if (token()->Kind == TokenKind::comma)
 			{
