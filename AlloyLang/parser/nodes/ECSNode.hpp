@@ -9,7 +9,7 @@ namespace AlloyCompiler
 	struct STATEMENT_BLOCK;
 	struct TYPE;
 
-	struct NAMED_COMPONENT_DEFINITION
+	struct COMPONENT_DEFINITION
 	{
 		Token* pNameToken;
 		TYPE* pType;
@@ -17,19 +17,19 @@ namespace AlloyCompiler
 		AnnotationArgs Excludes;
 	};
 
-	struct NAMED_RESOURCE_DEFINITION
+	struct RESOURCE_DEFINITION
 	{
 		Token* pNameToken;
 		TYPE* pType;
 	};
 
-	struct NAMED_QUERY_DEFINITION
+	struct QUERY_DEFINITION
 	{
 		Token* pNameToken;
 		std::vector<Token*> ComponentReadNames, ComponentWriteNames;
 	};
 
-	struct NAMED_SYSTEM_DEFINITION
+	struct SYSTEM_DEFINITION
 	{
 		Token* pNameToken;
 		std::vector<Token*> ResourceReads, ResourceWrites, QueryNames;
@@ -38,7 +38,7 @@ namespace AlloyCompiler
 		bool IsInline;
 	};
 
-	struct NAMED_GROUP_DEFINITION
+	struct GROUP_DEFINITION
 	{
 		Token* pNameToken;
 		std::vector<Token*> SystemNames;

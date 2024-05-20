@@ -14,14 +14,14 @@ namespace AlloyCompiler
 
 		std::unordered_map<std::string_view, APPLICATION_DEFINITION*> ApplicationDefinitions;
 
-		std::unordered_map<std::string_view, NAMED_GROUP_DEFINITION*> GroupDefinitions;
-		std::unordered_map<std::string_view, NAMED_SYSTEM_DEFINITION*> SystemDefinitions;
-		std::unordered_map<std::string_view, NAMED_QUERY_DEFINITION*> QueryDefinitions;
-		std::unordered_map<std::string_view, NAMED_RESOURCE_DEFINITION*> ResourceDefinitions;
-		std::unordered_map<std::string_view, NAMED_COMPONENT_DEFINITION*> ComponentDefinitions;
-		std::unordered_map<std::string_view, NAMED_TYPE_DEFINITION*> TypeDefinitions;
+		std::unordered_map<std::string_view, GROUP_DEFINITION*> GroupDefinitions;
+		std::unordered_map<std::string_view, SYSTEM_DEFINITION*> SystemDefinitions;
+		std::unordered_map<std::string_view, QUERY_DEFINITION*> QueryDefinitions;
+		std::unordered_map<std::string_view, RESOURCE_DEFINITION*> ResourceDefinitions;
+		std::unordered_map<std::string_view, COMPONENT_DEFINITION*> ComponentDefinitions;
+		std::unordered_map<std::string_view, TYPE_DEFINITION*> TypeDefinitions;
 		std::unordered_map<std::string_view, NAMED_FUNCTION_DEFINITION*> FunctionDefinitions;
-		std::unordered_map<std::string_view, EXTERN_FUNCTION_DEFINITION*> ExternDefinitions;
+		std::unordered_map<std::string_view, EXTERN_DEFINITION*> ExternDefinitions;
 
 		NamedNodes(size_t allocatorSize)
 			: Allocator(allocatorSize)

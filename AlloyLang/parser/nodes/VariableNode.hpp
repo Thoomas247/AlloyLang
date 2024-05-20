@@ -5,21 +5,21 @@
 
 namespace AlloyCompiler
 {
-	struct NAMED_VARIABLE
+	struct VARIABLE
 	{
 		Token* pNameToken;
 	};
 
-	struct NAMED_VARIABLE_DECLARATION
+	struct VARIABLE_DECLARATION
 	{
 		VariableType VarType;
 		Token* pNameToken;
 		TYPE* pType;
 	};
 
-	struct NAMED_VARIABLE_DEFINITION
+	struct VARIABLE_DEFINITION
 	{
-		NAMED_VARIABLE_DECLARATION* pDeclaration;
+		VARIABLE_DECLARATION* pDeclaration;
 		EXPRESSION* pValue;
 	};
 }

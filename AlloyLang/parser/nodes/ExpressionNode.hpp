@@ -5,8 +5,8 @@
 
 namespace AlloyCompiler
 {
-	struct NAMED_TYPE;
-	struct NAMED_VARIABLE;
+	struct TYPE_NAME;
+	struct VARIABLE;
 
 	struct LITERAL
 	{
@@ -16,7 +16,7 @@ namespace AlloyCompiler
 
 	struct CONSTRUCTOR 
 	{
-		NAMED_TYPE* pType;
+		TYPE_NAME* pType;
 		std::vector<std::pair<Token*, EXPRESSION*>> Arguments;	// Token* contains name of member
 	};
 
@@ -28,7 +28,7 @@ namespace AlloyCompiler
 
 	struct POINTER_MOVE
 	{
-		NAMED_VARIABLE* pVariable;
+		VARIABLE* pVariable;
 	};
 
 	struct INITIALIZER_LIST

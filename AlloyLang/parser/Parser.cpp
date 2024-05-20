@@ -11,37 +11,37 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	bool Parser::namedNodeExists<NAMED_GROUP_DEFINITION>(const std::string_view& name) const
+	bool Parser::namedNodeExists<GROUP_DEFINITION>(const std::string_view& name) const
 	{
 		return m_NamedNodes.GroupDefinitions.contains(name);
 	}
 
 	template<>
-	bool Parser::namedNodeExists<NAMED_SYSTEM_DEFINITION>(const std::string_view& name) const
+	bool Parser::namedNodeExists<SYSTEM_DEFINITION>(const std::string_view& name) const
 	{
 		return m_NamedNodes.SystemDefinitions.contains(name);
 	}
 
 	template<>
-	bool Parser::namedNodeExists<NAMED_QUERY_DEFINITION>(const std::string_view& name) const
+	bool Parser::namedNodeExists<QUERY_DEFINITION>(const std::string_view& name) const
 	{
 		return m_NamedNodes.QueryDefinitions.contains(name);
 	}
 
 	template<>
-	bool Parser::namedNodeExists<NAMED_RESOURCE_DEFINITION>(const std::string_view& name) const
+	bool Parser::namedNodeExists<RESOURCE_DEFINITION>(const std::string_view& name) const
 	{
 		return m_NamedNodes.ResourceDefinitions.contains(name);
 	}
 
 	template<>
-	bool Parser::namedNodeExists<NAMED_COMPONENT_DEFINITION>(const std::string_view& name) const
+	bool Parser::namedNodeExists<COMPONENT_DEFINITION>(const std::string_view& name) const
 	{
 		return m_NamedNodes.ComponentDefinitions.contains(name);
 	}
 
 	template<>
-	bool Parser::namedNodeExists<NAMED_TYPE_DEFINITION>(const std::string_view& name) const
+	bool Parser::namedNodeExists<TYPE_DEFINITION>(const std::string_view& name) const
 	{
 		return m_NamedNodes.TypeDefinitions.contains(name);
 	}
@@ -53,7 +53,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	bool Parser::namedNodeExists<EXTERN_FUNCTION_DEFINITION>(const std::string_view& name) const
+	bool Parser::namedNodeExists<EXTERN_DEFINITION>(const std::string_view& name) const
 	{
 		return m_NamedNodes.ExternDefinitions.contains(name);
 	}
@@ -69,37 +69,37 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	void Parser::addNamedNode(const std::string_view& name, NAMED_GROUP_DEFINITION* pNode)
+	void Parser::addNamedNode(const std::string_view& name, GROUP_DEFINITION* pNode)
 	{
 		m_NamedNodes.GroupDefinitions[name] = pNode;
 	}
 
 	template<>
-	void Parser::addNamedNode(const std::string_view& name, NAMED_SYSTEM_DEFINITION* pNode)
+	void Parser::addNamedNode(const std::string_view& name, SYSTEM_DEFINITION* pNode)
 	{
 		m_NamedNodes.SystemDefinitions[name] = pNode;
 	}
 
 	template<>
-	void Parser::addNamedNode(const std::string_view& name, NAMED_QUERY_DEFINITION* pNode)
+	void Parser::addNamedNode(const std::string_view& name, QUERY_DEFINITION* pNode)
 	{
 		m_NamedNodes.QueryDefinitions[name] = pNode;
 	}
 
 	template<>
-	void Parser::addNamedNode(const std::string_view& name, NAMED_RESOURCE_DEFINITION* pNode)
+	void Parser::addNamedNode(const std::string_view& name, RESOURCE_DEFINITION* pNode)
 	{
 		m_NamedNodes.ResourceDefinitions[name] = pNode;
 	}
 
 	template<>
-	void Parser::addNamedNode(const std::string_view& name, NAMED_COMPONENT_DEFINITION* pNode)
+	void Parser::addNamedNode(const std::string_view& name, COMPONENT_DEFINITION* pNode)
 	{
 		m_NamedNodes.ComponentDefinitions[name] = pNode;
 	}
 
 	template<>
-	void Parser::addNamedNode(const std::string_view& name, NAMED_TYPE_DEFINITION* pNode)
+	void Parser::addNamedNode(const std::string_view& name, TYPE_DEFINITION* pNode)
 	{
 		m_NamedNodes.TypeDefinitions[name] = pNode;
 	}
@@ -111,7 +111,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	void Parser::addNamedNode(const std::string_view& name, EXTERN_FUNCTION_DEFINITION* pNode)
+	void Parser::addNamedNode(const std::string_view& name, EXTERN_DEFINITION* pNode)
 	{
 		m_NamedNodes.ExternDefinitions[name] = pNode;
 	}
@@ -275,7 +275,7 @@ namespace AlloyCompiler
 	TYPE* Parser::parse();
 
 	template<>
-	NAMED_TYPE* Parser::parse()
+	TYPE_NAME* Parser::parse()
 	{
 		Token* pNameToken;
 		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
@@ -284,7 +284,7 @@ namespace AlloyCompiler
 		}
 
 		return createNode(
-			NAMED_TYPE
+			TYPE_NAME
 			{
 				.pNameToken = pNameToken
 			}
@@ -293,7 +293,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	NAMED_VARIABLE_DECLARATION* Parser::parse<NAMED_VARIABLE_DECLARATION>();
+	VARIABLE_DECLARATION* Parser::parse<VARIABLE_DECLARATION>();
 
 	template<>
 	STRUCT_TYPE* Parser::parse()
@@ -425,12 +425,12 @@ namespace AlloyCompiler
 
 		using enum TokenKind;
 
-		VariantNode<NAMED_TYPE, STRUCT_TYPE, ARRAY_TYPE> type;
+		VariantNode<TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE> type;
 		switch (token()->Kind)
 		{
 		case identifier:
 		{
-			NAMED_TYPE* pNamedType = parse<NAMED_TYPE>();
+			TYPE_NAME* pNamedType = parse<TYPE_NAME>();
 
 			if (pNamedType == nullptr)
 			{
@@ -481,7 +481,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	NAMED_TYPE_DEFINITION* Parser::parse()
+	TYPE_DEFINITION* Parser::parse()
 	{
 		if (checkAnnotations({ }) != SUCCESS)
 		{
@@ -499,7 +499,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (namedNodeExists<NAMED_TYPE_DEFINITION>(pNameToken->Value))
+		if (namedNodeExists<TYPE_DEFINITION>(pNameToken->Value))
 		{
 			logErrorAtCurrentPosition("Type '{0}' is already defined.", pNameToken->Value);
 			return nullptr;
@@ -521,8 +521,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		NAMED_TYPE_DEFINITION* pTypeDefinition = createNode(
-			NAMED_TYPE_DEFINITION
+		TYPE_DEFINITION* pTypeDefinition = createNode(
+			TYPE_DEFINITION
 			{
 				.pNameToken = pNameToken,
 				.pType = pType
@@ -539,7 +539,7 @@ namespace AlloyCompiler
 #pragma region Variables
 
 	template<>
-	NAMED_VARIABLE* Parser::parse()
+	VARIABLE* Parser::parse()
 	{
 		Token* pNameToken;
 		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
@@ -548,7 +548,7 @@ namespace AlloyCompiler
 		}
 
 		return createNode(
-			NAMED_VARIABLE
+			VARIABLE
 			{
 				.pNameToken = pNameToken
 			}
@@ -556,7 +556,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	NAMED_VARIABLE_DECLARATION* Parser::parse()
+	VARIABLE_DECLARATION* Parser::parse()
 	{
 		Token* pToken;
 		if (expectKind<TokenKind::variable_keyword, TokenKind::constant_keyword>(&pToken) != SUCCESS)
@@ -594,7 +594,7 @@ namespace AlloyCompiler
 		}
 
 		return createNode(
-			NAMED_VARIABLE_DECLARATION
+			VARIABLE_DECLARATION
 			{
 				.VarType = varType,
 				.pNameToken = pNameToken,
@@ -607,9 +607,9 @@ namespace AlloyCompiler
 	EXPRESSION* Parser::parse<EXPRESSION>();
 
 	template<>
-	NAMED_VARIABLE_DEFINITION* Parser::parse()
+	VARIABLE_DEFINITION* Parser::parse()
 	{
-		NAMED_VARIABLE_DECLARATION* pVariableDeclaration = parse<NAMED_VARIABLE_DECLARATION>();
+		VARIABLE_DECLARATION* pVariableDeclaration = parse<VARIABLE_DECLARATION>();
 
 		if (pVariableDeclaration == nullptr)
 		{
@@ -629,7 +629,7 @@ namespace AlloyCompiler
 		}
 
 		return createNode(
-			NAMED_VARIABLE_DEFINITION
+			VARIABLE_DEFINITION
 			{
 				.pDeclaration = pVariableDeclaration,
 				.pValue = pValue
@@ -790,7 +790,7 @@ namespace AlloyCompiler
 		}
 
 		bool isVarArg = false;
-		std::vector<NAMED_VARIABLE_DECLARATION*> parameters;
+		std::vector<VARIABLE_DECLARATION*> parameters;
 		while (token()->Kind != TokenKind::close_paren)
 		{
 			if (token()->Kind == TokenKind::ellipsis)
@@ -814,7 +814,7 @@ namespace AlloyCompiler
 				break;
 			}
 
-			NAMED_VARIABLE_DECLARATION* pVariableDeclaration = parse<NAMED_VARIABLE_DECLARATION>();
+			VARIABLE_DECLARATION* pVariableDeclaration = parse<VARIABLE_DECLARATION>();
 
 			if (pVariableDeclaration == nullptr)
 			{
@@ -874,7 +874,7 @@ namespace AlloyCompiler
 
 		if (namedNodeExists<NAMED_FUNCTION_DEFINITION>(pFunctionSignature->pNameToken->Value))
 		{
-			if (namedNodeExists<EXTERN_FUNCTION_DEFINITION>(pFunctionSignature->pNameToken->Value))
+			if (namedNodeExists<EXTERN_DEFINITION>(pFunctionSignature->pNameToken->Value))
 			{
 				logErrorAtCurrentPosition("Function '{0}' is already defined.", pFunctionSignature->pNameToken->Value);
 				return nullptr;
@@ -902,7 +902,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	EXTERN_FUNCTION_DEFINITION* Parser::parse()
+	EXTERN_DEFINITION* Parser::parse()
 	{
 		if (checkAnnotations({ }) != SUCCESS)
 		{
@@ -921,7 +921,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (namedNodeExists<EXTERN_FUNCTION_DEFINITION>(pFunctionSignature->pNameToken->Value))
+		if (namedNodeExists<EXTERN_DEFINITION>(pFunctionSignature->pNameToken->Value))
 		{
 			logErrorAtCurrentPosition("Extern function '{0}' is already defined.", pFunctionSignature->pNameToken->Value);
 			return nullptr;
@@ -932,8 +932,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		EXTERN_FUNCTION_DEFINITION* pExternFunctionDefinition = createNode(
-			EXTERN_FUNCTION_DEFINITION
+		EXTERN_DEFINITION* pExternFunctionDefinition = createNode(
+			EXTERN_DEFINITION
 			{
 				.pSignature = pFunctionSignature
 			}
@@ -1045,7 +1045,7 @@ namespace AlloyCompiler
 	template<>
 	CONSTRUCTOR* Parser::parse()
 	{
-		NAMED_TYPE* pNamedType = parse<NAMED_TYPE>();
+		TYPE_NAME* pNamedType = parse<TYPE_NAME>();
 
 		if (pNamedType == nullptr)
 		{
@@ -1167,7 +1167,7 @@ namespace AlloyCompiler
 		}
 
 		// TODO: pointer could be struct member, array member, ... need to fix!
-		NAMED_VARIABLE* pNamedVariable = parse<NAMED_VARIABLE>();
+		VARIABLE* pNamedVariable = parse<VARIABLE>();
 
 		if (pNamedVariable == nullptr)
 		{
@@ -1282,7 +1282,7 @@ namespace AlloyCompiler
 			// NAMED_VARIABLE_DEFINITION
 			if (peekToken()->Kind == variable_keyword || peekToken()->Kind == constant_keyword)
 			{
-				NAMED_VARIABLE_DEFINITION* pVariableDefinition = parse<NAMED_VARIABLE_DEFINITION>();
+				VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
 
 				if (pVariableDefinition == nullptr)
 				{
@@ -1321,7 +1321,7 @@ namespace AlloyCompiler
 			}
 
 			// NAMED_VARIABLE
-			NAMED_VARIABLE* pNamedVariable = parse<NAMED_VARIABLE>();
+			VARIABLE* pNamedVariable = parse<VARIABLE>();
 
 			if (pNamedVariable == nullptr)
 			{
@@ -1933,7 +1933,7 @@ namespace AlloyCompiler
 		case TokenKind::variable_keyword:
 		case TokenKind::constant_keyword:
 		{
-			NAMED_VARIABLE_DEFINITION* pVariableDefinition = parse<NAMED_VARIABLE_DEFINITION>();
+			VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
 			if (pVariableDefinition == nullptr)
 			{
 				return nullptr;
@@ -2055,7 +2055,7 @@ namespace AlloyCompiler
 #pragma region ECS Constructs
 
 	template<>
-	NAMED_COMPONENT_DEFINITION* Parser::parse()
+	COMPONENT_DEFINITION* Parser::parse()
 	{
 		if (checkAnnotations({ "exclude" }) != SUCCESS)
 		{
@@ -2076,7 +2076,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (namedNodeExists<NAMED_COMPONENT_DEFINITION>(pNameToken->Value))
+		if (namedNodeExists<COMPONENT_DEFINITION>(pNameToken->Value))
 		{
 			logErrorAtCurrentPosition("Component '{0}' is already defined.", pNameToken->Value);
 			return nullptr;
@@ -2099,8 +2099,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		NAMED_COMPONENT_DEFINITION* pComponentDefinition = createNode(
-			NAMED_COMPONENT_DEFINITION
+		COMPONENT_DEFINITION* pComponentDefinition = createNode(
+			COMPONENT_DEFINITION
 			{
 				.pNameToken = pNameToken,
 				.pType = pType,
@@ -2114,7 +2114,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	NAMED_RESOURCE_DEFINITION* Parser::parse()
+	RESOURCE_DEFINITION* Parser::parse()
 	{
 		if (checkAnnotations({ }) != SUCCESS)
 		{
@@ -2132,7 +2132,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (namedNodeExists<NAMED_RESOURCE_DEFINITION>(pNameToken->Value))
+		if (namedNodeExists<RESOURCE_DEFINITION>(pNameToken->Value))
 		{
 			logErrorAtCurrentPosition("Resource '{0}' is already defined.", pNameToken->Value);
 			return nullptr;
@@ -2155,8 +2155,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		NAMED_RESOURCE_DEFINITION* pResourceDefinition = createNode(
-			NAMED_RESOURCE_DEFINITION
+		RESOURCE_DEFINITION* pResourceDefinition = createNode(
+			RESOURCE_DEFINITION
 			{
 				.pNameToken = pNameToken,
 				.pType = pType
@@ -2169,7 +2169,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	NAMED_QUERY_DEFINITION* Parser::parse()
+	QUERY_DEFINITION* Parser::parse()
 	{
 		if (checkAnnotations({ }) != SUCCESS)
 		{
@@ -2187,7 +2187,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (namedNodeExists<NAMED_QUERY_DEFINITION>(pNameToken->Value))
+		if (namedNodeExists<QUERY_DEFINITION>(pNameToken->Value))
 		{
 			logErrorAtCurrentPosition("Query '{0}' is already defined.", pNameToken->Value);
 			return nullptr;
@@ -2233,8 +2233,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		NAMED_QUERY_DEFINITION* pQueryDefinition = createNode(
-			NAMED_QUERY_DEFINITION
+		QUERY_DEFINITION* pQueryDefinition = createNode(
+			QUERY_DEFINITION
 			{
 				.pNameToken = pNameToken,
 				.ComponentReadNames = std::move(reads),
@@ -2248,7 +2248,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	NAMED_SYSTEM_DEFINITION* Parser::parse()
+	SYSTEM_DEFINITION* Parser::parse()
 	{
 		if (checkAnnotations({ "inline" }) != SUCCESS)
 		{
@@ -2268,7 +2268,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (namedNodeExists<NAMED_SYSTEM_DEFINITION>(pNameToken->Value))
+		if (namedNodeExists<SYSTEM_DEFINITION>(pNameToken->Value))
 		{
 			logErrorAtCurrentPosition("System '{0}' is already defined.", pNameToken->Value);
 			return nullptr;
@@ -2341,8 +2341,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		NAMED_SYSTEM_DEFINITION* pSystemDefinition = createNode(
-			NAMED_SYSTEM_DEFINITION
+		SYSTEM_DEFINITION* pSystemDefinition = createNode(
+			SYSTEM_DEFINITION
 			{
 				.pNameToken = pNameToken,
 				.ResourceReads = std::move(resourceReads),
@@ -2360,7 +2360,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	NAMED_GROUP_DEFINITION* Parser::parse()
+	GROUP_DEFINITION* Parser::parse()
 	{
 		if (checkAnnotations({ }) != SUCCESS)
 		{
@@ -2378,7 +2378,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (namedNodeExists<NAMED_GROUP_DEFINITION>(pNameToken->Value))
+		if (namedNodeExists<GROUP_DEFINITION>(pNameToken->Value))
 		{
 			logErrorAtCurrentPosition("Group '{0}' is already defined.", pNameToken->Value);
 			return nullptr;
@@ -2415,8 +2415,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		NAMED_GROUP_DEFINITION* pGroupDefinition = createNode(
-			NAMED_GROUP_DEFINITION
+		GROUP_DEFINITION* pGroupDefinition = createNode(
+			GROUP_DEFINITION
 			{
 				.pNameToken = pNameToken,
 				.SystemNames = std::move(systemNames)
@@ -2586,7 +2586,7 @@ namespace AlloyCompiler
 				break;
 
 			case type_keyword:
-				(void)parse<NAMED_TYPE_DEFINITION>();
+				(void)parse<TYPE_DEFINITION>();
 				break;
 
 			case function_keyword:
@@ -2594,27 +2594,27 @@ namespace AlloyCompiler
 				break;
 
 			case extern_keyword:
-				(void)parse<EXTERN_FUNCTION_DEFINITION>();
+				(void)parse<EXTERN_DEFINITION>();
 				break;
 
 			case component_keyword:
-				(void)parse<NAMED_COMPONENT_DEFINITION>();
+				(void)parse<COMPONENT_DEFINITION>();
 				break;
 
 			case resource_keyword:
-				(void)parse<NAMED_RESOURCE_DEFINITION>();
+				(void)parse<RESOURCE_DEFINITION>();
 				break;
 
 			case query_keyword:
-				(void)parse<NAMED_QUERY_DEFINITION>();
+				(void)parse<QUERY_DEFINITION>();
 				break;
 
 			case system_keyword:
-				(void)parse<NAMED_SYSTEM_DEFINITION>();
+				(void)parse<SYSTEM_DEFINITION>();
 				break;
 
 			case group_keyword:
-				(void)parse<NAMED_GROUP_DEFINITION>();
+				(void)parse<GROUP_DEFINITION>();
 				break;
 
 			case application_keyword:

@@ -5,7 +5,7 @@
 namespace AlloyCompiler
 {
 
-	SystemInputNames ECSResolver::getSystemInputNames(NAMED_SYSTEM_DEFINITION* pSystem)
+	SystemInputNames ECSResolver::getSystemInputNames(SYSTEM_DEFINITION* pSystem)
 	{
 		SystemInputNames inputNames;
 
@@ -48,7 +48,7 @@ namespace AlloyCompiler
 			else
 			{
 
-				NAMED_QUERY_DEFINITION* pQuery = queryIt->second;
+				QUERY_DEFINITION* pQuery = queryIt->second;
 
 				for (Token* pComponentReadName : pQuery->ComponentReadNames)
 				{
@@ -95,7 +95,7 @@ namespace AlloyCompiler
 
 			else
 			{
-				NAMED_GROUP_DEFINITION* pGroup = groupIt->second;
+				GROUP_DEFINITION* pGroup = groupIt->second;
 				for (Token* pSystemName : pGroup->SystemNames)
 				{
 					auto systemIt = m_NamedNodes.SystemDefinitions.find(pSystemName->Value);
@@ -166,7 +166,7 @@ namespace AlloyCompiler
 
 		for (size_t systemIndex = 0; systemIndex < systems.size();)
 		{
-			NAMED_SYSTEM_DEFINITION* pSystem = systems[systemIndex];
+			SYSTEM_DEFINITION* pSystem = systems[systemIndex];
 			SystemInputNames currentSystemInputs = getSystemInputNames(pSystem);
 
 			bool fitsInGroup = true;

@@ -65,21 +65,21 @@
 
 	(* - Types - *)
 
-	TYPE:						[ reference | pointer ] ( NAMED_TYPE | STRUCT_TYPE | ARRAY_TYPE ) ;
+	TYPE:						[ reference | pointer ] ( TYPE_NAME | STRUCT_TYPE | ARRAY_TYPE ) ;
 
-		NAMED_TYPE:					identifier ;
+		TYPE_NAME:					identifier ;
 		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { identifier colon TYPE } ] close_brace ;
 		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
-
-	NAMED_TYPE_DEFINITION:		type_keyword identifier assignment_operator TYPE semicolon ;
+		
+	TYPE_DEFINITION:			type_keyword identifier assignment_operator TYPE semicolon ;
 
 
 	(* - Variables - *)
 
-	NAMED_VARIABLE:				identifier
+	VARIABLE:				identifier
 
-	NAMED_VARIABLE_DECLARATION:	( variable | constant ) identifier colon TYPE ;
-	NAMED_VARIABLE_DEFINITION:	NAMED_VARIABLE_DECLARATION assignment_operator EXPRESSION ;
+	VARIABLE_DECLARATION:	( variable | constant ) identifier colon TYPE ;
+	VARIABLE_DEFINITION:	VARIABLE_DECLARATION assignment_operator EXPRESSION ;
 
 
 	(* - Annotations - *)
@@ -89,11 +89,11 @@
 
 	(* - Functions - *)
 
-	FUNCTION_SIGNATURE:			function identifier open_paren [ NAMED_VARIABLE_DECLARATION { comma NAMED_VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
+	FUNCTION_SIGNATURE:			function identifier open_paren [ VARIABLE_DECLARATION { comma VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
 		RETURN_TYPE:				[ variable | constant ] TYPE ;
 
-	NAMED_FUNCTION_DEFINITION:	FUNCTION_SIGNATURE STATEMENT_BLOCK ;
-	EXTERN_FUNCTION_DEFINITION:	extern_keyword FUNCTION_SIGNATURE semicolon ;
+	FUNCTION_DEFINITION:		FUNCTION_SIGNATURE STATEMENT_BLOCK ;
+	EXTERN_DEFINITION:			extern_keyword FUNCTION_SIGNATURE semicolon ;
 
 	FUNCTION_CALL:				identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
 
@@ -107,8 +107,8 @@
 						;
 
 		PRIMARY:			LITERAL 
-							| NAMED_VARIABLE
-							| NAMED_VARIABLE_DEFINITION
+							| VARIABLE
+							| VARIABLE_DEFINITION
 							| FUNCTION_CALL 
 							| CONSTRUCTOR
 							| POINTER_INIT
@@ -117,9 +117,9 @@
 							| ENCLOSED_EXPRESSION
 							; 
 			LITERAL:				integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
-			CONSTRUCTOR:			NAMED_TYPE open_brace [ identifier assignment_operator EXPRESSION { comma identifier assignment_operator EXPRESSION } ] close_brace ;
+			CONSTRUCTOR:			TYPE_NAME open_brace [ identifier assignment_operator EXPRESSION { comma identifier assignment_operator EXPRESSION } ] close_brace ;
 			POINTER_INIT:			new_keyword ( EXPRESSION | ( open_bracket EXPRESSION semicolon EXPRESSION close_bracket ) ) ;
-			POINTER_MOVE:			move_keyword NAMED_VARIABLE ; (* TODO: this should be more than just NAMED_VARIABLE *)
+			POINTER_MOVE:			move_keyword VARIABLE ; (* TODO: this should be more than just VARIABLE *)
 			INITIALIZER_LIST:		open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
 			ENCLOSED_EXPRESSION:	open_paren EXPRESSION close_paren ;
 
@@ -136,7 +136,7 @@
 
 	(* - Statements - *)
 
-	STATEMENT:		( NAMED_VARIABLE_DEFINITION semicolon )
+	STATEMENT:		( VARIABLE_DEFINITION semicolon )
 					| ( FUNCTION_CALL semicolon )
 					| ( ASSIGNMENT semicolon )
 					| FOR_LOOP
@@ -155,11 +155,11 @@
 
 	(* - ECS Constructs - *)
 
-	NAMED_COMPONENT_DEFINITION:	component_keyword identifier assignment_operator TYPE semicolon ;
-	NAMED_RESOURCE_DEFINITION:	resource_keyword identifier assignment_operator TYPE semicolon ;
-	NAMED_QUERY_DEFINITION:		query_keyword identifier open_brace { ( var_keyword | const_keyword ) identifier semicolon } close_brace ;
-	NAMED_SYSTEM_DEFINITION:	system_keyword identifier open_paren [ [ var_keyword | const_keyword ] identifier { comma [ var_keyword | const_keyword ] identifier } ] close_paren STATEMENT_BLOCK ;
-	NAMED_GROUP_DEFINITION:		group_keyword identifier open_brace identifier { comma identifier } close_brace ;
+	COMPONENT_DEFINITION:		component_keyword identifier assignment_operator TYPE semicolon ;
+	RESOURCE_DEFINITION:		resource_keyword identifier assignment_operator TYPE semicolon ;
+	QUERY_DEFINITION:			query_keyword identifier open_brace { ( var_keyword | const_keyword ) identifier semicolon } close_brace ;
+	SYSTEM_DEFINITION:			system_keyword identifier open_paren [ [ var_keyword | const_keyword ] identifier { comma [ var_keyword | const_keyword ] identifier } ] close_paren STATEMENT_BLOCK ;
+	GROUP_DEFINITION:			group_keyword identifier open_brace identifier { comma identifier } close_brace ;
 
 	APPLICATION_DEFINITION:		application_keyword identifier open_brace { ( 'start' | 'update' | 'end' ) open_brace [ identifier { comma identifier } ] close_brace } close_brace ;
 
@@ -167,13 +167,13 @@
 	(* - Definitions - *)
 
 	TOP_LEVEL:		ANNOTATION
-					| NAMED_TYPE_DEFINITION
-					| NAMED_FUNCTION_DEFINITION
-					| EXTERN_FUNCTION_DEFINITION
-					| NAMED_COMPONENT_DEFINITION
-					| NAMED_RESOURCE_DEFINITION
-					| NAMED_QUERY_DEFINITION
-					| NAMED_SYSTEM_DEFINITION
-					| NAMED_GROUP_DEFINITION
+					| TYPE_DEFINITION
+					| FUNCTION_DEFINITION
+					| EXTERN_DEFINITION
+					| COMPONENT_DEFINITION
+					| RESOURCE_DEFINITION
+					| QUERY_DEFINITION
+					| SYSTEM_DEFINITION
+					| GROUP_DEFINITION
 					| APPLICATION_DEFINITION
 					;

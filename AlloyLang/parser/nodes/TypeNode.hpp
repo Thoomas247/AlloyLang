@@ -5,7 +5,7 @@
 
 namespace AlloyCompiler
 {
-	struct NAMED_TYPE
+	struct TYPE_NAME
 	{
 		Token* pNameToken;
 	};
@@ -24,10 +24,10 @@ namespace AlloyCompiler
 	struct TYPE
 	{
 		TypeModifier Modifier;
-		VariantNode<NAMED_TYPE, STRUCT_TYPE, ARRAY_TYPE> Type;
+		VariantNode<TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE> Type;
 	};
 
-	struct NAMED_TYPE_DEFINITION
+	struct TYPE_DEFINITION
 	{
 		Token* pNameToken;
 		TYPE* pType;

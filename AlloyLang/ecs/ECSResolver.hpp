@@ -3,7 +3,7 @@
 
 namespace AlloyCompiler
 {
-	using SystemGroup = std::vector<NAMED_SYSTEM_DEFINITION*>;
+	using SystemGroup = std::vector<SYSTEM_DEFINITION*>;
 
 	struct SystemSchedulingInfo
 	{
@@ -19,7 +19,7 @@ namespace AlloyCompiler
 			{
 				Log::Print("\tGroup {0}:", i);
 
-				for (NAMED_SYSTEM_DEFINITION* pSystem : StartSystemGroups[i])
+				for (SYSTEM_DEFINITION* pSystem : StartSystemGroups[i])
 				{
 					Log::Print("\t\t{0}", pSystem->pNameToken->Value);
 				}
@@ -31,7 +31,7 @@ namespace AlloyCompiler
 			{
 				Log::Print("\tGroup {0}:", i);
 
-				for (NAMED_SYSTEM_DEFINITION* pSystem : UpdateSystemGroups[i])
+				for (SYSTEM_DEFINITION* pSystem : UpdateSystemGroups[i])
 				{
 					Log::Print("\t\t{0}", pSystem->pNameToken->Value);
 				}
@@ -43,7 +43,7 @@ namespace AlloyCompiler
 			{
 				Log::Print("\tGroup {0}:", i);
 
-				for (NAMED_SYSTEM_DEFINITION* pSystem : EndSystemGroups[i])
+				for (SYSTEM_DEFINITION* pSystem : EndSystemGroups[i])
 				{
 					Log::Print("\t\t{0}", pSystem->pNameToken->Value);
 				}
@@ -93,7 +93,7 @@ namespace AlloyCompiler
 		template<typename... Args>
 		constexpr void logErrorAtToken(Token* pToken, const std::string& format, Args&&... args);
 
-		SystemInputNames getSystemInputNames(NAMED_SYSTEM_DEFINITION* pSystem);
+		SystemInputNames getSystemInputNames(SYSTEM_DEFINITION* pSystem);
 		bool resourceInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs);
 		bool componentInputsAreCompatible(const SystemInputNames& currentGroupInputs, const SystemInputNames& currentSystemInputs);
 		SystemGroup getSystemsInStage(const std::vector<Token*>& groupNames);

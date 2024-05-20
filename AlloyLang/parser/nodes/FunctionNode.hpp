@@ -5,7 +5,7 @@
 
 namespace AlloyCompiler
 {
-	struct NAMED_VARIABLE_DECLARATION;
+	struct VARIABLE_DECLARATION;
 	struct STATEMENT_BLOCK;
 	struct RETURN_TYPE;
 
@@ -13,7 +13,7 @@ namespace AlloyCompiler
 	{
 		Token* pNameToken;
 		bool IsVarArg;
-		std::vector<NAMED_VARIABLE_DECLARATION*> Parameters;
+		std::vector<VARIABLE_DECLARATION*> Parameters;
 		RETURN_TYPE* pReturnType;	// optional
 	};
 
@@ -23,7 +23,7 @@ namespace AlloyCompiler
 		STATEMENT_BLOCK* pBody;
 	};
 
-	struct EXTERN_FUNCTION_DEFINITION
+	struct EXTERN_DEFINITION
 	{
 		FUNCTION_SIGNATURE* pSignature;
 	};
