@@ -1,0 +1,75 @@
+TYPE_IDENTIFIER has been replaced by TYPE.
+
+TYPE holds a modifier (none, reference, pointer) and one of the base types (TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE).
+
+TYPE_NAME is an identifier which represents a type.
+
+STRUCT_TYPE defines a struct's members but it does not give the struct a name. Note that this syntax allows for unnamed structs being used as types of variables, this should be treated as an error.
+
+ARRAY_TYPE defines an array the same way TYPE_IDENTIFIER would, but it has been separated for simplicity.
+
+
+New type names are no longer created only through structs.
+TYPE_DEFINITION allows the user to define a name for a type with the syntax:
+	type <type_name> = TYPE;
+
+Examples:
+
+	type size_t = u64;		// size_t is technically the same as a u64, 
+					// but these types can NOT be used interchangeably, 
+					// they are separate types
+	
+	type Vector3 = struct		// Vector3 is now a struct containing 3 floats
+	{				// this is equivalent to the previous C-like syntax
+		x: f32,
+		y: f32,
+		z: f32
+	};
+
+	type VoxelArray = [f32; 64];	// VoxelArray is now a type equivalent to an array
+ 					// of 64 floats. "[f32; 64]" and "VoxelArray" can
+					// NOT be used interchangeably, they are separate
+					// types
+
+
+
+IDENTIFIER has been replaced with a Token*. Token->Value is the actual string value. Extra info is also stored in Token for error reporting, such as the Token's position in the file.
+
+
+
+VALUE_DECLARATION has been renamed to VARIABLE_DECLARATION.
+VALUE_DEFINITION has been renamed to VARIABLE_DEFINITION.
+VALUE_DEFINITION_EXPRESSION has been replaced by VARIABLE_DEFINITION.
+
+
+
+The suffix _EXPRESSION has been mostly removed.
+The suffix _STATEMENT has been mostly removed.
+
+BLOCK_STATEMENT is now STATEMENT_BLOCK.
+
+VALUE_DEFINITION_STATEMENT has been replaced by VALUE_DEFINITION.
+FUNCTION_CALL_STATEMENT has been replaced by FUNCTION_CALL.
+ASSIGNMENT_STATEMENT has been replaced by ASSIGNMENT.
+These 3 nodes used to just wrap the nodes they were replaced by.
+
+
+
+The ANNOTATION node is used to add extra information to existing nodes, such as the excludes in COMPONENT_DEFINITION. ANNOTATION is not used by the codegen, and currently no annotations affect the codegen step. In the future, more annotations will be added which may affect the codegen.
+
+
+
+VariantNode is a new class to replace unions where they were used before. In cases where a node may reference another node of varying type, VariantNode is used instead of a raw pointer.
+
+The codegen step only requires the Get<T>(), Is<T>() and GetKind() functions in VariantNode:
+
+	Get<T>() returns a T* if the node pointed to by the VariantNode is of type T.
+	Otherwise, the function asserts.
+
+	Is<T>() returns true if the node pointed to by the VariantNode is of type T.
+	Otherwise, returns false.
+
+	GetKind() returns a unique integer identifier (NodeKind) representing the type of 
+	the node pointed to by the VariantNode.
+
+NodeKind is no longer an explicit enum. Instead, the unique ID associated with a node type T can be accessed using NodeInfo::Kind<T>().
