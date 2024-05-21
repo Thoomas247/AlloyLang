@@ -1,4 +1,4 @@
-extern fn printf (const str : String, ...) -> i64;
+extern printf (const str : String, ...) -> i64;
 
 
 /* Math Utilities */
@@ -18,12 +18,37 @@ type Quaternion = struct
 	w: f64,
 };
 
-fn Vector3_print(const v : &Vector3)
+
+// this function can be called in 2 ways:
+//		1) Quaternion:rotate(&v);
+//		2) v:rotate();
+fn Quaternion:rotate(var q: &Quaternion)
+{
+	
+}
+
+// this function can also be called in 2 ways:
+//		1) Quaternion:rotate(&v, &other, 0.25);
+//		2) v:lerp(&other, 0.25);
+// this is because the first parameter is of the type of the "namespace" this function is in
+fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: f64) -> Quaternion
+{
+	var q: Quaternion = Quaternion { x = 0, y = 0, z = 0, w = 0 };
+
+	q.x = qA.x + (qB.x - qA.x) * t;
+	q.y = qA.y + (qB.y - qA.y) * t;
+	q.z = qA.z + (qB.z - qA.z) * t;
+	q.w = qA.w + (qB.x - qA.w) * t;
+
+	return q;
+}
+
+fn Vector3:print(const v : &Vector3)
 {
 	printf("[ %f, %f, %f ]", v.x, v.y, v.z);
 }
 
-fn Vector3_translate(const point : Vector3, const vector : Vector3) -> Vector3
+fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 {
 	var result: Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
 					

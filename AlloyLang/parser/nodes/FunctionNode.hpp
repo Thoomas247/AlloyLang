@@ -7,26 +7,14 @@ namespace AlloyCompiler
 {
 	struct VARIABLE_DECLARATION;
 	struct STATEMENT_BLOCK;
-	struct RETURN_TYPE;
 
-	struct FUNCTION_SIGNATURE 
-	{
-		Token* pNameToken;
-		bool IsVarArg;
-		std::vector<VARIABLE_DECLARATION*> Parameters;
-		RETURN_TYPE* pReturnType;	// optional
-	};
-
-	struct NAMED_FUNCTION_DEFINITION 
-	{
-		FUNCTION_SIGNATURE* pSignature;
-		STATEMENT_BLOCK* pBody;
-	};
-
-	struct EXTERN_DEFINITION
-	{
-		FUNCTION_SIGNATURE* pSignature;
-	};
+	//struct FUNCTION_SIGNATURE 
+	//{
+	//	Token* pNameToken;
+	//	bool IsVarArg;
+	//	std::vector<VARIABLE_DECLARATION*> Parameters;
+	//	RETURN_TYPE* pReturnType;	// optional
+	//};
 
 	struct RETURN_TYPE
 	{
@@ -34,8 +22,30 @@ namespace AlloyCompiler
 		TYPE* pType;
 	};
 
+	struct FUNCTION_TYPE
+	{
+		bool IsVarArg;
+		std::vector<VARIABLE_DECLARATION*> Parameters;
+		RETURN_TYPE* pReturnType;	// optional
+	};
+
+	struct FUNCTION_DEFINITION
+	{
+		Token* pStructNameToken;	// optional name of a struct in the case of member functions
+		Token* pFunctionNameToken;
+		FUNCTION_TYPE* pFunctionType;
+		STATEMENT_BLOCK* pBody;
+	};
+
+	struct EXTERN_DEFINITION
+	{
+		Token* pNameToken;
+		FUNCTION_TYPE* pFunctionType;
+	};
+
 	struct FUNCTION_CALL
 	{
+		Token* pStructOrVariableNameToken;	// optional name of a struct or variable in the case of member functions
 		Token* pFunctionNameToken;
 		std::vector<EXPRESSION*> Arguments;
 	};

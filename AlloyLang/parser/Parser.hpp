@@ -10,18 +10,22 @@ namespace AlloyCompiler
 {
 	struct NamedNodes
 	{
+		template<typename T>
+		using NodeMap = std::unordered_map<std::string_view, T>;
+
 		NodeAllocator Allocator;
 
-		std::unordered_map<std::string_view, APPLICATION_DEFINITION*> ApplicationDefinitions;
+		NodeMap<APPLICATION_DEFINITION*> ApplicationDefinitions;
 
-		std::unordered_map<std::string_view, GROUP_DEFINITION*> GroupDefinitions;
-		std::unordered_map<std::string_view, SYSTEM_DEFINITION*> SystemDefinitions;
-		std::unordered_map<std::string_view, QUERY_DEFINITION*> QueryDefinitions;
-		std::unordered_map<std::string_view, RESOURCE_DEFINITION*> ResourceDefinitions;
-		std::unordered_map<std::string_view, COMPONENT_DEFINITION*> ComponentDefinitions;
-		std::unordered_map<std::string_view, TYPE_DEFINITION*> TypeDefinitions;
-		std::unordered_map<std::string_view, NAMED_FUNCTION_DEFINITION*> FunctionDefinitions;
-		std::unordered_map<std::string_view, EXTERN_DEFINITION*> ExternDefinitions;
+		NodeMap<GROUP_DEFINITION*> GroupDefinitions;
+		NodeMap<SYSTEM_DEFINITION*> SystemDefinitions;
+		NodeMap<QUERY_DEFINITION*> QueryDefinitions;
+		NodeMap<RESOURCE_DEFINITION*> ResourceDefinitions;
+		NodeMap<COMPONENT_DEFINITION*> ComponentDefinitions;
+		NodeMap<TYPE_DEFINITION*> TypeDefinitions;
+		NodeMap<FUNCTION_DEFINITION*> FunctionDefinitions;
+		NodeMap<NodeMap<FUNCTION_DEFINITION*>> MemberFunctionDefinitions;
+		NodeMap<EXTERN_DEFINITION*> ExternDefinitions;
 
 		NamedNodes(size_t allocatorSize)
 			: Allocator(allocatorSize)
@@ -76,10 +80,6 @@ namespace AlloyCompiler
 
 		template <typename T>
 		T* createNode(const T& node);
-		template <typename T>
-		bool namedNodeExists(const std::string_view& name) const = delete;
-		template <typename T>
-		void addNamedNode(const std::string_view& name, T* pNode) = delete;
 
 		bool isEOF() const;
 		bool hasNext() const;

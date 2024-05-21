@@ -73,13 +73,12 @@
 		
 	TYPE_DEFINITION:			type_keyword identifier assignment_operator TYPE semicolon ;
 
-
 	(* - Variables - *)
 
-	VARIABLE:				identifier
+	VARIABLE:					identifier
 
-	VARIABLE_DECLARATION:	( variable | constant ) identifier colon TYPE ;
-	VARIABLE_DEFINITION:	VARIABLE_DECLARATION assignment_operator EXPRESSION ;
+	VARIABLE_DECLARATION:		( variable | constant ) identifier colon TYPE ;
+	VARIABLE_DEFINITION:		VARIABLE_DECLARATION assignment_operator EXPRESSION ;
 
 
 	(* - Annotations - *)
@@ -89,13 +88,13 @@
 
 	(* - Functions - *)
 
-	FUNCTION_SIGNATURE:			function identifier open_paren [ VARIABLE_DECLARATION { comma VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
-		RETURN_TYPE:				[ variable | constant ] TYPE ;
+	RETURN_TYPE:				[ variable | constant ] TYPE ;
+	FUNCTION_TYPE:				open_paren [ VARIABLE_DECLARATION { comma VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
 
-	FUNCTION_DEFINITION:		FUNCTION_SIGNATURE STATEMENT_BLOCK ;
-	EXTERN_DEFINITION:			extern_keyword FUNCTION_SIGNATURE semicolon ;
+	FUNCTION_DEFINITION:		function_keyword [ identifier colon ] identifier FUNCTION_TYPE STATEMENT_BLOCK ;
+	EXTERN_DEFINITION:			extern_keyword identifier FUNCTION_TYPE semicolon ;
 
-	FUNCTION_CALL:				identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
+	FUNCTION_CALL:				[ identifier colon ] identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
 
 	(* - Expressions - *)
 
