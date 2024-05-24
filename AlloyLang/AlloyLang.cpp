@@ -1,6 +1,5 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
-#include "ecs/ECSResolver.hpp"
 //#include "codegen/CodeGenerator.hpp"
 
 #include "log/Log.hpp"
@@ -58,14 +57,6 @@ int main(int argc, char* argv[])
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
-	ECSResolver ecsResolver(source, namedNodes);
-	SystemSchedulingInfo systemSchedulingInfo = ecsResolver.ResolveScheduling();
-	end = std::chrono::high_resolution_clock::now();
-	const uint64_t resolutionTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-	systemSchedulingInfo.Print();
-
-	start = std::chrono::high_resolution_clock::now();
 	//LLVMState state(true);
 	//Generate(tokenBuffers, nodeBuffers, state);
 	end = std::chrono::high_resolution_clock::now();
@@ -73,11 +64,10 @@ int main(int argc, char* argv[])
 
 	Log::Print("Tokenize: {0}ms", tokenizeTime);
 	Log::Print("Parse: {0}ms", parseTime);
-	Log::Print("Resolution: {0}ms", resolutionTime);
 	AlloyCompiler::Log::Print("Codegen: {0}ms", codegenTime);
 
-	AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime + resolutionTime + codegenTime);
-	AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime + resolutionTime + codegenTime) / numKilobytes);
+	AlloyCompiler::Log::Print("-- Compiled in {0}ms --", tokenizeTime + parseTime + codegenTime);
+	AlloyCompiler::Log::Print("Speed: {0}ms/kB", (tokenizeTime + parseTime + codegenTime) / numKilobytes);
 
 	Log::Print("");
 }

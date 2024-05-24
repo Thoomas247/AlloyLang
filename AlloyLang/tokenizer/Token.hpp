@@ -20,18 +20,12 @@ namespace AlloyCompiler
 		struct_keyword,
 		enum_keyword,
 		function_keyword,
+		macro_keyword,
 
 		type_keyword,
 
 		variable_keyword,
 		constant_keyword,
-
-		resource_keyword,
-		component_keyword,
-		query_keyword,
-		system_keyword,
-		group_keyword,
-		application_keyword,
 
 		for_keyword,
 		while_keyword,
@@ -43,6 +37,7 @@ namespace AlloyCompiler
 		move_keyword,
 
 		pound,
+		at_symbol,
 
 		reference,
 		//pointer,
@@ -93,20 +88,15 @@ namespace AlloyCompiler
 		{ TokenKind::struct_keyword,		"struct" },
 		{ TokenKind::enum_keyword,			"enum" },
 		{ TokenKind::function_keyword,		"fn" },
+		{ TokenKind::macro_keyword,			"macro" },
 
 		{ TokenKind::type_keyword,			"type" },
 
 		{ TokenKind::pound,					"#" },
+		{ TokenKind::at_symbol,				"@" },
 
 		{ TokenKind::variable_keyword,		"var" },
 		{ TokenKind::constant_keyword,		"const" },
-
-		{ TokenKind::resource_keyword,		"resource" },
-		{ TokenKind::component_keyword,		"component" },
-		{ TokenKind::query_keyword,			"query" },
-		{ TokenKind::system_keyword,		"system" },
-		{ TokenKind::group_keyword,			"group" },
-		{ TokenKind::application_keyword,	"application" },
 
 		{ TokenKind::for_keyword,			"for" },
 		{ TokenKind::while_keyword,			"while" },
@@ -156,18 +146,12 @@ namespace AlloyCompiler
 		{ "struct", TokenKind::struct_keyword },
 		{ "enum", TokenKind::enum_keyword },
 		{ "fn", TokenKind::function_keyword },
+		{ "macro", TokenKind::macro_keyword },
 
 		{ "type", TokenKind::type_keyword },
 
 		{ "var", TokenKind::variable_keyword },
 		{ "const", TokenKind::constant_keyword },
-
-		{ "resource", TokenKind::resource_keyword },
-		{ "component", TokenKind::component_keyword },
-		{ "query", TokenKind::query_keyword },
-		{ "system", TokenKind::system_keyword },
-		{ "group", TokenKind::group_keyword },
-		{ "application", TokenKind::application_keyword },
 
 		{ "for", TokenKind::for_keyword },
 		{ "while", TokenKind::while_keyword },
@@ -179,6 +163,7 @@ namespace AlloyCompiler
 		{ "move", TokenKind::move_keyword },
 
 		{ "#", TokenKind::pound },
+		{ "@", TokenKind::at_symbol },
 
 		{ "&", TokenKind::reference },
 		//{ "*", TokenKind::pointer },

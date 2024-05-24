@@ -8,18 +8,12 @@
 	struct_keyword:					'struct' ;
 	enum_keyword:					'enum' ;
 	function_keyword:				'fn' ;
+	macro_keyword:					'macro' ;
 
 	type_keyword:					'type' ;
 
 	variable_keyword:				'var' ;
 	constant_keyword:				'const' ;
-
-	resource_keyword:				'resource' ;
-	component_keyword:				'component' ;
-	query_keyword:					'query' ;
-	system_keyword:					'system' ;
-	group_keyword:					'group' ;
-	application_keyword:			'application' ;
 
 	for_keyword:					'for' ;
 	while_keyword:					'while' ;
@@ -31,6 +25,7 @@
 	move_keyword:					'move' ;
 
 	pound:							'#' ;
+	at_symbol:						'@' ;
 
 	reference:						'&' ;
 	pointer:						'*' ;
@@ -65,7 +60,7 @@
 
 	(* - Types - *)
 
-	TYPE:						[ reference | pointer ] ( TYPE_NAME | STRUCT_TYPE | ARRAY_TYPE ) ;
+	TYPE:						[ reference | pointer ] ( TYPE_NAME | STRUCT_TYPE | ARRAY_TYPE | MACRO_CALL ) ;
 
 		TYPE_NAME:					identifier ;
 		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { identifier colon TYPE } ] close_brace ;
@@ -95,6 +90,22 @@
 	EXTERN_DEFINITION:			extern_keyword identifier FUNCTION_TYPE semicolon ;
 
 	FUNCTION_CALL:				[ identifier colon ] identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
+
+
+	(* Macros *)
+
+	MACRO_VARIABLE_IDENTIFIER:	identifier ;
+	MACRO_CALL:					at_symbol identifier open_paren [ ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL ) { comma ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL ) } ] close_paren ;
+
+	MACRO_DEFINITION:			macro_keyword identifier 
+								open_paren [ ( type | fn ) identifier { comma ( type | fn ) identifier } ] close_paren 
+								[ arrow ( type | fn ) ] 
+								open_brace { MACRO_STATEMENT } close_brace ;
+
+	MACRO_RETURN:				return_keyword ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL | TYPE ) semicolon ;
+
+	MACRO_STATEMENT:			MACRO_DEFINITION | ( MACRO_CALL semicolon ) | TYPE_DEFINITION | FUNCTION_DEFINITION | MACRO_RETURN ;
+
 
 	(* - Expressions - *)
 
@@ -165,7 +176,8 @@
 
 	(* - Definitions - *)
 
-	TOP_LEVEL:		ANNOTATION
+	TOP_LEVEL:		MACRO_DEFINITION
+					| ANNOTATION
 					| TYPE_DEFINITION
 					| FUNCTION_DEFINITION
 					| EXTERN_DEFINITION

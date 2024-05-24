@@ -290,6 +290,9 @@ namespace AlloyCompiler
 	}
 
 	template<>
+	MACRO_CALL* Parser::parse();
+
+	template<>
 	TYPE* Parser::parse()
 	{
 		TypeModifier modifier = TypeModifier::None;
@@ -310,9 +313,21 @@ namespace AlloyCompiler
 
 		using enum TokenKind;
 
-		VariantNode<TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE> type;
+		VariantNode<TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE, MACRO_CALL> type;
 		switch (token()->Kind)
 		{
+		case at_symbol:
+		{
+			MACRO_CALL* pMacroCall = parse<MACRO_CALL>();
+
+			if (pMacroCall == nullptr)
+			{
+				return nullptr;
+			}
+
+			type.Set(pMacroCall);
+		}
+
 		case identifier:
 		{
 			TYPE_NAME* pNamedType = parse<TYPE_NAME>();
@@ -917,6 +932,380 @@ namespace AlloyCompiler
 				.Arguments = arguments
 			}
 		);
+	}
+
+#pragma endregion
+
+#pragma region Macros
+
+	template<>
+	MACRO_STATEMENT* Parser::parse();
+
+	template<>
+	MACRO_VARIABLE_IDENTIFIER* Parser::parse()
+	{
+		Token* pIdentifierToken = nullptr;
+
+		if (expectKind<TokenKind::identifier>(&pIdentifierToken) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			MACRO_VARIABLE_IDENTIFIER
+			{
+				.pNameToken = pIdentifierToken
+			}
+		);
+	}
+
+	template<>
+	MACRO_CALL* Parser::parse()
+	{
+		if (expectKind<TokenKind::at_symbol>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		Token* pMacroNameToken = nullptr;
+
+		if (expectKind<TokenKind::identifier>(&pMacroNameToken) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		if (expectKind<TokenKind::open_paren>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<VariantNode<MACRO_VARIABLE_IDENTIFIER, MACRO_CALL>> arguments;
+		while (token()->Kind != TokenKind::close_paren)
+		{
+			VariantNode<MACRO_VARIABLE_IDENTIFIER, MACRO_CALL> variantNode;
+
+			if (token()->Kind == TokenKind::identifier)
+			{
+				MACRO_VARIABLE_IDENTIFIER* pVarIdentifier = parse<MACRO_VARIABLE_IDENTIFIER>();
+
+				if (pVarIdentifier == nullptr)
+				{
+					return nullptr;
+				}
+
+				variantNode.Set(pVarIdentifier);
+			}
+			else if (token()->Kind == TokenKind::at_symbol)
+			{
+				MACRO_CALL* pMacroCall = parse<MACRO_CALL>();
+
+				if (pMacroCall == nullptr)
+				{
+					return nullptr;
+				}
+
+				variantNode.Set(pMacroCall);
+			}
+
+			else
+			{
+				(void)expectKind<TokenKind::identifier, TokenKind::at_symbol>();
+				return nullptr;
+			}
+
+			arguments.push_back(variantNode);
+
+			if (token()->Kind == TokenKind::comma)
+			{
+				(void)eat();
+			}
+		}
+
+		(void)eat();
+
+		return createNode(
+			MACRO_CALL
+			{
+				.pMacroNameToken = pMacroNameToken,
+				.Arguments = std::move(arguments)
+			}
+		);
+	}
+
+	template<>
+	MACRO_DEFINITION* Parser::parse(bool isLocalMacro)
+	{
+		if (expectKind<TokenKind::macro_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		Token* pNameToken = nullptr;
+		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		if (!isLocalMacro)
+		{
+			if (m_NamedNodes.MacroDefinitions.contains(pNameToken->Value))
+			{
+				logErrorAtPreviousPosition("Macro '{0}' is already defined.", pNameToken->Value);
+				return nullptr;
+			}
+		}
+
+		if (expectKind<TokenKind::open_paren>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<std::pair<MacroVariableType, Token*>> parameters;
+		while (token()->Kind != TokenKind::close_paren)
+		{
+			Token* pTypeToken = nullptr;
+			if (expectKind<TokenKind::type_keyword, TokenKind::function_keyword>(&pTypeToken) != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			MacroVariableType type;
+
+			if (pTypeToken->Kind == TokenKind::type_keyword)
+			{
+				type = MacroVariableType::Type;
+			}
+			else
+			{
+				type = MacroVariableType::Fn;
+			}
+
+			Token* pParamNameToken = nullptr;
+			if (expectKind<TokenKind::identifier>(&pParamNameToken) != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			parameters.push_back({ type, pParamNameToken });
+
+			if (token()->Kind == TokenKind::comma)
+			{
+				(void)eat();
+			}
+		}
+
+		(void)eat();
+
+		MacroVariableType returnType = MacroVariableType::None;
+		if (token()->Kind == TokenKind::arrow)
+		{
+			(void)eat();
+
+			Token* pTypeToken = nullptr;
+			if (expectKind<TokenKind::type_keyword, TokenKind::function_keyword>(&pTypeToken) != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			if (pTypeToken->Kind == TokenKind::type_keyword)
+			{
+				returnType = MacroVariableType::Type;
+			}
+			else
+			{
+				returnType = MacroVariableType::Fn;
+			}
+		}
+
+		if (expectKind<TokenKind::open_brace>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<MACRO_STATEMENT*> macroStatements;
+		while (token()->Kind != TokenKind::close_brace)
+		{
+			MACRO_STATEMENT* pMacroStatement = parse<MACRO_STATEMENT>();
+
+			if (pMacroStatement == nullptr)
+			{
+				return nullptr;
+			}
+
+			macroStatements.push_back(pMacroStatement);
+
+			if (token()->Kind == TokenKind::comma)
+			{
+				(void)eat();
+			}
+		}
+
+		(void)eat();
+
+		MACRO_DEFINITION* pMacroDefinition = createNode(
+			MACRO_DEFINITION
+			{
+				.pNameToken = pNameToken,
+				.Parameters = std::move(parameters),
+				.ReturnType = returnType,
+				.Body = std::move(macroStatements)
+			}
+		);
+
+		if (!isLocalMacro)
+		{
+			m_NamedNodes.MacroDefinitions[pNameToken->Value] = pMacroDefinition;
+		}
+
+		return pMacroDefinition;
+	}
+
+	// MACRO_RETURN:	return_keyword ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL | TYPE ) semicolon ;
+	template<>
+	MACRO_RETURN* Parser::parse()
+	{
+		if (expectKind<TokenKind::return_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		MACRO_RETURN macroReturn;
+
+		switch (token()->Kind)
+		{
+		case TokenKind::identifier:
+		{
+			MACRO_VARIABLE_IDENTIFIER* pVarIdentifier = parse<MACRO_VARIABLE_IDENTIFIER>();
+
+			if (pVarIdentifier == nullptr)
+			{
+				return nullptr;
+			}
+
+			macroReturn.Set(pVarIdentifier);
+			break;
+		}
+
+		case TokenKind::at_symbol:
+		{
+			MACRO_CALL* pMacroCall = parse<MACRO_CALL>();
+
+			if (pMacroCall == nullptr)
+			{
+				return nullptr;
+			}
+
+			macroReturn.Set(pMacroCall);
+			break;
+		}
+		
+		case TokenKind::struct_keyword:
+		case TokenKind::open_bracket:
+		{
+			TYPE* pType = parse<TYPE>();
+
+			if (pType == nullptr)
+			{
+				return nullptr;
+			}
+
+			macroReturn.Set(pType);
+			break;
+		}
+
+		default:
+		{
+			(void)expectKind<TokenKind::identifier, TokenKind::at_symbol, TokenKind::struct_keyword, TokenKind::open_bracket>();
+			(void)eat();
+			return nullptr;
+		}
+		}
+
+		if (expectKind<TokenKind::semicolon>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		return createNode(macroReturn);
+	}
+
+	template<>
+	MACRO_STATEMENT* Parser::parse()
+	{
+		switch (token()->Kind)
+		{
+		case TokenKind::macro_keyword:
+		{
+			MACRO_DEFINITION* pMacroDefinition = parse<MACRO_DEFINITION>(/*isLocalMacro*/true);
+
+			if (pMacroDefinition == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(MACRO_STATEMENT(pMacroDefinition));
+		}
+
+		case TokenKind::at_symbol:
+		{
+			MACRO_CALL* pMacroCall = parse<MACRO_CALL>();
+
+			if (pMacroCall == nullptr)
+			{
+				return nullptr;
+			}
+
+			if (expectKind<TokenKind::semicolon>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			return createNode(MACRO_STATEMENT(pMacroCall));
+		}
+
+		case TokenKind::type_keyword:
+		{
+			TYPE_DEFINITION* pTypeDefinition = parse<TYPE_DEFINITION>();
+
+			if (pTypeDefinition == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(MACRO_STATEMENT(pTypeDefinition));
+		}
+
+		case TokenKind::function_keyword:
+		{
+			FUNCTION_DEFINITION* pFunctionDefinition = parse<FUNCTION_DEFINITION>();
+
+			if (pFunctionDefinition == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(MACRO_STATEMENT(pFunctionDefinition));
+		}
+
+		case TokenKind::return_keyword:
+		{
+			MACRO_RETURN* pMacroReturn = parse<MACRO_RETURN>();
+
+			if (pMacroReturn == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(MACRO_STATEMENT(pMacroReturn));
+		}
+
+		default:
+		{
+			(void)expectKind<TokenKind::macro_keyword, TokenKind::at_symbol, TokenKind::type_keyword, TokenKind::function_keyword>();
+			(void)eat();
+			return nullptr;
+		}
+		}
 	}
 
 #pragma endregion
@@ -1984,528 +2373,6 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-#pragma region ECS Constructs
-
-	template<>
-	COMPONENT_DEFINITION* Parser::parse()
-	{
-		if (checkAnnotations({ "exclude" }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		AnnotationArgs excludes;
-		consumeAnnotation("exclude", &excludes);
-
-		if (expectKind<TokenKind::component_keyword>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		Token* pNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (m_NamedNodes.ComponentDefinitions.contains(pNameToken->Value))
-		{
-			logErrorAtPreviousPosition("Component '{0}' is already defined.", pNameToken->Value);
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::assignment_operator>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		TYPE* pType = parse<TYPE>();
-
-		if (pType == nullptr)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::semicolon>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		COMPONENT_DEFINITION* pComponentDefinition = createNode(
-			COMPONENT_DEFINITION
-			{
-				.pNameToken = pNameToken,
-				.pType = pType,
-				.Excludes = std::move(excludes)
-			}
-		);
-
-		m_NamedNodes.ComponentDefinitions[pNameToken->Value] = pComponentDefinition;
-
-		return pComponentDefinition;
-	}
-
-	template<>
-	RESOURCE_DEFINITION* Parser::parse()
-	{
-		if (checkAnnotations({ }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::resource_keyword>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		Token* pNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		
-		if (m_NamedNodes.ResourceDefinitions.contains(pNameToken->Value))
-		{
-			logErrorAtCurrentPosition("Resource '{0}' is already defined.", pNameToken->Value);
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::assignment_operator>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		TYPE* pType = parse<TYPE>();
-
-		if (pType == nullptr)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::semicolon>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		RESOURCE_DEFINITION* pResourceDefinition = createNode(
-			RESOURCE_DEFINITION
-			{
-				.pNameToken = pNameToken,
-				.pType = pType
-			}
-		);
-
-		m_NamedNodes.ResourceDefinitions[pNameToken->Value] = pResourceDefinition;
-
-		return pResourceDefinition;
-	}
-
-	template<>
-	QUERY_DEFINITION* Parser::parse()
-	{
-		if (checkAnnotations({ }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::query_keyword>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		Token* pNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (m_NamedNodes.QueryDefinitions.contains(pNameToken->Value))
-		{
-			logErrorAtCurrentPosition("Query '{0}' is already defined.", pNameToken->Value);
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::open_brace>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		std::vector<Token*> reads, writes;
-		while (token()->Kind != TokenKind::close_brace)
-		{
-			Token* pKindToken = nullptr;
-			if (expectKind<TokenKind::variable_keyword, TokenKind::constant_keyword>(&pKindToken) != SUCCESS)
-			{
-				return nullptr;
-			}
-
-			Token* pComponentNameToken = nullptr;
-			if (expectKind<TokenKind::identifier>(&pComponentNameToken) != SUCCESS)
-			{
-				return nullptr;
-			}
-
-			if (pKindToken->Kind == TokenKind::variable_keyword)
-			{
-				writes.push_back(pComponentNameToken);
-			}
-			else
-			{
-				reads.push_back(pComponentNameToken);
-			}
-
-			if (expectKind<TokenKind::semicolon>() != SUCCESS)
-			{
-				return nullptr;
-			}
-		}
-
-		if (eat() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		QUERY_DEFINITION* pQueryDefinition = createNode(
-			QUERY_DEFINITION
-			{
-				.pNameToken = pNameToken,
-				.ComponentReadNames = std::move(reads),
-				.ComponentWriteNames = std::move(writes)
-			}
-		);
-
-		m_NamedNodes.QueryDefinitions[pNameToken->Value] = pQueryDefinition;
-
-		return pQueryDefinition;
-	}
-
-	template<>
-	SYSTEM_DEFINITION* Parser::parse()
-	{
-		if (checkAnnotations({ "inline" }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		bool isInline = consumeAnnotation("inline");
-
-		if (expectKind<TokenKind::system_keyword>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		Token* pNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (m_NamedNodes.SystemDefinitions.contains(pNameToken->Value))
-		{
-			logErrorAtCurrentPosition("System '{0}' is already defined.", pNameToken->Value);
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::open_paren>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		std::vector<Token*> resourceReads, resourceWrites, queryNames;
-		while (token()->Kind != TokenKind::close_paren)
-		{
-			if (token()->Kind == TokenKind::constant_keyword)
-			{
-				(void)eat();
-
-				Token* pResourceNameToken = nullptr;
-				if (expectKind<TokenKind::identifier>(&pResourceNameToken) != SUCCESS)
-				{
-					return nullptr;
-				}
-
-				resourceReads.push_back(pResourceNameToken);
-			}
-
-			else if (token()->Kind == TokenKind::variable_keyword)
-			{
-				(void)eat();
-
-				Token* pResourceNameToken = nullptr;
-				if (expectKind<TokenKind::identifier>(&pResourceNameToken) != SUCCESS)
-				{
-					return nullptr;
-				}
-
-				resourceWrites.push_back(pResourceNameToken);
-			}
-
-			else
-			{
-				Token* pQueryNameToken = nullptr;
-				if (expectKind<TokenKind::identifier>(&pQueryNameToken) != SUCCESS)
-				{
-					return nullptr;
-				}
-
-				queryNames.push_back(pQueryNameToken);
-			}
-
-			if (token()->Kind == TokenKind::comma)
-			{
-				if (eat() != SUCCESS)
-				{
-					return nullptr;
-				}
-			}
-		}
-
-		// consume closing paren
-		if (eat() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		STATEMENT_BLOCK* pBody = parse<STATEMENT_BLOCK>();
-
-		if (pBody == nullptr)
-		{
-			return nullptr;
-		}
-
-		SYSTEM_DEFINITION* pSystemDefinition = createNode(
-			SYSTEM_DEFINITION
-			{
-				.pNameToken = pNameToken,
-				.ResourceReads = std::move(resourceReads),
-				.ResourceWrites = std::move(resourceWrites),
-				.QueryNames = std::move(queryNames),
-				.pBody = pBody,
-
-				.IsInline = isInline
-			}
-		);
-
-		m_NamedNodes.SystemDefinitions[pNameToken->Value] = pSystemDefinition;
-
-		return pSystemDefinition;
-	}
-
-	template<>
-	GROUP_DEFINITION* Parser::parse()
-	{
-		if (checkAnnotations({ }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::group_keyword>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		Token* pNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (m_NamedNodes.GroupDefinitions.contains(pNameToken->Value))
-		{
-			logErrorAtCurrentPosition("Group '{0}' is already defined.", pNameToken->Value);
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::open_brace>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		std::vector<Token*> systemNames;
-		while (token()->Kind != TokenKind::close_brace)
-		{
-			Token* pSystemNameToken = nullptr;
-			if (expectKind<TokenKind::identifier>(&pSystemNameToken) != SUCCESS)
-			{
-				return nullptr;
-			}
-
-			systemNames.push_back(pSystemNameToken);
-
-			if (token()->Kind == TokenKind::comma)
-			{
-				if (eat() != SUCCESS)
-				{
-					return nullptr;
-				}
-			}
-		}
-
-		// eat closing brace
-		if (eat() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		GROUP_DEFINITION* pGroupDefinition = createNode(
-			GROUP_DEFINITION
-			{
-				.pNameToken = pNameToken,
-				.SystemNames = std::move(systemNames)
-			}
-		);
-
-		m_NamedNodes.GroupDefinitions[pNameToken->Value] = pGroupDefinition;
-
-		return pGroupDefinition;
-	}
-
-	template<>
-	APPLICATION_DEFINITION* Parser::parse()
-	{
-		if (checkAnnotations({ }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::application_keyword>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		Token* pNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (m_NamedNodes.ApplicationDefinitions.contains(pNameToken->Value))
-		{
-			logErrorAtCurrentPosition("Application '{0}' is already defined.", pNameToken->Value);
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::open_brace>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		std::vector<Token*> startGroups, updateGroups, endGroups;
-		bool startFound = false, updateFound = false, endFound = false;
-
-		while (token()->Kind != TokenKind::close_brace)
-		{
-			Token* pStageNameToken = nullptr;
-			if (expectKind<TokenKind::identifier>(&pStageNameToken) != SUCCESS)
-			{
-				return nullptr;
-			}
-
-			if (expectKind<TokenKind::open_brace>() != SUCCESS)
-			{
-				return nullptr;
-			}
-
-			// based on the name of the stage, determine which vector we are inserting into
-			std::vector<Token*>* pDstGroups = nullptr;
-
-			bool stageRedefinition = false;
-
-			if (pStageNameToken->Value == "start")
-			{
-				pDstGroups = &startGroups;
-
-				if (startFound)
-				{
-					stageRedefinition = true;
-				}
-
-				startFound = true;
-			}
-			else if (pStageNameToken->Value == "update")
-			{
-				pDstGroups = &updateGroups;
-
-				if (updateFound)
-				{
-					stageRedefinition = true;
-				}
-
-				updateFound = true;
-			}
-			else if (pStageNameToken->Value == "end")
-			{
-				pDstGroups = &endGroups;
-
-				if (endFound)
-				{
-					stageRedefinition = true;
-				}
-
-				endFound = true;
-			}
-			else
-			{
-				logErrorAtCurrentPosition("Invalid application stage name '{0}'. Valid stages are 'start', 'update' and 'end'.", pStageNameToken->Value);
-				return nullptr;
-			}
-
-			if (stageRedefinition)
-			{
-				logErrorAtCurrentPosition("Application stage '{0}' is already defined.", pStageNameToken->Value);
-				return nullptr;
-			}
-
-			while (token()->Kind != TokenKind::close_brace)
-			{
-				Token* pGroupNameToken = nullptr;
-				if (expectKind<TokenKind::identifier>(&pGroupNameToken) != SUCCESS)
-				{
-					return nullptr;
-				}
-
-				pDstGroups->push_back(pGroupNameToken);
-
-				if (token()->Kind == TokenKind::comma)
-				{
-					if (eat() != SUCCESS)
-					{
-						return nullptr;
-					}
-				}
-			}
-
-			// eat closing brace
-			if (eat() != SUCCESS)
-			{
-				return nullptr;
-			}
-		}
-
-		// eat closing brace
-		if (eat() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		APPLICATION_DEFINITION* pApplicationDefinition = createNode(
-			APPLICATION_DEFINITION
-			{
-				.pNameToken = pNameToken,
-				.StartGroupNames = std::move(startGroups),
-				.UpdateGroupNames = std::move(updateGroups),
-				.EndGroupNames = std::move(endGroups)
-			}
-		);
-
-		m_NamedNodes.ApplicationDefinitions[pNameToken->Value] = pApplicationDefinition;
-
-		return pApplicationDefinition;
-	}
-
-#pragma endregion
-
 	NamedNodes Parser::Parse()
 	{
 		using enum TokenKind;
@@ -2514,6 +2381,10 @@ namespace AlloyCompiler
 		{
 			switch (token()->Kind)
 			{
+			case macro_keyword:
+				(void)parse<MACRO_DEFINITION>(/*isLocalMacro*/false);
+				break;
+
 			case pound:
 				(void)getAnnotation();
 				break;
@@ -2530,34 +2401,8 @@ namespace AlloyCompiler
 				(void)parse<EXTERN_DEFINITION>();
 				break;
 
-			case component_keyword:
-				(void)parse<COMPONENT_DEFINITION>();
-				break;
-
-			case resource_keyword:
-				(void)parse<RESOURCE_DEFINITION>();
-				break;
-
-			case query_keyword:
-				(void)parse<QUERY_DEFINITION>();
-				break;
-
-			case system_keyword:
-				(void)parse<SYSTEM_DEFINITION>();
-				break;
-
-			case group_keyword:
-				(void)parse<GROUP_DEFINITION>();
-				break;
-
-			case application_keyword:
-				(void)parse<APPLICATION_DEFINITION>();
-				break;
-
 			default:
-				(void)expectKind<type_keyword, function_keyword, extern_keyword,
-					component_keyword, resource_keyword, query_keyword, system_keyword,
-					group_keyword, application_keyword>();
+				(void)expectKind<type_keyword, function_keyword, extern_keyword>();
 				(void)eat();
 				break;
 			}
@@ -2565,5 +2410,4 @@ namespace AlloyCompiler
 
 		return std::move(m_NamedNodes);
 	}
-
 }

@@ -5,6 +5,8 @@
 
 namespace AlloyCompiler
 {
+	struct MACRO_CALL;
+
 	struct TYPE_NAME
 	{
 		Token* pNameToken;
@@ -24,7 +26,7 @@ namespace AlloyCompiler
 	struct TYPE
 	{
 		TypeModifier Modifier;
-		VariantNode<TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE> Type;
+		VariantNode<TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE, MACRO_CALL> Type;
 	};
 
 	struct TYPE_DEFINITION

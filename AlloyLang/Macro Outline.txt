@@ -1,0 +1,71 @@
+NOTES:
+	- For now, macros will only be able to take in functions and types as parameters. This will be extended to allow literals in the future.
+	- A macro can only return a TYPE_DEFINITION or a FUNCTION_DEFINITION. This can be extended to allow returning literals in the future.
+	- MACRO_STATEMENT will stay very simple, no additional syntax will be created. For things such as loops or string concatenation, built-in macros will be used. (eg. @for_each(...) @concat(...)).
+	- Any generated type which is returned by a macro must only contain members of types which are accessible outside of said macro.
+	- Any generated function which is returned by a macro must have all of its parameters and its return type accessible outside of said macro.
+	- Types passed in as arguments cannot be modified by a macro.
+	- Functions passed in as arguments cannot be modified by a macro.
+
+
+EXAMPLES:
+	macro create_add_component_funtion(type P)
+	{
+		type ComponentType = @get_element_type(@get_member_type(P, "components"));
+
+		fn add_component_func(var pool: &P, const entity: Entity, const component: &ComponentType) -> var &Component
+		{
+			// TODO: implement this properly
+
+			// dense and components must match
+			pool.dense[pool.size] = entity:as_u64();
+			pool.components[pool.size] = component;
+
+			// in sparse index is entity and value is index into dense/components
+			pool.sparse[entity:as_u64()] = pool.size;
+
+			// increment index so we know where to add the next component
+			pool.size = pool.size + 1;
+
+			// TODO: resize arrays if needed
+
+			return pool.components[pool.size - 1];
+		}
+
+		@insert_member_function(P, add_component_func);
+	}
+
+	macro component_pool_type(type C) -> type
+	{
+		type PoolType = struct
+		{
+			size:		u64,
+			components:	*[C],
+			dense:		*[Entity],
+			sparse:		*[Entity],
+		};
+
+		@create_add_component_funtion(PoolType);
+
+		return PoolType;
+	}
+
+	macro create_ecs() -> type
+	{
+		type ECS = struct {};
+
+		// nested macros are allowed
+		macro get_pool_name(type ComponentType) -> [u8]	// TODO: way to return literal strings
+		{
+			return ComponentType.name + "_pool";
+		}
+
+		// create a pool for each component type in our program
+		@for_each(@get_structs_with_annotation("Component"), @(type ComponentType)
+			{
+				@insert_member(ECS, @get_pool_name(ComponentType), @component_pool_type(componentType));
+			}
+		);
+
+		return ECS;
+	}

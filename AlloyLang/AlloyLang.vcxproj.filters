@@ -36,9 +36,6 @@
     <ClCompile Include="parser\Parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ecs\ECSResolver.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tokenizer\Tokenizer.hpp">
@@ -74,9 +71,6 @@
     <ClInclude Include="parser\nodes\ExpressionNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\ECSNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="parser\nodes\StatementNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -95,7 +89,7 @@
     <ClInclude Include="parser\Annotation.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ecs\ECSResolver.hpp">
+    <ClInclude Include="parser\nodes\MacroNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -105,5 +99,6 @@
   <ItemGroup>
     <Text Include="Parser Issues.txt" />
     <Text Include="Coding Rules.txt" />
+    <Text Include="Macro Outline.txt" />
   </ItemGroup>
 </Project>

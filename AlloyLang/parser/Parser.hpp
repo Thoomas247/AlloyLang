@@ -15,13 +15,7 @@ namespace AlloyCompiler
 
 		NodeAllocator Allocator;
 
-		NodeMap<APPLICATION_DEFINITION*> ApplicationDefinitions;
-
-		NodeMap<GROUP_DEFINITION*> GroupDefinitions;
-		NodeMap<SYSTEM_DEFINITION*> SystemDefinitions;
-		NodeMap<QUERY_DEFINITION*> QueryDefinitions;
-		NodeMap<RESOURCE_DEFINITION*> ResourceDefinitions;
-		NodeMap<COMPONENT_DEFINITION*> ComponentDefinitions;
+		NodeMap<MACRO_DEFINITION*> MacroDefinitions;
 		NodeMap<TYPE_DEFINITION*> TypeDefinitions;
 		NodeMap<FUNCTION_DEFINITION*> FunctionDefinitions;
 		NodeMap<NodeMap<FUNCTION_DEFINITION*>> MemberFunctionDefinitions;

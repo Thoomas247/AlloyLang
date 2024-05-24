@@ -7,14 +7,7 @@ namespace AlloyCompiler
 {
 	struct VARIABLE_DECLARATION;
 	struct STATEMENT_BLOCK;
-
-	//struct FUNCTION_SIGNATURE 
-	//{
-	//	Token* pNameToken;
-	//	bool IsVarArg;
-	//	std::vector<VARIABLE_DECLARATION*> Parameters;
-	//	RETURN_TYPE* pReturnType;	// optional
-	//};
+	struct TYPE;
 
 	struct RETURN_TYPE
 	{

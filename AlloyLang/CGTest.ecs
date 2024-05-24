@@ -1,6 +1,18 @@
 extern printf (const str : String, ...) -> i64;
 
 
+/* Macros */
+
+type Entity = u64;
+
+macro test_macro(type T)
+{
+	type ptrT = *T;
+
+	return ptrT;
+}
+
+
 /* Math Utilities */
 
 type Vector3 = struct
@@ -59,205 +71,3 @@ fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 	return result;
 }
 
-
-/* Rendering Utilities */
-
-fn draw_mesh(const vertices : *[Vector3], const num_vertices : u32, const indices : *[i32], const num_indices : u32, const color : Vector3)
-{
-	printf("Drawing mesh with %d vertices and %d indices and with color (%lf, %lf, %lf).\n", num_vertices, num_indices, color.x, color.y, color.z);
-}
-
-
-/* Scene Resources */
-
-resource RootEntity = struct
-{
-	id: i32,
-};
-
-resource CurrentScene = struct
-{
-	id: i32,
-};
-
-
-/* Transform Components */
-
-component LocalTransform = struct
-{
-	position: Vector3,
-	rotation: Quaternion,
-	scale: Vector3,
-};
-
-component WorldTransform = struct
-{
-	position: Vector3,
-	rotation: Quaternion,
-	scale: Vector3,
-};
-
-
-/* Hierarchical Components */
-
-component Parent = struct
-{
-	parent: i32,
-};
-
-component Child = struct
-{
-	first_child: i32,
-};
-
-component Sibling = struct
-{
-	next_sibling: i32,
-};
-
-
-/* Rendering Components */
-
-component Mesh = struct
-{
-	vertices: *[Vector3],
-	indices: *[i32],
-};
-
-component Material = struct
-{
-	shader_index: i32,
-	color: Vector3,
-};
-
-
-/* Physics Components */
-
-component RigidBody = struct
-{
-	mass: f64,
-	velocity : Vector3,
-	angular_velocity : Vector3,
-};
-
-component Collider = struct
-{
-	shape : i32,
-};
-
-
-/* AI Components */
-
-#[exclude(Enemy)]
-component Ally = i32;
-
-#[exclude(Ally)]
-component Enemy = i32;
-
-/* Systems */
-
-query SceneQuery
-{
-	var WorldTransform;
-}
-
-#[inline]
-system load_scene(SceneQuery)
-{
-	printf("Loading scene.\n");
-}
-
-query TransformHierarchyQuery
-{
-	var WorldTransform;
-	const LocalTransform;
-	const Child;
-	const Sibling;
-}
-
-system calculate_world_transforms(TransformHierarchyQuery)
-{
-	printf("Calculating world transforms.\n");
-}
-
-
-query RenderQuery
-{
-	const WorldTransform;
-	const Mesh;
-	const Material;
-}
-
-system render(const CurrentScene, RenderQuery)
-{
-	printf("Rendering meshes.\n");
-}
-
-
-query PhysicsQuery
-{
-	const WorldTransform;
-	const RigidBody;
-	const Collider;
-}
-
-system update_physics(PhysicsQuery)
-{
-	printf("Updating physics.\n");
-}
-
-system save()
-{
-	printf("Saving game.\n");
-}
-
-
-/* Groups */
-
-group PreStartGroup
-{
-	load_scene
-}
-
-group StartGroup
-{
-	calculate_world_transforms
-}
-
-group UpdateGroup
-{
-	update_physics,
-}
-
-group RenderGroup
-{
-	render
-}
-
-group EndGroup
-{
-	save
-}
-
-
-/* Application */
-
-application App
-{
-	start
-	{
-		PreStartGroup,
-		StartGroup
-	}
-
-	update
-	{
-		UpdateGroup,
-		RenderGroup
-	}
-
-	end
-	{
-		EndGroup
-	}
-}
