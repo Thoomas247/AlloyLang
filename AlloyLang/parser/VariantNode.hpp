@@ -81,6 +81,11 @@ namespace AlloyCompiler
 			return m_Kind;
 		}
 
+		bool IsEmpty() const
+		{
+			return m_pNode == nullptr;
+		}
+
 	private:
 		NodeKind m_Kind;	// the kind of the variant node
 		void* m_pNode;		// points to the variant node

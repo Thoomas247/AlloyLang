@@ -55,8 +55,6 @@
 	string_literal:					'"' { (* character regex *) } '"' ;
 	character_literal:				'\'' [ (* character regex *) ] '\'' ;
 
-(* -- AST NODE DEFINITIONS -- *)
-
 
 	(* - Types - *)
 
@@ -67,6 +65,7 @@
 		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
 		
 	TYPE_DEFINITION:			type_keyword identifier assignment_operator TYPE semicolon ;
+
 
 	(* - Variables - *)
 
