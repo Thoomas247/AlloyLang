@@ -113,7 +113,7 @@ namespace AlloyCompiler
 					// set the TYPE node to point to the resolved type, rather than MACRO_TYPE
 					if (result.value().Is<TYPE>())
 					{
-						pTypeDefinition->pType->Type.Set(result.value().Get<TYPE>());
+						pTypeDefinition->pType = result.value().Get<TYPE>();
 					}
 
 					else
@@ -182,17 +182,22 @@ namespace AlloyCompiler
 		}
 
 		// check that the return value type matches the macro's return type
-		if (!returnValue.Is<TYPE>() && (macroDefinition.ReturnType == MacroVariableType::Type))
+		switch (macroDefinition.ReturnType)
 		{
-			ASSERT(false, "Expected a return value of type 'type'.");
-		}
-		else if (!returnValue.Is<FUNCTION_DEFINITION>() && (macroDefinition.ReturnType == MacroVariableType::Fn))
-		{
-			ASSERT(false, "Expected a return value of type 'fn'.");
-		}
-		else if (!returnValue.IsEmpty() && (macroDefinition.ReturnType == MacroVariableType::None))
-		{
-			ASSERT(false, "Expected no return value.");
+		case MacroVariableType::None:
+			ASSERT(returnValue.IsEmpty(), "Expected a return value of type 'type'.");
+			break;
+
+		case MacroVariableType::Type:
+			ASSERT(returnValue.Is<TYPE>(), "Expected a return value of type 'fn'.");
+			break;
+
+		case MacroVariableType::Fn:
+			ASSERT(returnValue.Is<FUNCTION_DEFINITION>(), "Expected no return value.");
+			break;
+
+		default:
+			break;
 		}
 
 		// pop the variable scope
@@ -222,7 +227,7 @@ namespace AlloyCompiler
 		{
 			if (m_NamedNodes.TypeDefinitions.contains(name))
 			{
-				result.emplace(MacroVariable(m_NamedNodes.TypeDefinitions[name]));
+				result.emplace(MacroVariable(m_NamedNodes.TypeDefinitions[name]->pType));
 			}
 
 			else if (m_NamedNodes.FunctionDefinitions.contains(name))

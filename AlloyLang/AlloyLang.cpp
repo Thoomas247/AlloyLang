@@ -1,5 +1,6 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
+#include "macro/MacroEngine.hpp"
 //#include "codegen/CodeGenerator.hpp"
 
 #include "log/Log.hpp"
@@ -48,13 +49,32 @@ int main(int argc, char* argv[])
 
 	const uint64_t tokenizeTime = std::max(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), 1ll);
 
-	//PrintTokens(tokenBuffers);
-
 	start = std::chrono::high_resolution_clock::now();
 	Parser parser(source, tokenBuffers);
 	NamedNodes namedNodes = parser.Parse();
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+	// MACRO TEST
+	MacroEngine macroEngine(namedNodes);
+
+	for (auto& [macroName, macroDefinition] : namedNodes.MacroDefinitions)
+	{
+		// name of the macro we want to execute
+		Token macroNameToken = Token{ .Value = macroName, .Location = Location(1, 1, 1), .Kind = TokenKind::identifier };
+
+		// name of the argument(s) we are passing to the macro
+		Token typeNameToken = Token{ .Value = "Entity", .Location = Location(1, 1, 1), .Kind = TokenKind::identifier};
+		MACRO_VARIABLE_IDENTIFIER typeNameNode = MACRO_VARIABLE_IDENTIFIER{ .pNameToken = &typeNameToken };
+
+		// set up the macro call we want the macro engine to execute
+		MACRO_CALL macroCall = MACRO_CALL { .pMacroNameToken = &macroNameToken, .Arguments = { &typeNameNode } };
+
+		// the result is an std::optional<MacroVariable>
+		// if has_value() is true, the operation was a success and either a TYPE or FUNCTION_DEFINITION is stored in MacroVariable
+		// if has_value() is false, some error occured when trying to evaluate the macro
+		MacroResult result = macroEngine.RunMacro(macroCall);
+	}
 
 	start = std::chrono::high_resolution_clock::now();
 	//LLVMState state(true);

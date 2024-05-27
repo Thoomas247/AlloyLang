@@ -326,6 +326,7 @@ namespace AlloyCompiler
 			}
 
 			type.Set(pMacroCall);
+			break;
 		}
 
 		case identifier:

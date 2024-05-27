@@ -5,11 +5,16 @@ extern printf (const str : String, ...) -> i64;
 
 type Entity = u64;
 
-macro test_macro(type T)
+macro make_ptr_array(type T) -> type
 {
-	type ptrT = *T;
+	return [*T];
+}
 
-	return ptrT;
+macro test_macro(type T) -> type
+{
+	type ptrArrayT = @make_ptr_array(T);
+
+	return struct { ptrArray: ptrArrayT, };
 }
 
 
