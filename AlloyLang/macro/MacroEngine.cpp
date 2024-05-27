@@ -213,7 +213,7 @@ namespace AlloyCompiler
 			auto it = m_LocalVariables[previousScopeIndex].find(name);
 			if (it != m_LocalVariables[previousScopeIndex].end())
 			{
-				result.emplace(*it);
+				result.emplace(it->second);
 			}
 		}
 
@@ -306,13 +306,22 @@ namespace AlloyCompiler
 		auto it = m_LocalVariables.back().find(name);
 		if (it != m_LocalVariables.back().end())
 		{
-			result.emplace(*it);
+			result.emplace(it->second);
 		}
 
 		if (!result.has_value())
 		{
-
+			if (m_NamedNodes.TypeDefinitions.contains(name))
+			{
+				result.emplace(m_NamedNodes.TypeDefinitions[name]);
+			}
+			else if (m_NamedNodes.FunctionDefinitions.contains(name))
+			{
+				result.emplace(m_NamedNodes.FunctionDefinitions[name]);
+			}
 		}
+
+		return result;
 	}
 
 }
