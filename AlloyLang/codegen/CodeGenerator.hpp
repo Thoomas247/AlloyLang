@@ -1,5 +1,5 @@
 #pragma once
-#include "../parser/Node.hpp"
+#include "../parser/Parser.hpp"
 
 #include "llvm/llvm.hpp"
 #include "NamedValues.hpp"
@@ -91,6 +91,6 @@ namespace AlloyCompiler
 		}
 	};
 
-	bool Generate(const TokenBuffers& tokenBuffers, const NodeBuffers& nodeBuffers, LLVMState& state);
+	bool Generate(const TokenBuffers& tokenBuffers, const NamedNodes& namedNodes, LLVMState& state);
 	int Execute(LLVMState& state);
 }
