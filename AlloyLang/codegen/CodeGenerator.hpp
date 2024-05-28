@@ -91,6 +91,6 @@ namespace AlloyCompiler
 		}
 	};
 
-	bool Generate(const TokenBuffers& tokenBuffers, const NamedNodes& namedNodes, LLVMState& state);
+	bool Generate(const NamedNodes& namedNodes, LLVMState& state);
 	int Execute(LLVMState& state);
 }

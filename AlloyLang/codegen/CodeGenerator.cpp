@@ -3,6 +3,15 @@
 namespace AlloyCompiler
 {
 
+	// forward declarations
+	llvm::Value* generateExpression(const NamedNodes& namedNodes, LLVMState& state, const EXPRESSION& expressionNode,
+		const TypeSubtypePair& expectedType);
+	llvm::Value* generateVariableDefinition(const NamedNodes& namedNodes, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
+	llvm::Value* generateStatement(const NamedNodes& namedNodes, LLVMState& state, const STATEMENT& statement);
+	llvm::Value* generateStatementBlock(const NamedNodes& namedNodes, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
+	llvm::Function* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition);
+	llvm::Function* generateExternDefinition(const NamedNodes& namedNodes, LLVMState& state, const EXTERN_DEFINITION& externDefinition);
+
 #pragma region Util
 
 	struct PtrValuePair
@@ -210,10 +219,6 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-	// forward declarations
-	llvm::Value* generateExpression(const NamedNodes& namedNodes, LLVMState& state, const EXPRESSION& expressionNode,
-									const TypeSubtypePair& expectedType);
-
 #pragma region Literals
 
 	llvm::Value* generateLiteral(const NamedNodes& namedNodes, LLVMState& state, const LITERAL& literalNode,
@@ -350,16 +355,16 @@ namespace AlloyCompiler
 		modifier = typeIdentifier.Modifier;
 
 		// handle non-array types
-		if (typeIdentifier.Type.Is<Token>() )
+		if (typeIdentifier.Type.Is<TYPE_NAME>() )
 		{
-			const Token& identifier = *typeIdentifier.Type.Get<Token>();
+			const TYPE_NAME& typeName = *typeIdentifier.Type.Get<TYPE_NAME>();
 
-			const std::string_view name = identifier.Value;
+			const std::string_view name = typeName.pNameToken->Value;
 			identifierType.type = state.NamedValues.GetType(name);
 
 			if (!identifierType.type)
 			{
-				logErrorAtCurrentPosition(&identifier,
+				logErrorAtCurrentPosition(typeName.pNameToken,
 					"Unknown type name '{0}'!", name);
 				identifierType = { nullptr, nullptr };
 				goto exit;
@@ -502,7 +507,7 @@ namespace AlloyCompiler
 		return allocaInst;
 	}
 
-	llvm::Value* generateFunctionDeclaration(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDeclarationNode)
+	llvm::Function* generateFunctionDeclaration(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDeclarationNode)
 	{
 		const std::string_view name = functionDeclarationNode.pFunctionNameToken->Value;
 
@@ -1006,6 +1011,24 @@ namespace AlloyCompiler
 		// look up the name in the global module table
 		llvm::Function* calleeFunc = state.Module->getFunction(std::string(functionName));
 
+		// function not found, it might not have been processed yet
+		// check if function is already in the parser and process it
+		if (!calleeFunc)
+		{
+			NamedNodes::NodeMap<FUNCTION_DEFINITION*>::const_iterator callee = namedNodes.FunctionDefinitions.find(functionName);
+			if (callee != namedNodes.FunctionDefinitions.end()) {
+				// function found, process it
+				calleeFunc = generateFunctionDefinition(namedNodes, state, *callee->second);
+			}
+			else {
+				NamedNodes::NodeMap<EXTERN_DEFINITION*>::const_iterator external = namedNodes.ExternDefinitions.find(functionName);
+				if (external != namedNodes.ExternDefinitions.end()) {
+					// external function found, process it
+					calleeFunc = generateExternDefinition(namedNodes, state, *external->second);
+				}
+			}
+		}
+
 		if (!calleeFunc)
 		{
 			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find function '{0}'!", functionName);
@@ -1381,11 +1404,6 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-	// forward declarations
-	llvm::Value* generateVariableDefinition(const NamedNodes& namedNodes, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
-	llvm::Value* generateStatement(const NamedNodes& namedNodes, LLVMState& state, const STATEMENT& statement);
-	llvm::Value* generateStatementBlock(const NamedNodes& namedNodes, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
-
 #pragma region Statements
 
 	llvm::Value* generateVariableDefinitionStatement(const NamedNodes& namedNodes, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
@@ -1692,7 +1710,7 @@ namespace AlloyCompiler
 
 #pragma region Definitions
 
-	llvm::Value* generateExternDefinition(const NamedNodes& namedNodes, LLVMState& state, const EXTERN_DEFINITION& externDefinition )
+	llvm::Function* generateExternDefinition(const NamedNodes& namedNodes, LLVMState& state, const EXTERN_DEFINITION& externDefinition )
 	{
 		FUNCTION_DEFINITION functionDefinition = { nullptr, externDefinition.pNameToken, externDefinition.pFunctionType, nullptr };
 		return generateFunctionDeclaration(namedNodes, state, functionDefinition);
@@ -1760,9 +1778,9 @@ namespace AlloyCompiler
 		return nullptr;
 	}
 */
-	llvm::Value* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition)
+	llvm::Function* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition)
 	{
-		llvm::Function* func = static_cast<llvm::Function*>(generateFunctionDeclaration(namedNodes, state, functionDefinition));
+		llvm::Function* func = generateFunctionDeclaration(namedNodes, state, functionDefinition);
 
 		if (func == nullptr)
 		{
@@ -1882,7 +1900,7 @@ namespace AlloyCompiler
 			return false;
 		}
 
-		llvm::Value* result = generateFunctionDefinition(namedNodes, state, *main->second);
+		llvm::Function* result = generateFunctionDefinition(namedNodes, state, *main->second);
 
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);

@@ -37,11 +37,13 @@ namespace unittests
 		void RunTest(const std::string code, int expected) {
 
 			Source	src(code);
-			TokenBuffers tokenBuffers = Tokenize(src);
-			auto nodeBuffers = Parse(tokenBuffers);
+			Tokenizer tokenizer(src);
+			TokenBuffers tokenBuffers = tokenizer.Tokenize();
+			Parser parser(src, tokenBuffers);
+			NamedNodes namedNodes = parser.Parse();
 
 			LLVMState state(true);
-			Generate(tokenBuffers, nodeBuffers, state);
+			Generate(namedNodes, state);
 			int result = Execute(state);
 
 #if 0
@@ -59,7 +61,7 @@ namespace unittests
 		TEST_METHOD(BasicTest)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String) -> i32;
+				extern printf (const str : String) -> i32;
 
 				fn main () -> i64
 				{
@@ -74,7 +76,7 @@ namespace unittests
 		TEST_METHOD(IfStatements)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : i64) -> i64;
+				extern printf (const str : String, const param : i64) -> i64;
 
 				fn mul (const a : i64, const b : i64) -> i64
 				{
@@ -99,7 +101,7 @@ namespace unittests
 		TEST_METHOD(ForLoop)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : i64) -> i64;
+				extern printf (const str : String, const param : i64) -> i64;
 
 				fn mul (const a : i64, const b : i64) -> i64
 				{
@@ -124,7 +126,7 @@ namespace unittests
 		TEST_METHOD(WhileLoop)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : i64) -> i64;
+				extern printf (const str : String, const param : i64) -> i64;
 
 				fn main () -> i64
 				{
@@ -149,7 +151,7 @@ namespace unittests
 		TEST_METHOD(Structures)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : f64) -> i64;
+				extern printf (const str : String, const param : f64) -> i64;
 
 				struct Vector3
 				{
@@ -217,7 +219,7 @@ namespace unittests
 		TEST_METHOD(Arrays)
 		{
 			constexpr auto TestStr = R"(
-			extern fn printf (const str : String, const param : i64) -> i64;
+			extern printf (const str : String, const param : i64) -> i64;
 
 				fn main () -> i64
 				{
@@ -247,7 +249,7 @@ namespace unittests
 		TEST_METHOD(ArraysInStructures)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : f64) -> i64;
+				extern printf (const str : String, const param : f64) -> i64;
 
 				struct Vector3
 				{
@@ -307,7 +309,7 @@ namespace unittests
 		TEST_METHOD(Pointers)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : i64) -> i64;
+				extern printf (const str : String, const param : i64) -> i64;
 	
 				struct TestStruct
 				{
@@ -358,7 +360,7 @@ namespace unittests
 		TEST_METHOD(References)
 		{
 			constexpr auto TestStr = R"(
-				extern fn printf (const str : String, const param : i64) -> i64;
+				extern printf (const str : String, const param : i64) -> i64;
 	
 				fn test (var a : i64, var b : &i64) -> i64
 				{

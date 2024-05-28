@@ -1,7 +1,7 @@
 #include "tokenizer/Tokenizer.hpp"
 #include "parser/Parser.hpp"
 #include "macro/MacroEngine.hpp"
-//#include "codegen/CodeGenerator.hpp"
+#include "codegen/CodeGenerator.hpp"
 
 #include "log/Log.hpp"
 #include "TestString.hpp"
@@ -77,8 +77,8 @@ int main(int argc, char* argv[])
 	}
 
 	start = std::chrono::high_resolution_clock::now();
-	//LLVMState state(true);
-	//Generate(tokenBuffers, nodeBuffers, state);
+	LLVMState state(true);
+	Generate(namedNodes, state);
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
