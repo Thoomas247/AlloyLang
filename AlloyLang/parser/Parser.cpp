@@ -1353,6 +1353,10 @@ namespace AlloyCompiler
 		case character_literal:
 			literalType = LiteralType::Character;
 			break;
+
+		default:
+			ASSERT(false, "Invalid literal!");
+			break;
 		}
 
 		return createNode(
@@ -1599,22 +1603,22 @@ namespace AlloyCompiler
 			break;
 		}
 
-		case identifier:
+		case variable_keyword:
+		case constant_keyword:
 		{
-			// VARIABLE_DEFINITION
-			if (peekToken()->Kind == variable_keyword || peekToken()->Kind == constant_keyword)
+			VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
+
+			if (pVariableDefinition == nullptr)
 			{
-				VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
-
-				if (pVariableDefinition == nullptr)
-				{
-					return nullptr;
-				}
-
-				expression.Set(createNode(PRIMARY(pVariableDefinition)));
-				break;
+				return nullptr;
 			}
 
+			expression.Set(createNode(PRIMARY(pVariableDefinition)));
+			break;
+		}
+
+		case identifier:
+		{
 			// FUNCTION_CALL
 			if (peekToken()->Kind == open_paren)
 			{
@@ -1720,7 +1724,7 @@ namespace AlloyCompiler
 
 	EXPRESSION* Parser::parse_POSTFIX()
 	{
-		// even though left size can be any expression in the syntax, due to the order we parse expressions in
+		// even though left side can be any expression in the syntax, due to the order we parse expressions in
 		// we can only have a primary expression at this point
 		EXPRESSION* pLeft = parse_PRIMARY();
 
@@ -1736,11 +1740,11 @@ namespace AlloyCompiler
 
 			if (token()->Kind == TokenKind::open_bracket)
 			{
-				(void)expectKind<TokenKind::open_bracket>();
+				(void)eat();
 
 				EXPRESSION* pRight = parse<EXPRESSION>();
 
-				if (pRight != nullptr)
+				if (pRight == nullptr)
 				{
 					return nullptr;
 				}
@@ -1761,9 +1765,9 @@ namespace AlloyCompiler
 				);
 			}
 
-			else
+			else if (token()->Kind == TokenKind::dot)
 			{
-				(void)expectKind<TokenKind::dot>();
+				(void)eat();
 
 				Token* pMemberNameToken = nullptr;
 				if (expectKind<TokenKind::identifier>(&pMemberNameToken) != SUCCESS)
@@ -1771,7 +1775,7 @@ namespace AlloyCompiler
 					return nullptr;
 				}
 
-				// set the POSTFIX expression to an MEMBER_ACCESS
+				// set the POSTFIX expression to a MEMBER_ACCESS
 				pPostfix->Set(
 					createNode(
 						MEMBER_ACCESS
@@ -1783,6 +1787,12 @@ namespace AlloyCompiler
 				);
 			}
 
+			else
+			{
+				(void)expectKind<TokenKind::open_bracket, TokenKind::dot>();
+				return nullptr;
+			}
+
 			// set the left to our newly-parsed POSTFIX expression
 			pLeft->Set(pPostfix);
 		}
@@ -1792,7 +1802,7 @@ namespace AlloyCompiler
 
 	EXPRESSION* Parser::parse_UNARY()
 	{
-		// operators '-' and '&' are ambiguous so we expect based on value instead of kind
+		// operators '-' and '&' are ambiguous in their TokenKind so we expect based on value instead
 
 		if (token()->Value != "!" && token()->Value != "-" && token()->Value != "&")
 		{
@@ -2014,6 +2024,11 @@ namespace AlloyCompiler
 	{
 		EXPRESSION* pAssignment = parse<EXPRESSION>();
 
+		if (pAssignment == nullptr)
+		{
+			return nullptr;
+		}
+
 		if (!pAssignment->Is<ASSIGNMENT>())
 		{
 			logErrorAtCurrentPosition("Expected an assignment.");
@@ -2203,10 +2218,7 @@ namespace AlloyCompiler
 			statements.push_back(pStatement);
 		}
 
-		if (eat() != SUCCESS)
-		{
-			return nullptr;
-		}
+		(void)eat();
 
 		return createNode(
 			STATEMENT_BLOCK
@@ -2384,23 +2396,40 @@ namespace AlloyCompiler
 			switch (token()->Kind)
 			{
 			case macro_keyword:
-				(void)parse<MACRO_DEFINITION>(/*isLocalMacro*/false);
+			{
+				if (parse<MACRO_DEFINITION>(/*isLocalMacro*/false) == nullptr)
+				{
+					ASSERT(false, "");
+				}
 				break;
+			}
 
 			case pound:
-				(void)getAnnotation();
+				if (getAnnotation() != SUCCESS)
+				{
+					ASSERT(false, "");
+				}
 				break;
 
 			case type_keyword:
-				(void)parse<TYPE_DEFINITION>();
+				if (parse<TYPE_DEFINITION>() == nullptr)
+				{
+					ASSERT(false, "");
+				}
 				break;
 
 			case function_keyword:
-				(void)parse<FUNCTION_DEFINITION>();
+				if (parse<FUNCTION_DEFINITION>() == nullptr)
+				{
+					ASSERT(false, "");
+				}
 				break;
 
 			case extern_keyword:
-				(void)parse<EXTERN_DEFINITION>();
+				if (parse<EXTERN_DEFINITION>() == nullptr)
+				{
+					ASSERT(false, "");
+				}
 				break;
 
 			default:

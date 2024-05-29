@@ -332,7 +332,7 @@ namespace unittests
 					const ptrArray : [*i64; 3] = { new array[1], new a.b, new 12 };
 
 					// array of i64 from ptrArray
-					const arr : [i64; 3] = { ptrArray[0], @ptrArray[1], @ptrArray[2] };
+					const arr : [i64; 3] = { ptrArray[0], ptrArray[1], ptrArray[2] };
 
 					// no dereference needed to perform operations on value being pointed to
 					ptr1.a = ptr1.b + 1;

@@ -1,5 +1,6 @@
 //extern printf (const str : String, ...) -> i64;
 
+/*
 
 /* Macros */
 
@@ -75,22 +76,28 @@ fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 					
 	return result;
 }
-
+*/
 
 extern printf (const str : String, const param : i64) -> i64;
+	
+				fn test (var a : i64, var b : &i64) -> i64
+				{
+					b = a;
+					return a;
+				}
+	
+				fn main () -> i64
+				{				
+					var a : i64 = 3;
+					var b : i64 = 0;
+					test(a, b);
 
-fn mul (const a : i64, const b : i64) -> i64
-{
-	var ret : i64 = 0;
-	if (a == 1)
-		ret = b;
-	else
-		ret = a * b;
-	return ret;
-}
+					// array of references to i64
+					var refArray : [&i64; 3] = { &a, &b, &a };
 
-fn main () -> i64
-{
-	printf("3 x 5 = %d", mul(3, 5));
-	return mul(3, 5);
-}
+					printf("b = %d", refArray[1]);
+					if (b == 3)
+						return 1;
+					else
+						return 0;
+				}
