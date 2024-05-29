@@ -1601,7 +1601,7 @@ namespace AlloyCompiler
 
 		case identifier:
 		{
-			// NAMED_VARIABLE_DEFINITION
+			// VARIABLE_DEFINITION
 			if (peekToken()->Kind == variable_keyword || peekToken()->Kind == constant_keyword)
 			{
 				VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
@@ -1626,6 +1626,7 @@ namespace AlloyCompiler
 				}
 
 				expression.Set(createNode(PRIMARY(pFunctionCall)));
+				break;
 			}
 
 			// CONSTRUCTOR
@@ -1642,7 +1643,7 @@ namespace AlloyCompiler
 				break;
 			}
 
-			// NAMED_VARIABLE
+			// VARIABLE
 			VARIABLE* pNamedVariable = parse<VARIABLE>();
 
 			if (pNamedVariable == nullptr)
