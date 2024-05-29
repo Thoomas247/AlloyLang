@@ -591,10 +591,9 @@ namespace AlloyCompiler
 
 #pragma region Expressions
 
-	llvm::Value* generateConstructorExpression(const NamedNodes& namedNodes, LLVMState& state, const CONSTRUCTOR& constructorExpressionNode)
+	llvm::Value* generateConstructorExpression(const NamedNodes& namedNodes, LLVMState& state, const CONSTRUCTOR& constructorExpression)
 	{
-/*
-		const std::string_view structName = constructorExpressionNode ???
+		const std::string_view structName = constructorExpression.pType->pNameToken->Value;
 
 		llvm::StructType* structType = static_cast<llvm::StructType*>(state.NamedValues.GetType(structName));
 
@@ -610,11 +609,10 @@ namespace AlloyCompiler
 		llvm::AllocaInst* structPtr = tempBuilder.CreateAlloca(structType, nullptr);
 
 		// go through the list of initializers and initialize all members
-		for (int i = 0; i < constructorExpressionNode.MemberIdentifierIDs.size(); i++)
+		for (int i = 0; i < constructorExpression.Arguments.size(); i++)
 		{
 			// get the name of the member to initialize
-			const IDENTIFIER& memberIdentifier = namedNodes.GetNode(constructorExpressionNode.MemberIdentifierIDs[i]).Identifier;
-			const std::string_view memberName = tokenBuffers.GetValue(memberIdentifier.IdentifierTokenID).ToStringView();
+			const std::string_view memberName = constructorExpression.Arguments[i].first->Value;
 
 			NamedValues::StructMemberInfo memberInfo = state.NamedValues.GetMemberIndex(structName, memberName);
 
@@ -635,7 +633,7 @@ namespace AlloyCompiler
 			// set the type that we are expecting for each structure element
 			TypeSubtypePair identifierType = { structType->getElementType(memberInfo.memberIndex), memberInfo.containedType };
 
-			llvm::Value* expressionVal = generateExpression(namedNodes, state, constructorExpressionNode.MemberValueIDs[i], identifierType);
+			llvm::Value* expressionVal = generateExpression(namedNodes, state, *constructorExpression.Arguments[i].second, identifierType);
 
 			if (!expressionVal)
 			{
@@ -659,8 +657,6 @@ namespace AlloyCompiler
 		}
 
 		return state.Builder->CreateLoad(structPtr->getAllocatedType(), structPtr);	// result contains the whole initialized structure
-		*/
-		return nullptr;
 	}
 
 	llvm::Value* generatePointerInitializerExpression(const NamedNodes& namedNodes, LLVMState& state, const POINTER_INIT& pointerInitializerNode,
@@ -1720,14 +1716,9 @@ namespace AlloyCompiler
 	{
 		return generateVariableDefinitionExpression(namedNodes, state, variableDefinition);
 	}
-/*
-	llvm::Type* generateStructDefinition(const NamedNodes& namedNodes, LLVMState& state, const STRUCT_TYPE& nodeID)
+
+	llvm::Type* generateStructDefinition(const NamedNodes& namedNodes, LLVMState& state, const std::string_view& structName, const STRUCT_TYPE& structDefinition)
 	{
-		const STRUCT_DEFINITION& structDefinitionNode = namedNodes.GetNode(nodeID).StructDefinition;
-		const IDENTIFIER& identifier = namedNodes.GetNode(structDefinitionNode.IdentifierID).Identifier;
-
-		const std::string_view name = tokenBuffers.GetValue(identifier.IdentifierTokenID).ToStringView();
-
 		llvm::Value* result = nullptr;
 
 		// get a vector of member types
@@ -1735,49 +1726,41 @@ namespace AlloyCompiler
 		std::unordered_map<std::string_view, NamedValues::StructMemberInfo> memberNames;
 
 		int memberIndex = 0;
-		for (auto id : structDefinitionNode.MemberIDs)
+		for (auto id : structDefinition.Members)
 		{
-			const VARIABLE_DECLARATION& valueDeclaration = id.;
 			TypeModifier modifier = TypeModifier::None;
-			TypeSubtypePair identifierType = generateTypeIdentifier(namedNodes, state, valueDeclaration.TypeIdentifierID, modifier);
+			TypeSubtypePair identifierType = generateTypeIdentifier(namedNodes, state, *id.second, modifier);
 
 			if (!identifierType.type)
 			{
 				logErrorAtCurrentPosition(nullptr, // TBD: valueDeclaration.TypeIdentifierID
-									"Invalid structure member type for structure '{0}'!", name);
+									"Invalid structure member type for structure '{0}'!", structName);
 				return nullptr;
 			}
 
 			memberTypes.push_back(identifierType.type);
 
 			// retrieve member name and add it to memberNames map
-			const IDENTIFIER& memberID = namedNodes.GetNode(valueDeclaration.IdentifierID).Identifier;
-			const std::string_view memberName = tokenBuffers.GetValue(memberID.IdentifierTokenID).ToStringView();
+			const std::string_view memberName = id.first->Value;
 
 			memberNames[memberName] = { memberIndex++, identifierType.containedType };
 		}
 
-		llvm::StructType* structType = llvm::StructType::create(*state.Context, memberTypes, name);
+		llvm::StructType* structType = llvm::StructType::create(*state.Context, memberTypes, structName);
 
 		if (!structType)
 		{
 			logErrorAtCurrentPosition(nullptr, // TBD: nodeID
-								"Invalid structure type for structure '{0}'!", name);
+								"Invalid structure type for structure '{0}'!", structName);
 			return nullptr;
 		}
 
-		state.NamedValues.InsertType(name, structType, true // isStruct
-										true, memberNames);
+		state.NamedValues.InsertType(structName, structType, true, // isStruct
+										memberNames);
 
 		return structType;
 	}
 
-	llvm::Value* generateEnumDefinition(const NamedNodes& namedNodes, LLVMState& state, NodeID nodeID)
-	{
-		ASSERT(false, "To be implemented.");
-		return nullptr;
-	}
-*/
 	llvm::Function* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition)
 	{
 		llvm::Function* func = generateFunctionDeclaration(namedNodes, state, functionDefinition);
@@ -1886,6 +1869,17 @@ namespace AlloyCompiler
 		return func;
 	}
 
+	llvm::Type* generateTypeDefinition(const NamedNodes& namedNodes, LLVMState& state, const TYPE_DEFINITION& typeDefinition)
+	{
+		llvm::Type* result = nullptr;
+
+		if (typeDefinition.pType->Type.Is<STRUCT_TYPE>()) {
+			result = generateStructDefinition(namedNodes, state, typeDefinition.pNameToken->Value, *typeDefinition.pType->Type.Get<STRUCT_TYPE>());
+		}
+
+		return result;
+	}
+
 #pragma endregion
 
 	bool Generate(const NamedNodes& namedNodes, LLVMState& state)
@@ -1898,6 +1892,11 @@ namespace AlloyCompiler
 			logErrorAtCurrentPosition(nullptr, // TBD: nodeID
 								"Cannot find main entry point!");
 			return false;
+		}
+
+		// pre-process all types definitions as these might be used throughout the code
+		for (auto t = namedNodes.TypeDefinitions.begin(); t != namedNodes.TypeDefinitions.end(); t++) {
+			generateTypeDefinition(namedNodes, state, *t->second);
 		}
 
 		llvm::Function* result = generateFunctionDefinition(namedNodes, state, *main->second);

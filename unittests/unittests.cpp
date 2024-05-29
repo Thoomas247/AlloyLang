@@ -153,19 +153,19 @@ namespace unittests
 			constexpr auto TestStr = R"(
 				extern printf (const str : String, const param : f64) -> i64;
 
-				struct Vector3
+				type Vector3 = struct
 				{
-					var x : f32;
-					var y : f32;
-					var z : f32;
-				}
+					x : f32,
+					y : f32,
+					z : f32
+				};
 
-				struct Transform
+				type Transform = struct
 				{
-					var position : Vector3;
-					var rotation : Vector3;
-					var scale : Vector3;
-				}
+					position : Vector3,
+					rotation : Vector3,
+					scale : Vector3
+				};
 
 				fn translate(const point : Vector3, const vector : Vector3) -> Vector3
 				{
@@ -251,18 +251,18 @@ namespace unittests
 			constexpr auto TestStr = R"(
 				extern printf (const str : String, const param : f64) -> i64;
 
-				struct Vector3
+				type Vector3 = struct
 				{
-					var x : f64;
-					var y : f64;
-					var z : f64;
-				}
+					x : f64,
+					y : f64,
+					z : f64
+				};
 
-				struct StructWithArray
+				type StructWithArray = struct
 				{
-					var x : i64;
-					var array : [f64; 2];
-				}
+					x : i64,
+					array : [f64; 2]
+				};
 
 				fn translate(const point : Vector3, const vector : Vector3) -> Vector3
 				{
@@ -311,12 +311,11 @@ namespace unittests
 			constexpr auto TestStr = R"(
 				extern printf (const str : String, const param : i64) -> i64;
 	
-				struct TestStruct
+				type TestStruct = struct
 				{
-					var a : i64;
-					var b : i64;
-				}
-	
+					a : i64,
+					b : i64
+				};
 	
 				fn main () -> i64
 				{				
