@@ -370,22 +370,19 @@ namespace AlloyCompiler
 				goto exit;
 			}
 		}
-
-		/* handle array types
+		// handle array types
 		else
 		{
-			ASSERT(typeIdentifier.Type.Is<TYPE>(), "Expected type identifier node!");
+			ASSERT(typeIdentifier.Type.Is<ARRAY_TYPE>(), "Expected type identifier node!");
 
 			uint64_t arraySize = 0;
-			const TYPE& type = *typeIdentifier.Type.Get<TYPE>();
+			const ARRAY_TYPE& type = *typeIdentifier.Type.Get<ARRAY_TYPE>();
 
 			// get size if given
-			if (type..ArraySizeID != ERROR_NODE_ID)
+			if (type.pSizeLiteral != nullptr)
 			{
-				const LITERAL& arraySizeNode = namedNodes.GetNode(typeIdentifierNode.ArraySizeID).Literal;
-				const std::string_view arraySizeStr = tokenBuffers.GetValue(arraySizeNode.InfoTokenID).ToStringView();
-
-				std::from_chars(arraySizeStr.data(), arraySizeStr.data() + arraySizeStr.size(), arraySize);
+				std::string_view sizeStr = type.pSizeLiteral->pValueToken->Value;
+				std::from_chars(sizeStr.data(), sizeStr.data() + sizeStr.size(), arraySize);
 
 				if (arraySize == 0)
 				{
@@ -396,9 +393,8 @@ namespace AlloyCompiler
 				}
 			}
 
-			const NodeID elementTypeIdentifierNode = typeIdentifierNode.IdentifierOrTypeIdentifierID;
 			TypeModifier modifier = TypeModifier::None;
-			identifierType = generateTypeIdentifier(namedNodes, state, elementTypeIdentifierNode, modifier);
+			identifierType = generateTypeIdentifier(namedNodes, state, *type.pElementType, modifier);
 			llvm::Type* elementType = identifierType.type;
 
 			if (identifierType.type == nullptr)
@@ -436,7 +432,6 @@ namespace AlloyCompiler
 														(arraySize == 0 ? true : false)		//scalable
 														);
 		}
-	*/
 
 		// return the identifier type and subtype
 		// e.g. var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }; when we encounter var array : [i64; 10] we know that we are
@@ -796,7 +791,7 @@ namespace AlloyCompiler
 			// set the type that we are expecting for each array element
 			TypeSubtypePair identifierType = { vectorType->getElementType(), expectedType.containedType };
 
-			llvm::Value* expressionVal = generateExpression(namedNodes, state, initListExpressionNode.Values[i], identifierType);
+			llvm::Value* expressionVal = generateExpression(namedNodes, state, *initListExpressionNode.Values[i], identifierType);
 
 			if (!expressionVal)
 			{
@@ -856,7 +851,7 @@ namespace AlloyCompiler
 	PtrValuePair generateArrayAccessExpression(const NamedNodes& namedNodes, LLVMState& state, const ARRAY_ACCESS& arrayAccessExpression,
 												const TypeSubtypePair& identifierType)
 	{
-		llvm::Value* memberIndex = generateExpression(namedNodes, state, arrayAccessExpression.pIndex, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
+		llvm::Value* memberIndex = generateExpression(namedNodes, state, *arrayAccessExpression.pIndex, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
 		TypeSubtypePair tempType = { nullptr, nullptr };
 		PtrValuePair left = { nullptr, nullptr };
 
@@ -1283,7 +1278,7 @@ namespace AlloyCompiler
 		TypeSubtypePair identiferType = expectedType;
 
 		if (primary.Is<LITERAL>()) {
-			result = generateLiteral(namedNodes, state, *primary.Get< LITERAL>(), expectedType);
+			result = generateLiteral(namedNodes, state, *primary.Get<LITERAL>(), expectedType);
 		}
 		else if (primary.Is<VARIABLE>()) {
 				result = generateIdentifier(namedNodes, state, *primary.Get<VARIABLE>(), identiferType).Value;
@@ -1390,6 +1385,18 @@ namespace AlloyCompiler
 		}
 		else if (expressionNode.Is<ASSIGNMENT>()) {
 			result = generateAssignmentExpression(namedNodes, state, *expressionNode.Get<ASSIGNMENT>(), expectedType);
+		}
+		else if (expressionNode.Is<POSTFIX>()) {
+			const POSTFIX& postfix = *expressionNode.Get<POSTFIX>();
+			if (postfix.Is<ARRAY_ACCESS>()) {
+				result = generateArrayAccessExpression(namedNodes, state, *postfix.Get<ARRAY_ACCESS>(), expectedType).Value;
+			}
+			else if (postfix.Is<MEMBER_ACCESS>()) {
+				result = generateMemberAccessExpression(namedNodes, state, *postfix.Get<MEMBER_ACCESS>(), expectedType).Value;
+			}
+			else {
+				ASSERT(false, "Unknown postfix expression node kind!");
+			}
 		}
 		else {
 			ASSERT(false, "Unknown expression node kind!");
@@ -1897,6 +1904,13 @@ namespace AlloyCompiler
 		// pre-process all types definitions as these might be used throughout the code
 		for (auto t = namedNodes.TypeDefinitions.begin(); t != namedNodes.TypeDefinitions.end(); t++) {
 			generateTypeDefinition(namedNodes, state, *t->second);
+		}
+
+		// pre-process all function definitions leaving the main function till the end
+		for (auto f = namedNodes.FunctionDefinitions.begin(); f != namedNodes.FunctionDefinitions.end(); f++) {
+			if (f->first != "main") {
+				generateFunctionDefinition(namedNodes, state, *f->second);
+			}
 		}
 
 		llvm::Function* result = generateFunctionDefinition(namedNodes, state, *main->second);
