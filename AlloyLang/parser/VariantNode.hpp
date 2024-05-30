@@ -21,6 +21,12 @@ namespace AlloyCompiler
 			return getKind<std::remove_const_t<std::remove_reference_t<std::remove_const_t<T>>>>();
 		}
 
+		template <typename T>
+		static std::string Name()
+		{
+			return typeid(T).name();
+		}
+
 	private:
 		using UnderlyingType = std::underlying_type_t<NodeKind>;
 		inline static UnderlyingType s_Counter = 0;
@@ -60,6 +66,10 @@ namespace AlloyCompiler
 
 			m_Kind = NodeInfo::Kind<T>();
 			m_pNode = pNode;
+
+#ifdef _DEBUG
+			m_Name = NodeInfo::Name<T>();
+#endif // _DEBUG
 		}
 
 		template <typename T>
@@ -89,5 +99,10 @@ namespace AlloyCompiler
 	private:
 		NodeKind m_Kind;	// the kind of the variant node
 		void* m_pNode;		// points to the variant node
+
+#ifdef _DEBUG
+		std::string m_Name;
+#endif // _DEBUG
+
 	};
 }
