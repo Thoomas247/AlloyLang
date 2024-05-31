@@ -10,6 +10,7 @@ namespace AlloyCompiler
 	llvm::Value* generateStatement(const NamedNodes& namedNodes, LLVMState& state, const STATEMENT& statement);
 	llvm::Value* generateStatementBlock(const NamedNodes& namedNodes, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
 	llvm::Function* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition);
+	llvm::Type* generateTypeDefinition(const NamedNodes& namedNodes, LLVMState& state, const TYPE_DEFINITION& typeDefinition);
 	llvm::Function* generateExternDefinition(const NamedNodes& namedNodes, LLVMState& state, const EXTERN_DEFINITION& externDefinition);
 
 #pragma region Util
@@ -364,6 +365,17 @@ namespace AlloyCompiler
 
 			if (!identifierType.type)
 			{
+				// type not found, it might not have been processed yet
+				// try to locate it in the namedNodes and process it
+				NamedNodes::NodeMap<TYPE_DEFINITION*>::const_iterator t = namedNodes.TypeDefinitions.find(name);
+				if (t != namedNodes.TypeDefinitions.end()) {
+					generateTypeDefinition(namedNodes, state, *t->second);
+					identifierType.type = state.NamedValues.GetType(name);
+				}
+			}
+
+			if (!identifierType.type)
+			{
 				logErrorAtCurrentPosition(typeName.pNameToken,
 					"Unknown type name '{0}'!", name);
 				identifierType = { nullptr, nullptr };
@@ -680,7 +692,7 @@ namespace AlloyCompiler
 		llvm::PointerType* pointerType = llvm::PointerType::get(elementType, 0);	// note that elementType is not actually stored by llvm
 
 		// get the value to set for each element
-		llvm::Value* defaultValue = generateExpression(namedNodes, state, pointerInitializerNode.pValue, { elementType, nullptr });
+		llvm::Value* defaultValue = generateExpression(namedNodes, state, *pointerInitializerNode.pValue, { elementType, nullptr });
 		// try to convert the value to the expected type	
 		convertValueToType(state, defaultValue, elementType);
 
@@ -864,7 +876,7 @@ namespace AlloyCompiler
 			left = generateIdentifier(namedNodes, state, *arrayAccessExpression.pArray->Get<PRIMARY>()->Get<VARIABLE>(), tempType);
 		}
 		else
-		// not an identifier, must be an expression that returns an array
+		// not a variable, must be an expression that returns an array
 		{
 			left.Value = generateExpression(namedNodes, state, *arrayAccessExpression.pArray, tempType);
 			left.Ptr = nullptr;		// we don't have a pointer to a variable, so set this to null
@@ -1253,10 +1265,13 @@ namespace AlloyCompiler
 			}
 			else
 				if (operatorStr == "&"
-					&& unaryExpressionNode.pExpression->Is<VARIABLE>())
+					&& unaryExpressionNode.pExpression->Is<PRIMARY>()
+					&& unaryExpressionNode.pExpression->Get<PRIMARY>()->Is<VARIABLE>())
 				{
 					TypeSubtypePair tempType = { nullptr, nullptr };
-					PtrValuePair left = generateIdentifier(namedNodes, state, *unaryExpressionNode.pExpression->Get<VARIABLE>(), tempType);
+					PtrValuePair left = generateIdentifier(namedNodes, state, 
+										*unaryExpressionNode.pExpression->Get<PRIMARY>()->Get<VARIABLE>(),
+										tempType);
 					result = left.Ptr;
 				}
 				else
@@ -1883,6 +1898,9 @@ namespace AlloyCompiler
 		if (typeDefinition.pType->Type.Is<STRUCT_TYPE>()) {
 			result = generateStructDefinition(namedNodes, state, typeDefinition.pNameToken->Value, *typeDefinition.pType->Type.Get<STRUCT_TYPE>());
 		}
+		else {
+			ASSERT(false, "Type definition not implemented!");
+		}
 
 		return result;
 	}
@@ -1901,10 +1919,13 @@ namespace AlloyCompiler
 			return false;
 		}
 
-		// pre-process all types definitions as these might be used throughout the code
+		/* pre-process all types definitions as these might be used throughout the code
+		* for this to work properly we need to process the types in the order they appear in the file because one type can reference a previous type
+		* for now, we are processing each type the first time it is encountered in the code
 		for (auto t = namedNodes.TypeDefinitions.begin(); t != namedNodes.TypeDefinitions.end(); t++) {
 			generateTypeDefinition(namedNodes, state, *t->second);
 		}
+		*/
 
 		// pre-process all function definitions leaving the main function till the end
 		for (auto f = namedNodes.FunctionDefinitions.begin(); f != namedNodes.FunctionDefinitions.end(); f++) {
