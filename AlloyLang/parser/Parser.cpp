@@ -1794,7 +1794,13 @@ namespace AlloyCompiler
 			}
 
 			// set the left to our newly-parsed POSTFIX expression
+			/* MDFDA: pLeft->Set(pPostfix) is wrong as it modifies the pArray or pObject of the POSTFIX expression,
+			* we should instead create a new expression and return it
+			* pLeft->Set(pPostfix);
+			*/
+			pLeft = new EXPRESSION;
 			pLeft->Set(pPostfix);
+
 		}
 
 		return pLeft;	// if no POSTFIX was found, this returns a PRIMARY wrapped in an EXPRESSION as expected
