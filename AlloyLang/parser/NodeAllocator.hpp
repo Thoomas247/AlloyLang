@@ -48,11 +48,13 @@ namespace AlloyCompiler
 			m_pCurrent += sizeof(N);
 
 			// move the value into the allocated memory
-			// cannot simply use operator= for some reason
-			std::memcpy(pNode, &value, sizeof(N));
-			std::memset((void*)&value, 0, sizeof(N));
+			// the class constructor is called on the allocated object using the placement constructor syntax
+			new (pNode) N(value);
 
-			//*pNode = value;
+			// cannot simply use operator = (the constructor has to be caled on the object)
+			// *pNode = value;
+			// std::memcpy(pNode, &value, sizeof(N));
+			// std::memset((void*)&value, 0, sizeof(N));	// we're modifying an object that is passed in as const, this can't be good
 
 			return pNode;
 		}
