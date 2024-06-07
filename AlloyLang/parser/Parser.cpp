@@ -672,7 +672,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	FUNCTION_TYPE* Parser::parse(bool allowVarArg)
+	FUNCTION_TYPE* Parser::parse(bool allowVarArg, bool allowSelf)
 	{
 		if (expectKind<TokenKind::open_paren>())
 		{
@@ -680,6 +680,7 @@ namespace AlloyCompiler
 		}
 
 		bool isVarArg = false;
+		bool hasSelf = false;
 		std::vector<VARIABLE_DECLARATION*> parameters;
 		while (token()->Kind != TokenKind::close_paren)
 		{
@@ -689,7 +690,7 @@ namespace AlloyCompiler
 
 				if (!allowVarArg)
 				{
-					logErrorAtCurrentPosition("Only extern functions can have variable arguments.");
+					logErrorAtPreviousPosition("Only extern functions can have variable arguments.");
 					return nullptr;
 				}
 
@@ -697,7 +698,7 @@ namespace AlloyCompiler
 
 				if (token()->Kind != TokenKind::close_paren)
 				{
-					logErrorAtCurrentPosition("Variable argument specifier '...' must be the last parameter.");
+					logErrorAtPreviousPosition("Variable argument specifier '...' must be the last parameter.");
 					return nullptr;
 				}
 
@@ -709,6 +710,30 @@ namespace AlloyCompiler
 			if (pVariableDeclaration == nullptr)
 			{
 				return nullptr;
+			}
+
+			// 'Self' type has to be TYPE_NAME
+			// if we have anything else we know the type is not 'Self'
+			if (pVariableDeclaration->pType->Type.Is<TYPE_NAME>()
+				&& pVariableDeclaration->pType->Type.Get<TYPE_NAME>()->pNameToken->Value == "Self")
+			{
+				if (!allowSelf)
+				{
+					logErrorAtPreviousPosition("Only member functions can have a parameter of type 'Self'.");
+					return nullptr;
+				}
+
+				if (hasSelf)
+				{
+					logErrorAtPreviousPosition("Only one parameter of type 'Self' is allowed.");
+					return nullptr;
+				}
+
+				if (parameters.size() != 0)
+				{
+					logErrorAtPreviousPosition("Parameter of type 'Self' must be the first parameter.");
+					return nullptr;
+				}
 			}
 
 			parameters.push_back(pVariableDeclaration);
@@ -793,7 +818,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/false);
+		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/false, /*allowSelf*/true);
 
 		if (pFunctionType == nullptr)
 		{
@@ -855,7 +880,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/true);
+		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/true, /*allowSelf*/false);
 
 		if (pFunctionType == nullptr)
 		{
@@ -1620,7 +1645,7 @@ namespace AlloyCompiler
 		case identifier:
 		{
 			// FUNCTION_CALL
-			if (peekToken()->Kind == open_paren)
+			if (peekToken()->Kind == open_paren || peekToken()->Kind == colon)
 			{
 				FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>();
 
@@ -2292,7 +2317,7 @@ namespace AlloyCompiler
 			STATEMENT* pStatement = nullptr;
 
 			// handle function call
-			if (peekToken()->Kind == TokenKind::open_paren)
+			if (peekToken()->Kind == TokenKind::open_paren || peekToken()->Kind == TokenKind::colon)
 			{
 				FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>();
 				if (pFunctionCall == nullptr)

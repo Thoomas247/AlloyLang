@@ -1,6 +1,4 @@
-//extern printf (const str : String, ...) -> i64;
-
-/*
+extern printf (const str: String, ...) -> i64;
 
 /* Macros */
 
@@ -15,7 +13,7 @@ macro test_macro(type T) -> type
 {
 	type ptrArrayT = @make_ptr_array(T);
 
-	return struct { ptrArray: ptrArrayT, };
+	return struct { ptrArray: ptrArrayT };
 }
 
 
@@ -37,18 +35,11 @@ type Quaternion = struct
 };
 
 
-// this function can be called in 2 ways:
-//		1) Quaternion:rotate(&v);
-//		2) v:rotate();
 fn Quaternion:rotate(var q: &Quaternion)
 {
 	
 }
 
-// this function can also be called in 2 ways:
-//		1) Quaternion:rotate(&v, &other, 0.25);
-//		2) v:lerp(&other, 0.25);
-// this is because the first parameter is of the type of the "namespace" this function is in
 fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: f64) -> Quaternion
 {
 	var q: Quaternion = Quaternion { x = 0, y = 0, z = 0, w = 0 };
@@ -61,7 +52,7 @@ fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: f64) -
 	return q;
 }
 
-fn Vector3:print(const v : &Vector3)
+fn Vector3:print(const v : &Self)
 {
 	printf("[ %f, %f, %f ]", v.x, v.y, v.z);
 }
@@ -76,26 +67,11 @@ fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 					
 	return result;
 }
-*/
 
-extern printf (const str : String, const param : i64) -> i64;
+fn main() -> i64
+{
+	var vec: Vector3 = Vector3 { x = 0, y = 0, z = 0 };
 
-				fn main () -> i64
-				{
-					var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-					var expected : i64 = 1*2*3*4*5*6*7*8*9*10;
-					var result : i64 = 1;
-
-					array[2] = 3;
-
-					for (var i : i32 = 0; i < 10; i = i + 1) {
-							result = result * array[i];
-						}
-
-					printf("result = %d", result);
-					if (result == expected)
-						result = 1;
-					else
-						result = 0;
-					return result;
-				}
+	vec = Vector3:translate(vec, Vector3 { x = 10, y = -3, z = 2 });
+	Vector3:print(vec);
+}
