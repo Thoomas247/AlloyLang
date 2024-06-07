@@ -371,7 +371,7 @@ namespace unittests
 				{				
 					var a : i64 = 3;
 					var b : i64 = 0;
-					test(a, b);
+					test(a, &b);
 
 					// array of references to i64
 					var refArray : [&i64; 3] = { &a, &b, &a };
