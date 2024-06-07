@@ -1798,8 +1798,7 @@ namespace AlloyCompiler
 			* we should instead create a new expression and return it
 			* pLeft->Set(pPostfix);
 			*/
-			pLeft = new EXPRESSION;
-			pLeft->Set(pPostfix);
+			pLeft = createNode(EXPRESSION(pPostfix));
 
 		}
 

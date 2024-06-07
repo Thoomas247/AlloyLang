@@ -146,6 +146,7 @@
     <ClInclude Include="macro\MacroEngine.hpp" />
     <ClInclude Include="parser\Node.hpp" />
     <ClInclude Include="parser\NodeAllocator.hpp" />
+    <ClInclude Include="parser\NodePrinter.hpp" />
     <ClInclude Include="parser\Nodes.hpp" />
     <ClInclude Include="parser\Annotation.hpp" />
     <ClInclude Include="parser\nodes\ExpressionNode.hpp" />
