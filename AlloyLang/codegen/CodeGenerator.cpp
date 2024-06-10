@@ -1010,6 +1010,8 @@ namespace AlloyCompiler
 	llvm::Value* generateFunctionCallExpression(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
 	{
 		const std::string_view functionName = functionCallExpressionNode.pFunctionNameToken->Value;
+		std::vector<llvm::Value*> args;
+		llvm::Value* result = nullptr;
 
 		// look up the name in the global module table
 		llvm::Function* calleeFunc = state.Module->getFunction(std::string(functionName));
@@ -1035,55 +1037,63 @@ namespace AlloyCompiler
 		if (!calleeFunc)
 		{
 			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find function '{0}'!", functionName);
-			return nullptr;
+			goto error;
 		}
 
 		// if the function was found, check for argument mismatch
 		if (calleeFunc->arg_size() != functionCallExpressionNode.Arguments.size())
 		{
 			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
-			return nullptr;
+			goto error;
 		}
 
 		// evaluate all the arguments
-		std::vector<llvm::Value*> args;
-
 		for (size_t i = 0; i < functionCallExpressionNode.Arguments.size(); i++)
 		{
 			const EXPRESSION& argument = *functionCallExpressionNode.Arguments[i];
+			TypeSubtypePair argType = { calleeFunc->getArg(i)->getType(), nullptr };
 			llvm::Value* argVal = nullptr;
 
-			// check if the parameter is passed byref, in which case it should be an identifier and we will pass the address of the identifier
+			// check if the parameter is passed byref, in which case it should be a variable and we will pass the address of the identifier
 			auto attr = calleeFunc->getAttributeAtIndex(i + 1, llvm::Attribute::AttrKind::ByRef);
 			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)) {
 				// we need a variable to pass it byref
-				if (!argument.Is<PRIMARY>()
-					|| !argument.Get<PRIMARY>()->Is<VARIABLE>()) {
+				if (!argument.Is<UNARY>()) {
 					logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-						"Function argument {0} expects an lvalue!", i + 1);
-					return nullptr;
+						"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
+					goto error;
 				}
-				TypeSubtypePair identifierType = { nullptr, nullptr };
-				argVal = generateIdentifier(namedNodes, state, *argument.Get<PRIMARY>()->Get<VARIABLE>(), identifierType).Ptr;
-				/* TBD the argument type is a pointer in case of references, how to compare the underlying type?
-				if (identifierType.type != calleeFunc->getArg(i)->getType())
-				{
+				const UNARY& unary = *argument.Get<UNARY>();
+				std::string_view operatorStr = unary.pOpToken->Value;
+
+				if (operatorStr != "&"
+					|| !unary.pExpression->Is<PRIMARY>()
+					|| !unary.pExpression->Get<PRIMARY>()->Is<VARIABLE>()) {
 					logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-						"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
-						state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
-						state.NamedValues.GetTypeName(identifierType.type));
-					return nullptr;
+						"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
+					goto error;
+				}
+
+				TypeSubtypePair tempType = { nullptr, nullptr };
+				PtrValuePair left = generateIdentifier(namedNodes, state, *unary.pExpression->Get<PRIMARY>()->Get<VARIABLE>(),
+														tempType);
+				/* TBD: not sure how valid this test is...
+				if (argType.containedType != tempType.type) { 
+					logErrorAtCurrentPosition(nullptr, // TBD: argumentID
+						"Wrong variable type passed to function argument {0}!", i + 1);
+					goto error;
 				}
 				*/
+				argVal = left.Ptr;
 			}
 			else {
-				argVal = generateExpression(namedNodes, state, argument, { calleeFunc->getArg(i)->getType(), nullptr });
+				argVal = generateExpression(namedNodes, state, argument, argType);
 
 				if (argVal == nullptr)
 				{
 					logErrorAtCurrentPosition(nullptr, // nodeID
 											"Error evaluating expression!");
-					return nullptr;
+					goto error;
 				}
 
 				convertValueToType(state, argVal, calleeFunc->getArg(i)->getType());
@@ -1094,13 +1104,16 @@ namespace AlloyCompiler
 						"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
 						state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
 						state.NamedValues.GetTypeName(argVal->getType()));
-					return nullptr;
+					goto error;
 				}
 			}
 			args.push_back(argVal);
 		}
 
-		return state.Builder->CreateCall(calleeFunc, args, "calltmp");
+		result = state.Builder->CreateCall(calleeFunc, args, "calltmp");
+
+	error:
+		return result;
 	}
 
 	llvm::Value* generateEnclosedExpression(const NamedNodes& namedNodes, LLVMState& state, const ENCLOSED_EXPRESSION& enclosedExpressionNode,
