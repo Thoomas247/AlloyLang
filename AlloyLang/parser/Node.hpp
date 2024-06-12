@@ -28,10 +28,15 @@ namespace AlloyCompiler
 		Constant
 	};
 
-	enum class VariableType : uint8_t
+	enum class VariableType
 	{
 		Variable,
 		Constant
+	};
+
+	enum class GenericParameterType : uint8_t
+	{
+		Fn, Type
 	};
 	
 }

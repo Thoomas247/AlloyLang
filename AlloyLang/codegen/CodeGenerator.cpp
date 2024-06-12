@@ -530,14 +530,26 @@ namespace AlloyCompiler
 		std::vector<llvm::Type*> paramSubTypes;
 		std::vector<TypeModifier> paramModifiers;
 
-		for (VARIABLE_DECLARATION* parameter : functionDeclarationNode.pFunctionType->Parameters)
+
+		////////////////////////////////////////////////////
+		// note change from VARIABLE_DECLARATION 		  //
+		// to FUNCTION_PARAMETER for variable 'parameter' //
+		// this is to add support for generics			  //
+		////////////////////////////////////////////////////
+		for (FUNCTION_PARAMETER* parameter : functionDeclarationNode.pFunctionType->Parameters)
 		{
+			ASSERT(parameter->Is<VARIABLE_DECLARATION>(), "TODO: add support for generics in codegen");
+
+			// TODO: fix this
+			// temporary hack to get the code compiling
+			VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
+
 			TypeModifier modifier = TypeModifier::None;
-			TypeSubtypePair identifierType = generateTypeIdentifier(namedNodes, state, *parameter->pType, modifier);
+			TypeSubtypePair identifierType = generateTypeIdentifier(namedNodes, state, *pParameterVariableDeclaration->pType, modifier);
 
 			if (!identifierType.type)
 			{
-				logErrorAtCurrentPosition(parameter->pNameToken, "Function '{0}' parameter type error!", name);
+				logErrorAtCurrentPosition(pParameterVariableDeclaration->pNameToken, "Function '{0}' parameter type error!", name);
 				return nullptr;
 			}
 
@@ -581,7 +593,10 @@ namespace AlloyCompiler
 		// set names for all arguments
 		for (size_t i = 0; i < function->arg_size(); i++)
 		{
-			const std::string_view paramName = functionDeclarationNode.pFunctionType->Parameters[i]->pNameToken->Value;
+			// TODO: fix this
+			// temporary hack to get the code compiling
+			//const std::string_view paramName = functionDeclarationNode.pFunctionType->Parameters[i]->pNameToken->Value;
+			const std::string_view paramName = functionDeclarationNode.pFunctionType->Parameters[i]->Get<VARIABLE_DECLARATION>()->pNameToken->Value;
 
 			function->getArg(i)->setName(paramName);
 

@@ -60,11 +60,11 @@
 
 	TYPE:						[ reference | pointer ] ( TYPE_NAME | STRUCT_TYPE | ARRAY_TYPE | MACRO_CALL ) ;
 
-		TYPE_NAME:					identifier ;
+		TYPE_NAME:					identifier [ open_paren TYPE { comma TYPE } close_paren ] ;
 		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { identifier colon TYPE } ] close_brace ;
 		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
 		
-	TYPE_DEFINITION:			type_keyword identifier assignment_operator TYPE semicolon ;
+	TYPE_DEFINITION:			type_keyword identifier [ open_paren GENERIC_PARAMETER { comma GENERIC_PARAMETER } close_paren ] assignment_operator TYPE semicolon ;
 
 
 	(* - Variables - *)
@@ -82,13 +82,20 @@
 
 	(* - Functions - *)
 
+	FUNCTION_PARAMETER:			VARIABLE_DECLARATION | GENERIC_PARAMETER ;
+
 	RETURN_TYPE:				[ variable | constant ] TYPE ;
-	FUNCTION_TYPE:				open_paren [ VARIABLE_DECLARATION { comma VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
+	FUNCTION_TYPE:				open_paren [ FUNCTION_PARAMETER { comma FUNCTION_PARAMETER } ] close_paren [ arrow RETURN_TYPE ] ;
 
 	FUNCTION_DEFINITION:		function_keyword [ identifier colon ] identifier FUNCTION_TYPE STATEMENT_BLOCK ;
 	EXTERN_DEFINITION:			extern_keyword identifier FUNCTION_TYPE semicolon ;
 
 	FUNCTION_CALL:				[ identifier colon ] identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ;
+
+
+	(* - Generics - *)
+
+	GENERIC_PARAMETER:			( function_keyword | type_keyword ) identifier ;
 
 
 	(* Macros *)

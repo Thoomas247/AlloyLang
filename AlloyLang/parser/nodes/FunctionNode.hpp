@@ -18,7 +18,9 @@ namespace AlloyCompiler
 	struct FUNCTION_TYPE
 	{
 		bool IsVarArg;
-		std::vector<VARIABLE_DECLARATION*> Parameters;
+		bool IsGeneric;
+		bool IsMember;
+		std::vector<FUNCTION_PARAMETER*> Parameters;
 		RETURN_TYPE* pReturnType;	// optional
 	};
 

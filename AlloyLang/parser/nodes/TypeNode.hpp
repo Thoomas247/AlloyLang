@@ -10,6 +10,7 @@ namespace AlloyCompiler
 	struct TYPE_NAME
 	{
 		Token* pNameToken;
+		std::vector<TYPE*> GenericArguments;
 	};
 
 	struct STRUCT_TYPE
@@ -33,5 +34,7 @@ namespace AlloyCompiler
 	{
 		Token* pNameToken;
 		TYPE* pType;
+
+		std::vector<GENERIC_PARAMETER*> GenericParameters;
 	};
 }

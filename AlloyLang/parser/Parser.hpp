@@ -79,7 +79,7 @@ namespace AlloyCompiler
 		bool hasNext() const;
 
 		Token* token();
-		Token* peekToken();
+		Token* peekToken(size_t offset = 0);
 
 		/// <summary>
 		/// Moves onto the next token if current token is not EOF.

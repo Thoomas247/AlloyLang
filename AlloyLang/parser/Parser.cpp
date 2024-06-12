@@ -75,9 +75,9 @@ namespace AlloyCompiler
 		return m_TokenBuffers.GetToken(m_CurrentTokenIndex);
 	}
 
-	Token* Parser::peekToken()
+	Token* Parser::peekToken(size_t offset)
 	{
-		return m_TokenBuffers.GetToken(m_CurrentTokenIndex + 1);
+		return m_TokenBuffers.GetToken(m_CurrentTokenIndex + offset + 1);
 	}
 
 	Parser::Result Parser::eat()
@@ -168,10 +168,32 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		// check if we have any arguments to take in
+		std::vector<TYPE*> genericArguments;
+		if (token()->Kind == TokenKind::open_paren)
+		{
+			(void)eat();
+
+			while (token()->Kind != TokenKind::close_paren)
+			{
+				TYPE* pArgument = parse<TYPE>();
+
+				if (pArgument == nullptr)
+				{
+					return nullptr;
+				}
+
+				genericArguments.push_back(pArgument);
+			}
+
+			(void)eat();
+		}
+
 		return createNode(
 			TYPE_NAME
 			{
-				.pNameToken = pNameToken
+				.pNameToken = pNameToken,
+				.GenericArguments = std::move(genericArguments)
 			}
 		);
 
@@ -382,6 +404,9 @@ namespace AlloyCompiler
 	}
 
 	template<>
+	GENERIC_PARAMETER* Parser::parse();
+
+	template<>
 	TYPE_DEFINITION* Parser::parse()
 	{
 		if (checkAnnotations({ }) != SUCCESS)
@@ -406,6 +431,27 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		// check if we have generic parameters
+		std::vector<GENERIC_PARAMETER*> genericParameters;
+		if (token()->Kind == TokenKind::open_paren)
+		{
+			(void)eat();
+
+			while (token()->Kind != TokenKind::close_paren)
+			{
+				GENERIC_PARAMETER* pGenericParam = parse<GENERIC_PARAMETER>();
+
+				if (pGenericParam == nullptr)
+				{
+					return nullptr;
+				}
+
+				genericParameters.push_back(pGenericParam);
+			}
+
+			(void)eat();
+		}
+
 		if (expectKind<TokenKind::assignment_operator>() != SUCCESS)
 		{
 			return nullptr;
@@ -426,7 +472,9 @@ namespace AlloyCompiler
 			TYPE_DEFINITION
 			{
 				.pNameToken = pNameToken,
-				.pType = pType
+				.pType = pType,
+
+				.GenericParameters = std::move(genericParameters)
 			}
 		);
 
@@ -637,6 +685,43 @@ namespace AlloyCompiler
 #pragma region Functions
 
 	template<>
+	FUNCTION_PARAMETER* Parser::parse()
+	{
+		switch (token()->Kind)
+		{
+		case TokenKind::variable_keyword:
+		case TokenKind::constant_keyword:
+		{
+			VARIABLE_DECLARATION* pVariableDeclaration = parse<VARIABLE_DECLARATION>();
+
+			if (pVariableDeclaration == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(FUNCTION_PARAMETER(pVariableDeclaration));
+		}
+		case TokenKind::type_keyword:
+		case TokenKind::function_keyword:
+		{
+			GENERIC_PARAMETER* pGenericParameter = parse<GENERIC_PARAMETER>();
+
+			if (pGenericParameter == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(FUNCTION_PARAMETER(pGenericParameter));
+		}
+		default:
+		{
+			(void)expectKind<TokenKind::variable_keyword, TokenKind::constant_keyword, TokenKind::type_keyword, TokenKind::function_keyword>();
+			return nullptr;
+		}
+		}
+	}
+
+	template<>
 	RETURN_TYPE* Parser::parse()
 	{
 		ReturnType retType = ReturnType::Copy;
@@ -680,10 +765,12 @@ namespace AlloyCompiler
 		}
 
 		bool isVarArg = false;
+		bool isGeneric = false;
 		bool hasSelf = false;
-		std::vector<VARIABLE_DECLARATION*> parameters;
+		std::vector<FUNCTION_PARAMETER*> parameters;
 		while (token()->Kind != TokenKind::close_paren)
 		{
+			// handle vararg
 			if (token()->Kind == TokenKind::ellipsis)
 			{
 				(void)eat();
@@ -705,38 +792,46 @@ namespace AlloyCompiler
 				break;
 			}
 
-			VARIABLE_DECLARATION* pVariableDeclaration = parse<VARIABLE_DECLARATION>();
+			FUNCTION_PARAMETER* pFunctionParameter = parse<FUNCTION_PARAMETER>();
 
-			if (pVariableDeclaration == nullptr)
+			if (pFunctionParameter == nullptr)
 			{
 				return nullptr;
 			}
 
+			// check if the first parameter is of type 'Self'
 			// 'Self' type has to be TYPE_NAME
-			// if we have anything else we know the type is not 'Self'
-			if (pVariableDeclaration->pType->Type.Is<TYPE_NAME>()
-				&& pVariableDeclaration->pType->Type.Get<TYPE_NAME>()->pNameToken->Value == "Self")
+			if (pFunctionParameter->Is<VARIABLE_DECLARATION>())
 			{
-				if (!allowSelf)
+				if (pFunctionParameter->Get<VARIABLE_DECLARATION>()->pType->Type.Is<TYPE_NAME>()
+					&& pFunctionParameter->Get<VARIABLE_DECLARATION>()->pType->Type.Get<TYPE_NAME>()->pNameToken->Value == "Self")
 				{
-					logErrorAtPreviousPosition("Only member functions can have a parameter of type 'Self'.");
-					return nullptr;
-				}
+					if (!allowSelf)
+					{
+						logErrorAtPreviousPosition("Only member functions can have a parameter of type 'Self'.");
+						return nullptr;
+					}
 
-				if (hasSelf)
-				{
-					logErrorAtPreviousPosition("Only one parameter of type 'Self' is allowed.");
-					return nullptr;
-				}
+					if (hasSelf)
+					{
+						logErrorAtPreviousPosition("Only one parameter of type 'Self' is allowed.");
+						return nullptr;
+					}
 
-				if (parameters.size() != 0)
-				{
-					logErrorAtPreviousPosition("Parameter of type 'Self' must be the first parameter.");
-					return nullptr;
+					if (parameters.size() != 0)
+					{
+						logErrorAtPreviousPosition("Parameter of type 'Self' must be the first parameter.");
+						return nullptr;
+					}
 				}
 			}
 
-			parameters.push_back(pVariableDeclaration);
+			if (pFunctionParameter->Is<GENERIC_PARAMETER>())
+			{
+				isGeneric = true;
+			}
+
+			parameters.push_back(pFunctionParameter);
 
 			if (token()->Kind == TokenKind::comma)
 			{
@@ -763,6 +858,8 @@ namespace AlloyCompiler
 			FUNCTION_TYPE
 			{
 				.IsVarArg = isVarArg,
+				.IsGeneric = isGeneric,
+				.IsMember = hasSelf,
 				.Parameters = std::move(parameters),
 				.pReturnType = pReturnType
 			}
@@ -803,12 +900,14 @@ namespace AlloyCompiler
 		}
 
 		// check for existing member function
-		if (pStructNameToken != nullptr 
-			&& m_NamedNodes.MemberFunctionDefinitions.contains(pStructNameToken->Value) 
-			&& m_NamedNodes.MemberFunctionDefinitions[pStructNameToken->Value].contains(pFunctionNameToken->Value))
+		if (pStructNameToken != nullptr)
 		{
-			logErrorAtPreviousPosition("Member function '{0}:{1}' is already defined.", pStructNameToken->Value, pFunctionNameToken->Value);
-			return nullptr;
+			if (m_NamedNodes.MemberFunctionDefinitions.contains(pStructNameToken->Value)
+				&& m_NamedNodes.MemberFunctionDefinitions[pStructNameToken->Value].contains(pFunctionNameToken->Value))
+			{
+				logErrorAtPreviousPosition("Member function '{0}:{1}' is already defined.", pStructNameToken->Value, pFunctionNameToken->Value);
+				return nullptr;
+			}
 		}
 
 		// check for existing function
@@ -958,6 +1057,36 @@ namespace AlloyCompiler
 				.Arguments = arguments
 			}
 		);
+	}
+
+#pragma endregion
+
+#pragma region Generics
+
+	template<>
+	GENERIC_PARAMETER* Parser::parse()
+	{
+		Token* pKindToken = nullptr;
+		if (expectKind<TokenKind::type_keyword, TokenKind::function_keyword>(&pKindToken) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		Token* pIdentifierToken = nullptr;
+		if (expectKind<TokenKind::identifier>(&pIdentifierToken) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		GenericParameterType type = pKindToken->Kind == TokenKind::type_keyword
+			? GenericParameterType::Type
+			: GenericParameterType::Fn;
+
+		return createNode(GENERIC_PARAMETER
+			{
+				.Type = type,
+				.pIdentifierToken = pIdentifierToken
+			});
 	}
 
 #pragma endregion
@@ -1605,8 +1734,6 @@ namespace AlloyCompiler
 
 	EXPRESSION* Parser::parse_PRIMARY()
 	{
-		EXPRESSION expression;
-
 		using enum TokenKind;
 
 		switch (token()->Kind)
@@ -1624,8 +1751,7 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			expression.Set(createNode(PRIMARY(pLiteral)));
-			break;
+			return createNode(EXPRESSION(createNode(PRIMARY(pLiteral))));
 		}
 
 		case variable_keyword:
@@ -1638,15 +1764,58 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			expression.Set(createNode(PRIMARY(pVariableDefinition)));
-			break;
+			return createNode(EXPRESSION(createNode(PRIMARY(pVariableDefinition))));
 		}
 
 		case identifier:
 		{
-			// FUNCTION_CALL
-			if (peekToken()->Kind == open_paren || peekToken()->Kind == colon)
+			if (peekToken()->Kind == open_paren)
 			{
+				// we have to look for what occurs after the closing parenthesis after the opening one we just peeked
+				// if we find a curly brace, we have a constructor expression
+				// otherwise, we have a function call
+				
+				size_t offset = 1;	// start after the open_paren
+				size_t depth = 1;
+
+				while (depth > 0)
+				{
+					Token* pToken = peekToken(offset);
+
+					if (pToken->Kind == TokenKind::end_of_file)
+					{
+						break;	// resume parsing from where we were assuming we have a function call, do not give error yet
+					}
+
+					if (pToken->Kind == TokenKind::open_paren)
+					{
+						depth++;
+					}
+
+					else if (pToken->Kind == TokenKind::close_paren)
+					{
+						depth--;
+					}
+
+					offset++;
+				}
+
+				if (peekToken(offset)->Kind == TokenKind::open_brace)
+				{
+					goto parse_constructor;
+				}
+
+				else
+				{
+					goto parse_function_call;
+				}
+			}
+
+			// FUNCTION_CALL
+			if (peekToken()->Kind == colon)
+			{
+			parse_function_call:	// we jump here in the case where we are unsure if we have a function call or a constructor
+
 				FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>();
 
 				if (pFunctionCall == nullptr)
@@ -1654,13 +1823,14 @@ namespace AlloyCompiler
 					return nullptr;
 				}
 
-				expression.Set(createNode(PRIMARY(pFunctionCall)));
-				break;
+				return createNode(EXPRESSION(createNode(PRIMARY(pFunctionCall))));
 			}
 
 			// CONSTRUCTOR
 			if (peekToken()->Kind == open_brace)
 			{
+			parse_constructor:		// we jump here in the case where we are unsure if we have a function call or a constructor
+
 				CONSTRUCTOR* pConstructor = parse<CONSTRUCTOR>();
 
 				if (pConstructor == nullptr)
@@ -1668,8 +1838,7 @@ namespace AlloyCompiler
 					return nullptr;
 				}
 
-				expression.Set(createNode(PRIMARY(pConstructor)));
-				break;
+				return createNode(EXPRESSION(createNode(PRIMARY(pConstructor))));
 			}
 
 			// VARIABLE
@@ -1680,8 +1849,7 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			expression.Set(createNode(PRIMARY(pNamedVariable)));
-			break;
+			return createNode(EXPRESSION(createNode(PRIMARY(pNamedVariable))));
 		}
 
 		case new_keyword:
@@ -1693,8 +1861,7 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			expression.Set(createNode(PRIMARY(pPointerInit)));
-			break;
+			return createNode(EXPRESSION(createNode(PRIMARY(pPointerInit))));
 		}
 
 		case move_keyword:
@@ -1706,8 +1873,7 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			expression.Set(createNode(PRIMARY(pPointerMove)));
-			break;
+			return createNode(EXPRESSION(createNode(PRIMARY(pPointerMove))));
 		}
 
 		case open_brace:
@@ -1719,8 +1885,7 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			expression.Set(createNode(PRIMARY(pInitializerList)));
-			break;
+			return createNode(EXPRESSION(createNode(PRIMARY(pInitializerList))));
 		}
 
 		case open_paren:
@@ -1732,8 +1897,7 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			expression.Set(createNode(PRIMARY(pEnclosedExpression)));
-			break;
+			return createNode(EXPRESSION(createNode(PRIMARY(pEnclosedExpression))));
 		}
 
 		default:
@@ -1743,8 +1907,6 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 		}
-
-		return createNode(expression);
 	}
 
 	EXPRESSION* Parser::parse_POSTFIX()

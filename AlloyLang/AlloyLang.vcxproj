@@ -151,6 +151,7 @@
     <ClInclude Include="parser\Annotation.hpp" />
     <ClInclude Include="parser\nodes\ExpressionNode.hpp" />
     <ClInclude Include="parser\nodes\FunctionNode.hpp" />
+    <ClInclude Include="parser\nodes\GenericNode.hpp" />
     <ClInclude Include="parser\nodes\MacroNode.hpp" />
     <ClInclude Include="parser\nodes\StatementNode.hpp" />
     <ClInclude Include="parser\nodes\TypeNode.hpp" />

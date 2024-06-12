@@ -7,3 +7,4 @@
 #include "nodes/VariableNode.hpp"
 #include "nodes/VariantNodes.hpp"
 #include "nodes/MacroNode.hpp"
+#include "nodes/GenericNode.hpp"

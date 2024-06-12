@@ -68,6 +68,43 @@ fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 }
 
 
+/* Generics */
+
+// types can be made generic
+type Result(type T) = struct
+{
+	success: bool,
+	value: T
+};
+
+// the 'Any' type can be used to specify that a parameter can be of any type
+fn serialize(const obj: &Any)
+{
+	// do serialization...
+}
+
+// generics can be used in member functions in the same ways as in normal functions
+// they can also be used to add a member function to any type
+fn Any:serialize(const obj: &Self)
+{
+	// do serialization...
+}
+
+// the type of a parameter can be obtained via the @type_of() macro used on a previous parameter
+fn compare(const objA: &Any, const objA: &@type_of(objA)) -> i32
+{
+	// do comparison...
+}
+
+// otherwise, a type can be explicitly passed in
+fn try_cast(const obj: &Any, type To) -> Result(To)
+{
+	// try to cast...
+
+	return Result(To) { success = false, value = To {} };
+}
+
+
 /* Main */
 
 fn main() -> i64
