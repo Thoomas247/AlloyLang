@@ -121,8 +121,12 @@
     <None Include="CGTest.ecs" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="Parser Issues.txt" />
-    <Text Include="Coding Rules.txt" />
-    <Text Include="Macro Outline.txt" />
+    <Text Include="docs\Parser Issues.txt" />
+    <Text Include="docs\Coding Rules.txt" />
+    <Text Include="docs\Macro Outline.txt" />
+    <Text Include="docs\Member Functions.txt" />
+    <Text Include="docs\ECS Outline.txt" />
+    <Text Include="docs\LLVM Compile Instructions.txt" />
+    <Text Include="docs\Node Changes.txt" />
   </ItemGroup>
 </Project>

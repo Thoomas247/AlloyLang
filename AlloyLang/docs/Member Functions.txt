@@ -1,0 +1,28 @@
+Member functions are defined using the syntax:
+	fn type_name:func_name(...) {}						// static function
+	fn type_name:func_name(var obj: &Self, ...) {}		// member function
+	fn type_name:func_name(const obj: &Self, ...) {}	// member function
+
+
+If a member function's first parameter is not '&Self', it must be called with the syntax:
+	type_name:func_name(...);
+
+
+If a member function's first parameter is of type '&Self', it must be called with the syntax:
+	variable_name:func_name(...);
+
+This is equivalent to calling the function in this way:
+	type_name:func_name(&variable_name, ...);
+
+
+In order to differentiate between the different ways of calling a function, the following must be done:
+	- check if 'pStructOrVariableNameToken' of 'FUNCTION_CALL' is 'nullptr', if it is, we have a normal function call
+	- if 'pStructOrVariableNameToken' is the name of a variable which is accessible in this scope, we have a non-static member function call
+		- look up the type of the variable
+		- find the function by doing 'NamedNodes.MemberFunctionDefinitions[type_name][func_name]'
+		- check that the first parameter of the function is indeed of type '&Self'
+		- pass '&variable_name' as the first parameter and the rest of the arguments as the following parameters
+	- if 'pStructOrVariableNameToken' is the name of a type, we have a static member function call
+		- find the function by doing 'NamedNodes.MemberFunctionDefinitions[type_name][func_name]'
+		- call it like you would a normal function
+	
