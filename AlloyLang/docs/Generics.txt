@@ -1,0 +1,51 @@
+Generic types are defined by adding generic parameters to a type definition:
+	type type_name(type A, ...) = type_name;
+	type type_name(type A, ...) = [A; 4];
+	type type_name(type A, ...) = struct {...};
+				  ^___________^
+
+
+To use a generic type, just use the syntax type_name(...). For example:
+	type Vector3Of(type T) = struct
+	{
+		x: T,
+		y: T,
+		z: T,
+	};
+
+	type I32Vec3 = Vector3Of(i32);
+	type F64Vec3 = Vector3Of(f64);
+
+
+[UNIMPLEMENTED] Generic types can also contain member functions by using the syntax:
+	fn type_name(type A, ...):func_name() {...};
+
+	fn Vector3Of(type T):magnitude(const v: &Self) -> T
+	{
+		return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+	}
+
+	fn Vector3Of(type T):normalize(var v: &Self)
+	{
+		const inverse_magnitude: f64 = 1.0 / v:magnitude();
+
+		v.x = v.x * inverse_magnitude;
+		v.y = v.y * inverse_magnitude;
+		v.z = v.z * inverse_magnitude;
+	}
+
+	Note:	Any definition of a type which is equal to a generic type also copies over all member functions of the generic type.
+			In the example above, 'I32Vec3' and 'F64Vec3' also contain the member functions 'magnitude' and 'normalize', where 'T' is 'i32'
+			and 'f64' accordingly.
+
+
+
+Generic functions are defined by adding generic parameters to any function or by making one or more of the types 'Any'. For example:
+	fn func_name(type A, const a: &A, type B, ...) -> B {...};
+	fn func_name(const obj: &Any) -> @type_of(obj) {...};
+	fn func_name(const obj: &Any, type A, const a: &A) {...};
+
+	This applies to member functions as well.
+
+	Generic parameters and normal variables can be declared in any order, generic parameters do not need to come first.
+	The 'Any' type is always inferred at compile time. If inferring the type is not possible for any reason, give an error.

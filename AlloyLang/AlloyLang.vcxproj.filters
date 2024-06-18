@@ -128,5 +128,6 @@
     <Text Include="docs\ECS Outline.txt" />
     <Text Include="docs\LLVM Compile Instructions.txt" />
     <Text Include="docs\Node Changes.txt" />
+    <Text Include="docs\Generics.txt" />
   </ItemGroup>
 </Project>

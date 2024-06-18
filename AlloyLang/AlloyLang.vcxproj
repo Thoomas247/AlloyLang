@@ -170,6 +170,7 @@
   <ItemGroup>
     <Text Include="docs\Coding Rules.txt" />
     <Text Include="docs\ECS Outline.txt" />
+    <Text Include="docs\Generics.txt" />
     <Text Include="docs\LLVM Compile Instructions.txt" />
     <Text Include="docs\Macro Outline.txt" />
     <Text Include="docs\Member Functions.txt" />
