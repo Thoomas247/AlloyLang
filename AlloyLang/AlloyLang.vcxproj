@@ -151,7 +151,6 @@
     <ClInclude Include="parser\Annotation.hpp" />
     <ClInclude Include="parser\nodes\ExpressionNode.hpp" />
     <ClInclude Include="parser\nodes\FunctionNode.hpp" />
-    <ClInclude Include="parser\nodes\GenericNode.hpp" />
     <ClInclude Include="parser\nodes\MacroNode.hpp" />
     <ClInclude Include="parser\nodes\StatementNode.hpp" />
     <ClInclude Include="parser\nodes\TypeNode.hpp" />
@@ -176,6 +175,7 @@
     <Text Include="docs\Member Functions.txt" />
     <Text Include="docs\Node Changes.txt" />
     <Text Include="docs\Parser Issues.txt" />
+    <Text Include="SYNTAX.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -152,6 +152,38 @@ namespace AlloyCompiler
 		return true;
 	}
 
+	size_t Parser::getOffsetToClosing(TokenKind closing)
+	{
+		TokenKind opening = peekToken()->Kind;
+
+		size_t offset = 1;	// start after current token
+		size_t depth = 1;
+
+		while (depth > 0)
+		{
+			Token* pToken = peekToken(offset);
+
+			if (pToken->Kind == TokenKind::end_of_file)
+			{
+				break;
+			}
+
+			if (pToken->Kind == opening)
+			{
+				depth++;
+			}
+
+			else if (pToken->Kind == closing)
+			{
+				depth--;
+			}
+
+			offset++;
+		}
+
+		return offset;
+	}
+
 #pragma endregion
 
 #pragma region Types
@@ -407,27 +439,11 @@ namespace AlloyCompiler
 	GENERIC_PARAMETER* Parser::parse();
 
 	template<>
-	TYPE_DEFINITION* Parser::parse()
+	TYPE_IDENTIFIER* Parser::parse()
 	{
-		if (checkAnnotations({ }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::type_keyword>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
 		Token* pNameToken = nullptr;
 		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
 		{
-			return nullptr;
-		}
-
-		if (m_NamedNodes.TypeDefinitions.contains(pNameToken->Value))
-		{
-			logErrorAtPreviousPosition("Type '{0}' is already defined.", pNameToken->Value);
 			return nullptr;
 		}
 
@@ -447,9 +463,49 @@ namespace AlloyCompiler
 				}
 
 				genericParameters.push_back(pGenericParam);
+
+				if (token()->Kind == TokenKind::comma)
+				{
+					(void)eat();
+				}
 			}
 
 			(void)eat();
+		}
+
+		return createNode(
+			TYPE_IDENTIFIER
+			{
+				.pNameToken = pNameToken,
+				.GenericParameters = std::move(genericParameters)
+			}
+		);
+	}
+
+	template<>
+	TYPE_DEFINITION* Parser::parse()
+	{
+		if (checkAnnotations({ }) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		if (expectKind<TokenKind::type_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		TYPE_IDENTIFIER* pTypeIdentifier = parse<TYPE_IDENTIFIER>();
+
+		if (pTypeIdentifier == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (m_NamedNodes.TypeDefinitions.contains(pTypeIdentifier->pNameToken->Value))
+		{
+			logErrorAtPreviousPosition("Type '{0}' is already defined.", pTypeIdentifier->pNameToken->Value);
+			return nullptr;
 		}
 
 		if (expectKind<TokenKind::assignment_operator>() != SUCCESS)
@@ -471,14 +527,12 @@ namespace AlloyCompiler
 		TYPE_DEFINITION* pTypeDefinition = createNode(
 			TYPE_DEFINITION
 			{
-				.pNameToken = pNameToken,
+				.pTypeIdentifier = pTypeIdentifier,
 				.pType = pType,
-
-				.GenericParameters = std::move(genericParameters)
 			}
 		);
 
-		m_NamedNodes.TypeDefinitions[pNameToken->Value] = pTypeDefinition;
+		m_NamedNodes.TypeDefinitions[pTypeIdentifier->pNameToken->Value] = pTypeDefinition;
 
 		return pTypeDefinition;
 	}
@@ -882,15 +936,18 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		Token* pStructNameToken = nullptr;
-		if (peekToken()->Kind == TokenKind::colon)
+		TYPE_IDENTIFIER* pTypeIdentifier = nullptr;
+		if (peekToken()->Kind == TokenKind::colon 
+			|| peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon)
 		{
-			if (expectKind<TokenKind::identifier>(&pStructNameToken))
+			pTypeIdentifier = parse<TYPE_IDENTIFIER>();
+
+			if (pTypeIdentifier == nullptr)
 			{
 				return nullptr;
 			}
 
-			(void)eat();
+			(void)eat();	// eat colon
 		}
 
 		Token* pFunctionNameToken = nullptr;
@@ -900,12 +957,12 @@ namespace AlloyCompiler
 		}
 
 		// check for existing member function
-		if (pStructNameToken != nullptr)
+		if (pTypeIdentifier != nullptr)
 		{
-			if (m_NamedNodes.MemberFunctionDefinitions.contains(pStructNameToken->Value)
-				&& m_NamedNodes.MemberFunctionDefinitions[pStructNameToken->Value].contains(pFunctionNameToken->Value))
+			if (m_NamedNodes.MemberFunctionDefinitions.contains(pTypeIdentifier->pNameToken->Value)
+				&& m_NamedNodes.MemberFunctionDefinitions[pTypeIdentifier->pNameToken->Value].contains(pFunctionNameToken->Value))
 			{
-				logErrorAtPreviousPosition("Member function '{0}:{1}' is already defined.", pStructNameToken->Value, pFunctionNameToken->Value);
+				logErrorAtPreviousPosition("Member function '{0}:{1}' is already defined.", pTypeIdentifier->pNameToken->Value, pFunctionNameToken->Value);
 				return nullptr;
 			}
 		}
@@ -934,16 +991,16 @@ namespace AlloyCompiler
 		FUNCTION_DEFINITION* pFunctionDefinition = createNode(
 			FUNCTION_DEFINITION
 			{
-				.pStructNameToken = pStructNameToken,
+				.pTypeIdentifier = pTypeIdentifier,
 				.pFunctionNameToken = pFunctionNameToken,
 				.pFunctionType = pFunctionType,
 				.pBody = pBody
 			}
 		);
 
-		if (pStructNameToken != nullptr)
+		if (pTypeIdentifier != nullptr)
 		{
-			m_NamedNodes.MemberFunctionDefinitions[pStructNameToken->Value][pFunctionNameToken->Value] = pFunctionDefinition;
+			m_NamedNodes.MemberFunctionDefinitions[pTypeIdentifier->pNameToken->Value][pFunctionNameToken->Value] = pFunctionDefinition;
 		}
 
 		else
@@ -1007,15 +1064,18 @@ namespace AlloyCompiler
 	template<>
 	FUNCTION_CALL* Parser::parse()
 	{
-		Token* pStructOrVariableNameToken = nullptr;
-		if (peekToken()->Kind == TokenKind::colon)
+		TYPE_NAME* pTypeName = nullptr;
+		if (peekToken()->Kind == TokenKind::colon
+			|| peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon)
 		{
-			if (expectKind<TokenKind::identifier>(&pStructOrVariableNameToken))
+			pTypeName = parse<TYPE_NAME>();
+
+			if (pTypeName == nullptr)
 			{
 				return nullptr;
 			}
 
-			(void)eat();
+			(void)eat();	// eat colon
 		}
 
 		Token* pFunctionNameToken = nullptr;
@@ -1052,7 +1112,7 @@ namespace AlloyCompiler
 		return createNode(
 			FUNCTION_CALL
 			{
-				.pStructOrVariableNameToken = pStructOrVariableNameToken,
+				.pTypeOrVariableName = pTypeName,
 				.pFunctionNameToken = pFunctionNameToken,
 				.Arguments = arguments
 			}
@@ -1066,8 +1126,7 @@ namespace AlloyCompiler
 	template<>
 	GENERIC_PARAMETER* Parser::parse()
 	{
-		Token* pKindToken = nullptr;
-		if (expectKind<TokenKind::type_keyword, TokenKind::function_keyword>(&pKindToken) != SUCCESS)
+		if (expectKind<TokenKind::type_keyword>() != SUCCESS)
 		{
 			return nullptr;
 		}
@@ -1078,13 +1137,8 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		GenericParameterType type = pKindToken->Kind == TokenKind::type_keyword
-			? GenericParameterType::Type
-			: GenericParameterType::Fn;
-
 		return createNode(GENERIC_PARAMETER
 			{
-				.Type = type,
 				.pIdentifierToken = pIdentifierToken
 			});
 	}
@@ -1769,36 +1823,10 @@ namespace AlloyCompiler
 
 		case identifier:
 		{
+			// ambiguous case, look further ahead
 			if (peekToken()->Kind == open_paren)
 			{
-				// we have to look for what occurs after the closing parenthesis after the opening one we just peeked
-				// if we find a curly brace, we have a constructor expression
-				// otherwise, we have a function call
-				
-				size_t offset = 1;	// start after the open_paren
-				size_t depth = 1;
-
-				while (depth > 0)
-				{
-					Token* pToken = peekToken(offset);
-
-					if (pToken->Kind == TokenKind::end_of_file)
-					{
-						break;	// resume parsing from where we were assuming we have a function call, do not give error yet
-					}
-
-					if (pToken->Kind == TokenKind::open_paren)
-					{
-						depth++;
-					}
-
-					else if (pToken->Kind == TokenKind::close_paren)
-					{
-						depth--;
-					}
-
-					offset++;
-				}
+				const size_t offset = getOffsetToClosing(close_paren);
 
 				if (peekToken(offset)->Kind == TokenKind::open_brace)
 				{

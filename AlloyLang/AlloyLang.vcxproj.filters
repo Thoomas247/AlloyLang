@@ -113,9 +113,6 @@
     <ClInclude Include="parser\NodePrinter.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\GenericNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.ecs" />
@@ -129,5 +126,6 @@
     <Text Include="docs\LLVM Compile Instructions.txt" />
     <Text Include="docs\Node Changes.txt" />
     <Text Include="docs\Generics.txt" />
+    <Text Include="SYNTAX.txt" />
   </ItemGroup>
 </Project>
