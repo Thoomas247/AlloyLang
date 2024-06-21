@@ -9,7 +9,7 @@ namespace AlloyCompiler
 	llvm::Value* generateVariableDefinition(const NamedNodes& namedNodes, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
 	llvm::Value* generateStatement(const NamedNodes& namedNodes, LLVMState& state, const STATEMENT& statement);
 	llvm::Value* generateStatementBlock(const NamedNodes& namedNodes, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
-	llvm::Function* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition);
+	llvm::Function* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, const std::string_view& Type, const FUNCTION_DEFINITION& functionDefinition);
 	llvm::Type* generateTypeDefinition(const NamedNodes& namedNodes, LLVMState& state, const TYPE_DEFINITION& typeDefinition);
 	llvm::Function* generateExternDefinition(const NamedNodes& namedNodes, LLVMState& state, const EXTERN_DEFINITION& externDefinition);
 
@@ -218,6 +218,28 @@ namespace AlloyCompiler
 		return tempBuilder.CreateAlloca(type, elements, varName);
 	}
 
+	llvm::Type* getTypeFromTypeName(const NamedNodes& namedNodes, LLVMState& state, const std::string_view& name)
+	{
+		//
+		// Helper function to return an llvm type given its type name
+		// Also searches the named nodes if the type has not been defined yet and define it
+		//
+		llvm::Type* type = state.NamedValues.GetType(name);
+
+		if (!type)
+		{
+			// type not found, it might not have been processed yet
+			// try to locate it in the namedNodes and process it
+			NamedNodes::NodeMap<TYPE_DEFINITION*>::const_iterator t = namedNodes.TypeDefinitions.find(name);
+			if (t != namedNodes.TypeDefinitions.end()) {
+				generateTypeDefinition(namedNodes, state, *t->second);
+				type = state.NamedValues.GetType(name);
+			}
+		}
+
+		return type;
+	}
+
 #pragma endregion
 
 #pragma region Literals
@@ -347,9 +369,12 @@ namespace AlloyCompiler
 	}
 
 	TypeSubtypePair generateTypeIdentifier(const NamedNodes& namedNodes, LLVMState& state, const TYPE& typeIdentifier,
-														TypeModifier& modifier
+														const std::string_view& parentTypeName, TypeModifier& modifier
 		)
 	{
+		//
+		// If the type name is Self, we take the parentTypeName as Self is not a real type
+		//
 		TypeSubtypePair identifierType = { nullptr, nullptr };
 
 		// let the caller know if this is a pointer, a reference or none
@@ -360,19 +385,19 @@ namespace AlloyCompiler
 		{
 			const TYPE_NAME& typeName = *typeIdentifier.Type.Get<TYPE_NAME>();
 
-			const std::string_view name = typeName.pNameToken->Value;
-			identifierType.type = state.NamedValues.GetType(name);
-
-			if (!identifierType.type)
-			{
-				// type not found, it might not have been processed yet
-				// try to locate it in the namedNodes and process it
-				NamedNodes::NodeMap<TYPE_DEFINITION*>::const_iterator t = namedNodes.TypeDefinitions.find(name);
-				if (t != namedNodes.TypeDefinitions.end()) {
-					generateTypeDefinition(namedNodes, state, *t->second);
-					identifierType.type = state.NamedValues.GetType(name);
+			std::string_view name = typeName.pNameToken->Value;
+			if (name == "Self") {
+				if (parentTypeName == "")
+				{
+					logErrorAtCurrentPosition(typeName.pNameToken,
+						"Self used with non member function!");
+					identifierType = { nullptr, nullptr };
+					goto exit;
 				}
+				name = parentTypeName;
 			}
+
+			identifierType.type = getTypeFromTypeName(namedNodes, state, name);
 
 			if (!identifierType.type)
 			{
@@ -406,7 +431,7 @@ namespace AlloyCompiler
 			}
 
 			TypeModifier modifier = TypeModifier::None;
-			identifierType = generateTypeIdentifier(namedNodes, state, *type.pElementType, modifier);
+			identifierType = generateTypeIdentifier(namedNodes, state, *type.pElementType, parentTypeName, modifier);
 			llvm::Type* elementType = identifierType.type;
 
 			if (identifierType.type == nullptr)
@@ -461,7 +486,12 @@ namespace AlloyCompiler
 		// TODO: var and const
 
 		TypeModifier modifier = TypeModifier::None;
-		return generateTypeIdentifier(namedNodes, state, *typeDeclarationNode.pReturnType->pType , modifier);
+		if (typeDeclarationNode.pReturnType->pType == nullptr) {
+			return {};
+		}
+		else {
+			return generateTypeIdentifier(namedNodes, state, *typeDeclarationNode.pReturnType->pType, "", modifier);
+		}
 	}
 
 	llvm::Value* generateVariableDeclaration(const NamedNodes& namedNodes, LLVMState& state, const VARIABLE_DECLARATION& variableDeclarationNode,
@@ -469,7 +499,7 @@ namespace AlloyCompiler
 	{
 		const std::string_view name = variableDeclarationNode.pNameToken->Value;
 		TypeModifier modifier =	TypeModifier::None;
-		identifierType = generateTypeIdentifier(namedNodes, state, *variableDeclarationNode.pType, modifier);
+		identifierType = generateTypeIdentifier(namedNodes, state, *variableDeclarationNode.pType, "", modifier);
 
 		if (!identifierType.type)
 		{
@@ -514,9 +544,19 @@ namespace AlloyCompiler
 		return allocaInst;
 	}
 
-	llvm::Function* generateFunctionDeclaration(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDeclarationNode)
+	llvm::Function* generateFunctionDeclaration(const NamedNodes& namedNodes, LLVMState& state, 
+												const std::string_view& Type, const FUNCTION_DEFINITION& functionDeclarationNode)
 	{
-		const std::string_view name = functionDeclarationNode.pFunctionNameToken->Value;
+		//
+		// If type is not empty, we are generating a member function in the form of Type@Name
+		//
+		std::string name;
+		if (Type == "") {
+			name = functionDeclarationNode.pFunctionNameToken->Value;
+		}
+		else {
+			name = std::string(Type) + std::string("@") + std::string(functionDeclarationNode.pFunctionNameToken->Value);
+		}
 
 		// check if function already exists
 		if (state.Module->getFunction(name))
@@ -529,7 +569,7 @@ namespace AlloyCompiler
 		std::vector<llvm::Type*> paramTypes;
 		std::vector<llvm::Type*> paramSubTypes;
 		std::vector<TypeModifier> paramModifiers;
-
+		std::vector< VariableType> paramVarTypes;
 
 		////////////////////////////////////////////////////
 		// note change from VARIABLE_DECLARATION 		  //
@@ -545,7 +585,7 @@ namespace AlloyCompiler
 			VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
 
 			TypeModifier modifier = TypeModifier::None;
-			TypeSubtypePair identifierType = generateTypeIdentifier(namedNodes, state, *pParameterVariableDeclaration->pType, modifier);
+			TypeSubtypePair identifierType = generateTypeIdentifier(namedNodes, state, *pParameterVariableDeclaration->pType, Type, modifier);
 
 			if (!identifierType.type)
 			{
@@ -553,8 +593,9 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			// Reference should be passed as pointers
-			if (modifier == TypeModifier::Reference) {
+			// References should be passed as pointers unless they are also constant
+			if (modifier == TypeModifier::Reference
+				&& pParameterVariableDeclaration->VarType != VariableType::Constant) {
 				paramTypes.push_back(llvm::PointerType::get(identifierType.type, 0));
 				paramSubTypes.push_back(identifierType.type);
 			}
@@ -563,12 +604,14 @@ namespace AlloyCompiler
 				paramSubTypes.push_back(nullptr);
 			}
 			paramModifiers.push_back(modifier);
+			paramVarTypes.push_back(pParameterVariableDeclaration->VarType);
 		}
 
 		// retrieve the return type
 		llvm::Type* returnType = llvm::Type::getVoidTy(*state.Context);
 
-		if (functionDeclarationNode.pFunctionType != nullptr)
+		if (functionDeclarationNode.pFunctionType != nullptr
+			&& functionDeclarationNode.pFunctionType->pReturnType != nullptr)
 		{
 			returnType = generateTypeDeclaration(namedNodes, state, *functionDeclarationNode.pFunctionType).type;
 		}
@@ -579,7 +622,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, true /*functionDeclarationNode.IsVariadic*/);
+		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, functionDeclarationNode.pFunctionType->IsVarArg);
 
 		//
 		// This call creates a crash when later executing the code using the JIT engine: 
@@ -601,8 +644,13 @@ namespace AlloyCompiler
 			function->getArg(i)->setName(paramName);
 
 			// set the ByRef attribute on parameters passed byref
-			if (paramModifiers[i] == TypeModifier::Reference) {
+			if (paramModifiers[i] == TypeModifier::Reference && paramVarTypes[i] != VariableType::Constant) {
 				function->addAttributeAtIndex(i+1, llvm::Attribute::getWithByRefType(*state.Context, paramSubTypes[i]));
+			}
+
+			// set the ReadOnly attribute on parameters passed as const
+			if (paramVarTypes[i] == VariableType::Constant) {
+				function->addAttributeAtIndex(i+1, llvm::Attribute::get(*state.Context, llvm::Attribute::AttrKind::ReadOnly));
 			}
 		}
 
@@ -1024,12 +1072,62 @@ namespace AlloyCompiler
 
 	llvm::Value* generateFunctionCallExpression(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
 	{
-		const std::string_view functionName = functionCallExpressionNode.pFunctionNameToken->Value;
+		std::string functionName(functionCallExpressionNode.pFunctionNameToken->Value);
 		std::vector<llvm::Value*> args;
+		int argi = 0;	// argument index currently processed
 		llvm::Value* result = nullptr;
+		llvm::Function* calleeFunc = nullptr;
+		bool insertSelfAsFirstParam = false;		// indicates whether the first parameter should be the variable value in the case of member function calls
+		std::vector<EXPRESSION*> Arguments(functionCallExpressionNode.Arguments);
+													// creating a copy of the arguments as we might need to insert new elements
 
-		// look up the name in the global module table
-		llvm::Function* calleeFunc = state.Module->getFunction(std::string(functionName));
+		// handle member function calls
+		/*
+		In order to differentiate between the different ways of calling a function, the following must be done :
+		-check if 'pStructOrVariableNameToken' of 'FUNCTION_CALL' is 'nullptr', if it is, we have a normal function call
+			- if 'pStructOrVariableNameToken' is the name of a variable which is accessible in this scope, we have a non-static member function call
+				- look up the type of the variable
+				- find the function named type_name@func_name
+				- check that the first parameter of the function is indeed of type '&Self'
+				- pass '&variable_name' as the first parameter and the rest of the arguments as the following parameters
+			- if 'pStructOrVariableNameToken' is the name of a type, we have a static member function call
+				- find the function type_name@func_name
+				- call it like you would a normal function
+		*/
+		if (functionCallExpressionNode.pStructOrVariableNameToken != nullptr) {
+			const std::string_view varOrTypeName = functionCallExpressionNode.pStructOrVariableNameToken->Value;
+			if (state.NamedValues.GetValue(varOrTypeName) != nullptr) {
+				// member function call
+				functionName = std::string(state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType())) + "@" + functionName;
+				// look up the function in the global module table
+				calleeFunc = state.Module->getFunction(std::string(functionName));
+				if (calleeFunc == nullptr) {
+					logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find member function '{0}'!", functionName);
+					goto error;
+				}
+				/* TBD:check that the first argument is of the right type
+				if (calleeFunc->arg_size() < 1 || calleeFunc->getArg(0)->getType() != state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType()) {
+					logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "The first parameter of member function '{0}' is not of the right type!", functionName);
+					goto error;
+				}
+				*/
+				insertSelfAsFirstParam = true;
+			}
+			else if (state.NamedValues.GetType(varOrTypeName) != nullptr) {
+				// static function call
+				functionName = std::string(varOrTypeName) + "@" + functionName;
+				// look up the function in the global module table
+				calleeFunc = state.Module->getFunction(std::string(functionName));
+			}
+			else {
+				logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Not a variable or type name '{0}'!", varOrTypeName);
+				goto error;
+			}
+		}
+		else {
+			// look up the function in the global module table
+			calleeFunc = state.Module->getFunction(std::string(functionName));
+		}
 
 		// function not found, it might not have been processed yet
 		// check if function is already in the parser and process it
@@ -1037,8 +1135,11 @@ namespace AlloyCompiler
 		{
 			NamedNodes::NodeMap<FUNCTION_DEFINITION*>::const_iterator callee = namedNodes.FunctionDefinitions.find(functionName);
 			if (callee != namedNodes.FunctionDefinitions.end()) {
+				ASSERT(false, "Defining a new function while another function is already being defined is not working, all functions have to be pre-processed in Generate!");
+#if 0
 				// function found, process it
-				calleeFunc = generateFunctionDefinition(namedNodes, state, *callee->second);
+				calleeFunc = generateFunctionDefinition(namedNodes, state, "", *callee->second);
+#endif
 			}
 			else {
 				NamedNodes::NodeMap<EXTERN_DEFINITION*>::const_iterator external = namedNodes.ExternDefinitions.find(functionName);
@@ -1055,23 +1156,43 @@ namespace AlloyCompiler
 			goto error;
 		}
 
-		// if the function was found, check for argument mismatch
-		if (calleeFunc->arg_size() != functionCallExpressionNode.Arguments.size())
+		// first parameter is &Self
+		if (insertSelfAsFirstParam) {
+			VARIABLE var{ functionCallExpressionNode.pStructOrVariableNameToken };
+			TypeSubtypePair identifierType = {};
+			llvm::Value* varPtr = generateIdentifier(namedNodes, state, var, identifierType).Ptr;
+			if (varPtr == nullptr) {
+				logErrorAtCurrentPosition(functionCallExpressionNode.pStructOrVariableNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pStructOrVariableNameToken->Value);
+				goto error;
+			}
+			args.push_back(varPtr);
+			argi = 1;
+		}
+
+		// if the function was found, check for argument count mismatch (not counting the additional arguments that we added
+		if (!calleeFunc->isVarArg() && calleeFunc->arg_size() != Arguments.size() + argi)
 		{
 			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
 			goto error;
 		}
 
 		// evaluate all the arguments
-		for (size_t i = 0; i < functionCallExpressionNode.Arguments.size(); i++)
+		for (size_t i = 0; i < Arguments.size(); i++, argi++)
 		{
-			const EXPRESSION& argument = *functionCallExpressionNode.Arguments[i];
-			TypeSubtypePair argType = { calleeFunc->getArg(i)->getType(), nullptr };
+			const EXPRESSION& argument = *Arguments[i];
+
+			// for functions with a variable number of arguments, check the argument types till the first optional argument
+			// e.g. if the function has 2 mandatory arguments and a number of optional arguments, check for only the first 2 types 
+			TypeSubtypePair argType = { (i < calleeFunc->arg_size() ? calleeFunc->getArg(argi)->getType() : nullptr), nullptr };
+
 			llvm::Value* argVal = nullptr;
 
 			// check if the parameter is passed byref, in which case it should be a variable and we will pass the address of the identifier
+			auto ro = calleeFunc->getAttributeAtIndex(i + 1, llvm::Attribute::AttrKind::ReadOnly);
+			bool isReadOnly = ro.hasAttribute(llvm::Attribute::AttrKind::ReadOnly);
 			auto attr = calleeFunc->getAttributeAtIndex(i + 1, llvm::Attribute::AttrKind::ByRef);
-			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)) {
+			bool isByRef = attr.hasAttribute(llvm::Attribute::AttrKind::ByRef);
+			if (isByRef && !isReadOnly) {
 				// we need a variable to pass it byref
 				if (!argument.Is<UNARY>()) {
 					logErrorAtCurrentPosition(nullptr, // TBD: argumentID
@@ -1111,21 +1232,23 @@ namespace AlloyCompiler
 					goto error;
 				}
 
-				convertValueToType(state, argVal, calleeFunc->getArg(i)->getType());
+				if (i < calleeFunc->arg_size()) {
+					convertValueToType(state, argVal, calleeFunc->getArg(argi)->getType());
 
-				if (argVal->getType() != calleeFunc->getArg(i)->getType())
-				{
-					logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-						"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
-						state.NamedValues.GetTypeName(calleeFunc->getArg(i)->getType()),
-						state.NamedValues.GetTypeName(argVal->getType()));
-					goto error;
+					if (argVal->getType() != calleeFunc->getArg(argi)->getType())
+					{
+						logErrorAtCurrentPosition(nullptr, // TBD: argumentID
+							"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
+							state.NamedValues.GetTypeName(calleeFunc->getArg(argi)->getType()),
+							state.NamedValues.GetTypeName(argVal->getType()));
+						goto error;
+					}
 				}
 			}
 			args.push_back(argVal);
 		}
 
-		result = state.Builder->CreateCall(calleeFunc, args, "calltmp");
+		result = state.Builder->CreateCall(calleeFunc, args);
 
 	error:
 		return result;
@@ -1759,7 +1882,7 @@ namespace AlloyCompiler
 	llvm::Function* generateExternDefinition(const NamedNodes& namedNodes, LLVMState& state, const EXTERN_DEFINITION& externDefinition )
 	{
 		FUNCTION_DEFINITION functionDefinition = { nullptr, externDefinition.pNameToken, externDefinition.pFunctionType, nullptr };
-		return generateFunctionDeclaration(namedNodes, state, functionDefinition);
+		return generateFunctionDeclaration(namedNodes, state, "", functionDefinition);
 	}
 
 	llvm::Value* generateVariableDefinition(const NamedNodes& namedNodes, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
@@ -1779,7 +1902,7 @@ namespace AlloyCompiler
 		for (auto id : structDefinition.Members)
 		{
 			TypeModifier modifier = TypeModifier::None;
-			TypeSubtypePair identifierType = generateTypeIdentifier(namedNodes, state, *id.second, modifier);
+			TypeSubtypePair identifierType = generateTypeIdentifier(namedNodes, state, *id.second, "", modifier);
 
 			if (!identifierType.type)
 			{
@@ -1811,9 +1934,14 @@ namespace AlloyCompiler
 		return structType;
 	}
 
-	llvm::Function* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition)
+	llvm::Function* generateFunctionDefinition(const NamedNodes& namedNodes, LLVMState& state, 
+												const std::string_view& Type, const FUNCTION_DEFINITION& functionDefinition)
 	{
-		llvm::Function* func = generateFunctionDeclaration(namedNodes, state, functionDefinition);
+		//
+		// Generate either a global function definition or a member function definition
+		// If type is other than an empty string, we are defining a member function, in which case the name of the function is defined as Type@Name in LLVM
+		//
+		llvm::Function* func = generateFunctionDeclaration(namedNodes, state, Type, functionDefinition);
 
 		if (func == nullptr)
 		{
@@ -1851,10 +1979,13 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
+			// const ByRef parameters are considered ByVal for more flexibility
 			llvm::Attribute attr = arg.getAttribute(llvm::Attribute::AttrKind::ByRef);
+			llvm::Attribute ro = arg.getAttribute(llvm::Attribute::AttrKind::ReadOnly);
 			llvm::Type* subType = nullptr;
 			llvm::AllocaInst* allocaInst = nullptr;
-			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)) {
+			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)
+				&& !ro.hasAttribute(llvm::Attribute::AttrKind::ReadOnly)) {
 				subType = arg.getParamByRefType();
 			}
 			// create an alloca for this variable
@@ -1871,16 +2002,20 @@ namespace AlloyCompiler
 		llvm::BasicBlock* previousExitBlock = state.FuncExitBlock;
 		state.FuncExitBlock = llvm::BasicBlock::Create(*state.Context, "exit", func);
 
-		llvm::Value* bodyVal = generateStatementBlock(namedNodes, state, *functionDefinition.pBody);
+		// check if function has any statements and generate them
+		if (functionDefinition.pBody->Statements.size() > 0) {
+			llvm::Value* bodyVal = generateStatementBlock(namedNodes, state, *functionDefinition.pBody);
 
-		if (!bodyVal)
-		{
-			func->eraseFromParent();
-			state.NamedValues.FreeHeapPointers(*state.Builder);
-			state.NamedValues.PopScope();
-			state.CurrentReturnValue = previousReturnValue;
-			state.FuncExitBlock = previousExitBlock;
-			return nullptr;
+			if (!bodyVal)
+			{
+				ASSERT(false, "Unexpected error generating function body!");
+				func->eraseFromParent();
+				state.NamedValues.FreeHeapPointers(*state.Builder);
+				state.NamedValues.PopScope();
+				state.CurrentReturnValue = previousReturnValue;
+				state.FuncExitBlock = previousExitBlock;
+				return nullptr;
+			}
 		}
 
 		// insert the branch into the end of the function
@@ -1911,7 +2046,7 @@ namespace AlloyCompiler
 		if (state.Optimizations)
 		{
 			// run the optimizer on the function.
-			state.FPM->run(*func, *state.FAM);
+			// state.FPM->run(*func, *state.FAM);
 		}
 
 		state.CurrentReturnValue = nullptr;
@@ -1935,6 +2070,10 @@ namespace AlloyCompiler
 
 #pragma endregion
 
+	void foo(const int& i)
+	{
+	}
+
 	bool Generate(const NamedNodes& namedNodes, LLVMState& state)
 	{
 		//
@@ -1947,6 +2086,8 @@ namespace AlloyCompiler
 			return false;
 		}
 
+		foo(2);
+
 		/* pre-process all types definitions as these might be used throughout the code
 		* for this to work properly we need to process the types in the order they appear in the file because one type can reference a previous type
 		* for now, we are processing each type the first time it is encountered in the code
@@ -1955,14 +2096,26 @@ namespace AlloyCompiler
 		}
 		*/
 
+		// pre-process all extern function definitions
+		for (auto f = namedNodes.ExternDefinitions.begin(); f != namedNodes.ExternDefinitions.end(); f++) {
+			generateExternDefinition(namedNodes, state, *f->second);
+		}
+
 		// pre-process all function definitions leaving the main function till the end
 		for (auto f = namedNodes.FunctionDefinitions.begin(); f != namedNodes.FunctionDefinitions.end(); f++) {
 			if (f->first != "main") {
-				generateFunctionDefinition(namedNodes, state, *f->second);
+				generateFunctionDefinition(namedNodes, state, "", *f->second);
 			}
 		}
 
-		llvm::Function* result = generateFunctionDefinition(namedNodes, state, *main->second);
+		// pre-process all member function definitions
+		for (auto mf = namedNodes.MemberFunctionDefinitions.begin(); mf != namedNodes.MemberFunctionDefinitions.end(); mf++) {
+			for (auto mf1 = mf->second.begin(); mf1 != mf->second.end(); mf1++) {
+				generateFunctionDefinition(namedNodes, state, mf->first, *mf1->second);	// mf->first is the type name, second is the function
+			}
+		}
+
+		llvm::Function* result = generateFunctionDefinition(namedNodes, state, "", *main->second);
 
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);

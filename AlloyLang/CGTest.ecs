@@ -1,21 +1,4 @@
-extern printf (const str: String, ...) -> i64;
-
-/* Macros */
-
-type Entity = u64;
-
-macro make_ptr_array(type T) -> type
-{
-	return [*T];
-}
-
-macro test_macro(type T) -> type
-{
-	type ptrArrayT = @make_ptr_array(T);
-
-	return struct { ptrArray: ptrArrayT };
-}
-
+//extern printf (const str: String, ...) -> i64;
 
 /* Math Utilities */
 
@@ -26,34 +9,9 @@ type Vector3 = struct
 	z: f64,
 };
 
-type Quaternion = struct
-{
-	x: f64,
-	y: f64,
-	z: f64,
-	w: f64,
-};
-
-fn Quaternion:rotate(var q: &Quaternion)
-{
-	
-}
-
-fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: f64) -> Quaternion
-{
-	var q: Quaternion = Quaternion { x = 0, y = 0, z = 0, w = 0 };
-
-	q.x = qA.x + (qB.x - qA.x) * t;
-	q.y = qA.y + (qB.y - qA.y) * t;
-	q.z = qA.z + (qB.z - qA.z) * t;
-	q.w = qA.w + (qB.x - qA.w) * t;
-
-	return q;
-}
-
 fn Vector3:print(const v : &Self)
 {
-	printf("[ %f, %f, %f ]", v.x, v.y, v.z);
+//	printf("[ %f, %f, %f ]", v.x, v.y, v.z);
 }
 
 fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
@@ -67,45 +25,6 @@ fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 	return result;
 }
 
-
-/* Generics */
-
-// types can be made generic
-type Result(type T) = struct
-{
-	success: bool,
-	value: T
-};
-
-// the 'Any' type can be used to specify that a parameter can be of any type
-fn serialize(const obj: &Any)
-{
-	// do serialization...
-}
-
-// generics can be used in member functions in the same ways as in normal functions
-// they can also be used to add a member function to any type
-fn Any:serialize(const obj: &Self)
-{
-	// do serialization...
-}
-
-// the type of a parameter can be obtained via the @type_of() macro used on a previous parameter
-fn compare(const objA: &Any, const objA: &@type_of(objA)) -> i32
-{
-	// do comparison...
-}
-
-// otherwise, a type can be explicitly passed in
-fn try_cast(const obj: &Any, type To) -> Result(To)
-{
-	// try to cast...
-
-	return Result(To) { success = false, value = To {} };
-}
-
-
-/* Main */
 
 fn main() -> i64
 {

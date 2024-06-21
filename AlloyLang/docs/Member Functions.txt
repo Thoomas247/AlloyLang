@@ -25,4 +25,17 @@ In order to differentiate between the different ways of calling a function, the 
 	- if 'pStructOrVariableNameToken' is the name of a type, we have a static member function call
 		- find the function by doing 'NamedNodes.MemberFunctionDefinitions[type_name][func_name]'
 		- call it like you would a normal function
-	
+
+Dany's Notes:
+- I haven't found a way to process functions as they are encountered in the code. When generating code for F1, if we encounter F2 that is not yet defined, I haven't found a way to interrupt the code generation of F1,
+  generate the code for F2, then resume the code generation for F1. I will further investigate the possibility later on if necessary
+- This means that all functions including member function are pre-processed in the call the Generate. Member function are given a special name in the form of type_name@function_name
+- Due to the first 2 items, instead of doing 'NamedNodes.MemberFunctionDefinitions[type_name][func_name]', I am looking for the function type_name@func_name
+- Due to the way I wrote the code to handle &Self, these 2 declarations produce the same result:
+	fn type_name:func_name(var obj: &Self, ...) {}
+	and
+	fn type_name:func_name(var obj: &type_name, ...) {}
+	If necessary we can enforce that we are catually writing @Self and not &type_name for the first parameter
+
+
+
