@@ -1924,7 +1924,7 @@ namespace AlloyCompiler
 		llvm::Type* result = nullptr;
 
 		if (typeDefinition.pType->Type.Is<STRUCT_TYPE>()) {
-			result = generateStructDefinition(namedNodes, state, typeDefinition.pNameToken->Value, *typeDefinition.pType->Type.Get<STRUCT_TYPE>());
+			result = generateStructDefinition(namedNodes, state, typeDefinition.pTypeIdentifier->pNameToken->Value, *typeDefinition.pType->Type.Get<STRUCT_TYPE>());
 		}
 		else {
 			ASSERT(false, "Type definition not implemented!");

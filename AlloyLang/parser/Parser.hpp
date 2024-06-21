@@ -107,6 +107,14 @@ namespace AlloyCompiler
 		/// </summary>
 		bool consumeAnnotation(const std::string_view& name, AnnotationArgs* pArgs = nullptr);
 
+		/// <summary>
+		/// Gets the offset of the token after the matching token with the given kind.
+		/// For example, with the sequence "(())()", the function would return 4 as that 
+		/// is the distance to the token after the closing parenthesis which matches 
+		/// the first one.
+		/// </summary>
+		size_t getOffsetToClosing(TokenKind closing);
+
 	private:
 		NamedNodes m_NamedNodes;
 		AnnotationMap m_CurrentAnnotations;

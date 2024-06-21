@@ -122,7 +122,7 @@ namespace AlloyCompiler
 					}
 				}
 
-				if (!addVariable(pTypeDefinition->pNameToken->Value, MacroVariable(pTypeDefinition->pType)))
+				if (!addVariable(pTypeDefinition->pTypeIdentifier->pNameToken->Value, MacroVariable(pTypeDefinition->pType)))
 				{
 					ASSERT(false, "");
 				}

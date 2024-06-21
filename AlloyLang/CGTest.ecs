@@ -77,6 +77,11 @@ type Result(type T) = struct
 	value: T
 };
 
+fn Result(type T):some_func()
+{
+	
+}
+
 // the 'Any' type can be used to specify that a parameter can be of any type
 fn serialize(const obj: &Any)
 {
