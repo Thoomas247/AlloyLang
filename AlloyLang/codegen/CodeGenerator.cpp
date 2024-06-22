@@ -1084,18 +1084,18 @@ namespace AlloyCompiler
 		// handle member function calls
 		/*
 		In order to differentiate between the different ways of calling a function, the following must be done :
-		-check if 'pStructOrVariableNameToken' of 'FUNCTION_CALL' is 'nullptr', if it is, we have a normal function call
-			- if 'pStructOrVariableNameToken' is the name of a variable which is accessible in this scope, we have a non-static member function call
+		-check if 'pTypeOrVariableName' of 'FUNCTION_CALL' is 'nullptr', if it is, we have a normal function call
+			- if 'pTypeOrVariableName' is the name of a variable which is accessible in this scope, we have a non-static member function call
 				- look up the type of the variable
 				- find the function named type_name@func_name
 				- check that the first parameter of the function is indeed of type '&Self'
 				- pass '&variable_name' as the first parameter and the rest of the arguments as the following parameters
-			- if 'pStructOrVariableNameToken' is the name of a type, we have a static member function call
+			- if 'pTypeOrVariableName' is the name of a type, we have a static member function call
 				- find the function type_name@func_name
 				- call it like you would a normal function
 		*/
-		if (functionCallExpressionNode.pStructOrVariableNameToken != nullptr) {
-			const std::string_view varOrTypeName = functionCallExpressionNode.pStructOrVariableNameToken->Value;
+		if (functionCallExpressionNode.pTypeOrVariableName != nullptr) {
+			const std::string_view varOrTypeName = functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value;
 			if (state.NamedValues.GetValue(varOrTypeName) != nullptr) {
 				// member function call
 				functionName = std::string(state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType())) + "@" + functionName;
@@ -1158,11 +1158,11 @@ namespace AlloyCompiler
 
 		// first parameter is &Self
 		if (insertSelfAsFirstParam) {
-			VARIABLE var{ functionCallExpressionNode.pStructOrVariableNameToken };
+			VARIABLE var{ functionCallExpressionNode.pTypeOrVariableName->pNameToken };
 			TypeSubtypePair identifierType = {};
 			llvm::Value* varPtr = generateIdentifier(namedNodes, state, var, identifierType).Ptr;
 			if (varPtr == nullptr) {
-				logErrorAtCurrentPosition(functionCallExpressionNode.pStructOrVariableNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pStructOrVariableNameToken->Value);
+				logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
 				goto error;
 			}
 			args.push_back(varPtr);
