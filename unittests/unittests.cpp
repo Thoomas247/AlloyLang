@@ -387,6 +387,78 @@ namespace unittests
 
 			RunTest(TestStr, 1);
 		}
+
+		TEST_METHOD(MemberFunctions)
+		{
+			constexpr auto TestStr = R"(
+				extern printf (const str: String, ...) -> i64;
+
+				type Vector3 = struct
+				{
+					x: f64,
+					y: f64,
+					z: f64,
+				};
+
+				type Quaternion = struct
+				{
+					x: f64,
+					y: f64,
+					z: f64,
+					w: f64,
+				};
+
+				fn Quaternion:rotate(var q: &Quaternion)
+				{
+	
+				}
+
+				fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: &f64) -> Quaternion
+				{
+					var q: Quaternion = Quaternion { x = 0, y = 0, z = 0, w = 0 };
+
+					q.x = qA.x + (qB.x - qA.x) * t;
+					q.y = qA.y + (qB.y - qA.y) * t;
+					q.z = qA.z + (qB.z - qA.z) * t;
+					q.w = qA.w + (qB.x - qA.w) * t;
+
+					return q;
+				}
+
+				fn Vector3:print(const v : &Self)
+				{
+					printf("[ %f, %f, %f ]", v.x, v.y, v.z);
+				}
+
+				fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
+				{
+					var result: Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
+					
+					result.x = point.x + vector.x;
+					result.y = point.y + vector.y;
+					result.z = point.z + vector.z;
+					
+					return result;
+				}
+
+
+				fn main() -> i64
+				{
+					var vec: Vector3 = Vector3 { x = 0, y = 0, z = 0 };
+
+					vec = Vector3:translate(&vec, Vector3 { x = 10, y = -3, z = 2 });
+					vec:print();
+
+					if (vec.x * vec.y * vec.z == -60.0)
+						return 1;
+					else
+						return 0;
+				}
+			)";
+			std::string expected = "[ 10.000000, -3.000000, 2.000000 ]";
+
+			RunTest(TestStr, 1);
+		}
 	};
 }
 
