@@ -593,9 +593,8 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			// References should be passed as pointers unless they are also constant
-			if (modifier == TypeModifier::Reference
-				&& pParameterVariableDeclaration->VarType != VariableType::Constant) {
+			// References should be passed as pointers
+			if (modifier == TypeModifier::Reference) {
 				paramTypes.push_back(llvm::PointerType::get(identifierType.type, 0));
 				paramSubTypes.push_back(identifierType.type);
 			}
@@ -644,7 +643,7 @@ namespace AlloyCompiler
 			function->getArg(i)->setName(paramName);
 
 			// set the ByRef attribute on parameters passed byref
-			if (paramModifiers[i] == TypeModifier::Reference && paramVarTypes[i] != VariableType::Constant) {
+			if (paramModifiers[i] == TypeModifier::Reference) {
 				function->addAttributeAtIndex(i+1, llvm::Attribute::getWithByRefType(*state.Context, paramSubTypes[i]));
 			}
 
@@ -1160,12 +1159,13 @@ namespace AlloyCompiler
 		if (insertSelfAsFirstParam) {
 			VARIABLE var{ functionCallExpressionNode.pTypeOrVariableName->pNameToken };
 			TypeSubtypePair identifierType = {};
-			llvm::Value* varPtr = generateIdentifier(namedNodes, state, var, identifierType).Ptr;
-			if (varPtr == nullptr) {
+			PtrValuePair ptrValue = generateIdentifier(namedNodes, state, var, identifierType);
+			if (ptrValue.Ptr == nullptr) {
 				logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
 				goto error;
 			}
-			args.push_back(varPtr);
+
+			args.push_back(ptrValue.Ptr);
 			argi = 1;
 		}
 
@@ -1192,35 +1192,43 @@ namespace AlloyCompiler
 			bool isReadOnly = ro.hasAttribute(llvm::Attribute::AttrKind::ReadOnly);
 			auto attr = calleeFunc->getAttributeAtIndex(i + 1, llvm::Attribute::AttrKind::ByRef);
 			bool isByRef = attr.hasAttribute(llvm::Attribute::AttrKind::ByRef);
-			if (isByRef && !isReadOnly) {
-				// we need a variable to pass it byref
-				if (!argument.Is<UNARY>()) {
-					logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-						"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
-					goto error;
-				}
-				const UNARY& unary = *argument.Get<UNARY>();
-				std::string_view operatorStr = unary.pOpToken->Value;
+			if (isByRef) {
+				bool foundVariable = false;
+				// we need a variable to pass it byref, unless it is a const byref
+				if (argument.Is<UNARY>()) {
+					const UNARY& unary = *argument.Get<UNARY>();
+					std::string_view operatorStr = unary.pOpToken->Value;
 
-				if (operatorStr != "&"
-					|| !unary.pExpression->Is<PRIMARY>()
-					|| !unary.pExpression->Get<PRIMARY>()->Is<VARIABLE>()) {
-					logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-						"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
-					goto error;
+					if (operatorStr == "&"
+						&& unary.pExpression->Is<PRIMARY>()
+						&& unary.pExpression->Get<PRIMARY>()->Is<VARIABLE>()) {
+						TypeSubtypePair tempType = { nullptr, nullptr };
+						PtrValuePair left = generateIdentifier(namedNodes, state, *unary.pExpression->Get<PRIMARY>()->Get<VARIABLE>(),
+							tempType);
+						if (left.Ptr == nullptr) {
+							logErrorAtCurrentPosition(nullptr, // TBD: argumentID
+								"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
+							goto error;
+						}
+						argVal = left.Ptr;
+						foundVariable = true;
+					}
 				}
 
-				TypeSubtypePair tempType = { nullptr, nullptr };
-				PtrValuePair left = generateIdentifier(namedNodes, state, *unary.pExpression->Get<PRIMARY>()->Get<VARIABLE>(),
-														tempType);
-				/* TBD: not sure how valid this test is...
-				if (argType.containedType != tempType.type) { 
-					logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-						"Wrong variable type passed to function argument {0}!", i + 1);
-					goto error;
+				// argument is not in the form of &variable, if we are expecting a constant, continue evaluating the expression
+				if (!foundVariable) {
+					if (!isReadOnly) {
+						logErrorAtCurrentPosition(nullptr, // TBD: argumentID
+							"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
+						goto error;
+					}
+
+					argVal = generateExpression(namedNodes, state, argument, argType);
+					// create a pointer to the evaluated expression and pass the pointer as argument
+					llvm::AllocaInst* ptr = state.Builder->CreateAlloca(argVal->getType());
+					state.Builder->CreateStore(argVal, ptr);
+					argVal = ptr;
 				}
-				*/
-				argVal = left.Ptr;
 			}
 			else {
 				argVal = generateExpression(namedNodes, state, argument, argType);
@@ -1981,11 +1989,9 @@ namespace AlloyCompiler
 
 			// const ByRef parameters are considered ByVal for more flexibility
 			llvm::Attribute attr = arg.getAttribute(llvm::Attribute::AttrKind::ByRef);
-			llvm::Attribute ro = arg.getAttribute(llvm::Attribute::AttrKind::ReadOnly);
 			llvm::Type* subType = nullptr;
 			llvm::AllocaInst* allocaInst = nullptr;
-			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)
-				&& !ro.hasAttribute(llvm::Attribute::AttrKind::ReadOnly)) {
+			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)) {
 				subType = arg.getParamByRefType();
 			}
 			// create an alloca for this variable
@@ -2046,7 +2052,7 @@ namespace AlloyCompiler
 		if (state.Optimizations)
 		{
 			// run the optimizer on the function.
-			// state.FPM->run(*func, *state.FAM);
+			state.FPM->run(*func, *state.FAM);
 		}
 
 		state.CurrentReturnValue = nullptr;
