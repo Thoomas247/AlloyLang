@@ -113,6 +113,9 @@
     <ClInclude Include="parser\NodePrinter.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="parser\nodes\GenericNode.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.ecs" />

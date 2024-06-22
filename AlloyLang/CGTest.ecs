@@ -58,7 +58,7 @@ fn Vector3:print(const v : &Self)
 
 fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 {
-	var result: Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
+	var result = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
 					
 	result.x = point.x + vector.x;
 	result.y = point.y + vector.y;
@@ -114,7 +114,7 @@ fn try_cast(const obj: &Any, type To) -> Result(To)
 
 fn main() -> i64
 {
-	var vec: Vector3 = Vector3 { x = 0, y = 0, z = 0 };
+	var vec = Vector3 { x = 0, y = 0, z = 0 };
 
 	Vector3:translate(&vec, Vector3 { x = 10, y = -3, z = 2 });
 	vec:print();

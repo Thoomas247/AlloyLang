@@ -14,7 +14,7 @@ namespace AlloyCompiler
 	{
 		VariableType VarType;
 		Token* pNameToken;
-		TYPE* pType;
+		TYPE* pType;	// optional, if nullptr, try to infer type from the rhs of the expression
 	};
 
 	struct VARIABLE_DEFINITION

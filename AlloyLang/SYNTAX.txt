@@ -72,7 +72,7 @@
 
 	VARIABLE:					identifier
 
-	VARIABLE_DECLARATION:		( variable | constant ) identifier colon TYPE ;
+	VARIABLE_DECLARATION:		( variable | constant ) identifier [ colon TYPE ] ;
 	VARIABLE_DEFINITION:		VARIABLE_DECLARATION assignment_operator EXPRESSION ;
 
 
@@ -92,6 +92,7 @@
 	EXTERN_DEFINITION:			extern_keyword identifier FUNCTION_TYPE semicolon ;
 	
 	FUNCTION_CALL:				[ TYPE_NAME colon ] identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ; (* TYPE_NAME can contain a variable name in this context *)
+
 
 	(* Macros *)
 

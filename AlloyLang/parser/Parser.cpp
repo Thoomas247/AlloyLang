@@ -232,7 +232,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	VARIABLE_DECLARATION* Parser::parse<VARIABLE_DECLARATION>();
+	VARIABLE_DECLARATION* Parser::parse<VARIABLE_DECLARATION>(bool allowTypeInferring);
 
 	template<>
 	STRUCT_TYPE* Parser::parse()
@@ -559,7 +559,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	VARIABLE_DECLARATION* Parser::parse()
+	VARIABLE_DECLARATION* Parser::parse(bool allowTypeInferring)
 	{
 		Token* pToken = nullptr;
 		if (expectKind<TokenKind::variable_keyword, TokenKind::constant_keyword>(&pToken) != SUCCESS)
@@ -584,16 +584,35 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (expectKind<TokenKind::colon>() != SUCCESS)
+		// check if the type is explicitely stated
+		TYPE* pType = nullptr;
+		if (allowTypeInferring)
 		{
-			return nullptr;
+			if (token()->Kind == TokenKind::colon)
+			{
+				(void)eat();
+
+				pType = parse<TYPE>();
+
+				if (pType == nullptr)
+				{
+					return nullptr;
+				}
+			}
 		}
-
-		TYPE* pType = parse<TYPE>();
-
-		if (pType == nullptr)
+		else
 		{
-			return nullptr;
+			if (expectKind<TokenKind::colon>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			pType = parse<TYPE>();
+
+			if (pType == nullptr)
+			{
+				return nullptr;
+			}
 		}
 
 		return createNode(
@@ -612,7 +631,7 @@ namespace AlloyCompiler
 	template<>
 	VARIABLE_DEFINITION* Parser::parse()
 	{
-		VARIABLE_DECLARATION* pVariableDeclaration = parse<VARIABLE_DECLARATION>();
+		VARIABLE_DECLARATION* pVariableDeclaration = parse<VARIABLE_DECLARATION>(/*allowTypeInferring*/true);
 
 		if (pVariableDeclaration == nullptr)
 		{
@@ -746,7 +765,7 @@ namespace AlloyCompiler
 		case TokenKind::variable_keyword:
 		case TokenKind::constant_keyword:
 		{
-			VARIABLE_DECLARATION* pVariableDeclaration = parse<VARIABLE_DECLARATION>();
+			VARIABLE_DECLARATION* pVariableDeclaration = parse<VARIABLE_DECLARATION>(/*allowTypeInferring*/false);
 
 			if (pVariableDeclaration == nullptr)
 			{
