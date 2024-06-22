@@ -51,13 +51,13 @@ int main(int argc, char* argv[])
 
 	start = std::chrono::high_resolution_clock::now();
 	Parser parser(source, tokenBuffers);
-	NamedNodes namedNodes = parser.Parse();
+	Module module = parser.Parse();
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t parseTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 	start = std::chrono::high_resolution_clock::now();
 	LLVMState state(true);
-	Generate(namedNodes, state);
+	Generate(module.PrivateNodes, state);
 	end = std::chrono::high_resolution_clock::now();
 	const uint64_t codegenTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 

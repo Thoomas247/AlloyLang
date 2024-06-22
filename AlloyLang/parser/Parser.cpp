@@ -502,12 +502,6 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (m_NamedNodes.TypeDefinitions.contains(pTypeIdentifier->pNameToken->Value))
-		{
-			logErrorAtPreviousPosition("Type '{0}' is already defined.", pTypeIdentifier->pNameToken->Value);
-			return nullptr;
-		}
-
 		if (expectKind<TokenKind::assignment_operator>() != SUCCESS)
 		{
 			return nullptr;
@@ -524,17 +518,14 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		TYPE_DEFINITION* pTypeDefinition = createNode(
+
+		return createNode(
 			TYPE_DEFINITION
 			{
 				.pTypeIdentifier = pTypeIdentifier,
 				.pType = pType,
 			}
 		);
-
-		m_NamedNodes.TypeDefinitions[pTypeIdentifier->pNameToken->Value] = pTypeDefinition;
-
-		return pTypeDefinition;
 	}
 
 #pragma endregion
@@ -975,24 +966,6 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		// check for existing member function
-		if (pTypeIdentifier != nullptr)
-		{
-			if (m_NamedNodes.MemberFunctionDefinitions.contains(pTypeIdentifier->pNameToken->Value)
-				&& m_NamedNodes.MemberFunctionDefinitions[pTypeIdentifier->pNameToken->Value].contains(pFunctionNameToken->Value))
-			{
-				logErrorAtPreviousPosition("Member function '{0}:{1}' is already defined.", pTypeIdentifier->pNameToken->Value, pFunctionNameToken->Value);
-				return nullptr;
-			}
-		}
-
-		// check for existing function
-		else if (m_NamedNodes.FunctionDefinitions.contains(pFunctionNameToken->Value))
-		{
-			logErrorAtPreviousPosition("Function '{0}' is already defined.", pFunctionNameToken->Value);
-			return nullptr;
-		}
-
 		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/false, /*allowSelf*/true);
 
 		if (pFunctionType == nullptr)
@@ -1007,7 +980,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		FUNCTION_DEFINITION* pFunctionDefinition = createNode(
+		return createNode(
 			FUNCTION_DEFINITION
 			{
 				.pTypeIdentifier = pTypeIdentifier,
@@ -1016,18 +989,6 @@ namespace AlloyCompiler
 				.pBody = pBody
 			}
 		);
-
-		if (pTypeIdentifier != nullptr)
-		{
-			m_NamedNodes.MemberFunctionDefinitions[pTypeIdentifier->pNameToken->Value][pFunctionNameToken->Value] = pFunctionDefinition;
-		}
-
-		else
-		{
-			m_NamedNodes.FunctionDefinitions[pFunctionNameToken->Value] = pFunctionDefinition;
-		}
-
-		return pFunctionDefinition;
 	}
 
 	template<>
@@ -1049,12 +1010,6 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (m_NamedNodes.ExternDefinitions.contains(pFunctionNameToken->Value))
-		{
-			logErrorAtPreviousPosition("Extern '{0}' is already defined!", pFunctionNameToken->Value);
-			return nullptr;
-		}
-
 		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/true, /*allowSelf*/false);
 
 		if (pFunctionType == nullptr)
@@ -1067,17 +1022,13 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		EXTERN_DEFINITION* pExternFunctionDefinition = createNode(
+		return createNode(
 			EXTERN_DEFINITION
 			{
 				.pNameToken = pFunctionNameToken,
 				.pFunctionType = pFunctionType
 			}
 		);
-
-		m_NamedNodes.ExternDefinitions[pFunctionNameToken->Value] = pExternFunctionDefinition;
-
-		return pExternFunctionDefinition;
 	}
 
 	template<>
@@ -1261,7 +1212,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	MACRO_DEFINITION* Parser::parse(bool isLocalMacro)
+	MACRO_DEFINITION* Parser::parse()
 	{
 		if (expectKind<TokenKind::macro_keyword>() != SUCCESS)
 		{
@@ -1272,15 +1223,6 @@ namespace AlloyCompiler
 		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
 		{
 			return nullptr;
-		}
-
-		if (!isLocalMacro)
-		{
-			if (m_NamedNodes.MacroDefinitions.contains(pNameToken->Value))
-			{
-				logErrorAtPreviousPosition("Macro '{0}' is already defined.", pNameToken->Value);
-				return nullptr;
-			}
 		}
 
 		if (expectKind<TokenKind::open_paren>() != SUCCESS)
@@ -1370,7 +1312,7 @@ namespace AlloyCompiler
 
 		(void)eat();
 
-		MACRO_DEFINITION* pMacroDefinition = createNode(
+		return createNode(
 			MACRO_DEFINITION
 			{
 				.pNameToken = pNameToken,
@@ -1379,13 +1321,6 @@ namespace AlloyCompiler
 				.Body = std::move(macroStatements)
 			}
 		);
-
-		if (!isLocalMacro)
-		{
-			m_NamedNodes.MacroDefinitions[pNameToken->Value] = pMacroDefinition;
-		}
-
-		return pMacroDefinition;
 	}
 
 	// MACRO_RETURN:	return_keyword ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL | TYPE ) semicolon ;
@@ -1464,7 +1399,7 @@ namespace AlloyCompiler
 		{
 		case TokenKind::macro_keyword:
 		{
-			MACRO_DEFINITION* pMacroDefinition = parse<MACRO_DEFINITION>(/*isLocalMacro*/true);
+			MACRO_DEFINITION* pMacroDefinition = parse<MACRO_DEFINITION>();
 
 			if (pMacroDefinition == nullptr)
 			{
@@ -2626,58 +2561,155 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-	NamedNodes Parser::Parse()
+	Module Parser::Parse()
 	{
 		using enum TokenKind;
 
 		while (!isEOF())
 		{
-			switch (token()->Kind)
+			// check for annotation
+			if (token()->Kind == pound)
 			{
-			case macro_keyword:
-			{
-				if (parse<MACRO_DEFINITION>(/*isLocalMacro*/false) == nullptr)
-				{
-					ASSERT(false, "");
-				}
-				break;
-			}
-
-			case pound:
 				if (getAnnotation() != SUCCESS)
 				{
 					ASSERT(false, "");
 				}
+			}
+
+			// check for visibility modifier
+			NamedNodes* currentNamedNodes = &m_Module.PrivateNodes;
+
+			if (token()->Kind == public_keyword)
+			{
+				currentNamedNodes = &m_Module.PublicNodes;
+				(void)eat();
+			}
+			else if (token()->Kind == export_keyword)
+			{
+				currentNamedNodes = &m_Module.ExportNodes;
+				(void)eat();
+			}
+
+			switch (token()->Kind)
+			{
+			case macro_keyword:
+			{
+				MACRO_DEFINITION* pMacroDefinition = parse<MACRO_DEFINITION>();
+
+				if (pMacroDefinition == nullptr)
+				{
+					ASSERT(false, "");
+				}
+
+				if (m_Module.AllSymbolNames.contains(pMacroDefinition->pNameToken->Value))
+				{
+					logErrorAtToken(pMacroDefinition->pNameToken, "Symbol with name '{0}' already exists in this module.", pMacroDefinition->pNameToken->Value);
+					ASSERT(false, "");
+				}
+
+				currentNamedNodes->MacroDefinitions[pMacroDefinition->pNameToken->Value] = pMacroDefinition;
+				m_Module.AllSymbolNames.insert(pMacroDefinition->pNameToken->Value);
+
 				break;
+			}
 
 			case type_keyword:
-				if (parse<TYPE_DEFINITION>() == nullptr)
+			{
+				TYPE_DEFINITION* pTypeDefinition = parse<TYPE_DEFINITION>();
+
+				if (pTypeDefinition == nullptr)
 				{
 					ASSERT(false, "");
 				}
+
+				if (m_Module.AllSymbolNames.contains(pTypeDefinition->pTypeIdentifier->pNameToken->Value))
+				{
+					logErrorAtToken(pTypeDefinition->pTypeIdentifier->pNameToken, 
+						"Symbol with name '{0}' already exists in this module.", pTypeDefinition->pTypeIdentifier->pNameToken->Value);
+					ASSERT(false, "");
+				}
+
+				currentNamedNodes->TypeDefinitions[pTypeDefinition->pTypeIdentifier->pNameToken->Value] = pTypeDefinition;
+				m_Module.AllSymbolNames.insert(pTypeDefinition->pTypeIdentifier->pNameToken->Value);
+
 				break;
+			}
 
 			case function_keyword:
-				if (parse<FUNCTION_DEFINITION>() == nullptr)
+			{
+				FUNCTION_DEFINITION* pFunctionDefinition = parse<FUNCTION_DEFINITION>();
+
+				if (pFunctionDefinition == nullptr)
 				{
 					ASSERT(false, "");
 				}
+
+				const Token* pFunctionNameToken = pFunctionDefinition->pFunctionNameToken;
+
+				// member functions are not added to the AllSymbolNames list
+				if (pFunctionDefinition->pTypeIdentifier != nullptr)
+				{
+					const Token* pTypeNameToken = pFunctionDefinition->pTypeIdentifier->pNameToken;
+
+					// check if member function already exists for this type
+					if (m_Module.MemberFunctionNames.contains(pTypeNameToken->Value)
+						&& m_Module.MemberFunctionNames[pTypeNameToken->Value].contains(pFunctionNameToken->Value))
+					{
+						logErrorAtToken(pFunctionNameToken, "Member function '{0}' is already defined for type '{1}'.", 
+							pFunctionNameToken->Value, pTypeNameToken->Value);
+						ASSERT(false, "");
+					}
+
+					currentNamedNodes->MemberFunctionDefinitions[pTypeNameToken->Value][pFunctionNameToken->Value] = pFunctionDefinition;
+					m_Module.MemberFunctionNames[pTypeNameToken->Value].insert(pFunctionNameToken->Value);
+				}
+
+				else
+				{
+					if (m_Module.AllSymbolNames.contains(pFunctionNameToken->Value))
+					{
+						logErrorAtToken(pFunctionNameToken, "Symbol with name '{0}' already exists in this module.", pFunctionNameToken->Value);
+						ASSERT(false, "");
+					}
+
+					currentNamedNodes->FunctionDefinitions[pFunctionNameToken->Value] = pFunctionDefinition;
+					m_Module.AllSymbolNames.insert(pFunctionNameToken->Value);
+				}
+
 				break;
+			}
 
 			case extern_keyword:
-				if (parse<EXTERN_DEFINITION>() == nullptr)
+			{
+				EXTERN_DEFINITION* pExternDefinition = parse<EXTERN_DEFINITION>();
+
+				if (pExternDefinition == nullptr)
 				{
 					ASSERT(false, "");
 				}
+
+				if (m_Module.AllSymbolNames.contains(pExternDefinition->pNameToken->Value))
+				{
+					logErrorAtToken(pExternDefinition->pNameToken,
+						"Symbol with name '{0}' already exists in this module.", pExternDefinition->pNameToken->Value);
+					ASSERT(false, "");
+				}
+
+				currentNamedNodes->ExternDefinitions[pExternDefinition->pNameToken->Value] = pExternDefinition;
+				m_Module.AllSymbolNames.insert(pExternDefinition->pNameToken->Value);
+
 				break;
+			}
 
 			default:
-				(void)expectKind<type_keyword, function_keyword, extern_keyword>();
+			{
+				(void)expectKind<macro_keyword, type_keyword, function_keyword, extern_keyword>();
 				(void)eat();
 				break;
 			}
+			}
 		}
 
-		return std::move(m_NamedNodes);
+		return std::move(m_Module);
 	}
 }

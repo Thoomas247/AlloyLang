@@ -10,6 +10,9 @@
 	function_keyword:				'fn' ;
 	macro_keyword:					'macro' ;
 
+	public_keyword:					'pub' ;
+	export_keyword:					'exp' ;
+
 	type_keyword:					'type' ;
 
 	variable_keyword:				'var' ;
@@ -165,28 +168,3 @@
 		RETURN:				return_keyword [ EXPRESSION ] semicolon ;
 
 
-	(* - ECS Constructs - *)
-
-	COMPONENT_DEFINITION:		component_keyword identifier assignment_operator TYPE semicolon ;
-	RESOURCE_DEFINITION:		resource_keyword identifier assignment_operator TYPE semicolon ;
-	QUERY_DEFINITION:			query_keyword identifier open_brace { ( var_keyword | const_keyword ) identifier semicolon } close_brace ;
-	SYSTEM_DEFINITION:			system_keyword identifier open_paren [ [ var_keyword | const_keyword ] identifier { comma [ var_keyword | const_keyword ] identifier } ] close_paren STATEMENT_BLOCK ;
-	GROUP_DEFINITION:			group_keyword identifier open_brace identifier { comma identifier } close_brace ;
-
-	APPLICATION_DEFINITION:		application_keyword identifier open_brace { ( 'start' | 'update' | 'end' ) open_brace [ identifier { comma identifier } ] close_brace } close_brace ;
-
-
-	(* - Definitions - *)
-
-	TOP_LEVEL:		MACRO_DEFINITION
-					| ANNOTATION
-					| TYPE_DEFINITION
-					| FUNCTION_DEFINITION
-					| EXTERN_DEFINITION
-					| COMPONENT_DEFINITION
-					| RESOURCE_DEFINITION
-					| QUERY_DEFINITION
-					| SYSTEM_DEFINITION
-					| GROUP_DEFINITION
-					| APPLICATION_DEFINITION
-					;

@@ -13,15 +13,32 @@ namespace AlloyCompiler
 		template<typename T>
 		using NodeMap = std::unordered_map<std::string_view, T>;
 
-		NodeAllocator Allocator;
-
 		NodeMap<MACRO_DEFINITION*> MacroDefinitions;
 		NodeMap<TYPE_DEFINITION*> TypeDefinitions;
 		NodeMap<FUNCTION_DEFINITION*> FunctionDefinitions;
 		NodeMap<NodeMap<FUNCTION_DEFINITION*>> MemberFunctionDefinitions;
 		NodeMap<EXTERN_DEFINITION*> ExternDefinitions;
+	};
 
-		NamedNodes(size_t allocatorSize)
+	/// <summary>
+	/// A module is a file which is compiled.
+	/// There are three visibility modifiers for definitions in a module:
+	/// private - the default visibility, definition can only be accessed within this file.
+	/// public - definition can be accessed by all other modules which compile to the same binary.
+	/// exported - definition will be accessible by all users of the binary, useful only for creating libraries.
+	/// </summary>
+	struct Module
+	{
+		NodeAllocator Allocator;
+
+		NamedNodes ExportNodes;
+		NamedNodes PublicNodes;
+		NamedNodes PrivateNodes;
+
+		std::unordered_set<std::string_view> AllSymbolNames;
+		std::unordered_map<std::string_view, std::unordered_set<std::string_view>> MemberFunctionNames;
+
+		Module(size_t allocatorSize)
 			: Allocator(allocatorSize)
 		{}
 	};
@@ -30,7 +47,7 @@ namespace AlloyCompiler
 	{
 	public:
 		Parser(const Source& source, TokenBuffers& tokenBuffers)
-			: m_NamedNodes(tokenBuffers.NumTokens() * 120) // TODO: remove magic number
+			: m_Module(tokenBuffers.NumTokens() * 120) // TODO: remove magic number
 			, m_CurrentAnnotations()
 			, m_Source(source)
 			, m_TokenBuffers(tokenBuffers)
@@ -38,7 +55,7 @@ namespace AlloyCompiler
 		{
 		}
 
-		NamedNodes Parse();
+		Module Parse();
 
 	private:
 		enum Result
@@ -61,6 +78,9 @@ namespace AlloyCompiler
 
 		template<typename... Args>
 		constexpr void logErrorAtPreviousPosition(const std::string& format, Args&&... args);
+
+		template<typename ...Args>
+		constexpr void logErrorAtToken(const Token* pToken, const std::string& format, Args && ...args);
 
 		template <typename T, typename... Ts>
 		T* parse(Ts...) = delete;
@@ -116,7 +136,7 @@ namespace AlloyCompiler
 		size_t getOffsetToClosing(TokenKind closing);
 
 	private:
-		NamedNodes m_NamedNodes;
+		Module m_Module;
 		AnnotationMap m_CurrentAnnotations;
 
 		const Source& m_Source;
@@ -129,6 +149,22 @@ namespace AlloyCompiler
 	{
 		const Token* pToken = m_TokenBuffers.GetToken(m_CurrentTokenIndex);
 
+		logErrorAtToken(pToken, format, args...);
+	}
+
+	template<typename ...Args>
+	constexpr void Parser::logErrorAtPreviousPosition(const std::string& format, Args&& ...args)
+	{
+		ASSERT(m_CurrentTokenIndex != 0, "Cannot go back to previous position!");
+
+		const Token* pToken = m_TokenBuffers.GetToken(m_CurrentTokenIndex - 1);
+
+		logErrorAtToken(pToken, format, args...);
+	}
+
+	template<typename ...Args>
+	inline constexpr void Parser::logErrorAtToken(const Token* pToken, const std::string& format, Args&& ...args)
+	{
 		const Location& location = pToken->Location;
 		const size_t tokenSize = pToken->Value.size();
 		const std::string_view line = m_Source.GetLine(location.LineStart);
@@ -139,20 +175,10 @@ namespace AlloyCompiler
 		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 	}
 
-	template<typename ...Args>
-	constexpr void Parser::logErrorAtPreviousPosition(const std::string& format, Args && ...args)
-	{
-		ASSERT(m_CurrentTokenIndex != 0, "Cannot go back to previous position!");
-
-		m_CurrentTokenIndex--;
-		logErrorAtCurrentPosition(format, args...);
-		m_CurrentTokenIndex++;
-	}
-
 	template<typename T>
 	T* Parser::createNode(const T& node)
 	{
-		return m_NamedNodes.Allocator.Create<T>(node);
+		return m_Module.Allocator.Create<T>(node);
 	}
 
 	template<TokenKind ...Tokens>

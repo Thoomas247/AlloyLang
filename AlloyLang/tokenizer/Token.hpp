@@ -22,6 +22,9 @@ namespace AlloyCompiler
 		function_keyword,
 		macro_keyword,
 
+		public_keyword, 
+		export_keyword,
+
 		type_keyword,
 
 		variable_keyword,
@@ -90,6 +93,9 @@ namespace AlloyCompiler
 		{ TokenKind::function_keyword,		"fn" },
 		{ TokenKind::macro_keyword,			"macro" },
 
+		{ TokenKind::public_keyword,		"pub" },
+		{ TokenKind::export_keyword,		"exp" },
+
 		{ TokenKind::type_keyword,			"type" },
 
 		{ TokenKind::pound,					"#" },
@@ -147,6 +153,9 @@ namespace AlloyCompiler
 		{ "enum", TokenKind::enum_keyword },
 		{ "fn", TokenKind::function_keyword },
 		{ "macro", TokenKind::macro_keyword },
+
+		{ "pub", TokenKind::public_keyword },
+		{ "exp", TokenKind::export_keyword },
 
 		{ "type", TokenKind::type_keyword },
 
