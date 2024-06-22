@@ -36,6 +36,16 @@ Dany's Notes:
 	and
 	fn type_name:func_name(var obj: &type_name, ...) {}
 	If necessary we can enforce that we are catually writing @Self and not &type_name for the first parameter
+- LLVM doesn't accept this:
+	fn lerp(const t: f64) -> f64
+	it has to be:
+	fn lerp(var t: f64) -> f64
+	or
+	fn lerp(const t: &f64) -> f64
+
+	I can make changes to the code generator to skip the const for things other than references and pointer
+
+
 
 
 

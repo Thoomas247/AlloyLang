@@ -2040,6 +2040,12 @@ namespace AlloyCompiler
 			if (retValue != nullptr) {
 				state.Builder->CreateRet(retValue);
 			}
+			else {
+				state.Builder->CreateRetVoid();
+			}
+		}
+		else {
+			state.Builder->CreateRetVoid();
 		}
 
 		// restore the previous exit block and return value
@@ -2076,10 +2082,6 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-	void foo(const int& i)
-	{
-	}
-
 	bool Generate(const NamedNodes& namedNodes, LLVMState& state)
 	{
 		//
@@ -2091,8 +2093,6 @@ namespace AlloyCompiler
 								"Cannot find main entry point!");
 			return false;
 		}
-
-		foo(2);
 
 		/* pre-process all types definitions as these might be used throughout the code
 		* for this to work properly we need to process the types in the order they appear in the file because one type can reference a previous type
