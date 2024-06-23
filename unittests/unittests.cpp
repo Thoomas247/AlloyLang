@@ -40,10 +40,10 @@ namespace unittests
 			Tokenizer tokenizer(src);
 			TokenBuffers tokenBuffers = tokenizer.Tokenize();
 			Parser parser(src, tokenBuffers);
-			NamedNodes namedNodes = parser.Parse();
+			Module module = parser.Parse();
 
 			LLVMState state(true);
-			Generate(namedNodes, state);
+			Generate(module.PrivateNodes, state);
 			int result = Execute(state);
 
 #if 0
@@ -215,7 +215,7 @@ namespace unittests
 
 			RunTest(TestStr, 1);
 		}
-		
+
 		TEST_METHOD(Arrays)
 		{
 			constexpr auto TestStr = R"(
