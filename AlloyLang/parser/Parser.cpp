@@ -652,100 +652,6 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-#pragma region Annotations
-
-	Parser::Result Parser::getAnnotation()
-	{
-		Result result;
-
-		result = expectKind<TokenKind::pound>();
-		if (result != SUCCESS)
-		{
-			return result;
-		}
-
-		result = expectKind<TokenKind::open_bracket>();
-		if (result != SUCCESS)
-		{
-			return result;
-		}
-
-		Token* pNameToken = nullptr;
-		result = expectKind<TokenKind::identifier>(&pNameToken);
-		if (result != SUCCESS)
-		{
-			return result;
-		}
-
-		auto it = ANNOTATION_NAMES.find(pNameToken->Value);
-		if (it == ANNOTATION_NAMES.end())
-		{
-			logErrorAtPreviousPosition("Unknown annotation '{0}'.", pNameToken->Value);
-			return UNKNOWN_ANNOTATION;
-		}
-
-		AnnotationArgs arguments;
-		if (token()->Kind == TokenKind::open_paren)
-		{
-			(void)eat();
-
-			while (token()->Kind != TokenKind::close_paren)
-			{
-				Token* pArgumentToken = nullptr;
-				result = expectKind<TokenKind::identifier>(&pArgumentToken);
-				if (result != SUCCESS)
-				{
-					return result;
-				}
-
-				arguments.push_back(pArgumentToken);
-
-				if (token()->Kind == TokenKind::comma)
-				{
-					(void)eat();
-				}
-			}
-
-			(void)eat();
-		}
-
-		if (it->second == AnnotationKind::NoArgs && arguments.size() != 0)
-		{
-			logErrorAtCurrentPosition("Annotation '{0}' does not take any arguments.", pNameToken->Value);
-			return INVALID_ANNOTATION;
-		}
-
-		if (it->second == AnnotationKind::SingleArg && arguments.size() != 1)
-		{
-			logErrorAtCurrentPosition("Annotation '{0}' only takes one argument.", pNameToken->Value);
-			return INVALID_ANNOTATION;
-		}
-
-		if (it->second == AnnotationKind::MultiArgs && arguments.size() < 1)
-		{
-			logErrorAtCurrentPosition("Annotation '{0}' must have at least one argument.", pNameToken->Value);
-			return INVALID_ANNOTATION;
-		}
-
-		if (m_CurrentAnnotations.contains(pNameToken->Value))
-		{
-			logErrorAtCurrentPosition("Duplicate annotation '{0}'.", pNameToken->Value);
-			return DUPLICATE_ANNOTATION;
-		}
-
-		result = expectKind<TokenKind::close_bracket>();
-		if (result != SUCCESS)
-		{
-			return result;
-		}
-
-		m_CurrentAnnotations[pNameToken->Value] = arguments;
-
-		return SUCCESS;
-	}
-
-#pragma endregion
-
 #pragma region Functions
 
 	template<>
@@ -947,7 +853,7 @@ namespace AlloyCompiler
 		}
 
 		TYPE_IDENTIFIER* pTypeIdentifier = nullptr;
-		if (peekToken()->Kind == TokenKind::colon 
+		if (peekToken()->Kind == TokenKind::colon
 			|| peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon)
 		{
 			pTypeIdentifier = parse<TYPE_IDENTIFIER>();
@@ -1361,7 +1267,7 @@ namespace AlloyCompiler
 			macroReturn.Set(pMacroCall);
 			break;
 		}
-		
+
 		case TokenKind::struct_keyword:
 		case TokenKind::open_bracket:
 		{
@@ -2561,6 +2467,152 @@ namespace AlloyCompiler
 
 #pragma endregion
 
+#pragma region Annotations
+
+	Parser::Result Parser::getAnnotation()
+	{
+		Result result;
+
+		result = expectKind<TokenKind::pound>();
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		result = expectKind<TokenKind::open_bracket>();
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		Token* pNameToken = nullptr;
+		result = expectKind<TokenKind::identifier>(&pNameToken);
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		auto it = ANNOTATION_NAMES.find(pNameToken->Value);
+		if (it == ANNOTATION_NAMES.end())
+		{
+			logErrorAtPreviousPosition("Unknown annotation '{0}'.", pNameToken->Value);
+			return UNKNOWN_ANNOTATION;
+		}
+
+		AnnotationArgs arguments;
+		if (token()->Kind == TokenKind::open_paren)
+		{
+			(void)eat();
+
+			while (token()->Kind != TokenKind::close_paren)
+			{
+				Token* pArgumentToken = nullptr;
+				result = expectKind<TokenKind::identifier>(&pArgumentToken);
+				if (result != SUCCESS)
+				{
+					return result;
+				}
+
+				arguments.push_back(pArgumentToken);
+
+				if (token()->Kind == TokenKind::comma)
+				{
+					(void)eat();
+				}
+			}
+
+			(void)eat();
+		}
+
+		if (it->second == AnnotationKind::NoArgs && arguments.size() != 0)
+		{
+			logErrorAtCurrentPosition("Annotation '{0}' does not take any arguments.", pNameToken->Value);
+			return INVALID_ANNOTATION;
+		}
+
+		if (it->second == AnnotationKind::SingleArg && arguments.size() != 1)
+		{
+			logErrorAtCurrentPosition("Annotation '{0}' only takes one argument.", pNameToken->Value);
+			return INVALID_ANNOTATION;
+		}
+
+		if (it->second == AnnotationKind::MultiArgs && arguments.size() < 1)
+		{
+			logErrorAtCurrentPosition("Annotation '{0}' must have at least one argument.", pNameToken->Value);
+			return INVALID_ANNOTATION;
+		}
+
+		if (m_CurrentAnnotations.contains(pNameToken->Value))
+		{
+			logErrorAtCurrentPosition("Duplicate annotation '{0}'.", pNameToken->Value);
+			return DUPLICATE_ANNOTATION;
+		}
+
+		result = expectKind<TokenKind::close_bracket>();
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		m_CurrentAnnotations[pNameToken->Value] = arguments;
+
+		return SUCCESS;
+	}
+
+#pragma endregion
+
+#pragma region Modules
+
+	Parser::Result Parser::getImport()
+	{
+		Result result;
+
+		result = expectKind<TokenKind::import_keyword>();
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		const char* firstChar = &token()->Value.front();
+		const char* lastChar = nullptr;
+		bool readingPath = true;
+		while (readingPath)
+		{
+			Token* pToken = nullptr;
+			result = expectKind<TokenKind::identifier>(&pToken);
+			if (result != SUCCESS)
+			{
+				return result;
+			}
+
+			lastChar = &pToken->Value.back();
+
+			if (token()->Kind == TokenKind::double_colon)
+			{
+				(void)eat();
+			}
+			else
+			{
+				readingPath = false;
+			}
+		}
+
+		result = expectKind<TokenKind::semicolon>();
+		if (result != SUCCESS)
+		{
+			return result;
+		}
+
+		std::string_view fullModulePath = std::string_view(firstChar, lastChar + 1);
+
+		m_Module.ImportedModules.push_back(fullModulePath);
+
+		return result;
+	}
+
+#pragma endregion
+
+
 	Module Parser::Parse()
 	{
 		using enum TokenKind;
@@ -2574,6 +2626,17 @@ namespace AlloyCompiler
 				{
 					ASSERT(false, "");
 				}
+			}
+
+			// check for import
+			if (token()->Kind == import_keyword)
+			{
+				if (getImport() != SUCCESS)
+				{
+					ASSERT(false, "");
+				}
+
+				continue;
 			}
 
 			// check for visibility modifier
@@ -2624,7 +2687,7 @@ namespace AlloyCompiler
 
 				if (m_Module.AllSymbolNames.contains(pTypeDefinition->pTypeIdentifier->pNameToken->Value))
 				{
-					logErrorAtToken(pTypeDefinition->pTypeIdentifier->pNameToken, 
+					logErrorAtToken(pTypeDefinition->pTypeIdentifier->pNameToken,
 						"Symbol with name '{0}' already exists in this module.", pTypeDefinition->pTypeIdentifier->pNameToken->Value);
 					ASSERT(false, "");
 				}
@@ -2655,7 +2718,7 @@ namespace AlloyCompiler
 					if (m_Module.MemberFunctionNames.contains(pTypeNameToken->Value)
 						&& m_Module.MemberFunctionNames[pTypeNameToken->Value].contains(pFunctionNameToken->Value))
 					{
-						logErrorAtToken(pFunctionNameToken, "Member function '{0}' is already defined for type '{1}'.", 
+						logErrorAtToken(pFunctionNameToken, "Member function '{0}' is already defined for type '{1}'.",
 							pFunctionNameToken->Value, pTypeNameToken->Value);
 						ASSERT(false, "");
 					}

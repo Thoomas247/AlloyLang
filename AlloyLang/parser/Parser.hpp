@@ -38,6 +38,8 @@ namespace AlloyCompiler
 		std::unordered_set<std::string_view> AllSymbolNames;
 		std::unordered_map<std::string_view, std::unordered_set<std::string_view>> MemberFunctionNames;
 
+		std::vector<std::string_view> ImportedModules;
+
 		Module(size_t allocatorSize)
 			: Allocator(allocatorSize)
 		{}
@@ -86,6 +88,7 @@ namespace AlloyCompiler
 		T* parse(Ts...) = delete;
 
 		Result getAnnotation();
+		Result getImport();
 
 		EXPRESSION* parse_PRIMARY();
 		EXPRESSION* parse_POSTFIX();

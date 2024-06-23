@@ -1,3 +1,7 @@
+import util::math;	// bring every public or exported symbol from util::math into this scope
+					// similar to doing "using namespace ..." in C++
+					// not required to access symbols in other files
+
 extern printf (const str: String, ...) -> i64;
 
 /* Macros */

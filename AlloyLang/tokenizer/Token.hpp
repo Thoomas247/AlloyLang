@@ -22,7 +22,9 @@ namespace AlloyCompiler
 		function_keyword,
 		macro_keyword,
 
-		public_keyword, 
+		import_keyword,
+
+		public_keyword,
 		export_keyword,
 
 		type_keyword,
@@ -48,6 +50,7 @@ namespace AlloyCompiler
 		comma,
 		colon,
 		semicolon,
+		double_colon,
 		dot,
 		arrow,
 		ellipsis,
@@ -93,6 +96,8 @@ namespace AlloyCompiler
 		{ TokenKind::function_keyword,		"fn" },
 		{ TokenKind::macro_keyword,			"macro" },
 
+		{ TokenKind::import_keyword,		"import" },
+
 		{ TokenKind::public_keyword,		"pub" },
 		{ TokenKind::export_keyword,		"exp" },
 
@@ -119,6 +124,7 @@ namespace AlloyCompiler
 		{ TokenKind::comma,					"," },
 		{ TokenKind::colon,					":" },
 		{ TokenKind::semicolon,				";" },
+		{ TokenKind::double_colon,			"::" },
 		{ TokenKind::dot,					"." },
 		{ TokenKind::arrow,					"->" },
 		{ TokenKind::ellipsis,				"..." },
@@ -154,6 +160,8 @@ namespace AlloyCompiler
 		{ "fn", TokenKind::function_keyword },
 		{ "macro", TokenKind::macro_keyword },
 
+		{ "import", TokenKind::import_keyword },
+
 		{ "pub", TokenKind::public_keyword },
 		{ "exp", TokenKind::export_keyword },
 
@@ -180,6 +188,7 @@ namespace AlloyCompiler
 		{ ",", TokenKind::comma },
 		{ ":", TokenKind::colon },
 		{ ";", TokenKind::semicolon },
+		{ "::", TokenKind::double_colon },
 		{ ".", TokenKind::dot },
 		{ "->", TokenKind::arrow },
 		{ "...", TokenKind::ellipsis },
@@ -230,7 +239,8 @@ namespace AlloyCompiler
 		{ '*', { } },		// *
 		{ '/', { } },		// /
 		{ '%', { } },		// %
-		{ '.', { } }		// . (... doesn't fit here as it is 3 characters long, case is handled manually in tokenizer)
+		{ '.', { } },		// . (... doesn't fit here as it is 3 characters long, case is handled manually in tokenizer)
+		{ ':', { ':' }},	// : or ::
 	};
 
 	/// <summary>

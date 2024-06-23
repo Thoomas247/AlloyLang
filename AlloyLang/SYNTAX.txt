@@ -10,6 +10,8 @@
 	function_keyword:				'fn' ;
 	macro_keyword:					'macro' ;
 
+	import_keyword:					'import' ;
+
 	public_keyword:					'pub' ;
 	export_keyword:					'exp' ;
 
@@ -36,6 +38,7 @@
 	comma:							',' ;
 	colon:							':' ;
 	semicolon:						';' ;
+	double_colon:					'::' ;
 	dot:							'.' ;
 	arrow:							'->' ;
 	ellipsis:						'...' ;
@@ -77,11 +80,6 @@
 
 	VARIABLE_DECLARATION:		( variable | constant ) identifier [ colon TYPE ] ;
 	VARIABLE_DEFINITION:		VARIABLE_DECLARATION assignment_operator EXPRESSION ;
-
-
-	(* - Annotations - *)
-
-	ANNOTATION:					pound open_bracket identifier [ open_paren [ identifier { comma identifier } ] ] close_bracket ;
 
 
 	(* - Functions - *)
@@ -168,3 +166,12 @@
 		RETURN:				return_keyword [ EXPRESSION ] semicolon ;
 
 
+	
+	(* - Annotations - *)
+
+	ANNOTATION:					pound open_bracket identifier [ open_paren [ identifier { comma identifier } ] ] close_bracket ;
+
+
+	(* - Modules - *)
+
+	MODULE_IMPORT:				import_keyword identifier { double_colon identifier } semicolon ;
