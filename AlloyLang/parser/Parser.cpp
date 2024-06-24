@@ -195,7 +195,7 @@ namespace AlloyCompiler
 	TYPE_NAME* Parser::parse()
 	{
 		Token* pNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pNameToken) != SUCCESS)
+		if (expectKind<TokenKind::identifier, TokenKind::long_identifier>(&pNameToken) != SUCCESS)
 		{
 			return nullptr;
 		}
@@ -955,9 +955,20 @@ namespace AlloyCompiler
 		}
 
 		Token* pFunctionNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pFunctionNameToken) != SUCCESS)
+		if (pTypeName == nullptr)
 		{
-			return nullptr;
+			// long_identifier here is only valid if this is not a member function
+			if (expectKind<TokenKind::identifier, TokenKind::long_identifier>(&pFunctionNameToken) != SUCCESS)
+			{
+				return nullptr;
+			}
+		}
+		else
+		{
+			if (expectKind<TokenKind::identifier>(&pFunctionNameToken) != SUCCESS)
+			{
+				return nullptr;
+			}
 		}
 
 		if (expectKind<TokenKind::open_paren>() != SUCCESS)
@@ -1053,8 +1064,7 @@ namespace AlloyCompiler
 		}
 
 		Token* pMacroNameToken = nullptr;
-
-		if (expectKind<TokenKind::identifier>(&pMacroNameToken) != SUCCESS)
+		if (expectKind<TokenKind::identifier, TokenKind::long_identifier>(&pMacroNameToken) != SUCCESS)
 		{
 			return nullptr;
 		}
@@ -2363,6 +2373,7 @@ namespace AlloyCompiler
 		}
 
 		case TokenKind::identifier:
+		case TokenKind::long_identifier:
 		{
 			STATEMENT* pStatement = nullptr;
 
@@ -2573,28 +2584,11 @@ namespace AlloyCompiler
 			return result;
 		}
 
-		const char* firstChar = &token()->Value.front();
-		const char* lastChar = nullptr;
-		bool readingPath = true;
-		while (readingPath)
+		Token* pIdentifierToken = nullptr;
+		result = expectKind<TokenKind::identifier, TokenKind::long_identifier>(&pIdentifierToken);
+		if (result != SUCCESS)
 		{
-			Token* pToken = nullptr;
-			result = expectKind<TokenKind::identifier>(&pToken);
-			if (result != SUCCESS)
-			{
-				return result;
-			}
-
-			lastChar = &pToken->Value.back();
-
-			if (token()->Kind == TokenKind::double_colon)
-			{
-				(void)eat();
-			}
-			else
-			{
-				readingPath = false;
-			}
+			return result;
 		}
 
 		result = expectKind<TokenKind::semicolon>();
@@ -2603,9 +2597,7 @@ namespace AlloyCompiler
 			return result;
 		}
 
-		std::string_view fullModulePath = std::string_view(firstChar, lastChar + 1);
-
-		m_Module.ImportedModules.push_back(fullModulePath);
+		m_Module.ImportedModules.push_back(pIdentifierToken->Value);
 
 		return result;
 	}

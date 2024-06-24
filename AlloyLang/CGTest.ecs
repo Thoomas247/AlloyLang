@@ -1,6 +1,6 @@
-import util::math;	// bring every public or exported symbol from util::math into this scope
-					// similar to doing "using namespace ..." in C++
-					// not required to access symbols in other files
+import util::misc;		// bring every public or exported symbol from util::math into this scope
+						// similar to doing "using namespace ..." in C++
+						// not required to access symbols in other files
 
 extern printf (const str: String, ...) -> i64;
 
@@ -119,6 +119,8 @@ fn try_cast(const obj: &Any, type To) -> Result(To)
 fn main() -> i64
 {
 	var vec = Vector3 { x = 0, y = 0, z = 0 };
+
+	renderer::opengl:Init();
 
 	vec = Vector3:translate(&vec, Vector3 { x = 10, y = -3, z = 2 });
 	vec:print();

@@ -279,10 +279,36 @@ namespace AlloyCompiler
 		// consume the first character
 		eat();
 
-		// keep going until the end of the word
-		while (isalnum(current()) || current() == '_')
+		bool isLongIdentifier = false;
+		bool reading = true;
+		bool foundLetters = false;
+
+		while (reading)
 		{
-			eat();
+			// keep going until the end of the word
+			while (isalnum(current()) || current() == '_')
+			{
+				foundLetters = true;
+				eat();
+			}
+
+			if (current() == ':' && peek() == ':')
+			{
+				isLongIdentifier = true;
+				foundLetters = false;
+				eat();
+				eat();
+			}
+			else
+			{
+				reading = false;
+			}
+		}
+
+		// ensure we don't end on a ::
+		if (isLongIdentifier && !foundLetters)
+		{
+			logErrorAtCurrentPosition("Expected an identifier.");
 		}
 
 		// store the word
@@ -291,11 +317,22 @@ namespace AlloyCompiler
 		// check if word is any keyword
 		auto it = KNOWN_SYMBOLS.find(value);
 		if (it != KNOWN_SYMBOLS.end())
+		{
 			addToken(it->second, value, loc);
+		}
 
 		// otherwise, it's an identifier
 		else
-			addToken(TokenKind::identifier, value, loc);
+		{
+			if (isLongIdentifier)
+			{
+				addToken(TokenKind::long_identifier, value, loc);
+			}
+			else
+			{
+				addToken(TokenKind::identifier, value, loc);
+			}
+		}
 
 		return true;
 	}

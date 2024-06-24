@@ -1,6 +1,7 @@
 (* -- TOKEN DEFINITIONS -- *)
 
 	identifier:						( letter | '_' ) { letter | digit | '_' } ;
+	long_identifier:				identifier { double_colon identifier } ;
 
 	comment:						('//' { character } '\n') | ('/*' { character } '*/') ;
 
@@ -66,7 +67,7 @@
 
 	TYPE:						[ reference | pointer ] ( TYPE_NAME | STRUCT_TYPE | ARRAY_TYPE | MACRO_CALL ) ;
 
-		TYPE_NAME:					identifier [ open_paren TYPE { comma TYPE } close_paren ] ;
+		TYPE_NAME:					( identifier | long_identifier ) [ open_paren TYPE { comma TYPE } close_paren ] ;
 		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { identifier colon TYPE } ] close_brace ;
 		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
 		
@@ -92,13 +93,13 @@
 	FUNCTION_DEFINITION:		function_keyword [ TYPE_IDENTIFIER colon ] identifier FUNCTION_TYPE STATEMENT_BLOCK ;
 	EXTERN_DEFINITION:			extern_keyword identifier FUNCTION_TYPE semicolon ;
 	
-	FUNCTION_CALL:				[ TYPE_NAME colon ] identifier open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ; (* TYPE_NAME can contain a variable name in this context *)
+	FUNCTION_CALL:				[ TYPE_NAME colon ] ( identifier | long_identifier ) open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ; (* TYPE_NAME can contain a variable name in this context *)
 
 
 	(* Macros *)
 
 	MACRO_VARIABLE_IDENTIFIER:	identifier ;
-	MACRO_CALL:					at_symbol identifier open_paren [ ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL ) { comma ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL ) } ] close_paren ;
+	MACRO_CALL:					at_symbol ( identifier | long_identifier ) open_paren [ ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL ) { comma ( MACRO_VARIABLE_IDENTIFIER | MACRO_CALL ) } ] close_paren ;
 
 	MACRO_DEFINITION:			macro_keyword identifier 
 								open_paren [ ( type | fn ) identifier { comma ( type | fn ) identifier } ] close_paren 
@@ -174,4 +175,4 @@
 
 	(* - Modules - *)
 
-	MODULE_IMPORT:				import_keyword identifier { double_colon identifier } semicolon ;
+	MODULE_IMPORT:				import_keyword ( identifier | long_identifier ) semicolon ;

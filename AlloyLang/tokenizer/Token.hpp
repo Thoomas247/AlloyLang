@@ -15,6 +15,7 @@ namespace AlloyCompiler
 		end_of_file,
 
 		identifier,
+		long_identifier,
 
 		extern_keyword,
 		struct_keyword,
@@ -86,9 +87,10 @@ namespace AlloyCompiler
 	/// </summary>
 	const std::unordered_map<TokenKind, std::string> TOKEN_KIND_VALUES =
 	{
-		{ TokenKind::none, "none" },
+		{ TokenKind::none,					"none" },
 
-		{ TokenKind::identifier, "identifier" },
+		{ TokenKind::identifier,			"identifier" },
+		{ TokenKind::long_identifier,		"identifier" },
 
 		{ TokenKind::extern_keyword,		"extern"},
 		{ TokenKind::struct_keyword,		"struct" },
