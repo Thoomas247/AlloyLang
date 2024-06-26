@@ -116,9 +116,12 @@
     <ClInclude Include="parser\nodes\GenericNode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Compiler.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="CGTest.ecs" />
+    <None Include="CGTest.alloy" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="docs\Parser Issues.txt" />

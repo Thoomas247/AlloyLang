@@ -142,6 +142,7 @@
   <ItemGroup>
     <ClInclude Include="codegen\CodeGenerator.hpp" />
     <ClInclude Include="codegen\NamedValues.hpp" />
+    <ClInclude Include="Compiler.hpp" />
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="macro\MacroEngine.hpp" />
     <ClInclude Include="parser\Node.hpp" />
@@ -165,7 +166,7 @@
     <ClInclude Include="tokenizer\Tokenizer.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="CGTest.ecs" />
+    <None Include="CGTest.alloy" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="docs\Coding Rules.txt" />

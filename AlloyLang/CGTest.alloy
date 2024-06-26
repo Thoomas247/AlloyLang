@@ -1,4 +1,4 @@
-import util::misc;		// bring every public or exported symbol from util::math into this scope
+import standard::io;	// bring every public or exported symbol from standard::io into this scope
 						// similar to doing "using namespace ..." in C++
 						// not required to access symbols in other files
 
