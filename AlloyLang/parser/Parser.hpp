@@ -8,16 +8,39 @@
 
 namespace AlloyCompiler
 {
+	enum class Visibility : uint8_t
+	{
+		Private,
+		Public,
+		Export
+	};
+
+	template <typename T>
+	struct Definition
+	{
+		Visibility Access;
+		T* pDefinition;
+
+		Definition(Visibility visibility, T* pDefinition)
+			: Access(visibility), pDefinition(pDefinition)
+		{}
+
+		bool IsNull() const
+		{
+			return pDefinition == nullptr;
+		}
+	};
+
 	struct NamedNodes
 	{
 		template<typename T>
-		using NodeMap = std::unordered_map<std::string_view, T>;
+		using NodeMap = std::unordered_map<std::string_view, Definition<T>>;
 
-		NodeMap<MACRO_DEFINITION*> MacroDefinitions;
-		NodeMap<TYPE_DEFINITION*> TypeDefinitions;
-		NodeMap<FUNCTION_DEFINITION*> FunctionDefinitions;
-		NodeMap<NodeMap<FUNCTION_DEFINITION*>> MemberFunctionDefinitions;
-		NodeMap<EXTERN_DEFINITION*> ExternDefinitions;
+		NodeMap<MACRO_DEFINITION> MacroDefinitions;
+		NodeMap<TYPE_DEFINITION> TypeDefinitions;
+		NodeMap<FUNCTION_DEFINITION> FunctionDefinitions;
+		std::unordered_map<std::string_view, NodeMap<FUNCTION_DEFINITION>> MemberFunctionDefinitions;
+		NodeMap<EXTERN_DEFINITION> ExternDefinitions;
 	};
 
 	/// <summary>
@@ -29,30 +52,41 @@ namespace AlloyCompiler
 	/// </summary>
 	struct Module
 	{
-		NodeAllocator Allocator;
+		Source Src;
+		TokenBuffers Tokens;
 
-		NamedNodes ExportNodes;
-		NamedNodes PublicNodes;
-		NamedNodes PrivateNodes;
+		NodeAllocator Allocator;
+		NamedNodes Nodes;
 
 		std::unordered_set<std::string_view> AllSymbolNames;
 		std::unordered_map<std::string_view, std::unordered_set<std::string_view>> MemberFunctionNames;
 
-		std::vector<std::string_view> ImportedModules;
+		std::vector<std::string> ImportedModules;
 
-		Module(size_t allocatorSize)
-			: Allocator(allocatorSize)
+		Module(Source source, TokenBuffers tokenBuffers, size_t allocatorSize)
+			: Src(std::move(source)), Tokens(std::move(tokenBuffers)), Allocator(allocatorSize)
 		{}
+
+		template<typename ...Args>
+		void LogErrorAtToken(const Token* pToken, const std::string& format, Args&& ...args) const
+		{
+			const Location& location = pToken->Location;
+			const size_t tokenSize = pToken->Value.size();
+			const std::string_view line = Src.GetLine(location.LineStart);
+
+			Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
+			Log::Error("\t{0}", line);
+			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
+			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+		}
 	};
 
 	class Parser
 	{
 	public:
-		Parser(const Source& source, TokenBuffers& tokenBuffers)
-			: m_Module(tokenBuffers.NumTokens() * 120) // TODO: remove magic number
+		Parser(Source source, TokenBuffers tokenBuffers)
+			: m_Module(std::move(source), std::move(tokenBuffers), tokenBuffers.NumTokens() * 55) // TODO: remove magic number
 			, m_CurrentAnnotations()
-			, m_Source(source)
-			, m_TokenBuffers(tokenBuffers)
 			, m_CurrentTokenIndex(0)
 		{
 		}
@@ -141,16 +175,13 @@ namespace AlloyCompiler
 	private:
 		Module m_Module;
 		AnnotationMap m_CurrentAnnotations;
-
-		const Source& m_Source;
-		TokenBuffers& m_TokenBuffers;
 		size_t m_CurrentTokenIndex;
 	};
 
 	template<typename... Args>
 	constexpr void Parser::logErrorAtCurrentPosition(const std::string& format, Args&&... args)
 	{
-		const Token* pToken = m_TokenBuffers.GetToken(m_CurrentTokenIndex);
+		const Token* pToken = m_Module.Tokens.GetToken(m_CurrentTokenIndex);
 
 		logErrorAtToken(pToken, format, args...);
 	}
@@ -160,7 +191,7 @@ namespace AlloyCompiler
 	{
 		ASSERT(m_CurrentTokenIndex != 0, "Cannot go back to previous position!");
 
-		const Token* pToken = m_TokenBuffers.GetToken(m_CurrentTokenIndex - 1);
+		const Token* pToken = m_Module.Tokens.GetToken(m_CurrentTokenIndex - 1);
 
 		logErrorAtToken(pToken, format, args...);
 	}
@@ -168,14 +199,7 @@ namespace AlloyCompiler
 	template<typename ...Args>
 	inline constexpr void Parser::logErrorAtToken(const Token* pToken, const std::string& format, Args&& ...args)
 	{
-		const Location& location = pToken->Location;
-		const size_t tokenSize = pToken->Value.size();
-		const std::string_view line = m_Source.GetLine(location.LineStart);
-
-		Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
-		Log::Error("\t{0}", line);
-		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
-		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+		m_Module.LogErrorAtToken(pToken, format, args...);
 	}
 
 	template<typename T>
@@ -187,7 +211,7 @@ namespace AlloyCompiler
 	template<TokenKind ...Tokens>
 	Parser::Result Parser::expectKind(Token** ppToken)
 	{
-		const bool isExpectedToken = ((m_TokenBuffers.GetToken(m_CurrentTokenIndex)->Kind == Tokens) || ...);
+		const bool isExpectedToken = ((m_Module.Tokens.GetToken(m_CurrentTokenIndex)->Kind == Tokens) || ...);
 
 		if (!isExpectedToken)
 		{
@@ -198,7 +222,7 @@ namespace AlloyCompiler
 
 		if (ppToken != nullptr)
 		{
-			*ppToken = m_TokenBuffers.GetToken(m_CurrentTokenIndex);
+			*ppToken = m_Module.Tokens.GetToken(m_CurrentTokenIndex);
 		}
 
 		++m_CurrentTokenIndex;

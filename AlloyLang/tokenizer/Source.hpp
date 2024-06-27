@@ -20,9 +20,6 @@ namespace AlloyCompiler
 		{}
 	};
 
-	/// <summary>
-	/// Holds the source code and provides an iterator for it.
-	/// </summary>
 	class Source
 	{
 	public:

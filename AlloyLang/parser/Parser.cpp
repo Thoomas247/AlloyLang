@@ -62,7 +62,7 @@ namespace AlloyCompiler
 
 	bool Parser::isEOF() const
 	{
-		return m_CurrentTokenIndex >= (m_TokenBuffers.NumTokens() - 1);
+		return m_CurrentTokenIndex >= (m_Module.Tokens.NumTokens() - 1);
 	}
 
 	bool Parser::hasNext() const
@@ -72,12 +72,12 @@ namespace AlloyCompiler
 
 	Token* Parser::token()
 	{
-		return m_TokenBuffers.GetToken(m_CurrentTokenIndex);
+		return m_Module.Tokens.GetToken(m_CurrentTokenIndex);
 	}
 
 	Token* Parser::peekToken(size_t offset)
 	{
-		return m_TokenBuffers.GetToken(m_CurrentTokenIndex + offset + 1);
+		return m_Module.Tokens.GetToken(m_CurrentTokenIndex + offset + 1);
 	}
 
 	Parser::Result Parser::eat()
@@ -97,7 +97,7 @@ namespace AlloyCompiler
 		bool found = false;
 		for (const std::string& value : values)
 		{
-			if (value == m_TokenBuffers.GetToken(m_CurrentTokenIndex)->Value)
+			if (value == m_Module.Tokens.GetToken(m_CurrentTokenIndex)->Value)
 			{
 				found = true;
 				break;
@@ -112,7 +112,7 @@ namespace AlloyCompiler
 
 		if (ppToken != nullptr)
 		{
-			*ppToken = m_TokenBuffers.GetToken(m_CurrentTokenIndex);
+			*ppToken = m_Module.Tokens.GetToken(m_CurrentTokenIndex);
 		}
 
 		++m_CurrentTokenIndex;
@@ -2632,16 +2632,16 @@ namespace AlloyCompiler
 			}
 
 			// check for visibility modifier
-			NamedNodes* currentNamedNodes = &m_Module.PrivateNodes;
+			Visibility visibility = Visibility::Private;
 
 			if (token()->Kind == public_keyword)
 			{
-				currentNamedNodes = &m_Module.PublicNodes;
+				visibility = Visibility::Public;
 				(void)eat();
 			}
 			else if (token()->Kind == export_keyword)
 			{
-				currentNamedNodes = &m_Module.ExportNodes;
+				visibility = Visibility::Export;
 				(void)eat();
 			}
 
@@ -2662,7 +2662,7 @@ namespace AlloyCompiler
 					ASSERT(false, "");
 				}
 
-				currentNamedNodes->MacroDefinitions[pMacroDefinition->pNameToken->Value] = pMacroDefinition;
+				m_Module.Nodes.MacroDefinitions[pMacroDefinition->pNameToken->Value] = Definition<MACRO_DEFINITION>(visibility, pMacroDefinition);
 				m_Module.AllSymbolNames.insert(pMacroDefinition->pNameToken->Value);
 
 				break;
@@ -2684,7 +2684,7 @@ namespace AlloyCompiler
 					ASSERT(false, "");
 				}
 
-				currentNamedNodes->TypeDefinitions[pTypeDefinition->pTypeIdentifier->pNameToken->Value] = pTypeDefinition;
+				m_Module.Nodes.TypeDefinitions[pTypeDefinition->pTypeIdentifier->pNameToken->Value] = Definition<TYPE_DEFINITION>(visibility, pTypeDefinition);
 				m_Module.AllSymbolNames.insert(pTypeDefinition->pTypeIdentifier->pNameToken->Value);
 
 				break;
@@ -2715,7 +2715,7 @@ namespace AlloyCompiler
 						ASSERT(false, "");
 					}
 
-					currentNamedNodes->MemberFunctionDefinitions[pTypeNameToken->Value][pFunctionNameToken->Value] = pFunctionDefinition;
+					m_Module.Nodes.MemberFunctionDefinitions[pTypeNameToken->Value][pFunctionNameToken->Value] = Definition<FUNCTION_DEFINITION>(visibility, pFunctionDefinition);
 					m_Module.MemberFunctionNames[pTypeNameToken->Value].insert(pFunctionNameToken->Value);
 				}
 
@@ -2727,7 +2727,7 @@ namespace AlloyCompiler
 						ASSERT(false, "");
 					}
 
-					currentNamedNodes->FunctionDefinitions[pFunctionNameToken->Value] = pFunctionDefinition;
+					m_Module.Nodes.FunctionDefinitions[pFunctionNameToken->Value] = Definition<FUNCTION_DEFINITION>(visibility, pFunctionDefinition);
 					m_Module.AllSymbolNames.insert(pFunctionNameToken->Value);
 				}
 
@@ -2750,7 +2750,7 @@ namespace AlloyCompiler
 					ASSERT(false, "");
 				}
 
-				currentNamedNodes->ExternDefinitions[pExternDefinition->pNameToken->Value] = pExternDefinition;
+				m_Module.Nodes.ExternDefinitions[pExternDefinition->pNameToken->Value] = Definition<EXTERN_DEFINITION>(visibility, pExternDefinition);
 				m_Module.AllSymbolNames.insert(pExternDefinition->pNameToken->Value);
 
 				break;

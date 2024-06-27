@@ -133,6 +133,8 @@
     </ClCompile>
     <ClCompile Include="codegen\CodeGenerator.cpp" />
     <ClCompile Include="codegen\NamedValues.cpp" />
+    <ClCompile Include="Compiler.cpp" />
+    <ClCompile Include="compiler\Program.cpp" />
     <ClCompile Include="macro\MacroEngine.cpp" />
     <ClCompile Include="parser\Parser.cpp" />
     <ClCompile Include="tokenizer\Source.cpp" />
@@ -143,6 +145,7 @@
     <ClInclude Include="codegen\CodeGenerator.hpp" />
     <ClInclude Include="codegen\NamedValues.hpp" />
     <ClInclude Include="Compiler.hpp" />
+    <ClInclude Include="compiler\Program.hpp" />
     <ClInclude Include="log\Log.hpp" />
     <ClInclude Include="macro\MacroEngine.hpp" />
     <ClInclude Include="parser\Node.hpp" />
