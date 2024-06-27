@@ -111,10 +111,10 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	void NamedValues::InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type, bool freeOnExit)
+	void NamedValues::InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit)
 	{
 		ASSERT(!m_ScopeStack.back().Values.contains(name), "Named value already exists! Should check if it exists first with NamedValues::GetValue(const std::string& name).");
-		ValueTypePair valueTypePair = { value, type, freeOnExit };
+		ValueTypePair valueTypePair = { value, type, isConst, freeOnExit };
 		m_ScopeStack.back().Values[name] = valueTypePair;
 	}
 

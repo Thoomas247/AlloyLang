@@ -26,6 +26,7 @@ namespace AlloyCompiler
 	{
 		llvm::AllocaInst* value = nullptr;
 		llvm::Type* containedType = nullptr;
+		bool isConst = false;					// whether we are pointing to a constant value
 		bool freeOnExit = false;				// whether we should free the pointer
 	};
 
@@ -41,7 +42,7 @@ namespace AlloyCompiler
 		void PopScope();
 
 		ValueTypePair* GetValue(const std::string_view& name);
-		void InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type, bool freeOnExit);
+		void InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit);
 		bool RemoveValue(const std::string_view& name);
 
 		struct StructMemberInfo

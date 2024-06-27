@@ -19,6 +19,7 @@ namespace AlloyCompiler
 	{
 		llvm::Value* Ptr = nullptr;
 		llvm::Value* Value = nullptr;
+		bool isConst = false;	// indicates that we are pointing to constant variables
 	};
 
 	template<typename ...Args>
@@ -240,6 +241,26 @@ namespace AlloyCompiler
 		return type;
 	}
 
+	//
+	// Helper function to determine if a function parameter is declared as const
+	//
+	bool isFunctionParameterConst(const FUNCTION_TYPE& functionType, int index) {
+
+		// for functions with variable parameters, we can only check the known parameters
+		if (functionType.IsVarArg
+			&& index >= functionType.Parameters.size()) {
+			return false;
+		}
+		else {
+			const FUNCTION_PARAMETER* parameter = functionType.Parameters[index];
+			ASSERT(parameter->Is<VARIABLE_DECLARATION>(), "TODO: add support for generics in codegen");
+
+			// TODO: fix this
+			// temporary hack to get the code compiling
+			VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
+			return (pParameterVariableDeclaration->VarType == VariableType::Constant);
+		}
+	}
 #pragma endregion
 
 #pragma region Literals
@@ -347,11 +368,11 @@ namespace AlloyCompiler
 				// the type is set in the case of pointers and references, we need to load the pointed to value
 				llvm::Value* Value = state.Builder->CreateLoad(valueTypePair->containedType, valueOrPtr, "loadtmp");
 				identifierType = { Value->getType(), nullptr };
-				return PtrValuePair{ .Ptr = valueOrPtr, .Value = Value };
+				return PtrValuePair{ .Ptr = valueOrPtr, .Value = Value, .isConst = valueTypePair->isConst };
 			}
 			else {
 				identifierType.containedType = valueTypePair->containedType;
-				return PtrValuePair{ .Ptr = valueTypePair->value, .Value = valueOrPtr };
+				return PtrValuePair{ .Ptr = valueTypePair->value, .Value = valueOrPtr, .isConst = valueTypePair->isConst };
 			}
 		}
 
@@ -361,6 +382,7 @@ namespace AlloyCompiler
 		if (globalVar)
 		{
 			llvm::Value* value = state.Builder->CreateLoad(globalVar->getValueType(), globalVar, name);
+			// TODO: we need to handle const globals
 			return PtrValuePair{ .Ptr = globalVar, .Value = value };
 		}
 
@@ -539,7 +561,9 @@ namespace AlloyCompiler
 			);
 
 		// add the variable to the named values
-		state.NamedValues.InsertValue(name, allocaInst, identifierType.containedType, (modifier == TypeModifier::Pointer));
+		state.NamedValues.InsertValue(name, allocaInst, identifierType.containedType, 
+						(variableDeclarationNode.VarType == VariableType::Constant), 
+						(modifier == TypeModifier::Pointer));
 
 		return allocaInst;
 	}
@@ -647,10 +671,12 @@ namespace AlloyCompiler
 				function->addAttributeAtIndex(i+1, llvm::Attribute::getWithByRefType(*state.Context, paramSubTypes[i]));
 			}
 
+			/* ReadOnly is not the same as const and LLVM does not accept ReadOnly on anything other than pointers
 			// set the ReadOnly attribute on parameters passed as const
 			if (paramVarTypes[i] == VariableType::Constant) {
 				function->addAttributeAtIndex(i+1, llvm::Attribute::get(*state.Context, llvm::Attribute::AttrKind::ReadOnly));
 			}
+			*/
 		}
 
 		return function;
@@ -927,7 +953,7 @@ namespace AlloyCompiler
 	{
 		llvm::Value* memberIndex = generateExpression(namedNodes, state, *arrayAccessExpression.pIndex, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
 		TypeSubtypePair tempType = { nullptr, nullptr };
-		PtrValuePair left = { nullptr, nullptr };
+		PtrValuePair left = { nullptr, nullptr, false };
 
 		// handle identifier
 		if (arrayAccessExpression.pArray->Is<PRIMARY>()
@@ -982,10 +1008,10 @@ namespace AlloyCompiler
 
 			llvm::Value* Value = state.Builder->CreateLoad(tempType.containedType, memberValue, "loadtmp");
 
-			return PtrValuePair{ .Ptr = memberValue, .Value = Value };
+			return PtrValuePair{ .Ptr = memberValue, .Value = Value, .isConst = left.isConst };
 		}
 
-		return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue };
+		return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue, .isConst = left.isConst };
 	}
 
 	PtrValuePair generateMemberAccessExpression(const NamedNodes& namedNodes, LLVMState& state, const MEMBER_ACCESS& memberAccessExpression,
@@ -1057,7 +1083,7 @@ namespace AlloyCompiler
 			std::vector<unsigned int> indices(1);
 			indices[0] = memberInfo.memberIndex;
 			llvm::Value* memberValue = state.Builder->CreateExtractValue(left.Value, indices);
-			return PtrValuePair{ .Ptr = nullptr, .Value = memberValue };
+			return PtrValuePair{ .Ptr = nullptr, .Value = memberValue, .isConst = left.isConst };
 		}
 		else {
 			// get the member index in the format required by llvm
@@ -1065,7 +1091,7 @@ namespace AlloyCompiler
 
 			llvm::Value* memberPtr = state.Builder->CreateGEP(structType, left.Ptr, indices, "memberptr");
 			llvm::Value* memberValue = state.Builder->CreateLoad(structType->getTypeAtIndex(memberInfo.memberIndex), memberPtr, "loadtmp");
-			return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue };
+			return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue, .isConst = left.isConst };
 		}
 	}
 
@@ -1076,6 +1102,7 @@ namespace AlloyCompiler
 		int argi = 0;	// argument index currently processed
 		llvm::Value* result = nullptr;
 		llvm::Function* calleeFunc = nullptr;
+		FUNCTION_TYPE* pCalleeFunctionType = nullptr;	// in addition to the LLVM function definition, we need the original function definition in order to properly handle const parameters
 		bool insertSelfAsFirstParam = false;		// indicates whether the first parameter should be the variable value in the case of member function calls
 		std::vector<EXPRESSION*> Arguments(functionCallExpressionNode.Arguments);
 													// creating a copy of the arguments as we might need to insert new elements
@@ -1097,13 +1124,17 @@ namespace AlloyCompiler
 			const std::string_view varOrTypeName = functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value;
 			if (state.NamedValues.GetValue(varOrTypeName) != nullptr) {
 				// member function call
-				functionName = std::string(state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType())) + "@" + functionName;
+				std::string_view typeName = state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType());
 				// look up the function in the global module table
-				calleeFunc = state.Module->getFunction(std::string(functionName));
+				calleeFunc = state.Module->getFunction(std::string(std::string(typeName) + "@" + functionName));
 				if (calleeFunc == nullptr) {
-					logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find member function '{0}'!", functionName);
+					logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find member function '{0}:{1}'!", typeName, functionName);
 					goto error;
 				}
+
+				// also retrieve the original function definition
+				pCalleeFunctionType = (namedNodes.MemberFunctionDefinitions.at(typeName)).at(functionName)->pFunctionType;
+
 				/* TBD:check that the first argument is of the right type
 				if (calleeFunc->arg_size() < 1 || calleeFunc->getArg(0)->getType() != state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType()) {
 					logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "The first parameter of member function '{0}' is not of the right type!", functionName);
@@ -1114,9 +1145,11 @@ namespace AlloyCompiler
 			}
 			else if (state.NamedValues.GetType(varOrTypeName) != nullptr) {
 				// static function call
-				functionName = std::string(varOrTypeName) + "@" + functionName;
 				// look up the function in the global module table
-				calleeFunc = state.Module->getFunction(std::string(functionName));
+				calleeFunc = state.Module->getFunction(std::string(varOrTypeName) + "@" + functionName);
+
+				// also retrieve the original function definition
+				pCalleeFunctionType = (namedNodes.MemberFunctionDefinitions.at(varOrTypeName)).at(functionName)->pFunctionType;
 			}
 			else {
 				logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Not a variable or type name '{0}'!", varOrTypeName);
@@ -1126,6 +1159,15 @@ namespace AlloyCompiler
 		else {
 			// look up the function in the global module table
 			calleeFunc = state.Module->getFunction(std::string(functionName));
+
+			// also retrieve the original function definition
+			if (namedNodes.FunctionDefinitions.find(functionName) != namedNodes.FunctionDefinitions.end()) {
+				pCalleeFunctionType = namedNodes.FunctionDefinitions.at(functionName)->pFunctionType;
+			}
+			else if (namedNodes.ExternDefinitions.find(functionName) != namedNodes.ExternDefinitions.end()) {
+				EXTERN_DEFINITION* externDefinition = namedNodes.ExternDefinitions.at(functionName);
+				pCalleeFunctionType = externDefinition->pFunctionType;
+			}
 		}
 
 		// function not found, it might not have been processed yet
@@ -1149,7 +1191,8 @@ namespace AlloyCompiler
 			}
 		}
 
-		if (!calleeFunc)
+		if (!calleeFunc
+			|| !pCalleeFunctionType)
 		{
 			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find function '{0}'!", functionName);
 			goto error;
@@ -1187,9 +1230,10 @@ namespace AlloyCompiler
 
 			llvm::Value* argVal = nullptr;
 
+			// check if the function parameter was declared as const
+			bool isConst = isFunctionParameterConst(*pCalleeFunctionType, argi); 
+
 			// check if the parameter is passed byref, in which case it should be a variable and we will pass the address of the identifier
-			auto ro = calleeFunc->getAttributeAtIndex(i + 1, llvm::Attribute::AttrKind::ReadOnly);
-			bool isReadOnly = ro.hasAttribute(llvm::Attribute::AttrKind::ReadOnly);
 			auto attr = calleeFunc->getAttributeAtIndex(i + 1, llvm::Attribute::AttrKind::ByRef);
 			bool isByRef = attr.hasAttribute(llvm::Attribute::AttrKind::ByRef);
 			if (isByRef) {
@@ -1217,7 +1261,7 @@ namespace AlloyCompiler
 
 				// argument is not in the form of &variable, if we are expecting a constant, continue evaluating the expression
 				if (!foundVariable) {
-					if (!isReadOnly) {
+					if (!isConst) {
 						logErrorAtCurrentPosition(nullptr, // TBD: argumentID
 							"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
 						goto error;
@@ -1497,30 +1541,39 @@ namespace AlloyCompiler
 	llvm::Value* generateAssignmentExpression(const NamedNodes& namedNodes, LLVMState& state, const ASSIGNMENT& assignment,
 												const TypeSubtypePair& expectedType)
 	{
+		PtrValuePair ptrValue;
 		llvm::Value* ptr = nullptr;
 
 		if (assignment.pVariable->Is<POSTFIX>()
 			&& assignment.pVariable->Get<POSTFIX>()->Is<MEMBER_ACCESS>()
 			)
 		{
-			ptr = generateMemberAccessExpression(namedNodes, state, *assignment.pVariable->Get<POSTFIX>()->Get<MEMBER_ACCESS>(), expectedType).Ptr;
+			ptrValue = generateMemberAccessExpression(namedNodes, state, *assignment.pVariable->Get<POSTFIX>()->Get<MEMBER_ACCESS>(), expectedType);
 		}
 		else if (assignment.pVariable->Is<PRIMARY>()
 			&& assignment.pVariable->Get<PRIMARY>()->Is<VARIABLE>())
 		{
 			TypeSubtypePair identifierType = expectedType;
-			ptr = generateIdentifier(namedNodes, state, *assignment.pVariable->Get<PRIMARY>()->Get<VARIABLE>(), identifierType).Ptr;
+			ptrValue = generateIdentifier(namedNodes, state, *assignment.pVariable->Get<PRIMARY>()->Get<VARIABLE>(), identifierType);
 		}
 		else if (assignment.pVariable->Is<POSTFIX>()
 			&& assignment.pVariable->Get<POSTFIX>()->Is<ARRAY_ACCESS>())
 		{
-			ptr = generateArrayAccessExpression(namedNodes, state, *assignment.pVariable->Get<POSTFIX>()->Get<ARRAY_ACCESS>(), expectedType).Ptr;
+			ptrValue = generateArrayAccessExpression(namedNodes, state, *assignment.pVariable->Get<POSTFIX>()->Get<ARRAY_ACCESS>(), expectedType);
 		}
+
+		ptr = ptrValue.Ptr;
 
 		if (!ptr)
 		{
 			logErrorAtCurrentPosition(nullptr, // TBD: nodeID 
 									"Error evaluating identifier!");
+			return nullptr;
+		}
+
+		if (ptrValue.isConst) {
+			logErrorAtCurrentPosition(nullptr, // TBD: nodeID 
+				"Assigning a value to a constant!");
 			return nullptr;
 		}
 
@@ -1987,7 +2040,6 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			// const ByRef parameters are considered ByVal for more flexibility
 			llvm::Attribute attr = arg.getAttribute(llvm::Attribute::AttrKind::ByRef);
 			llvm::Type* subType = nullptr;
 			llvm::AllocaInst* allocaInst = nullptr;
@@ -2001,7 +2053,7 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(&arg, allocaInst);
 
 			// add arguments to named values
-			state.NamedValues.InsertValue(arg.getName(), allocaInst, subType, false);
+			state.NamedValues.InsertValue(arg.getName(), allocaInst, subType, isFunctionParameterConst(*functionDefinition.pFunctionType, index), false);
 		}
 
 		// every function has an exit block for cleanup and setting the return value
@@ -2103,21 +2155,21 @@ namespace AlloyCompiler
 		*/
 
 		// pre-process all extern function definitions
-		for (auto f = namedNodes.ExternDefinitions.begin(); f != namedNodes.ExternDefinitions.end(); f++) {
-			generateExternDefinition(namedNodes, state, *f->second);
+		for (auto& f : namedNodes.ExternDefinitions) {
+			generateExternDefinition(namedNodes, state, *f.second);
 		}
 
 		// pre-process all function definitions leaving the main function till the end
-		for (auto f = namedNodes.FunctionDefinitions.begin(); f != namedNodes.FunctionDefinitions.end(); f++) {
-			if (f->first != "main") {
-				generateFunctionDefinition(namedNodes, state, "", *f->second);
+		for (auto& f : namedNodes.FunctionDefinitions) {
+			if (f.first != "main") {
+				generateFunctionDefinition(namedNodes, state, "", *f.second);
 			}
 		}
 
 		// pre-process all member function definitions
-		for (auto mf = namedNodes.MemberFunctionDefinitions.begin(); mf != namedNodes.MemberFunctionDefinitions.end(); mf++) {
-			for (auto mf1 = mf->second.begin(); mf1 != mf->second.end(); mf1++) {
-				generateFunctionDefinition(namedNodes, state, mf->first, *mf1->second);	// mf->first is the type name, second is the function
+		for (auto& mf : namedNodes.MemberFunctionDefinitions) {
+			for (auto& mf1 : mf.second) {
+				generateFunctionDefinition(namedNodes, state, mf.first, *mf1.second);	// mf->first is the type name, second is the function
 			}
 		}
 

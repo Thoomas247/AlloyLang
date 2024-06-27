@@ -63,10 +63,17 @@ namespace unittests
 			constexpr auto TestStr = R"(
 				extern printf (const str : String) -> i32;
 
+				fn test (const i : i64) -> i64
+				{
+					const j : i64 = 2;	// this is ok
+					// this will fail: i = 3;
+					return i;
+				}
+
 				fn main () -> i64
 				{
 					printf("Basic");
-					return 1;
+					return test(1);
 				}
 			)";
 			std::string expected_ = "Basic";
