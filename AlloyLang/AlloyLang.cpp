@@ -1,4 +1,4 @@
-#include "Compiler.hpp"
+#include "compiler/Compiler.hpp"
 
 using namespace AlloyCompiler;
 

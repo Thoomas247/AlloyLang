@@ -24,39 +24,27 @@
     <ClCompile Include="AlloyLang.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="tokenizer\Tokenizer.cpp">
+    <ClCompile Include="compiler\module\source\Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="tokenizer\Token.cpp">
+    <ClCompile Include="compiler\codegen\CodeGenerator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="tokenizer\Source.cpp">
+    <ClCompile Include="compiler\codegen\NamedValues.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="parser\Parser.cpp">
+    <ClCompile Include="compiler\Compiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="macro\MacroEngine.cpp">
+    <ClCompile Include="compiler\module\token\TokenBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="codegen\CodeGenerator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="codegen\NamedValues.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Compiler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="compiler\Program.cpp">
+    <ClCompile Include="compiler\module\node\NodeBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="tokenizer\Tokenizer.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tokenizer\Token.hpp">
+    <ClInclude Include="compiler\module\token\Token.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="log\Log.hpp">
@@ -65,67 +53,70 @@
     <ClInclude Include="TestString.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="tokenizer\Source.hpp">
+    <ClInclude Include="compiler\module\source\Source.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\NodeAllocator.hpp">
+    <ClInclude Include="compiler\module\node\NodeAllocator.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\Node.hpp">
+    <ClInclude Include="compiler\module\node\nodes\TypeNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\TypeNode.hpp">
+    <ClInclude Include="compiler\module\node\nodes\VariableNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\VariableNode.hpp">
+    <ClInclude Include="compiler\module\node\nodes\FunctionNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\FunctionNode.hpp">
+    <ClInclude Include="compiler\module\node\nodes\ExpressionNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\ExpressionNode.hpp">
+    <ClInclude Include="compiler\module\node\nodes\StatementNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\StatementNode.hpp">
+    <ClInclude Include="compiler\module\node\nodes\AllNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\Parser.hpp">
+    <ClInclude Include="compiler\module\node\nodes\VariantNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\VariantNode.hpp">
+    <ClInclude Include="compiler\module\node\Annotation.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\Nodes.hpp">
+    <ClInclude Include="compiler\module\node\nodes\MacroNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\VariantNodes.hpp">
+    <ClInclude Include="compiler\codegen\CodeGenerator.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\Annotation.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="parser\nodes\MacroNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="macro\MacroEngine.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="codegen\CodeGenerator.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="codegen\NamedValues.hpp">
+    <ClInclude Include="compiler\codegen\NamedValues.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="parser\NodePrinter.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="parser\nodes\GenericNode.hpp">
+    <ClInclude Include="compiler\module\node\nodes\GenericNodes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Compiler.hpp">
+    <ClInclude Include="compiler\Compiler.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="compiler\Program.hpp">
+    <ClInclude Include="compiler\module\Module.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\module\token\TokenBuffer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\module\node\nodes\NodeCommon.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\module\node\NodeBuffer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\module\node\Definition.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="json\json.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

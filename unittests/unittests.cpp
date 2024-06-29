@@ -34,16 +34,22 @@ namespace unittests
 	TEST_CLASS(LLVMCodeGeneratorUnitTests)
 	{
 	private:
-		void RunTest(const std::string code, int expected) {
-
-			Source	src(code);
+		void RunTest(const std::string code, int expected)
+		{
+			Source src(code);
 			Tokenizer tokenizer(src);
-			TokenBuffers tokenBuffers = tokenizer.Tokenize();
+			TokenBuffer tokenBuffers = tokenizer.Tokenize();
 			Parser parser(src, tokenBuffers);
-			Module module = parser.Parse();
+
+			std::unordered_map<std::string, Module> modules;
+			modules.insert({ "main", std::move(parser.Parse()) });
+
+			std::vector<std::string> sources = { std::move(code) };
+
+			Program program("main", std::move(sources), std::move(modules));
 
 			LLVMState state(true);
-			Generate(module.PrivateNodes, state);
+			Generate(program, state);
 			int result = Execute(state);
 
 #if 0

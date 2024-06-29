@@ -131,42 +131,39 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="codegen\CodeGenerator.cpp" />
-    <ClCompile Include="codegen\NamedValues.cpp" />
-    <ClCompile Include="Compiler.cpp" />
-    <ClCompile Include="compiler\Program.cpp" />
-    <ClCompile Include="macro\MacroEngine.cpp" />
-    <ClCompile Include="parser\Parser.cpp" />
-    <ClCompile Include="tokenizer\Source.cpp" />
-    <ClCompile Include="tokenizer\Token.cpp" />
-    <ClCompile Include="tokenizer\Tokenizer.cpp" />
+    <ClCompile Include="compiler\codegen\CodeGenerator.cpp" />
+    <ClCompile Include="compiler\codegen\NamedValues.cpp" />
+    <ClCompile Include="compiler\Compiler.cpp" />
+    <ClCompile Include="compiler\module\node\NodeBuffer.cpp" />
+    <ClCompile Include="compiler\module\source\Source.cpp" />
+    <ClCompile Include="compiler\module\token\TokenBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="codegen\CodeGenerator.hpp" />
-    <ClInclude Include="codegen\NamedValues.hpp" />
-    <ClInclude Include="Compiler.hpp" />
-    <ClInclude Include="compiler\Program.hpp" />
+    <ClInclude Include="compiler\codegen\CodeGenerator.hpp" />
+    <ClInclude Include="compiler\codegen\NamedValues.hpp" />
+    <ClInclude Include="compiler\Compiler.hpp" />
+    <ClInclude Include="compiler\module\Module.hpp" />
+    <ClInclude Include="json\json.hpp" />
     <ClInclude Include="log\Log.hpp" />
-    <ClInclude Include="macro\MacroEngine.hpp" />
-    <ClInclude Include="parser\Node.hpp" />
-    <ClInclude Include="parser\NodeAllocator.hpp" />
+    <ClInclude Include="compiler\module\node\Definition.hpp" />
+    <ClInclude Include="compiler\module\node\NodeBuffer.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\NodeCommon.hpp" />
+    <ClInclude Include="compiler\module\node\NodeAllocator.hpp" />
     <ClInclude Include="parser\NodePrinter.hpp" />
-    <ClInclude Include="parser\Nodes.hpp" />
-    <ClInclude Include="parser\Annotation.hpp" />
-    <ClInclude Include="parser\nodes\ExpressionNode.hpp" />
-    <ClInclude Include="parser\nodes\FunctionNode.hpp" />
-    <ClInclude Include="parser\nodes\GenericNode.hpp" />
-    <ClInclude Include="parser\nodes\MacroNode.hpp" />
-    <ClInclude Include="parser\nodes\StatementNode.hpp" />
-    <ClInclude Include="parser\nodes\TypeNode.hpp" />
-    <ClInclude Include="parser\nodes\VariableNode.hpp" />
-    <ClInclude Include="parser\nodes\VariantNodes.hpp" />
-    <ClInclude Include="parser\VariantNode.hpp" />
-    <ClInclude Include="parser\Parser.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\AllNodes.hpp" />
+    <ClInclude Include="compiler\module\node\Annotation.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\ExpressionNodes.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\FunctionNodes.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\GenericNodes.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\MacroNodes.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\StatementNodes.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\TypeNodes.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\VariableNodes.hpp" />
+    <ClInclude Include="compiler\module\node\nodes\VariantNodes.hpp" />
     <ClInclude Include="TestString.hpp" />
-    <ClInclude Include="tokenizer\Source.hpp" />
-    <ClInclude Include="tokenizer\Token.hpp" />
-    <ClInclude Include="tokenizer\Tokenizer.hpp" />
+    <ClInclude Include="compiler\module\source\Source.hpp" />
+    <ClInclude Include="compiler\module\token\Token.hpp" />
+    <ClInclude Include="compiler\module\token\TokenBuffer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.alloy" />
