@@ -1,4 +1,6 @@
 #include "Compiler.hpp"
+#include "ModuleTable.hpp"
+#include "codegen/CodeGenerator.hpp"
 
 namespace AlloyCompiler
 {
@@ -39,13 +41,18 @@ namespace AlloyCompiler
 
 		for (const fs::path& path : pathsToCompile)
 		{
-			m_Modules.insert({ getModuleName(path), Module(path) });
+			m_Modules.emplace(getModuleName(path), path);
 		}
 
 		for (auto& [name, module] : m_Modules)
 		{
 			module.Generate();
 		}
+
+		ModuleTable moduleTable(m_Modules, getModuleName(m_MainFilePath));
+
+		LLVMState llvmState(true);
+		Generate(moduleTable, llvmState);
 	}
 
 	std::string Compiler::getModuleName(const fs::path& path)

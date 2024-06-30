@@ -1,9 +1,8 @@
 #pragma once
-#include "../node/NodeBuffer.hpp"
 
 #include "llvm/llvm.hpp"
 #include "NamedValues.hpp"
-#include "../compiler/Program.hpp"
+#include "../ModuleTable.hpp"
 
 namespace AlloyCompiler
 {
@@ -92,6 +91,6 @@ namespace AlloyCompiler
 		}
 	};
 
-	bool Generate(const Program& program, LLVMState& state);
+	bool Generate(ModuleTable& moduleTable, LLVMState& state);
 	int Execute(LLVMState& state);
 }

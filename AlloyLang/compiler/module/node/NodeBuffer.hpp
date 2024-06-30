@@ -31,6 +31,11 @@ namespace AlloyCompiler
 		NodeBuffer(const Source& source, TokenBuffer& tokenBuffer);
 		void Parse();
 
+		const std::vector<std::string_view>& GetImportedModules() const
+		{
+			return m_ImportedModules;
+		}
+
 		const NodeMap<MACRO_DEFINITION>& GetMacroDefinitions() const
 		{
 			return m_MacroDefinitions;

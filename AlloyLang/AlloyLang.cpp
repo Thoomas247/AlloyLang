@@ -1,3 +1,4 @@
+#include "log/Log.hpp"
 #include "compiler/Compiler.hpp"
 
 using namespace AlloyCompiler;

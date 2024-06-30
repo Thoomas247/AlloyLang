@@ -2608,13 +2608,15 @@ namespace AlloyCompiler
 	NodeBuffer::NodeBuffer(const Source& source, TokenBuffer& tokenBuffer)
 		: m_Source(source)
 		, m_TokenBuffer(tokenBuffer)
-		, m_Allocator(tokenBuffer.NumTokens() * 80)	// TODO: get rid of magic number
+		, m_Allocator()
 		, m_CurrentTokenIndex(0)
 	{
 	}
 
 	void NodeBuffer::Parse()
 	{
+		m_Allocator.Reset(m_TokenBuffer.NumTokens() * 80);	// TODO: remove magic number
+
 		using enum TokenKind;
 
 		while (!isEOF())

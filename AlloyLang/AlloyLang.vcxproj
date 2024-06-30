@@ -134,6 +134,8 @@
     <ClCompile Include="compiler\codegen\CodeGenerator.cpp" />
     <ClCompile Include="compiler\codegen\NamedValues.cpp" />
     <ClCompile Include="compiler\Compiler.cpp" />
+    <ClCompile Include="compiler\ModuleTable.cpp" />
+    <ClCompile Include="compiler\module\Module.cpp" />
     <ClCompile Include="compiler\module\node\NodeBuffer.cpp" />
     <ClCompile Include="compiler\module\source\Source.cpp" />
     <ClCompile Include="compiler\module\token\TokenBuffer.cpp" />
@@ -142,6 +144,7 @@
     <ClInclude Include="compiler\codegen\CodeGenerator.hpp" />
     <ClInclude Include="compiler\codegen\NamedValues.hpp" />
     <ClInclude Include="compiler\Compiler.hpp" />
+    <ClInclude Include="compiler\ModuleTable.hpp" />
     <ClInclude Include="compiler\module\Module.hpp" />
     <ClInclude Include="json\json.hpp" />
     <ClInclude Include="log\Log.hpp" />

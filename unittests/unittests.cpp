@@ -1,9 +1,9 @@
 #include "CppUnitTest.h"
-#include "../AlloyLang/codegen/llvm/llvm.hpp"
+#include "../AlloyLang/compiler/codegen/llvm/llvm.hpp"
 
-#include "../AlloyLang/tokenizer/Tokenizer.hpp"
-#include "../AlloyLang/parser/Parser.hpp"
-#include "../AlloyLang/codegen/CodeGenerator.hpp"
+#include "../AlloyLang/compiler/module/token/TokenBuffer.hpp"
+#include "../AlloyLang/compiler/module/node/NodeBuffer.hpp"
+#include "../AlloyLang/compiler/codegen/CodeGenerator.hpp"
 
 #include <iostream>
 #include <fstream>

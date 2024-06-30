@@ -4,14 +4,14 @@ namespace AlloyCompiler
 {
 
 	// forward declarations
-	llvm::Value* generateExpression(const Program& program, LLVMState& state, const EXPRESSION& expressionNode,
+	llvm::Value* generateExpression(ModuleTable& moduleTable, LLVMState& state, const EXPRESSION& expressionNode,
 		const TypeSubtypePair& expectedType);
-	llvm::Value* generateVariableDefinition(const Program& program, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
-	llvm::Value* generateStatement(const Program& program, LLVMState& state, const STATEMENT& statement);
-	llvm::Value* generateStatementBlock(const Program& program, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
-	llvm::Function* generateFunctionDefinition(const Program& program, LLVMState& state, Token* pTypeName, const FUNCTION_DEFINITION& functionDefinition);
-	llvm::Type* generateTypeDefinition(const Program& program, LLVMState& state, const TYPE_DEFINITION& typeDefinition);
-	llvm::Function* generateExternDefinition(const Program& program, LLVMState& state, const EXTERN_DEFINITION& externDefinition);
+	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
+	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
+	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
+	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, Token* pTypeName, const FUNCTION_DEFINITION& functionDefinition);
+	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition);
+	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition);
 
 #pragma region Util
 
@@ -219,7 +219,7 @@ namespace AlloyCompiler
 		return tempBuilder.CreateAlloca(type, elements, varName);
 	}
 
-	llvm::Type* getTypeFromTypeName(const Program& program, LLVMState& state, Token* pNameToken)
+	llvm::Type* getTypeFromTypeName(ModuleTable& moduleTable, LLVMState& state, Token* pNameToken)
 	{
 		const std::string_view& name = pNameToken->Value;
 
@@ -229,14 +229,27 @@ namespace AlloyCompiler
 		//
 		llvm::Type* type = state.NamedValues.GetType(name);
 
-		if (!type)
+		if (type == nullptr)
 		{
 			// type not found, it might not have been processed yet
 			// try to locate it in the program and process it
-			TYPE_DEFINITION* pTypeDefinition = program.GetTypeDefinition(pNameToken, /*emitErrors*/true).pValue;
-			if (pTypeDefinition != nullptr)
+
+			SearchResult<TYPE_DEFINITION> result = moduleTable.GetTypeDefinition(name);
+
+			if (result.Code == SearchResultCode::NotFound)
 			{
-				generateTypeDefinition(program, state, *pTypeDefinition);
+				// logError(pNameToken, "Type '{0}' does not exist.", name);
+			}
+
+			else if (result.Code == SearchResultCode::Inaccessible)
+			{
+				// logError(pNameToken, "Type '{0}' is private and cannot be accessed here.", name);
+				return nullptr;
+			}
+
+			else
+			{
+				generateTypeDefinition(moduleTable, state, *result.pDefiniton);
 				type = state.NamedValues.GetType(name);
 			}
 		}
@@ -268,7 +281,7 @@ namespace AlloyCompiler
 
 #pragma region Literals
 
-	llvm::Value* generateLiteral(const Program& program, LLVMState& state, const LITERAL& literalNode,
+	llvm::Value* generateLiteral(ModuleTable& moduleTable, LLVMState& state, const LITERAL& literalNode,
 								const TypeSubtypePair& identifierType)
 	{
 		const std::string_view literalStr = literalNode.pValueToken->Value;
@@ -349,7 +362,7 @@ namespace AlloyCompiler
 
 #pragma region Identifiers
 
-	PtrValuePair generateIdentifier(const Program& program, LLVMState& state, const VARIABLE& variable,
+	PtrValuePair generateIdentifier(ModuleTable& moduleTable, LLVMState& state, const VARIABLE& variable,
 									TypeSubtypePair& identifierType)
 	{
 		const std::string_view name = variable.pNameToken->Value;
@@ -393,7 +406,7 @@ namespace AlloyCompiler
 		return {};
 	}
 
-	TypeSubtypePair generateTypeIdentifier(const Program& program, LLVMState& state, const TYPE& typeIdentifier,
+	TypeSubtypePair generateTypeIdentifier(ModuleTable& moduleTable, LLVMState& state, const TYPE& typeIdentifier,
 														Token* pParentTypeNameToken, TypeModifier& modifier)
 	{
 		//
@@ -422,7 +435,7 @@ namespace AlloyCompiler
 				pNameToken = pParentTypeNameToken;
 			}
 
-			identifierType.type = getTypeFromTypeName(program, state, pNameToken);
+			identifierType.type = getTypeFromTypeName(moduleTable, state, pNameToken);
 
 			if (!identifierType.type)
 			{
@@ -456,7 +469,7 @@ namespace AlloyCompiler
 			}
 
 			TypeModifier modifier = TypeModifier::None;
-			identifierType = generateTypeIdentifier(program, state, *type.pElementType, pParentTypeNameToken, modifier);
+			identifierType = generateTypeIdentifier(moduleTable, state, *type.pElementType, pParentTypeNameToken, modifier);
 			llvm::Type* elementType = identifierType.type;
 
 			if (identifierType.type == nullptr)
@@ -506,7 +519,7 @@ namespace AlloyCompiler
 
 #pragma region Declarations
 
-	TypeSubtypePair generateTypeDeclaration(const Program& program, LLVMState& state, const FUNCTION_TYPE& typeDeclarationNode)
+	TypeSubtypePair generateTypeDeclaration(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_TYPE& typeDeclarationNode)
 	{
 		// TODO: var and const
 
@@ -515,16 +528,16 @@ namespace AlloyCompiler
 			return {};
 		}
 		else {
-			return generateTypeIdentifier(program, state, *typeDeclarationNode.pReturnType->pType, nullptr, modifier);
+			return generateTypeIdentifier(moduleTable, state, *typeDeclarationNode.pReturnType->pType, nullptr, modifier);
 		}
 	}
 
-	llvm::Value* generateVariableDeclaration(const Program& program, LLVMState& state, const VARIABLE_DECLARATION& variableDeclarationNode,
+	llvm::Value* generateVariableDeclaration(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DECLARATION& variableDeclarationNode,
 											TypeSubtypePair& identifierType)
 	{
 		const std::string_view name = variableDeclarationNode.pNameToken->Value;
 		TypeModifier modifier =	TypeModifier::None;
-		identifierType = generateTypeIdentifier(program, state, *variableDeclarationNode.pType, nullptr, modifier);
+		identifierType = generateTypeIdentifier(moduleTable, state, *variableDeclarationNode.pType, nullptr, modifier);
 
 		if (!identifierType.type)
 		{
@@ -571,23 +584,26 @@ namespace AlloyCompiler
 		return allocaInst;
 	}
 
-	llvm::Function* generateFunctionDeclaration(const Program& program, LLVMState& state, 
+	llvm::Function* generateFunctionDeclaration(ModuleTable& moduleTable, LLVMState& state, 
 												Token* pTypeNameToken, const FUNCTION_DEFINITION& functionDeclarationNode)
 	{
 		//
 		// If type is not empty, we are generating a member function in the form of Type@Name
 		//
 		std::string name;
-		if (pTypeNameToken == nullptr) {
+		if (pTypeNameToken == nullptr)
+		{
 			name = functionDeclarationNode.pFunctionNameToken->Value;
 		}
-		else {
-			name = Module::GetMangledName(pTypeNameToken, functionDeclarationNode.pFunctionNameToken);
+		else
+		{
+			name = NodeBuffer::GetMangledName(pTypeNameToken, functionDeclarationNode.pFunctionNameToken);
 		}
 
 		// check if function already exists
 		if (state.Module->getFunction(name))
 		{
+			// TODO: replace '@' in mangled name by ':' for error messages
 			logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' already defined!", name);
 			return nullptr;
 		}
@@ -612,7 +628,7 @@ namespace AlloyCompiler
 			VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
 
 			TypeModifier modifier = TypeModifier::None;
-			TypeSubtypePair identifierType = generateTypeIdentifier(program, state, *pParameterVariableDeclaration->pType, pTypeNameToken, modifier);
+			TypeSubtypePair identifierType = generateTypeIdentifier(moduleTable, state, *pParameterVariableDeclaration->pType, pTypeNameToken, modifier);
 
 			if (!identifierType.type)
 			{
@@ -639,7 +655,7 @@ namespace AlloyCompiler
 		if (functionDeclarationNode.pFunctionType != nullptr
 			&& functionDeclarationNode.pFunctionType->pReturnType != nullptr)
 		{
-			returnType = generateTypeDeclaration(program, state, *functionDeclarationNode.pFunctionType).type;
+			returnType = generateTypeDeclaration(moduleTable, state, *functionDeclarationNode.pFunctionType).type;
 		}
 
 		if (!returnType)
@@ -689,7 +705,7 @@ namespace AlloyCompiler
 
 #pragma region Expressions
 
-	llvm::Value* generateConstructorExpression(const Program& program, LLVMState& state, const CONSTRUCTOR& constructorExpression)
+	llvm::Value* generateConstructorExpression(ModuleTable& moduleTable, LLVMState& state, const CONSTRUCTOR& constructorExpression)
 	{
 		const std::string_view structName = constructorExpression.pType->pNameToken->Value;
 
@@ -731,7 +747,7 @@ namespace AlloyCompiler
 			// set the type that we are expecting for each structure element
 			TypeSubtypePair identifierType = { structType->getElementType(memberInfo.memberIndex), memberInfo.containedType };
 
-			llvm::Value* expressionVal = generateExpression(program, state, *constructorExpression.Arguments[i].second, identifierType);
+			llvm::Value* expressionVal = generateExpression(moduleTable, state, *constructorExpression.Arguments[i].second, identifierType);
 
 			if (!expressionVal)
 			{
@@ -757,7 +773,7 @@ namespace AlloyCompiler
 		return state.Builder->CreateLoad(structPtr->getAllocatedType(), structPtr);	// result contains the whole initialized structure
 	}
 
-	llvm::Value* generatePointerInitializerExpression(const Program& program, LLVMState& state, const POINTER_INIT& pointerInitializerNode,
+	llvm::Value* generatePointerInitializerExpression(ModuleTable& moduleTable, LLVMState& state, const POINTER_INIT& pointerInitializerNode,
 													  const TypeSubtypePair& identifierType)
 	{
 		//
@@ -783,7 +799,7 @@ namespace AlloyCompiler
 		llvm::PointerType* pointerType = llvm::PointerType::get(elementType, 0);	// note that elementType is not actually stored by llvm
 
 		// get the value to set for each element
-		llvm::Value* defaultValue = generateExpression(program, state, *pointerInitializerNode.pValue, { elementType, nullptr });
+		llvm::Value* defaultValue = generateExpression(moduleTable, state, *pointerInitializerNode.pValue, { elementType, nullptr });
 		// try to convert the value to the expected type	
 		convertValueToType(state, defaultValue, elementType);
 
@@ -794,7 +810,7 @@ namespace AlloyCompiler
 			count = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1, true));
 		}
 		else {
-			count = generateExpression(program, state, *pointerInitializerNode.pSize, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
+			count = generateExpression(moduleTable, state, *pointerInitializerNode.pSize, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
 		}
 
 		// create a mutable variable on the heap
@@ -851,14 +867,14 @@ namespace AlloyCompiler
 		return Ptr;	// return the initialized pointer
 	}
 
-	llvm::Value* generatePointerMoveExpression(const Program& program, LLVMState& state, const POINTER_MOVE& pointerMoveNode,
+	llvm::Value* generatePointerMoveExpression(ModuleTable& moduleTable, LLVMState& state, const POINTER_MOVE& pointerMoveNode,
 											const TypeSubtypePair& expectedType)
 	{
 		//
 		// move Identifier ;
 		//
 		TypeSubtypePair identifierType = { nullptr, nullptr };
-		PtrValuePair ptrValue = generateIdentifier(program, state, *pointerMoveNode.pVariable, identifierType);
+		PtrValuePair ptrValue = generateIdentifier(moduleTable, state, *pointerMoveNode.pVariable, identifierType);
 
 		// retrieve the name of the identifier in the right-side node in order to remove it from the NamedValues map
 		const Token& rightNode = *pointerMoveNode.pVariable->pNameToken;
@@ -868,7 +884,7 @@ namespace AlloyCompiler
 		return ptrValue.Ptr;
 	}
 		
-	llvm::Value* generateInitializerListExpression(const Program& program, LLVMState& state, const INITIALIZER_LIST& initListExpressionNode,
+	llvm::Value* generateInitializerListExpression(ModuleTable& moduleTable, LLVMState& state, const INITIALIZER_LIST& initListExpressionNode,
 													const TypeSubtypePair& expectedType)
 	{
 		//
@@ -894,7 +910,7 @@ namespace AlloyCompiler
 			// set the type that we are expecting for each array element
 			TypeSubtypePair identifierType = { vectorType->getElementType(), expectedType.containedType };
 
-			llvm::Value* expressionVal = generateExpression(program, state, *initListExpressionNode.Values[i], identifierType);
+			llvm::Value* expressionVal = generateExpression(moduleTable, state, *initListExpressionNode.Values[i], identifierType);
 
 			if (!expressionVal)
 			{
@@ -914,7 +930,7 @@ namespace AlloyCompiler
 		return state.Builder->CreateLoad(arrayPtr->getAllocatedType(), arrayPtr);	// result contains the whole initialized array
 	}
 
-	llvm::Value* generateVariableDefinitionExpression(const Program& program, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
+	llvm::Value* generateVariableDefinitionExpression(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
 	{
 		//
 		// ( var | const ) identifier:TYPE = expression;
@@ -922,7 +938,7 @@ namespace AlloyCompiler
 		TypeSubtypePair identifierType = { nullptr, nullptr };
 
 		// create the declaration
-		llvm::Value* declarationVal = generateVariableDeclaration(program, state, *variableDefinition.pDeclaration, identifierType);
+		llvm::Value* declarationVal = generateVariableDeclaration(moduleTable, state, *variableDefinition.pDeclaration, identifierType);
 
 		if (!declarationVal)
 		{
@@ -932,7 +948,7 @@ namespace AlloyCompiler
 		}
 
 		// create the value expression
-		llvm::Value* value = generateExpression(program, state, *variableDefinition.pValue, identifierType);
+		llvm::Value* value = generateExpression(moduleTable, state, *variableDefinition.pValue, identifierType);
 
 		if (!value)
 		{
@@ -950,10 +966,10 @@ namespace AlloyCompiler
 		return state.Builder->CreateStore(value, declarationVal);
 	}
 
-	PtrValuePair generateArrayAccessExpression(const Program& program, LLVMState& state, const ARRAY_ACCESS& arrayAccessExpression,
+	PtrValuePair generateArrayAccessExpression(ModuleTable& moduleTable, LLVMState& state, const ARRAY_ACCESS& arrayAccessExpression,
 												const TypeSubtypePair& identifierType)
 	{
-		llvm::Value* memberIndex = generateExpression(program, state, *arrayAccessExpression.pIndex, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
+		llvm::Value* memberIndex = generateExpression(moduleTable, state, *arrayAccessExpression.pIndex, { llvm::IntegerType::getInt64Ty(*state.Context), nullptr });
 		TypeSubtypePair tempType = { nullptr, nullptr };
 		PtrValuePair left = { nullptr, nullptr, false };
 
@@ -963,12 +979,12 @@ namespace AlloyCompiler
 			)
 		{
 			TypeSubtypePair identifierType = { nullptr, nullptr };
-			left = generateIdentifier(program, state, *arrayAccessExpression.pArray->Get<PRIMARY>()->Get<VARIABLE>(), tempType);
+			left = generateIdentifier(moduleTable, state, *arrayAccessExpression.pArray->Get<PRIMARY>()->Get<VARIABLE>(), tempType);
 		}
 		else
 		// not a variable, must be an expression that returns an array
 		{
-			left.Value = generateExpression(program, state, *arrayAccessExpression.pArray, tempType);
+			left.Value = generateExpression(moduleTable, state, *arrayAccessExpression.pArray, tempType);
 			left.Ptr = nullptr;		// we don't have a pointer to a variable, so set this to null
 		}
 
@@ -1003,7 +1019,7 @@ namespace AlloyCompiler
 		// array of pointers, we need to load the underlying value
 		if (llvm::isa<llvm::PointerType>(memberValue->getType())) {
 			if (tempType.containedType == nullptr) {
-				logErrorAtCurrentPosition(nullptr, // TBD: program.GetErrorInfo(arrayAccessExpression.ArrayExpressionID)
+				logErrorAtCurrentPosition(nullptr, // TBD: moduleTable.GetErrorInfo(arrayAccessExpression.ArrayExpressionID)
 										"Array contains pointers of unknown type!");
 				return {};
 			}
@@ -1016,7 +1032,7 @@ namespace AlloyCompiler
 		return PtrValuePair{ .Ptr = memberPtr, .Value = memberValue, .isConst = left.isConst };
 	}
 
-	PtrValuePair generateMemberAccessExpression(const Program& program, LLVMState& state, const MEMBER_ACCESS& memberAccessExpression,
+	PtrValuePair generateMemberAccessExpression(ModuleTable& moduleTable, LLVMState& state, const MEMBER_ACCESS& memberAccessExpression,
 												const TypeSubtypePair& expectedType)
 	{
 		const std::string_view memberName = memberAccessExpression.pMemberNameToken->Value;
@@ -1028,19 +1044,19 @@ namespace AlloyCompiler
 			&& memberAccessExpression.pObject->Get<POSTFIX>()->Is<MEMBER_ACCESS>()
 			)
 		{
-			left = generateMemberAccessExpression(program, state, *memberAccessExpression.pObject->Get<POSTFIX>()->Get<MEMBER_ACCESS>(), expectedType);
+			left = generateMemberAccessExpression(moduleTable, state, *memberAccessExpression.pObject->Get<POSTFIX>()->Get<MEMBER_ACCESS>(), expectedType);
 		}
 		// handle identifier
 		else if (memberAccessExpression.pObject->Is<PRIMARY>()
 			&& memberAccessExpression.pObject->Get<PRIMARY>()->Is<VARIABLE>())
 		{
 			TypeSubtypePair identifierType = { nullptr, nullptr };
-			left = generateIdentifier(program, state, *memberAccessExpression.pObject->Get<PRIMARY>()->Get<VARIABLE>(), identifierType);
+			left = generateIdentifier(moduleTable, state, *memberAccessExpression.pObject->Get<PRIMARY>()->Get<VARIABLE>(), identifierType);
 		}
 		else
 		// neither an identifier nor a nested member access, must be an expression that returns a structure
 		{
-			left.Value = generateExpression(program, state, *memberAccessExpression.pObject, expectedType);
+			left.Value = generateExpression(moduleTable, state, *memberAccessExpression.pObject, expectedType);
 			left.Ptr = nullptr;		// we don't have a pointer to a variable, so set this to null
 		}
 
@@ -1049,7 +1065,7 @@ namespace AlloyCompiler
 
 		if (leftType->getTypeID() != llvm::Type::StructTyID)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: program.GetErrorInfo(memberAccessExpressionNode.LeftID)
+			logErrorAtCurrentPosition(nullptr, // TBD: moduleTable.GetErrorInfo(memberAccessExpressionNode.LeftID)
 									"Expected struct type!");
 			return {};
 		}
@@ -1097,7 +1113,7 @@ namespace AlloyCompiler
 		}
 	}
 
-	llvm::Value* generateFunctionCallExpression(const Program& program, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
+	llvm::Value* generateFunctionCallExpression(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
 	{
 		std::string functionName(functionCallExpressionNode.pFunctionNameToken->Value);
 		std::vector<llvm::Value*> args;
@@ -1127,9 +1143,9 @@ namespace AlloyCompiler
 			const std::string_view varOrTypeName = functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value;
 			if (state.NamedValues.GetValue(varOrTypeName) != nullptr)
 			{
-				// member function call
+				// non-static member function call
 				std::string_view typeName = state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType());
-				std::string mangledName = Module::GetMangledName(typeName, functionName);
+				std::string mangledName = NodeBuffer::GetMangledName(typeName, functionName);
 
 				// look up the function in the global module table
 				calleeFunc = state.Module->getFunction(mangledName);
@@ -1140,15 +1156,21 @@ namespace AlloyCompiler
 				}
 
 				// also retrieve the original function definition
-				ErrorRange errorRange = ErrorRange(functionCallExpressionNode.pTypeOrVariableName->pNameToken, functionCallExpressionNode.pFunctionNameToken);
-				auto memberFunctionResult = program.GetMemberFunctionDefinition(errorRange, mangledName, /*emitErrors*/true);
-				if (memberFunctionResult.Code == SearchErrorCode::Success)
+				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
+				
+				if (result.Code == SearchResultCode::NotFound)
 				{
-					pCalleeFunctionType = memberFunctionResult.pValue->pFunctionType;
+					// TODO: error not found
+					goto error;
+				}
+				else if (result.Code == SearchResultCode::Inaccessible)
+				{
+					// TODO: error inaccessible
+					goto error;
 				}
 				else
 				{
-					goto error;
+					pCalleeFunctionType = result.pDefiniton->pFunctionType;
 				}
 
 				/* TBD:check that the first argument is of the right type
@@ -1159,24 +1181,31 @@ namespace AlloyCompiler
 				*/
 				insertSelfAsFirstParam = true;
 			}
+
 			else if (state.NamedValues.GetType(varOrTypeName) != nullptr)
 			{
-				std::string mangledName = Module::GetMangledName(varOrTypeName, functionName);
+				// static member function call
+				std::string mangledName = NodeBuffer::GetMangledName(varOrTypeName, functionName);
 
-				// static function call
 				// look up the function in the global module table
 				calleeFunc = state.Module->getFunction(mangledName);
 
 				// also retrieve the original function definition
-				ErrorRange errorRange = ErrorRange(functionCallExpressionNode.pTypeOrVariableName->pNameToken, functionCallExpressionNode.pFunctionNameToken);
-				auto memberFunctionResult = program.GetMemberFunctionDefinition(errorRange, mangledName, /*emitErrors*/true);
-				if (memberFunctionResult.Code == SearchErrorCode::Success)
+				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
+
+				if (result.Code == SearchResultCode::NotFound)
 				{
-					pCalleeFunctionType = memberFunctionResult.pValue->pFunctionType;
+					// TODO: error not found
+					goto error;
+				}
+				else if (result.Code == SearchResultCode::Inaccessible)
+				{
+					// TODO: error inaccessible
+					goto error;
 				}
 				else
 				{
-					goto error;
+					pCalleeFunctionType = result.pDefiniton->pFunctionType;
 				}
 			}
 			else
@@ -1191,31 +1220,38 @@ namespace AlloyCompiler
 			calleeFunc = state.Module->getFunction(std::string(functionName));
 
 			// also retrieve the original function definition
-			// look for a function definition
-			auto funcResult = program.GetFunctionDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/false);
-			if (funcResult.Code == SearchErrorCode::Success)
+			SearchResult<FUNCTION_DEFINITION> funcResult = moduleTable.GetFunctionDefinition(functionName);
+
+			if (funcResult.Code == SearchResultCode::NotFound)
 			{
-				pCalleeFunctionType = funcResult.pValue->pFunctionType;
+				// could also be an extern
+				SearchResult<EXTERN_DEFINITION> externResult = moduleTable.GetExternDefinition(functionName);
+
+				if (externResult.Code == SearchResultCode::NotFound)
+				{
+					// TODO: error not found
+					goto error;
+				}
+
+				else if (externResult.Code == SearchResultCode::Inaccessible)
+				{
+					// TODO: error inaccessible
+					goto error;
+				}
+
+				else
+				{
+					pCalleeFunctionType = externResult.pDefiniton->pFunctionType;
+				}
 			}
-			else if (funcResult.Code == SearchErrorCode::Inaccessible)
+			else if (funcResult.Code == SearchResultCode::Inaccessible)
 			{
-				// call again to emit the appropriate error
-				(void)program.GetFunctionDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/true);
+				// TODO: error inaccessible
 				goto error;
 			}
 			else
 			{
-				// otherwise look for an extern definition
-				// if this time we find nothing, emit the error straight away
-				auto externResult = program.GetExternDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/true);
-				if (externResult.Code == SearchErrorCode::Success)
-				{
-					pCalleeFunctionType = externResult.pValue->pFunctionType;
-				}
-				else
-				{
-					goto error;
-				}
+				pCalleeFunctionType = funcResult.pDefiniton->pFunctionType;
 			}
 		}
 
@@ -1223,25 +1259,28 @@ namespace AlloyCompiler
 		// check if function is already in the parser and process it
 		if (!calleeFunc)
 		{
-			auto functionResult = program.GetFunctionDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/true);
+			ASSERT(false, "Defining a new function while another function is already being defined is not working, all functions have to be pre-processed in Generate!");
+
+#if 0
+			auto functionResult = moduleTable.GetFunctionDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/true);
 			if (functionResult.Code == SearchErrorCode::Success)
 			{
-				ASSERT(false, "Defining a new function while another function is already being defined is not working, all functions have to be pre-processed in Generate!");
-#if 0
+
 				// function found, process it
-				calleeFunc = generateFunctionDefinition(program, state, "", *functionResult.pValue);
-#endif
+				calleeFunc = generateFunctionDefinition(moduleTable, state, "", *functionResult.pValue);
+
 			}
 			else
 			{
-				auto externResult = program.GetExternDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/true);
+				auto externResult = moduleTable.GetExternDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/true);
 
 				if (externResult.Code == SearchErrorCode::Success)
 				{
 					// external function found, process it
-					calleeFunc = generateExternDefinition(program, state, *externResult.pValue);
+					calleeFunc = generateExternDefinition(moduleTable, state, *externResult.pValue);
 				}
 			}
+#endif
 		}
 
 		if (!calleeFunc
@@ -1252,11 +1291,13 @@ namespace AlloyCompiler
 		}
 
 		// first parameter is &Self
-		if (insertSelfAsFirstParam) {
+		if (insertSelfAsFirstParam)
+		{
 			VARIABLE var{ functionCallExpressionNode.pTypeOrVariableName->pNameToken };
 			TypeSubtypePair identifierType = {};
-			PtrValuePair ptrValue = generateIdentifier(program, state, var, identifierType);
-			if (ptrValue.Ptr == nullptr) {
+			PtrValuePair ptrValue = generateIdentifier(moduleTable, state, var, identifierType);
+			if (ptrValue.Ptr == nullptr)
+			{
 				logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
 				goto error;
 			}
@@ -1300,7 +1341,7 @@ namespace AlloyCompiler
 						&& unary.pExpression->Is<PRIMARY>()
 						&& unary.pExpression->Get<PRIMARY>()->Is<VARIABLE>()) {
 						TypeSubtypePair tempType = { nullptr, nullptr };
-						PtrValuePair left = generateIdentifier(program, state, *unary.pExpression->Get<PRIMARY>()->Get<VARIABLE>(),
+						PtrValuePair left = generateIdentifier(moduleTable, state, *unary.pExpression->Get<PRIMARY>()->Get<VARIABLE>(),
 							tempType);
 						if (left.Ptr == nullptr) {
 							logErrorAtCurrentPosition(nullptr, // TBD: argumentID
@@ -1320,7 +1361,7 @@ namespace AlloyCompiler
 						goto error;
 					}
 
-					argVal = generateExpression(program, state, argument, argType);
+					argVal = generateExpression(moduleTable, state, argument, argType);
 					// create a pointer to the evaluated expression and pass the pointer as argument
 					llvm::AllocaInst* ptr = state.Builder->CreateAlloca(argVal->getType());
 					state.Builder->CreateStore(argVal, ptr);
@@ -1328,7 +1369,7 @@ namespace AlloyCompiler
 				}
 			}
 			else {
-				argVal = generateExpression(program, state, argument, argType);
+				argVal = generateExpression(moduleTable, state, argument, argType);
 
 				if (argVal == nullptr)
 				{
@@ -1359,18 +1400,18 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	llvm::Value* generateEnclosedExpression(const Program& program, LLVMState& state, const ENCLOSED_EXPRESSION& enclosedExpressionNode,
+	llvm::Value* generateEnclosedExpression(ModuleTable& moduleTable, LLVMState& state, const ENCLOSED_EXPRESSION& enclosedExpressionNode,
 												const TypeSubtypePair& expectedType)
 	{
-		return generateExpression(program, state, *enclosedExpressionNode.pExpression, expectedType);
+		return generateExpression(moduleTable, state, *enclosedExpressionNode.pExpression, expectedType);
 	}
 
-	llvm::Value* generateBinaryExpression(const Program& program, LLVMState& state, const BINARY& binaryExpressionNode)
+	llvm::Value* generateBinaryExpression(ModuleTable& moduleTable, LLVMState& state, const BINARY& binaryExpressionNode)
 	{
 		TypeSubtypePair leftExpressionType = { nullptr, nullptr };
-		llvm::Value* leftVal = generateExpression(program, state, *binaryExpressionNode.pLeft, leftExpressionType);
+		llvm::Value* leftVal = generateExpression(moduleTable, state, *binaryExpressionNode.pLeft, leftExpressionType);
 		TypeSubtypePair rightExpressionType = { leftVal->getType(), nullptr};	// when computing rightVal, try to obtain a value of same type as leftVal
-		llvm::Value* rightVal = generateExpression(program, state, *binaryExpressionNode.pRight, rightExpressionType);
+		llvm::Value* rightVal = generateExpression(moduleTable, state, *binaryExpressionNode.pRight, rightExpressionType);
 
 		if (!leftVal || !rightVal)
 		{
@@ -1494,7 +1535,7 @@ namespace AlloyCompiler
 		return nullptr;
 	}
 
-	llvm::Value* generateUnaryExpression(const Program& program, LLVMState& state, const UNARY& unaryExpressionNode,
+	llvm::Value* generateUnaryExpression(ModuleTable& moduleTable, LLVMState& state, const UNARY& unaryExpressionNode,
 											const TypeSubtypePair& expectedType)
 	{
 		std::string_view operatorStr = unaryExpressionNode.pOpToken->Value;
@@ -1502,7 +1543,7 @@ namespace AlloyCompiler
 
 		if (operatorStr == "-")
 		{
-			llvm::Value* expressionVal = generateExpression(program, state, *unaryExpressionNode.pExpression, expectedType);
+			llvm::Value* expressionVal = generateExpression(moduleTable, state, *unaryExpressionNode.pExpression, expectedType);
 
 			if (expressionVal)
 			{
@@ -1512,7 +1553,7 @@ namespace AlloyCompiler
 		else
 			if (operatorStr == "!")
 			{
-				llvm::Value* expressionVal = generateExpression(program, state, *unaryExpressionNode.pExpression, expectedType);
+				llvm::Value* expressionVal = generateExpression(moduleTable, state, *unaryExpressionNode.pExpression, expectedType);
 
 				if (expressionVal)
 				{
@@ -1525,7 +1566,7 @@ namespace AlloyCompiler
 					&& unaryExpressionNode.pExpression->Get<PRIMARY>()->Is<VARIABLE>())
 				{
 					TypeSubtypePair tempType = { nullptr, nullptr };
-					PtrValuePair left = generateIdentifier(program, state, 
+					PtrValuePair left = generateIdentifier(moduleTable, state, 
 										*unaryExpressionNode.pExpression->Get<PRIMARY>()->Get<VARIABLE>(),
 										tempType);
 					result = left.Ptr;
@@ -1538,7 +1579,7 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	llvm::Value* generatePrimaryExpression(const Program& program, LLVMState& state, const PRIMARY& primary,
+	llvm::Value* generatePrimaryExpression(ModuleTable& moduleTable, LLVMState& state, const PRIMARY& primary,
 									const TypeSubtypePair& expectedType)
 	{
 		//
@@ -1549,37 +1590,37 @@ namespace AlloyCompiler
 		TypeSubtypePair identiferType = expectedType;
 
 		if (primary.Is<LITERAL>()) {
-			result = generateLiteral(program, state, *primary.Get<LITERAL>(), expectedType);
+			result = generateLiteral(moduleTable, state, *primary.Get<LITERAL>(), expectedType);
 		}
 		else if (primary.Is<VARIABLE>()) {
-				result = generateIdentifier(program, state, *primary.Get<VARIABLE>(), identiferType).Value;
+				result = generateIdentifier(moduleTable, state, *primary.Get<VARIABLE>(), identiferType).Value;
 		}
 		else if (primary.Is<CONSTRUCTOR>()) {
-			result = generateConstructorExpression(program, state, *primary.Get<CONSTRUCTOR>());
+			result = generateConstructorExpression(moduleTable, state, *primary.Get<CONSTRUCTOR>());
 		}
 		else if (primary.Is<POINTER_INIT>()) {
-			result = generatePointerInitializerExpression(program, state, *primary.Get<POINTER_INIT>(), expectedType);
+			result = generatePointerInitializerExpression(moduleTable, state, *primary.Get<POINTER_INIT>(), expectedType);
 		}
 		else if (primary.Is<POINTER_MOVE>()) {
-			result = generatePointerMoveExpression(program, state, *primary.Get<POINTER_MOVE>(), expectedType);
+			result = generatePointerMoveExpression(moduleTable, state, *primary.Get<POINTER_MOVE>(), expectedType);
 		}
 		else if (primary.Is<INITIALIZER_LIST>()) {
-			result = generateInitializerListExpression(program, state, *primary.Get<INITIALIZER_LIST>(), expectedType);
+			result = generateInitializerListExpression(moduleTable, state, *primary.Get<INITIALIZER_LIST>(), expectedType);
 		}
 		else if (primary.Is<VARIABLE_DEFINITION>()) {
-			result = generateVariableDefinitionExpression(program, state, *primary.Get<VARIABLE_DEFINITION>());
+			result = generateVariableDefinitionExpression(moduleTable, state, *primary.Get<VARIABLE_DEFINITION>());
 		}
 		else if (primary.Is<ARRAY_ACCESS>()) {
-			result = generateArrayAccessExpression(program, state, *primary.Get<ARRAY_ACCESS>(), expectedType).Value;
+			result = generateArrayAccessExpression(moduleTable, state, *primary.Get<ARRAY_ACCESS>(), expectedType).Value;
 		}
 		else if (primary.Is<MEMBER_ACCESS>()) {
-			result = generateMemberAccessExpression(program, state, *primary.Get<MEMBER_ACCESS>(), expectedType).Value;
+			result = generateMemberAccessExpression(moduleTable, state, *primary.Get<MEMBER_ACCESS>(), expectedType).Value;
 		}
 		else if (primary.Is<FUNCTION_CALL>()) {
-			result = generateFunctionCallExpression(program, state, *primary.Get<FUNCTION_CALL>());
+			result = generateFunctionCallExpression(moduleTable, state, *primary.Get<FUNCTION_CALL>());
 		}
 		else if (primary.Is<ENCLOSED_EXPRESSION>()) {
-			result = generateEnclosedExpression(program, state, *primary.Get<ENCLOSED_EXPRESSION>(), expectedType);
+			result = generateEnclosedExpression(moduleTable, state, *primary.Get<ENCLOSED_EXPRESSION>(), expectedType);
 		}
 		else {
 			ASSERT(false, "Unknown primary expression node kind!");
@@ -1591,7 +1632,7 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	llvm::Value* generateAssignmentExpression(const Program& program, LLVMState& state, const ASSIGNMENT& assignment,
+	llvm::Value* generateAssignmentExpression(ModuleTable& moduleTable, LLVMState& state, const ASSIGNMENT& assignment,
 												const TypeSubtypePair& expectedType)
 	{
 		PtrValuePair ptrValue;
@@ -1601,18 +1642,18 @@ namespace AlloyCompiler
 			&& assignment.pVariable->Get<POSTFIX>()->Is<MEMBER_ACCESS>()
 			)
 		{
-			ptrValue = generateMemberAccessExpression(program, state, *assignment.pVariable->Get<POSTFIX>()->Get<MEMBER_ACCESS>(), expectedType);
+			ptrValue = generateMemberAccessExpression(moduleTable, state, *assignment.pVariable->Get<POSTFIX>()->Get<MEMBER_ACCESS>(), expectedType);
 		}
 		else if (assignment.pVariable->Is<PRIMARY>()
 			&& assignment.pVariable->Get<PRIMARY>()->Is<VARIABLE>())
 		{
 			TypeSubtypePair identifierType = expectedType;
-			ptrValue = generateIdentifier(program, state, *assignment.pVariable->Get<PRIMARY>()->Get<VARIABLE>(), identifierType);
+			ptrValue = generateIdentifier(moduleTable, state, *assignment.pVariable->Get<PRIMARY>()->Get<VARIABLE>(), identifierType);
 		}
 		else if (assignment.pVariable->Is<POSTFIX>()
 			&& assignment.pVariable->Get<POSTFIX>()->Is<ARRAY_ACCESS>())
 		{
-			ptrValue = generateArrayAccessExpression(program, state, *assignment.pVariable->Get<POSTFIX>()->Get<ARRAY_ACCESS>(), expectedType);
+			ptrValue = generateArrayAccessExpression(moduleTable, state, *assignment.pVariable->Get<POSTFIX>()->Get<ARRAY_ACCESS>(), expectedType);
 		}
 
 		ptr = ptrValue.Ptr;
@@ -1630,7 +1671,7 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		llvm::Value* expressionVal = generateExpression(program, state, *assignment.pValue, expectedType);
+		llvm::Value* expressionVal = generateExpression(moduleTable, state, *assignment.pValue, expectedType);
 
 		if (!expressionVal)
 		{
@@ -1649,30 +1690,30 @@ namespace AlloyCompiler
 		return state.Builder->CreateStore(expressionVal, ptr);
 	}
 
-	llvm::Value* generateExpression(const Program& program, LLVMState& state, const EXPRESSION& expressionNode,
+	llvm::Value* generateExpression(ModuleTable& moduleTable, LLVMState& state, const EXPRESSION& expressionNode,
 														const TypeSubtypePair& expectedType)
 	{
 		llvm::Value* result = nullptr;
 
 		if (expressionNode.Is<BINARY>()) {
-			result = generateBinaryExpression(program, state, *expressionNode.Get<BINARY>());
+			result = generateBinaryExpression(moduleTable, state, *expressionNode.Get<BINARY>());
 		}
 		else if (expressionNode.Is<UNARY>()) {
-			result = generateUnaryExpression(program, state, *expressionNode.Get<UNARY>(), expectedType);
+			result = generateUnaryExpression(moduleTable, state, *expressionNode.Get<UNARY>(), expectedType);
 		}
 		else if (expressionNode.Is<PRIMARY>()) {
-			result = generatePrimaryExpression(program, state, *expressionNode.Get<PRIMARY>(), expectedType);
+			result = generatePrimaryExpression(moduleTable, state, *expressionNode.Get<PRIMARY>(), expectedType);
 		}
 		else if (expressionNode.Is<ASSIGNMENT>()) {
-			result = generateAssignmentExpression(program, state, *expressionNode.Get<ASSIGNMENT>(), expectedType);
+			result = generateAssignmentExpression(moduleTable, state, *expressionNode.Get<ASSIGNMENT>(), expectedType);
 		}
 		else if (expressionNode.Is<POSTFIX>()) {
 			const POSTFIX& postfix = *expressionNode.Get<POSTFIX>();
 			if (postfix.Is<ARRAY_ACCESS>()) {
-				result = generateArrayAccessExpression(program, state, *postfix.Get<ARRAY_ACCESS>(), expectedType).Value;
+				result = generateArrayAccessExpression(moduleTable, state, *postfix.Get<ARRAY_ACCESS>(), expectedType).Value;
 			}
 			else if (postfix.Is<MEMBER_ACCESS>()) {
-				result = generateMemberAccessExpression(program, state, *postfix.Get<MEMBER_ACCESS>(), expectedType).Value;
+				result = generateMemberAccessExpression(moduleTable, state, *postfix.Get<MEMBER_ACCESS>(), expectedType).Value;
 			}
 			else {
 				ASSERT(false, "Unknown postfix expression node kind!");
@@ -1689,23 +1730,23 @@ namespace AlloyCompiler
 
 #pragma region Statements
 
-	llvm::Value* generateVariableDefinitionStatement(const Program& program, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
+	llvm::Value* generateVariableDefinitionStatement(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
 	{
-		return generateVariableDefinitionExpression(program, state, variableDefinition);
+		return generateVariableDefinitionExpression(moduleTable, state, variableDefinition);
 	}
 
-	llvm::Value* generateFunctionCallStatement(const Program& program, LLVMState& state, const FUNCTION_CALL& functionCall)
+	llvm::Value* generateFunctionCallStatement(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_CALL& functionCall)
 	{
-		return generateFunctionCallExpression(program, state, functionCall);
+		return generateFunctionCallExpression(moduleTable, state, functionCall);
 	}
 
-	llvm::Value* generateAssignmentStatement(const Program& program, LLVMState& state, const ASSIGNMENT& assignment)
+	llvm::Value* generateAssignmentStatement(ModuleTable& moduleTable, LLVMState& state, const ASSIGNMENT& assignment)
 	{
 		TypeSubtypePair identifierType = { nullptr, nullptr };
-		return generateAssignmentExpression(program, state, assignment, identifierType);
+		return generateAssignmentExpression(moduleTable, state, assignment, identifierType);
 	}
 
-	llvm::Value* generateForLoopStatement(const Program& program, LLVMState& state, const FOR_LOOP& forLoop)
+	llvm::Value* generateForLoopStatement(ModuleTable& moduleTable, LLVMState& state, const FOR_LOOP& forLoop)
 	{
 		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
 
@@ -1714,7 +1755,7 @@ namespace AlloyCompiler
 		// emit init code before the loop
 		if (forLoop.pInitialization != nullptr)
 		{
-			llvm::Value* initVal = generateExpression(program, state, *forLoop.pInitialization, { nullptr, nullptr });
+			llvm::Value* initVal = generateExpression(moduleTable, state, *forLoop.pInitialization, { nullptr, nullptr });
 
 			if (initVal == nullptr)
 			{
@@ -1735,7 +1776,7 @@ namespace AlloyCompiler
 
 		// generate the body of the loop
 		if (forLoop.pBody != nullptr) {
-			llvm::Value* bodyVal = generateStatement(program, state, *forLoop.pBody);
+			llvm::Value* bodyVal = generateStatement(moduleTable, state, *forLoop.pBody);
 
 			if (bodyVal == nullptr)
 			{
@@ -1747,7 +1788,7 @@ namespace AlloyCompiler
 
 		// emit step value
 		if (forLoop.pIncrement != nullptr) {
-			llvm::Value* stepVal = generateExpression(program, state, *forLoop.pIncrement, { nullptr, nullptr });
+			llvm::Value* stepVal = generateExpression(moduleTable, state, *forLoop.pIncrement, { nullptr, nullptr });
 
 			if (stepVal == nullptr)
 			{
@@ -1760,7 +1801,7 @@ namespace AlloyCompiler
 		// emit the condition
 		llvm::Value* conditionVal;
 		if (forLoop.pCondition != nullptr) {
-			conditionVal = generateExpression(program, state, *forLoop.pCondition, { nullptr, nullptr });
+			conditionVal = generateExpression(moduleTable, state, *forLoop.pCondition, { nullptr, nullptr });
 
 			if (conditionVal == nullptr)
 			{
@@ -1785,7 +1826,7 @@ namespace AlloyCompiler
 		return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
 	}
 
-	llvm::Value* generateWhileLoopStatement(const Program& program, LLVMState& state, const WHILE_LOOP& whileLoop)
+	llvm::Value* generateWhileLoopStatement(ModuleTable& moduleTable, LLVMState& state, const WHILE_LOOP& whileLoop)
 	{
 		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
 
@@ -1801,7 +1842,7 @@ namespace AlloyCompiler
 		state.Builder->SetInsertPoint(loopBlock);
 
 		// generate the body of the loop
-		llvm::Value* bodyVal = generateStatement(program, state, *whileLoop.pStatement);
+		llvm::Value* bodyVal = generateStatement(moduleTable, state, *whileLoop.pStatement);
 
 		if (bodyVal == nullptr)
 		{
@@ -1809,7 +1850,7 @@ namespace AlloyCompiler
 		}
 
 		// emit the condition
-		llvm::Value* conditionVal = generateExpression(program, state, *whileLoop.pCondition, { nullptr, nullptr });
+		llvm::Value* conditionVal = generateExpression(moduleTable, state, *whileLoop.pCondition, { nullptr, nullptr });
 
 		if (conditionVal == nullptr)
 		{
@@ -1831,10 +1872,10 @@ namespace AlloyCompiler
 		return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
 	}
 
-	llvm::Value* generateIfStatement(const Program& program, LLVMState& state, const IF_STATEMENT& ifStatement)
+	llvm::Value* generateIfStatement(ModuleTable& moduleTable, LLVMState& state, const IF_STATEMENT& ifStatement)
 	{
 
-		llvm::Value* conditionVal = generateExpression(program, state, *ifStatement.pCondition, { nullptr, nullptr });
+		llvm::Value* conditionVal = generateExpression(moduleTable, state, *ifStatement.pCondition, { nullptr, nullptr });
 
 		if (conditionVal == nullptr)
 		{
@@ -1857,7 +1898,7 @@ namespace AlloyCompiler
 		// emit then value
 		state.Builder->SetInsertPoint(thenBlock);
 
-		llvm::Value* thenVal = generateStatement(program, state, *ifStatement.pStatement);
+		llvm::Value* thenVal = generateStatement(moduleTable, state, *ifStatement.pStatement);
 
 		if (thenVal == nullptr)
 		{
@@ -1875,7 +1916,7 @@ namespace AlloyCompiler
 
 		if (ifStatement.pElseStatement != nullptr)
 		{
-			elseVal = generateStatement(program, state, *ifStatement.pElseStatement);
+			elseVal = generateStatement(moduleTable, state, *ifStatement.pElseStatement);
 
 			if (elseVal == nullptr)
 			{
@@ -1893,13 +1934,13 @@ namespace AlloyCompiler
 		return llvm::ConstantInt::getTrue(*state.Context);
 	}
 
-	llvm::Value* generateStatementBlock(const Program& program, LLVMState& state, const STATEMENT_BLOCK& statementBlock)
+	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock)
 	{
 		llvm::Value* statementVal = nullptr;
 
 		for (const STATEMENT* statement : statementBlock.Statements)
 		{
-			statementVal = generateStatement(program, state, *statement);
+			statementVal = generateStatement(moduleTable, state, *statement);
 
 			if (statementVal == nullptr)
 			{
@@ -1910,7 +1951,7 @@ namespace AlloyCompiler
 		return statementVal;
 	}
 
-	llvm::Value* generateReturnStatement(const Program& program, LLVMState& state, const RETURN& returnStatement)
+	llvm::Value* generateReturnStatement(ModuleTable& moduleTable, LLVMState& state, const RETURN& returnStatement)
 	{
 		// handle void return
 		if (returnStatement.pValue == nullptr)
@@ -1926,7 +1967,7 @@ namespace AlloyCompiler
 			return state.Builder->CreateBr(state.FuncExitBlock);
 		}
 
-		llvm::Value* expressionValue = generateExpression(program, state, *returnStatement.pValue, { nullptr, nullptr });
+		llvm::Value* expressionValue = generateExpression(moduleTable, state, *returnStatement.pValue, { nullptr, nullptr });
 
 		if (expressionValue == nullptr)
 		{
@@ -1954,33 +1995,33 @@ namespace AlloyCompiler
 		return state.Builder->CreateBr(state.FuncExitBlock);
 	}
 
-	llvm::Value* generateStatement(const Program& program, LLVMState& state, const STATEMENT& statement)
+	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement)
 	{
 		llvm::Value* result = nullptr;
 
 		if (statement.Is<VARIABLE_DEFINITION>()) {
-			result = generateVariableDefinitionStatement(program, state, *statement.Get<VARIABLE_DEFINITION>());
+			result = generateVariableDefinitionStatement(moduleTable, state, *statement.Get<VARIABLE_DEFINITION>());
 		}
 		else if (statement.Is<FUNCTION_CALL>()) {
-			result = generateFunctionCallStatement(program, state, *statement.Get<FUNCTION_CALL>());
+			result = generateFunctionCallStatement(moduleTable, state, *statement.Get<FUNCTION_CALL>());
 		}
 		else if (statement.Is<ASSIGNMENT>()) {
-			result = generateAssignmentStatement(program, state, *statement.Get<ASSIGNMENT>());
+			result = generateAssignmentStatement(moduleTable, state, *statement.Get<ASSIGNMENT>());
 		}
 		else if (statement.Is<FOR_LOOP>()) {
-			result = generateForLoopStatement(program, state, *statement.Get<FOR_LOOP>());
+			result = generateForLoopStatement(moduleTable, state, *statement.Get<FOR_LOOP>());
 		}
 		else if (statement.Is<WHILE_LOOP>()) {
-			result = generateWhileLoopStatement(program, state, *statement.Get<WHILE_LOOP>());
+			result = generateWhileLoopStatement(moduleTable, state, *statement.Get<WHILE_LOOP>());
 		}
 		else if (statement.Is<IF_STATEMENT>()) {
-			result = generateIfStatement(program, state, *statement.Get<IF_STATEMENT>());
+			result = generateIfStatement(moduleTable, state, *statement.Get<IF_STATEMENT>());
 		}
 		else if (statement.Is<STATEMENT_BLOCK>()) {
-			result = generateStatementBlock(program, state, *statement.Get<STATEMENT_BLOCK>());
+			result = generateStatementBlock(moduleTable, state, *statement.Get<STATEMENT_BLOCK>());
 		}
 		else if (statement.Is<RETURN>()) {
-			result = generateReturnStatement(program, state, *statement.Get<RETURN>());
+			result = generateReturnStatement(moduleTable, state, *statement.Get<RETURN>());
 		}
 		else {
 			ASSERT(false, "Unknown statement node kind!");
@@ -1993,18 +2034,18 @@ namespace AlloyCompiler
 
 #pragma region Definitions
 
-	llvm::Function* generateExternDefinition(const Program& program, LLVMState& state, const EXTERN_DEFINITION& externDefinition )
+	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition )
 	{
 		FUNCTION_DEFINITION functionDefinition = { nullptr, externDefinition.pNameToken, externDefinition.pFunctionType, nullptr };
-		return generateFunctionDeclaration(program, state, nullptr, functionDefinition);
+		return generateFunctionDeclaration(moduleTable, state, nullptr, functionDefinition);
 	}
 
-	llvm::Value* generateVariableDefinition(const Program& program, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
+	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
 	{
-		return generateVariableDefinitionExpression(program, state, variableDefinition);
+		return generateVariableDefinitionExpression(moduleTable, state, variableDefinition);
 	}
 
-	llvm::Type* generateStructDefinition(const Program& program, LLVMState& state, const std::string_view& structName, const STRUCT_TYPE& structDefinition)
+	llvm::Type* generateStructDefinition(ModuleTable& moduleTable, LLVMState& state, const std::string_view& structName, const STRUCT_TYPE& structDefinition)
 	{
 		llvm::Value* result = nullptr;
 
@@ -2016,7 +2057,7 @@ namespace AlloyCompiler
 		for (auto id : structDefinition.Members)
 		{
 			TypeModifier modifier = TypeModifier::None;
-			TypeSubtypePair identifierType = generateTypeIdentifier(program, state, *id.second, nullptr, modifier);
+			TypeSubtypePair identifierType = generateTypeIdentifier(moduleTable, state, *id.second, nullptr, modifier);
 
 			if (!identifierType.type)
 			{
@@ -2048,14 +2089,14 @@ namespace AlloyCompiler
 		return structType;
 	}
 
-	llvm::Function* generateFunctionDefinition(const Program& program, LLVMState& state, 
+	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, 
 												Token* pTypeNameToken, const FUNCTION_DEFINITION& functionDefinition)
 	{
 		//
 		// Generate either a global function definition or a member function definition
 		// If type is other than an empty string, we are defining a member function, in which case the name of the function is defined as Type@Name in LLVM
 		//
-		llvm::Function* func = generateFunctionDeclaration(program, state, pTypeNameToken, functionDefinition);
+		llvm::Function* func = generateFunctionDeclaration(moduleTable, state, pTypeNameToken, functionDefinition);
 
 		if (func == nullptr)
 		{
@@ -2115,7 +2156,7 @@ namespace AlloyCompiler
 
 		// check if function has any statements and generate them
 		if (functionDefinition.pBody->Statements.size() > 0) {
-			llvm::Value* bodyVal = generateStatementBlock(program, state, *functionDefinition.pBody);
+			llvm::Value* bodyVal = generateStatementBlock(moduleTable, state, *functionDefinition.pBody);
 
 			if (!bodyVal)
 			{
@@ -2171,12 +2212,12 @@ namespace AlloyCompiler
 		return func;
 	}
 
-	llvm::Type* generateTypeDefinition(const Program& program, LLVMState& state, const TYPE_DEFINITION& typeDefinition)
+	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition)
 	{
 		llvm::Type* result = nullptr;
 
 		if (typeDefinition.pType->Type.Is<STRUCT_TYPE>()) {
-			result = generateStructDefinition(program, state, typeDefinition.pTypeIdentifier->pNameToken->Value, *typeDefinition.pType->Type.Get<STRUCT_TYPE>());
+			result = generateStructDefinition(moduleTable, state, typeDefinition.pTypeIdentifier->pNameToken->Value, *typeDefinition.pType->Type.Get<STRUCT_TYPE>());
 		}
 		else {
 			ASSERT(false, "Type definition not implemented!");
@@ -2187,12 +2228,12 @@ namespace AlloyCompiler
 
 #pragma endregion
 
-	bool Generate(const Program& program, LLVMState& state)
+	bool Generate(ModuleTable& moduleTable, LLVMState& state)
 	{
 		//
 		// search for main entry point and start code generation
 		//
-		FUNCTION_DEFINITION* pMainFunction = program.GetMainFunction();
+		FUNCTION_DEFINITION* pMainFunction = moduleTable.GetMainFunction();
 		if (pMainFunction == nullptr)
 		{
 			logErrorAtCurrentPosition(nullptr, "Cannot find main entry point!");
@@ -2202,30 +2243,30 @@ namespace AlloyCompiler
 		/* pre-process all types definitions as these might be used throughout the code
 		* for this to work properly we need to process the types in the order they appear in the file because one type can reference a previous type
 		* for now, we are processing each type the first time it is encountered in the code
-		for (auto t = program.TypeDefinitions.begin(); t != program.TypeDefinitions.end(); t++) {
-			generateTypeDefinition(program, state, *t->second);
+		for (auto t = moduleTable.TypeDefinitions.begin(); t != moduleTable.TypeDefinitions.end(); t++) {
+			generateTypeDefinition(moduleTable, state, *t->second);
 		}
 		*/
 
-		for (auto& [name, module] : program.GetModules())
+		for (auto& [name, module] : moduleTable.GetModules())
 		{
 			// pre-process all extern function definitions
-			for (auto& f : module.Nodes.ExternDefinitions)
+			for (auto& f : module.GetNodeBuffer().GetExternDefinitions())
 			{
-				generateExternDefinition(program, state, *f.second.pDefinition);
+				generateExternDefinition(moduleTable, state, *f.second.pDefinition);
 			}
 
 			// pre-process all function definitions leaving the main function till the end
-			for (auto& f : module.Nodes.FunctionDefinitions)
+			for (auto& f : module.GetNodeBuffer().GetFunctionDefinitions())
 			{
 				if (f.first != "main")
 				{
-					generateFunctionDefinition(program, state, nullptr, *f.second.pDefinition);
+					generateFunctionDefinition(moduleTable, state, nullptr, *f.second.pDefinition);
 				}
 			}
 		}
 
-		llvm::Function* result = generateFunctionDefinition(program, state, nullptr, *pMainFunction);
+		llvm::Function* result = generateFunctionDefinition(moduleTable, state, nullptr, *pMainFunction);
 
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);

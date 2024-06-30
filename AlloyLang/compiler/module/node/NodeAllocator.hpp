@@ -6,6 +6,10 @@ namespace AlloyCompiler
 	class NodeAllocator
 	{
 	public:
+		NodeAllocator()
+			:m_pMemBlock(nullptr), m_pCurrent(nullptr), m_pEnd(nullptr)
+		{}
+
 		NodeAllocator(size_t size)
 			: m_pMemBlock(new char[size]), m_pCurrent(m_pMemBlock), m_pEnd(m_pMemBlock + size)
 		{}
@@ -20,6 +24,20 @@ namespace AlloyCompiler
 
 		~NodeAllocator()
 		{
+			Delete();
+		}
+
+		void Reset(size_t newSize)
+		{
+			Delete();
+
+			m_pMemBlock = new char[newSize];
+			m_pCurrent = m_pMemBlock;
+			m_pEnd = m_pMemBlock + newSize;
+		}
+
+		void Delete()
+		{
 			if (m_pMemBlock)
 			{
 				delete[] m_pMemBlock;
@@ -31,6 +49,8 @@ namespace AlloyCompiler
 		template<typename N>
 		N* Create(const N& value)
 		{
+			ASSERT(m_pMemBlock != nullptr, "Allocator has not been initialized!");
+
 			// allign the current pointer as needed by N
 			const uintptr_t offset = (uintptr_t)(m_pCurrent) & (alignof(N) - 1);
 			if (offset != 0)

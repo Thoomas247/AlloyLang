@@ -168,25 +168,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\AlloyLang\codegen\CodeGenerator.cpp" />
-    <ClCompile Include="..\AlloyLang\codegen\NamedValues.cpp" />
-    <ClCompile Include="..\AlloyLang\compiler\Program.cpp" />
-    <ClCompile Include="..\AlloyLang\parser\Parser.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\AlloyLang\tokenizer\Source.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\AlloyLang\tokenizer\Token.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="..\AlloyLang\tokenizer\Tokenizer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="..\AlloyLang\compiler\codegen\CodeGenerator.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\codegen\llvm\llvm.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\codegen\NamedValues.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\Compiler.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\ModuleTable.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\module\Module.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\module\node\NodeBuffer.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\module\source\Source.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\module\token\TokenBuffer.cpp" />
     <ClCompile Include="unittests.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -196,15 +186,6 @@
     <ProjectReference Include="..\AlloyLang\AlloyLang.vcxproj">
       <Project>{a679ee29-ad0b-440b-a6c8-dd2d090ce7d4}</Project>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\AlloyLang\parser\nodes\ExpressionNode.hpp" />
-    <ClInclude Include="..\AlloyLang\parser\nodes\FunctionNode.hpp" />
-    <ClInclude Include="..\AlloyLang\parser\nodes\MacroNode.hpp" />
-    <ClInclude Include="..\AlloyLang\parser\nodes\StatementNode.hpp" />
-    <ClInclude Include="..\AlloyLang\parser\nodes\TypeNode.hpp" />
-    <ClInclude Include="..\AlloyLang\parser\nodes\VariableNode.hpp" />
-    <ClInclude Include="..\AlloyLang\parser\nodes\VariantNodes.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

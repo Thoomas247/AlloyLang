@@ -18,49 +18,32 @@
     <ClCompile Include="unittests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\AlloyLang\parser\Parser.cpp">
+    <ClCompile Include="..\AlloyLang\compiler\Compiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\AlloyLang\tokenizer\Source.cpp">
+    <ClCompile Include="..\AlloyLang\compiler\ModuleTable.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\AlloyLang\tokenizer\Token.cpp">
+    <ClCompile Include="..\AlloyLang\compiler\module\Module.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\AlloyLang\tokenizer\Tokenizer.cpp">
+    <ClCompile Include="..\AlloyLang\compiler\module\node\NodeBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\AlloyLang\codegen\CodeGenerator.cpp">
+    <ClCompile Include="..\AlloyLang\compiler\module\source\Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\AlloyLang\codegen\NamedValues.cpp">
+    <ClCompile Include="..\AlloyLang\compiler\module\token\TokenBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\AlloyLang\compiler\Program.cpp">
+    <ClCompile Include="..\AlloyLang\compiler\codegen\CodeGenerator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\AlloyLang\parser\nodes\ExpressionNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\AlloyLang\parser\nodes\FunctionNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\AlloyLang\parser\nodes\MacroNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\AlloyLang\parser\nodes\StatementNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\AlloyLang\parser\nodes\TypeNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\AlloyLang\parser\nodes\VariableNode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\AlloyLang\parser\nodes\VariantNodes.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <ClCompile Include="..\AlloyLang\compiler\codegen\NamedValues.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\AlloyLang\compiler\codegen\llvm\llvm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

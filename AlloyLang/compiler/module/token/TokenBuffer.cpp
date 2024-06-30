@@ -4,6 +4,10 @@ namespace AlloyCompiler
 {
 	TokenBuffer::TokenBuffer(const Source& source)
 		: m_Source(source)
+		, m_CharIndex(0)
+		, m_Column(1)
+		, m_Line(1)
+		, m_LineStarts({ 0 })
 	{
 	}
 
@@ -48,6 +52,18 @@ namespace AlloyCompiler
 		} while (hasNext());
 
 		addToken(TokenKind::end_of_file, createStringView(index(), index()), location());
+	}
+
+	Token* TokenBuffer::GetToken(size_t index)
+	{
+		ASSERT(index < m_Tokens.size(), "Index is out of range!");
+
+		return &m_Tokens.at(index);
+	}
+
+	size_t TokenBuffer::NumTokens() const
+	{
+		return m_Tokens.size();
 	}
 
 	void TokenBuffer::addToken(TokenKind kind, const std::string_view& value, const Location& location)

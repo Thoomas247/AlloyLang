@@ -14,17 +14,8 @@ namespace AlloyCompiler
 
 		void Tokenize();
 
-		Token* GetToken(size_t index)
-		{
-			ASSERT(index < m_Tokens.size(), "Index is out of range!");
-
-			return &m_Tokens.at(index);
-		}
-
-		size_t NumTokens() const
-		{
-			return m_Tokens.size();
-		}
+		Token* GetToken(size_t index);
+		size_t NumTokens() const;
 
 	private:
 		template<typename... Args>

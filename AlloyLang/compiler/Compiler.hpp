@@ -17,7 +17,6 @@ namespace AlloyCompiler
 		void Compile();
 
 	private:
-		Module parseModule(const fs::path& path);
 		std::string getModuleName(const fs::path& path);
 
 	private:
