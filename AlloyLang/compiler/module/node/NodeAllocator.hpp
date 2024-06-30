@@ -1,5 +1,5 @@
 #pragma once
-#include "../../log/Log.hpp"
+#include "../../../log/Log.hpp"
 
 namespace AlloyCompiler
 {

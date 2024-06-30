@@ -61,7 +61,7 @@ namespace AlloyCompiler
 
 	FUNCTION_DEFINITION* ModuleTable::GetMainFunction()
 	{
-		Module& mainModule = m_Modules.at(std::string(m_ContextStack[0]));
+		Module& mainModule = m_Modules.at(m_ContextStack[0]);
 
 		return mainModule.GetFunctionDefinition("main").pDefinition;
 	}

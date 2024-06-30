@@ -16,6 +16,12 @@ namespace AlloyCompiler
 			return;
 		}
 
+		if (m_MainFilePath.extension() != FILE_EXTENSION)
+		{
+			Log::Error("Main file '{0}' must have the correct extension, '{1}'.", m_MainFilePath.string(), FILE_EXTENSION);
+			return;
+		}
+
 		std::stack<fs::path> pathsToSearch;
 		pathsToSearch.push(m_MainFilePath.parent_path());
 
