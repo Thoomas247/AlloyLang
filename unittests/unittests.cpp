@@ -1,6 +1,7 @@
 #include "CppUnitTest.h"
 #include "../AlloyLang/compiler/codegen/llvm/llvm.hpp"
 
+#include "../AlloyLang/compiler/Compiler.hpp"
 #include "../AlloyLang/compiler/module/token/TokenBuffer.hpp"
 #include "../AlloyLang/compiler/module/node/NodeBuffer.hpp"
 #include "../AlloyLang/compiler/codegen/CodeGenerator.hpp"
@@ -34,23 +35,10 @@ namespace unittests
 	TEST_CLASS(LLVMCodeGeneratorUnitTests)
 	{
 	private:
-		void RunTest(const std::string code, int expected)
+		void RunTest(const std::string& code, int expected)
 		{
-			Source src(code);
-			Tokenizer tokenizer(src);
-			TokenBuffer tokenBuffers = tokenizer.Tokenize();
-			Parser parser(src, tokenBuffers);
-
-			std::unordered_map<std::string, Module> modules;
-			modules.insert({ "main", std::move(parser.Parse()) });
-
-			std::vector<std::string> sources = { std::move(code) };
-
-			Program program("main", std::move(sources), std::move(modules));
-
-			LLVMState state(true);
-			Generate(program, state);
-			int result = Execute(state);
+			Compiler compiler("");
+			int result = compiler.Compile(code, true);
 
 #if 0
 			// retrieve result and compare with expected data

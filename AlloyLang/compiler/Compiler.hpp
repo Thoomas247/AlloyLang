@@ -16,6 +16,12 @@ namespace AlloyCompiler
 		Compiler(const std::string& mainFilePath);
 		void Compile();
 
+		///
+		/// Compile a single string, needed for unit tests
+		/// Also executes the code if required
+		///
+		int Compile(const std::string& sourceString, bool Execute);
+
 	private:
 		std::string getModuleName(const fs::path& path);
 

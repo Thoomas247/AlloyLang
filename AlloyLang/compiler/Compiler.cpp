@@ -61,22 +61,42 @@ namespace AlloyCompiler
 		Generate(moduleTable, llvmState);
 	}
 
+	int Compiler::Compile(const std::string& sourceString, bool execute)
+	{
+		m_Modules.emplace(".", "");
+		m_Modules.at(".").Generate(sourceString);
+
+		ModuleTable moduleTable(m_Modules, getModuleName(m_MainFilePath));
+
+		LLVMState llvmState(true);
+		Generate(moduleTable, llvmState);
+
+		if (execute) {
+			return Execute(llvmState);
+		}
+		else {
+			return 0;
+		}
+	}
+
 	std::string Compiler::getModuleName(const fs::path& path)
 	{
 		fs::path relativePath = fs::relative(path, m_MainFilePath.parent_path());
 
 		std::string pathString = relativePath.string();
-		pathString.resize(pathString.size() - std::string_view(FILE_EXTENSION).size());
-
-		for (size_t i = 0; i < pathString.size(); i++)
+		if (pathString.contains(FILE_EXTENSION))
 		{
-			if (pathString[i] == '/' || pathString[i] == '\\')
+			pathString.resize(pathString.size() - std::string_view(FILE_EXTENSION).size());
+
+			for (size_t i = 0; i < pathString.size(); i++)
 			{
-				pathString[i] = ':';
-				pathString.insert(i + 1, 1, ':');
+				if (pathString[i] == '/' || pathString[i] == '\\')
+				{
+					pathString[i] = ':';
+					pathString.insert(i + 1, 1, ':');
+				}
 			}
 		}
-
 		return pathString;
 	}
 }
