@@ -9,7 +9,7 @@ namespace AlloyCompiler
 	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
 	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
 	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
-	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, Token* pTypeName, const FUNCTION_DEFINITION& functionDefinition);
+	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition);
 	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition);
 	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition);
 
@@ -585,19 +585,19 @@ namespace AlloyCompiler
 	}
 
 	llvm::Function* generateFunctionDeclaration(ModuleTable& moduleTable, LLVMState& state, 
-												Token* pTypeNameToken, const FUNCTION_DEFINITION& functionDeclarationNode)
+												const FUNCTION_DEFINITION& functionDeclarationNode)
 	{
 		//
 		// If type is not empty, we are generating a member function in the form of Type@Name
 		//
 		std::string name;
-		if (pTypeNameToken == nullptr)
+		if (functionDeclarationNode.pTypeIdentifier == nullptr)
 		{
 			name = functionDeclarationNode.pFunctionNameToken->Value;
 		}
 		else
 		{
-			name = NodeBuffer::GetMangledName(pTypeNameToken, functionDeclarationNode.pFunctionNameToken);
+			name = NodeBuffer::GetMangledName(functionDeclarationNode.pTypeIdentifier->pNameToken, functionDeclarationNode.pFunctionNameToken);
 		}
 
 		// check if function already exists
@@ -628,7 +628,9 @@ namespace AlloyCompiler
 			VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
 
 			TypeModifier modifier = TypeModifier::None;
-			TypeSubtypePair identifierType = generateTypeIdentifier(moduleTable, state, *pParameterVariableDeclaration->pType, pTypeNameToken, modifier);
+			TypeSubtypePair identifierType = generateTypeIdentifier(moduleTable, state, *pParameterVariableDeclaration->pType,
+																(functionDeclarationNode.pTypeIdentifier ? functionDeclarationNode.pTypeIdentifier->pNameToken : nullptr), 
+																modifier);
 
 			if (!identifierType.type)
 			{
@@ -1267,7 +1269,7 @@ namespace AlloyCompiler
 			{
 
 				// function found, process it
-				calleeFunc = generateFunctionDefinition(moduleTable, state, "", *functionResult.pValue);
+				calleeFunc = generateFunctionDefinition(moduleTable, state, *functionResult.pValue);
 
 			}
 			else
@@ -2037,7 +2039,7 @@ namespace AlloyCompiler
 	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition )
 	{
 		FUNCTION_DEFINITION functionDefinition = { nullptr, externDefinition.pNameToken, externDefinition.pFunctionType, nullptr };
-		return generateFunctionDeclaration(moduleTable, state, nullptr, functionDefinition);
+		return generateFunctionDeclaration(moduleTable, state, functionDefinition);
 	}
 
 	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
@@ -2090,13 +2092,13 @@ namespace AlloyCompiler
 	}
 
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, 
-												Token* pTypeNameToken, const FUNCTION_DEFINITION& functionDefinition)
+												const FUNCTION_DEFINITION& functionDefinition)
 	{
 		//
 		// Generate either a global function definition or a member function definition
 		// If type is other than an empty string, we are defining a member function, in which case the name of the function is defined as Type@Name in LLVM
 		//
-		llvm::Function* func = generateFunctionDeclaration(moduleTable, state, pTypeNameToken, functionDefinition);
+		llvm::Function* func = generateFunctionDeclaration(moduleTable, state, functionDefinition);
 
 		if (func == nullptr)
 		{
@@ -2261,12 +2263,12 @@ namespace AlloyCompiler
 			{
 				if (name != "main")
 				{
-					generateFunctionDefinition(moduleTable, state, nullptr, *func.pDefinition);
+					generateFunctionDefinition(moduleTable, state, *func.pDefinition);
 				}
 			}
 		}
 
-		llvm::Function* result = generateFunctionDefinition(moduleTable, state, nullptr, *pMainFunction);
+		llvm::Function* result = generateFunctionDefinition(moduleTable, state, *pMainFunction);
 
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
