@@ -32,7 +32,7 @@ namespace AlloyCompiler
 	template<typename T>
 	inline Definition<T> Module::getDefinition(const NodeBuffer::NodeMap<T>& nodeMap, const std::string_view& name)
 	{
-		auto it = nodeMap.find(name);
+		auto it = nodeMap.find(std::string(name));
 		if (it == nodeMap.end())
 		{
 			return Definition<T>();

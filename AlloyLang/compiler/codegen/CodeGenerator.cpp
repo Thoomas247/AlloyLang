@@ -2251,17 +2251,17 @@ namespace AlloyCompiler
 		for (auto& [name, module] : moduleTable.GetModules())
 		{
 			// pre-process all extern function definitions
-			for (auto& f : module.GetNodeBuffer().GetExternDefinitions())
+			for (auto& [name, func] : module.GetNodeBuffer().GetExternDefinitions())
 			{
-				generateExternDefinition(moduleTable, state, *f.second.pDefinition);
+				generateExternDefinition(moduleTable, state, *func.pDefinition);
 			}
 
 			// pre-process all function definitions leaving the main function till the end
-			for (auto& f : module.GetNodeBuffer().GetFunctionDefinitions())
+			for (auto& [name, func] : module.GetNodeBuffer().GetFunctionDefinitions())
 			{
-				if (f.first != "main")
+				if (name != "main")
 				{
-					generateFunctionDefinition(moduleTable, state, nullptr, *f.second.pDefinition);
+					generateFunctionDefinition(moduleTable, state, nullptr, *func.pDefinition);
 				}
 			}
 		}

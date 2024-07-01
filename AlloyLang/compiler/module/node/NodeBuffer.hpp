@@ -15,7 +15,7 @@ namespace AlloyCompiler
 	{
 	public:
 		template<typename T>
-		using NodeMap = std::unordered_map<std::string_view, Definition<T>>;
+		using NodeMap = std::unordered_map<std::string, Definition<T>>;
 
 	public:
 		static std::string GetMangledName(const std::string_view& typeName, const std::string_view& functionName)

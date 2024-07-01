@@ -2672,7 +2672,7 @@ namespace AlloyCompiler
 					ASSERT(false, "");
 				}
 
-				m_MacroDefinitions[pMacroDefinition->pNameToken->Value] = Definition<MACRO_DEFINITION>(visibility, pMacroDefinition);
+				m_MacroDefinitions[std::string(pMacroDefinition->pNameToken->Value)] = Definition<MACRO_DEFINITION>(visibility, pMacroDefinition);
 				m_AllSymbolNames.insert(pMacroDefinition->pNameToken->Value);
 
 				break;
@@ -2694,7 +2694,7 @@ namespace AlloyCompiler
 					ASSERT(false, "");
 				}
 
-				m_TypeDefinitions[pTypeDefinition->pTypeIdentifier->pNameToken->Value] = Definition<TYPE_DEFINITION>(visibility, pTypeDefinition);
+				m_TypeDefinitions[std::string(pTypeDefinition->pTypeIdentifier->pNameToken->Value)] = Definition<TYPE_DEFINITION>(visibility, pTypeDefinition);
 				m_AllSymbolNames.insert(pTypeDefinition->pTypeIdentifier->pNameToken->Value);
 
 				break;
@@ -2735,7 +2735,7 @@ namespace AlloyCompiler
 						ASSERT(false, "");
 					}
 
-					m_FunctionDefinitions[pFunctionNameToken->Value] = Definition<FUNCTION_DEFINITION>(visibility, pFunctionDefinition);
+					m_FunctionDefinitions[std::string(pFunctionNameToken->Value)] = Definition<FUNCTION_DEFINITION>(visibility, pFunctionDefinition);
 					m_AllSymbolNames.insert(pFunctionNameToken->Value);
 				}
 
@@ -2758,7 +2758,7 @@ namespace AlloyCompiler
 					ASSERT(false, "");
 				}
 
-				m_ExternDefinitions[pExternDefinition->pNameToken->Value] = Definition<EXTERN_DEFINITION>(visibility, pExternDefinition);
+				m_ExternDefinitions[std::string(pExternDefinition->pNameToken->Value)] = Definition<EXTERN_DEFINITION>(visibility, pExternDefinition);
 				m_AllSymbolNames.insert(pExternDefinition->pNameToken->Value);
 
 				break;
