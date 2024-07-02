@@ -28,6 +28,24 @@ namespace AlloyCompiler
 			return GetMangledName(pTypeNameToken->Value, pFunctionNameToken->Value);
 		}
 
+		//
+		// return the mangled name for a type with generic arguments
+		//
+		static std::string GetMangledName(const std::string_view& typeName, const std::vector<TYPE*>& genericArguments)
+		{
+			std::string mangledName(typeName);
+
+			if (!genericArguments.empty()) {
+				for (auto& t : genericArguments) {
+					if (t->Type.Is<TYPE_NAME>()) {
+						mangledName = mangledName + "@" + std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value);
+					}
+				}
+			}
+
+			return mangledName;
+		}
+
 		NodeBuffer(const Source& source, TokenBuffer& tokenBuffer);
 		void Parse();
 

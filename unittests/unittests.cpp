@@ -460,6 +460,32 @@ namespace unittests
 
 			RunTest(TestStr, 1);
 		}
+
+		TEST_METHOD(Generics)
+		{
+			constexpr auto TestStr = R"(
+				extern printf (const str : String) -> i32;
+
+				type Vector3Of(type T) = struct
+				{
+					x: T,
+					y: T,
+					z: T,
+				};
+
+				// type I32Vec3 = Vector3Of(i32);
+				// type F64Vec3 = Vector3Of(f64);
+
+				fn main () -> i64
+				{
+					var temp : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
+
+					return 0;
+				}
+			)";
+			std::string expected_ = "";
+			RunTest(TestStr, 0);
+		}
 	};
 }
 

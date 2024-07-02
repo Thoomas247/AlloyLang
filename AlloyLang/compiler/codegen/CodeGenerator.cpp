@@ -10,7 +10,7 @@ namespace AlloyCompiler
 	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
 	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition);
-	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition);
+	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::vector<TYPE*>& genericArguments);
 	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition);
 
 #pragma region Util
@@ -219,14 +219,22 @@ namespace AlloyCompiler
 		return tempBuilder.CreateAlloca(type, elements, varName);
 	}
 
-	llvm::Type* getTypeFromTypeName(ModuleTable& moduleTable, LLVMState& state, Token* pNameToken)
+	llvm::Type* getTypeFromTypeName(ModuleTable& moduleTable, LLVMState& state, Token* pNameToken,
+									const std::vector<TYPE*>& genericArguments,
+									std::unordered_map<std::string, std::string>* genericTypeMap)
 	{
-		const std::string_view& name = pNameToken->Value;
-
 		//
 		// Helper function to return an llvm type given its type name
 		// Also searches the named nodes if the type has not been defined yet and define it
 		//
+		std::string name = NodeBuffer::GetMangledName(pNameToken->Value, genericArguments);
+		
+		// if we have a type map that contains the requested type, retrieve the actual type, e.g. T might be an i32
+		if (genericTypeMap != nullptr
+			&& genericTypeMap->contains(name)
+			) {
+			name = genericTypeMap->at(name);
+		}
 		llvm::Type* type = state.NamedValues.GetType(name);
 
 		if (type == nullptr)
@@ -234,22 +242,20 @@ namespace AlloyCompiler
 			// type not found, it might not have been processed yet
 			// try to locate it in the program and process it
 
-			SearchResult<TYPE_DEFINITION> result = moduleTable.GetTypeDefinition(name);
+			SearchResult<TYPE_DEFINITION> result = moduleTable.GetTypeDefinition(pNameToken->Value);
 
 			if (result.Code == SearchResultCode::NotFound)
 			{
-				// logError(pNameToken, "Type '{0}' does not exist.", name);
+				logErrorAtCurrentPosition(pNameToken, "Type '{0}' does not exist.", pNameToken->Value);
 			}
 
 			else if (result.Code == SearchResultCode::Inaccessible)
 			{
-				// logError(pNameToken, "Type '{0}' is private and cannot be accessed here.", name);
-				return nullptr;
+				logErrorAtCurrentPosition(pNameToken, "Type '{0}' is private and cannot be accessed here.", pNameToken->Value);
 			}
-
 			else
 			{
-				generateTypeDefinition(moduleTable, state, *result.pDefiniton);
+				generateTypeDefinition(moduleTable, state, *result.pDefiniton, genericArguments);
 				type = state.NamedValues.GetType(name);
 			}
 		}
@@ -407,10 +413,11 @@ namespace AlloyCompiler
 	}
 
 	TypeSubtypePair generateTypeIdentifier(ModuleTable& moduleTable, LLVMState& state, const TYPE& typeIdentifier,
-														Token* pParentTypeNameToken, TypeModifier& modifier)
+														Token* pParentTypeNameToken, TypeModifier& modifier,
+														std::unordered_map<std::string, std::string>* genericTypeMap)
 	{
 		//
-		// If the type name is Self, we take the parentTypeName as Self is not a real type
+		// genericTypeMap maps from the generic type names to the actual type names, can be null
 		//
 		TypeSubtypePair identifierType = { nullptr, nullptr };
 
@@ -423,6 +430,9 @@ namespace AlloyCompiler
 			const TYPE_NAME& typeName = *typeIdentifier.Type.Get<TYPE_NAME>();
 
 			Token* pNameToken = typeName.pNameToken;
+			//
+			// If the type name is Self, we take the parentTypeName as Self is not a real type
+			//
 			if (pNameToken->Value == "Self")
 			{
 				if (pParentTypeNameToken == nullptr)
@@ -435,7 +445,7 @@ namespace AlloyCompiler
 				pNameToken = pParentTypeNameToken;
 			}
 
-			identifierType.type = getTypeFromTypeName(moduleTable, state, pNameToken);
+			identifierType.type = getTypeFromTypeName(moduleTable, state, pNameToken, typeName.GenericArguments, genericTypeMap);
 
 			if (!identifierType.type)
 			{
@@ -469,7 +479,7 @@ namespace AlloyCompiler
 			}
 
 			TypeModifier modifier = TypeModifier::None;
-			identifierType = generateTypeIdentifier(moduleTable, state, *type.pElementType, pParentTypeNameToken, modifier);
+			identifierType = generateTypeIdentifier(moduleTable, state, *type.pElementType, pParentTypeNameToken, modifier, nullptr);
 			llvm::Type* elementType = identifierType.type;
 
 			if (identifierType.type == nullptr)
@@ -528,7 +538,7 @@ namespace AlloyCompiler
 			return {};
 		}
 		else {
-			return generateTypeIdentifier(moduleTable, state, *typeDeclarationNode.pReturnType->pType, nullptr, modifier);
+			return generateTypeIdentifier(moduleTable, state, *typeDeclarationNode.pReturnType->pType, nullptr, modifier, nullptr);
 		}
 	}
 
@@ -537,7 +547,7 @@ namespace AlloyCompiler
 	{
 		const std::string_view name = variableDeclarationNode.pNameToken->Value;
 		TypeModifier modifier =	TypeModifier::None;
-		identifierType = generateTypeIdentifier(moduleTable, state, *variableDeclarationNode.pType, nullptr, modifier);
+		identifierType = generateTypeIdentifier(moduleTable, state, *variableDeclarationNode.pType, nullptr, modifier, nullptr);
 
 		if (!identifierType.type)
 		{
@@ -630,7 +640,7 @@ namespace AlloyCompiler
 			TypeModifier modifier = TypeModifier::None;
 			TypeSubtypePair identifierType = generateTypeIdentifier(moduleTable, state, *pParameterVariableDeclaration->pType,
 																(functionDeclarationNode.pTypeIdentifier ? functionDeclarationNode.pTypeIdentifier->pNameToken : nullptr), 
-																modifier);
+																modifier, nullptr);
 
 			if (!identifierType.type)
 			{
@@ -2047,24 +2057,41 @@ namespace AlloyCompiler
 		return generateVariableDefinitionExpression(moduleTable, state, variableDefinition);
 	}
 
-	llvm::Type* generateStructDefinition(ModuleTable& moduleTable, LLVMState& state, const std::string_view& structName, const STRUCT_TYPE& structDefinition)
+	llvm::Type* generateStructDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
+											const STRUCT_TYPE& structDefinition, const std::vector<TYPE*>& genericArguments)
 	{
 		llvm::Value* result = nullptr;
+
+		ASSERT(genericArguments.size() == typeIdentifier.GenericParameters.size(),
+				"Size of expected generic arguments should be the same as the size of the passed types!");
 
 		// get a vector of member types
 		std::vector<llvm::Type*> memberTypes;
 		std::unordered_map<std::string_view, NamedValues::StructMemberInfo> memberNames;
 
+		// create mangled structure name (if needed)
+		std::string structName = NodeBuffer::GetMangledName(typeIdentifier.pNameToken->Value, genericArguments);
+
+		// create the map from the structure's generic types to the actual types requested by the caller
+		std::unordered_map<std::string, std::string> genericMap;
+		int arg = 0;
+		for (auto& type : typeIdentifier.GenericParameters) {
+			if (genericArguments[arg]->Type.Is<TYPE_NAME>()) {
+				genericMap[std::string(type->pIdentifierToken->Value)] = genericArguments[arg]->Type.Get<TYPE_NAME>()->pNameToken->Value;
+			}
+			arg++;
+		}
+
 		int memberIndex = 0;
 		for (auto id : structDefinition.Members)
 		{
 			TypeModifier modifier = TypeModifier::None;
-			TypeSubtypePair identifierType = generateTypeIdentifier(moduleTable, state, *id.second, nullptr, modifier);
+			TypeSubtypePair identifierType = generateTypeIdentifier(moduleTable, state, *id.second, nullptr, modifier, &genericMap);
 
 			if (!identifierType.type)
 			{
-				logErrorAtCurrentPosition(nullptr, // TBD: valueDeclaration.TypeIdentifierID
-									"Invalid structure member type for structure '{0}'!", structName);
+				logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+									"Invalid structure member type for structure '{0}'!", typeIdentifier.pNameToken->Value);
 				return nullptr;
 			}
 
@@ -2076,16 +2103,16 @@ namespace AlloyCompiler
 			memberNames[memberName] = { memberIndex++, identifierType.containedType };
 		}
 
-		llvm::StructType* structType = llvm::StructType::create(*state.Context, memberTypes, structName);
+		llvm::StructType* structType = llvm::StructType::create(*state.Context, memberTypes, typeIdentifier.pNameToken->Value);
 
 		if (!structType)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: nodeID
-								"Invalid structure type for structure '{0}'!", structName);
+			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+								"Invalid structure type for structure '{0}'!", typeIdentifier.pNameToken->Value);
 			return nullptr;
 		}
 
-		state.NamedValues.InsertType(structName, structType, true, // isStruct
+		state.NamedValues.InsertType(typeIdentifier.pNameToken->Value, structType, true, // isStruct
 										memberNames);
 
 		return structType;
@@ -2214,12 +2241,18 @@ namespace AlloyCompiler
 		return func;
 	}
 
-	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition)
+	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition,
+										const std::vector<TYPE*>& genericArguments)
 	{
 		llvm::Type* result = nullptr;
 
 		if (typeDefinition.pType->Type.Is<STRUCT_TYPE>()) {
-			result = generateStructDefinition(moduleTable, state, typeDefinition.pTypeIdentifier->pNameToken->Value, *typeDefinition.pType->Type.Get<STRUCT_TYPE>());
+			const STRUCT_TYPE& structType = *typeDefinition.pType->Type.Get<STRUCT_TYPE>();
+			result = generateStructDefinition(moduleTable, state, *typeDefinition.pTypeIdentifier, structType, genericArguments);
+		}
+		else if (typeDefinition.pType->Type.Is<TYPE_NAME>()) {
+			const TYPE_NAME* typeName = typeDefinition.pType->Type.Get<TYPE_NAME>();
+			ASSERT(false, typeName->pNameToken->Value.data());			
 		}
 		else {
 			ASSERT(false, "Type definition not implemented!");
@@ -2245,6 +2278,7 @@ namespace AlloyCompiler
 		/* pre-process all types definitions as these might be used throughout the code
 		* for this to work properly we need to process the types in the order they appear in the file because one type can reference a previous type
 		* for now, we are processing each type the first time it is encountered in the code
+		* also note that generic structures cannot be pre-processed as the generic type will not be defined
 		for (auto t = moduleTable.TypeDefinitions.begin(); t != moduleTable.TypeDefinitions.end(); t++) {
 			generateTypeDefinition(moduleTable, state, *t->second);
 		}
