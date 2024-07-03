@@ -466,11 +466,11 @@ namespace unittests
 			constexpr auto TestStr = R"(
 				extern printf (const str : String) -> i32;
 
-				type Vector3Of(type T) = struct
+				type Vector3Of(type T1) = struct
 				{
-					x: T,
-					y: T,
-					z: T,
+					x: T1,
+					y: T1,
+					z: T1,
 				};
 
 				// type I32Vec3 = Vector3Of(i32);
@@ -478,13 +478,23 @@ namespace unittests
 
 				fn main () -> i64
 				{
-					var temp : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
+					var temp32 : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
+					var temp64 : Vector3Of(i64) = Vector3Of(i64) { x=2, y=3, z=2 };
 
-					return 0;
+					if (temp32.y > temp32.x)
+					{
+						printf("Hello");
+						return 1;
+					}
+					else
+					{
+						printf("Bye");
+						return 0;
+					}
 				}
 			)";
 			std::string expected_ = "";
-			RunTest(TestStr, 0);
+			RunTest(TestStr, 1);
 		}
 	};
 }

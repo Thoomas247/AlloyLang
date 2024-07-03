@@ -41,9 +41,9 @@ namespace AlloyCompiler
 		void PushScope(const std::string_view& name);
 		void PopScope();
 
-		ValueTypePair* GetValue(const std::string_view& name);
-		void InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit);
-		bool RemoveValue(const std::string_view& name);
+		ValueTypePair* GetValue(const std::string& name);
+		void InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit);
+		bool RemoveValue(const std::string& name);
 
 		struct StructMemberInfo
 		{
@@ -58,7 +58,7 @@ namespace AlloyCompiler
 		NamedValues::StructMemberInfo GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
 		std::string_view GetTypeName(llvm::Type* type);
 
-		void InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, StructMemberInfo> structMembers = {});
+		void InsertType(const std::string& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, StructMemberInfo> structMembers = {});
 
 		// should be called before PopScope in order to free memory allocated on the heap
 		void FreeHeapPointers(llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>& builder);
@@ -75,9 +75,9 @@ namespace AlloyCompiler
 		struct Scope
 		{
 			std::string_view Name;
-			std::unordered_map<std::string_view, ValueTypePair> Values;
-			std::unordered_map<std::string_view, TypeInfo> Types;
-			std::unordered_map<llvm::Type*, std::string_view> TypeNames; // used for error messages
+			std::unordered_map<std::string, ValueTypePair> Values;
+			std::unordered_map<std::string, TypeInfo> Types;
+			std::unordered_map<llvm::Type*, std::string> TypeNames; // used for error messages
 
 			Scope(const std::string_view& name)
 				: Name(name)

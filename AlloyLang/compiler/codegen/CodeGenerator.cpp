@@ -374,7 +374,7 @@ namespace AlloyCompiler
 		const std::string_view name = variable.pNameToken->Value;
 
 		// check if we have a local variable with this name
-		ValueTypePair* valueTypePair = state.NamedValues.GetValue(name);
+		ValueTypePair* valueTypePair = state.NamedValues.GetValue(std::string(name));
 
 		if (valueTypePair)
 		{
@@ -587,7 +587,7 @@ namespace AlloyCompiler
 			);
 
 		// add the variable to the named values
-		state.NamedValues.InsertValue(name, allocaInst, identifierType.containedType, 
+		state.NamedValues.InsertValue(std::string(name), allocaInst, identifierType.containedType, 
 						(variableDeclarationNode.VarType == VariableType::Constant), 
 						(modifier == TypeModifier::Pointer));
 
@@ -719,7 +719,8 @@ namespace AlloyCompiler
 
 	llvm::Value* generateConstructorExpression(ModuleTable& moduleTable, LLVMState& state, const CONSTRUCTOR& constructorExpression)
 	{
-		const std::string_view structName = constructorExpression.pType->pNameToken->Value;
+		// create mangled structure name (if needed)
+		std::string structName = NodeBuffer::GetMangledName(constructorExpression.pType->pNameToken->Value, constructorExpression.pType->GenericArguments);
 
 		llvm::StructType* structType = static_cast<llvm::StructType*>(state.NamedValues.GetType(structName));
 
@@ -890,7 +891,7 @@ namespace AlloyCompiler
 
 		// retrieve the name of the identifier in the right-side node in order to remove it from the NamedValues map
 		const Token& rightNode = *pointerMoveNode.pVariable->pNameToken;
-		const std::string_view name = rightNode.Value;
+		const std::string name(rightNode.Value);
 		state.NamedValues.RemoveValue(name);
 
 		return ptrValue.Ptr;
@@ -1152,7 +1153,7 @@ namespace AlloyCompiler
 		*/
 		if (functionCallExpressionNode.pTypeOrVariableName != nullptr)
 		{
-			const std::string_view varOrTypeName = functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value;
+			const std::string varOrTypeName(functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
 			if (state.NamedValues.GetValue(varOrTypeName) != nullptr)
 			{
 				// non-static member function call
@@ -2060,21 +2061,24 @@ namespace AlloyCompiler
 	llvm::Type* generateStructDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
 											const STRUCT_TYPE& structDefinition, const std::vector<TYPE*>& genericArguments)
 	{
-		llvm::Value* result = nullptr;
-
-		ASSERT(genericArguments.size() == typeIdentifier.GenericParameters.size(),
-				"Size of expected generic arguments should be the same as the size of the passed types!");
-
-		// get a vector of member types
+		llvm::StructType* structType = nullptr;
+		int memberIndex, arg;
 		std::vector<llvm::Type*> memberTypes;
 		std::unordered_map<std::string_view, NamedValues::StructMemberInfo> memberNames;
+		std::unordered_map<std::string, std::string> genericMap;
 
 		// create mangled structure name (if needed)
 		std::string structName = NodeBuffer::GetMangledName(typeIdentifier.pNameToken->Value, genericArguments);
 
+		if (genericArguments.size() != typeIdentifier.GenericParameters.size())
+		{
+			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+				"Invalid number of arguments for generic type '{0}'!", structName);
+			goto failed;
+		}
+
 		// create the map from the structure's generic types to the actual types requested by the caller
-		std::unordered_map<std::string, std::string> genericMap;
-		int arg = 0;
+		arg = 0;
 		for (auto& type : typeIdentifier.GenericParameters) {
 			if (genericArguments[arg]->Type.Is<TYPE_NAME>()) {
 				genericMap[std::string(type->pIdentifierToken->Value)] = genericArguments[arg]->Type.Get<TYPE_NAME>()->pNameToken->Value;
@@ -2082,7 +2086,8 @@ namespace AlloyCompiler
 			arg++;
 		}
 
-		int memberIndex = 0;
+		// get a vector of member types
+		memberIndex = 0;
 		for (auto id : structDefinition.Members)
 		{
 			TypeModifier modifier = TypeModifier::None;
@@ -2091,8 +2096,8 @@ namespace AlloyCompiler
 			if (!identifierType.type)
 			{
 				logErrorAtCurrentPosition(typeIdentifier.pNameToken,
-									"Invalid structure member type for structure '{0}'!", typeIdentifier.pNameToken->Value);
-				return nullptr;
+									"Invalid structure member type for structure '{0}'!", structName);
+				goto failed;
 			}
 
 			memberTypes.push_back(identifierType.type);
@@ -2103,18 +2108,19 @@ namespace AlloyCompiler
 			memberNames[memberName] = { memberIndex++, identifierType.containedType };
 		}
 
-		llvm::StructType* structType = llvm::StructType::create(*state.Context, memberTypes, typeIdentifier.pNameToken->Value);
+		structType = llvm::StructType::create(*state.Context, memberTypes, structName);
 
 		if (!structType)
 		{
 			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
-								"Invalid structure type for structure '{0}'!", typeIdentifier.pNameToken->Value);
-			return nullptr;
+								"Invalid structure type for structure '{0}'!", structName);
+			goto failed;
 		}
 
-		state.NamedValues.InsertType(typeIdentifier.pNameToken->Value, structType, true, // isStruct
+		state.NamedValues.InsertType(structName, structType, true, // isStruct
 										memberNames);
 
+failed:
 		return structType;
 	}
 
@@ -2176,7 +2182,7 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(&arg, allocaInst);
 
 			// add arguments to named values
-			state.NamedValues.InsertValue(arg.getName(), allocaInst, subType, isFunctionParameterConst(*functionDefinition.pFunctionType, index), false);
+			state.NamedValues.InsertValue(std::string(arg.getName()), allocaInst, subType, isFunctionParameterConst(*functionDefinition.pFunctionType, index), false);
 		}
 
 		// every function has an exit block for cleanup and setting the return value

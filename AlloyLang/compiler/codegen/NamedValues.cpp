@@ -69,7 +69,7 @@ namespace AlloyCompiler
 	}
 
 
-	ValueTypePair* NamedValues::GetValue(const std::string_view& name)
+	ValueTypePair* NamedValues::GetValue(const std::string& name)
 	{
 		ValueTypePair* result = nullptr;
 
@@ -88,7 +88,7 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	bool NamedValues::RemoveValue(const std::string_view& name)
+	bool NamedValues::RemoveValue(const std::string& name)
 	{
 		//
 		// remove a value from map, returns true if value was found, false otherwise
@@ -111,7 +111,7 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	void NamedValues::InsertValue(const std::string_view& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit)
+	void NamedValues::InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit)
 	{
 		ASSERT(!m_ScopeStack.back().Values.contains(name), "Named value already exists! Should check if it exists first with NamedValues::GetValue(const std::string& name).");
 		ValueTypePair valueTypePair = { value, type, isConst, freeOnExit };
@@ -166,7 +166,7 @@ namespace AlloyCompiler
 		return "";
 	}
 
-	void NamedValues::InsertType(const std::string_view& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, StructMemberInfo> structMembers)
+	void NamedValues::InsertType(const std::string& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, StructMemberInfo> structMembers)
 	{
 		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
 		ASSERT(structMembers.empty() || isStruct, "Struct members can only be added to a struct type.");
@@ -191,7 +191,7 @@ namespace AlloyCompiler
 		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
 		{
 			auto& scope = *it;
-			auto found = scope.Types.find(name);
+			auto found = scope.Types.find(std::string(name));
 			if (found != scope.Types.end())
 			{
 				return &found->second;
