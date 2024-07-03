@@ -1,5 +1,12 @@
 extern printf (const str: String, ...) -> i64;
 
+type GenericType(type A, type B, type C) = struct
+{
+	a: A,
+	b: B,
+	c: C,
+};
+
 type Vector3 = struct
 {
 	x: f64,
@@ -52,6 +59,8 @@ fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 fn main() -> i64
 {
 	var vec: Vector3 = Vector3 { x = 0, y = 0, z = 0 };
+
+	var obj: GenericType(i64, u32, f32) = GenericType(i64, u32, f32) { a = 2, b = 3, c = 1.0 };
 
 	vec = Vector3:translate(&vec, Vector3 { x = 10, y = -3, z = 2 });
 	vec:print();

@@ -216,6 +216,11 @@ namespace AlloyCompiler
 				}
 
 				genericArguments.push_back(pArgument);
+
+				if (token()->Kind == TokenKind::comma)
+				{
+					(void)eat();
+				}
 			}
 
 			(void)eat();
@@ -384,6 +389,7 @@ namespace AlloyCompiler
 		}
 
 		case identifier:
+		case long_identifier:
 		{
 			TYPE_NAME* pNamedType = parse<TYPE_NAME>();
 
