@@ -24,6 +24,8 @@ namespace AlloyCompiler
 		InsertType("String", llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0), false); // convert string to u8*
 
 		// insert the default types
+		InsertType("bool", llvm::Type::getInt1Ty(llvmContext), false);
+
 		InsertType("i8", llvm::Type::getInt8Ty(llvmContext), false);
 		InsertType("i16", llvm::Type::getInt16Ty(llvmContext), false);
 		InsertType("i32", llvm::Type::getInt32Ty(llvmContext), false);
