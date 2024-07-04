@@ -14,7 +14,7 @@ type Result(type E) = enum
 	Error: E,
 };
 
-fn use_enum() -> bool
+fn use_enum()
 {
 	var team = PlayerTeam|Red;
 
