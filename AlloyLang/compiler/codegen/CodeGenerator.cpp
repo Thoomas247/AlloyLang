@@ -773,7 +773,7 @@ namespace AlloyCompiler
 			std::vector<llvm::Value*> indices = getGEPIndex(state, memberInfo.memberIndex);
 
 			if (llvm::isa<llvm::PointerType>(structType->getElementType(memberInfo.memberIndex))) {
-				assert(false);		// TODO: not implemented
+				// TBD: check if special processing is needed in case of pointers (e.g. strings?)
 			}
 
 			llvm::Value* memberPtr = state.Builder->CreateGEP(structType, structPtr, indices, "memberptr");
@@ -1106,7 +1106,7 @@ namespace AlloyCompiler
 		}
 
 		if (llvm::isa<llvm::PointerType>(structType->getTypeAtIndex(memberInfo.memberIndex))) {
-			assert(false);	// TODO: not implemented
+			// TBD: check if special processing is needed in case of pointers (e.g. strings?)
 		}
 
 		if (left.Ptr == nullptr) {
@@ -2258,7 +2258,20 @@ failed:
 		}
 		else if (typeDefinition.pType->Type.Is<TYPE_NAME>()) {
 			const TYPE_NAME* typeName = typeDefinition.pType->Type.Get<TYPE_NAME>();
-			ASSERT(false, typeName->pNameToken->Value.data());			
+			result = getTypeFromTypeName(moduleTable, state, typeName->pNameToken, typeName->GenericArguments, nullptr);
+
+			// insert the new type (which is a copy of the type it refers to) into the namedValues of the current scope
+			if (result != nullptr) {
+				bool isStruct = result->isStructTy();
+				if (isStruct) {
+					std::unordered_map<std::string_view, NamedValues::StructMemberInfo> structMembers;
+					state.NamedValues.GetStructMembers(state.NamedValues.GetTypeName(result), structMembers);
+					state.NamedValues.InsertType(std::string(typeDefinition.pTypeIdentifier->pNameToken->Value), result, true, structMembers);
+				}
+				else {
+					state.NamedValues.InsertType(std::string(typeName->pNameToken->Value), result, false);
+				}
+			}
 		}
 		else {
 			ASSERT(false, "Type definition not implemented!");

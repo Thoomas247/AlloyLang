@@ -473,17 +473,26 @@ namespace unittests
 					z: T1,
 				};
 
-				// type I32Vec3 = Vector3Of(i32);
-				// type F64Vec3 = Vector3Of(f64);
+				type PairOf(type T1, type T2) = struct
+				{
+					x: T1,
+					y: T2
+				};
+
+				type I32Vec3 = Vector3Of(i32);
+				type F64Vec3 = Vector3Of(f64);
+				type I32StringPair = PairOf(i32, String);
 
 				fn main () -> i64
 				{
 					var temp32 : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
-					var temp64 : Vector3Of(i64) = Vector3Of(i64) { x=2, y=3, z=2 };
+					var temp64 : I32Vec3 = I32Vec3 { x=2, y=3, z=2 };
+					var tempF64 : F64Vec3 = F64Vec3 { x = 2.0, y = 3.0, z = 3.0 }; 
+					var pair : I32StringPair = I32StringPair { x = 1, y = "Hello" };
 
 					if (temp32.y > temp32.x)
 					{
-						printf("Hello");
+						printf(pair.y);
 						return 1;
 					}
 					else
@@ -493,7 +502,7 @@ namespace unittests
 					}
 				}
 			)";
-			std::string expected_ = "";
+			std::string expected_ = "Hello";
 			RunTest(TestStr, 1);
 		}
 	};

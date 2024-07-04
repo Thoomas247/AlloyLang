@@ -130,6 +130,22 @@ namespace AlloyCompiler
 		return nullptr;
 	}
 
+	bool NamedValues::GetStructMembers(const std::string_view& structName, std::unordered_map<std::string_view, NamedValues::StructMemberInfo>& structMembers)
+	{
+		TypeInfo* typeInfo = findType(structName);
+
+		if (typeInfo && typeInfo->IsStruct)
+		{
+			structMembers = typeInfo->StructMembers;
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+
 	NamedValues::StructMemberInfo NamedValues::GetMemberIndex(const std::string_view& structName, const std::string_view& memberName)
 	{
 		TypeInfo* typeInfo = findType(structName);
