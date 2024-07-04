@@ -1,0 +1,57 @@
+Enums can be used similarly to how they are used in C++:
+	type EnumType = enum
+	{
+		ValueA,
+		ValueB,
+		ValueC,
+		...
+	};
+
+To access one of the enum values, use enum_name|enum_value:
+	var val = EnumType|ValueB;
+
+They can also be used as tagged unions, where each value can be assigned a payload:
+	type EnumType = enum
+	{
+		ValueA: i32,
+		ValueB: f64,
+		ValueC,	// no payload
+		ValueD: i32,	// same payload as ValueA
+	};
+
+Values with payloads must have their payload initialized:
+	var enumVar = EnumType|ValueA(43);	// value between the parens is assigned to the payload of ValueA
+
+In order to retrieve the payload of a tagged union, its value must be checked either in an if or switch-case statement:
+	if (enumVar == EnumType|ValueA) -> num
+	{
+		// 'num' can be used here, and is a reference to the payload within enumVar
+		// if enumVar is const, it is a const reference, if enumVar is var, it is a non-const reference
+		// 'num' has type i32, since this is the type of the payload of the value EnumType|ValueA
+	}
+
+	// if every sub-expression of an if statement (left and right sides of '||') checks for 
+	// an enum value with the same payload type, we can capture
+	// here, ValueA and ValueD both carry a payload of type i32, so we can capture
+	if (enumVar == EnumType|ValueA || enumVar == EnumType|ValueD) -> num
+	{
+		// use num
+	}
+
+	switch (enumVar)
+	{
+		case (EnumType|ValueA) -> iNum	// capture is optional, and can be omitted even when there is a payload, in which case the payload is inaccessible
+		{
+			// use iNum
+		}
+		// no fallthrough between cases!
+		case (EnumType|ValueB) -> fNum
+		{
+			// use fNum
+		}
+
+		case (EnumType|ValueC)	// ValueC has no payload, cannot capture
+		{
+			
+		}
+	}

@@ -142,5 +142,6 @@
     <Text Include="docs\Node Changes.txt" />
     <Text Include="docs\Generics.txt" />
     <Text Include="SYNTAX.txt" />
+    <Text Include="docs\Enums.txt" />
   </ItemGroup>
 </Project>
