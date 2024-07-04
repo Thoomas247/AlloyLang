@@ -294,7 +294,64 @@ namespace AlloyCompiler
 				.Members = std::move(members)
 			}
 		);
+	}
 
+	template<>
+	ENUM_TYPE* NodeBuffer::parse()
+	{
+		if (expectKind<TokenKind::enum_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		if (expectKind<TokenKind::open_brace>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<std::pair<Token*, TYPE*>> members;
+		while (token()->Kind != TokenKind::close_brace)
+		{
+			Token* pMemberNameToken = nullptr;
+			if (expectKind<TokenKind::identifier>(&pMemberNameToken) != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			// check for a payload
+			if (token()->Kind == TokenKind::colon)
+			{
+				(void)eat();
+
+				TYPE* pType = parse<TYPE>();
+
+				if (pType == nullptr)
+				{
+					return nullptr;
+				}
+
+				members.push_back({ pMemberNameToken, pType });
+			}
+
+			if (token()->Kind == TokenKind::comma)
+			{
+				(void)eat();
+			}
+			else if (token()->Kind != TokenKind::close_brace)
+			{
+				(void)expectKind<TokenKind::comma, TokenKind::close_brace>();
+				return nullptr;
+			}
+		}
+
+		(void)eat();
+
+		return createNode(
+			ENUM_TYPE
+			{
+				.Members = std::move(members)
+			}
+		);
 	}
 
 	template<>
@@ -372,7 +429,7 @@ namespace AlloyCompiler
 
 		using enum TokenKind;
 
-		VariantNode<TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE, MACRO_CALL> type;
+		VariantNode<TYPE_NAME, STRUCT_TYPE, ENUM_TYPE, ARRAY_TYPE, MACRO_CALL> type;
 		switch (token()->Kind)
 		{
 		case at_symbol:
@@ -411,6 +468,18 @@ namespace AlloyCompiler
 			}
 
 			type.Set(pStructType);
+			break;
+		}
+		case enum_keyword:
+		{
+			ENUM_TYPE* pEnumType = parse<ENUM_TYPE>();
+
+			if (pEnumType == nullptr)
+			{
+				return nullptr;
+			}
+
+			type.Set(pEnumType);
 			break;
 		}
 		case open_bracket:
@@ -1662,6 +1731,55 @@ namespace AlloyCompiler
 		);
 	}
 
+	template<>
+	ENUM_VALUE* NodeBuffer::parse()
+	{
+		TYPE_NAME* pEnumName = parse<TYPE_NAME>();
+
+		if (pEnumName == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expectKind<TokenKind::pipe_operator>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		Token* pEnumValueNameToken = nullptr;
+		if (expectKind<TokenKind::identifier>(&pEnumValueNameToken) != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pPayloadValue = nullptr;
+		if (token()->Kind == TokenKind::open_paren)
+		{
+			(void)eat();
+
+			pPayloadValue = parse<EXPRESSION>();
+
+			if (pPayloadValue == nullptr)
+			{
+				return nullptr;
+			}
+
+			if (expectKind<TokenKind::close_paren>() != SUCCESS)
+			{
+				return nullptr;
+			}
+		}
+
+		return createNode(
+			ENUM_VALUE
+			{
+				.pEnumName = pEnumName,
+				.pEnumValueNameToken = pEnumValueNameToken,
+				.pPayloadValue = pPayloadValue
+			}
+		);
+	}
+
 	EXPRESSION* NodeBuffer::parse_PRIMARY()
 	{
 		using enum TokenKind;
@@ -1709,6 +1827,11 @@ namespace AlloyCompiler
 					goto parse_constructor;
 				}
 
+				else if (peekToken(offset)->Kind == TokenKind::pipe_operator)
+				{
+					goto parse_enum_value;
+				}
+
 				else
 				{
 					goto parse_function_call;
@@ -1718,7 +1841,7 @@ namespace AlloyCompiler
 			// FUNCTION_CALL
 			if (peekToken()->Kind == colon)
 			{
-			parse_function_call:	// we jump here in the case where we are unsure if we have a function call or a constructor
+			parse_function_call:
 
 				FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>();
 
@@ -1733,7 +1856,7 @@ namespace AlloyCompiler
 			// CONSTRUCTOR
 			if (peekToken()->Kind == open_brace)
 			{
-			parse_constructor:		// we jump here in the case where we are unsure if we have a function call or a constructor
+			parse_constructor:
 
 				CONSTRUCTOR* pConstructor = parse<CONSTRUCTOR>();
 
@@ -1743,6 +1866,21 @@ namespace AlloyCompiler
 				}
 
 				return createNode(EXPRESSION(createNode(PRIMARY(pConstructor))));
+			}
+
+			// ENUM_VALUE
+			if (peekToken()->Kind == pipe_operator)
+			{
+			parse_enum_value:
+
+				ENUM_VALUE* pEnumValue = parse<ENUM_VALUE>();
+
+				if (pEnumValue == nullptr)
+				{
+					return nullptr;
+				}
+
+				return createNode(EXPRESSION(createNode(PRIMARY(pEnumValue))));
 			}
 
 			// VARIABLE
@@ -2260,6 +2398,17 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		Token* pCaptureNameToken = nullptr;
+		if (token()->Kind == TokenKind::arrow)
+		{
+			(void)eat();
+
+			if (expectKind<TokenKind::identifier>(&pCaptureNameToken) != SUCCESS)
+			{
+				return nullptr;
+			}
+		}
+
 		STATEMENT* pStatement = parse<STATEMENT>();
 
 		if (pStatement == nullptr)
@@ -2288,7 +2437,76 @@ namespace AlloyCompiler
 			{
 				.pCondition = pCondition->pExpression,
 				.pStatement = pStatement,
-				.pElseStatement = pElseStatement
+				.pElseStatement = pElseStatement,
+				.pCaptureNameToken = pCaptureNameToken
+			}
+		);
+	}
+
+	
+	template<>
+	SWITCH_STATEMENT* NodeBuffer::parse()
+	{
+		if (expectKind<TokenKind::switch_keyword>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		ENCLOSED_EXPRESSION* pSwitchValue = parse<ENCLOSED_EXPRESSION>();
+
+		if (pSwitchValue == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expectKind<TokenKind::open_brace>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		std::vector<std::tuple<EXPRESSION*, Token*, STATEMENT*>> cases;
+		while (token()->Kind != TokenKind::close_brace)
+		{
+			if (expectKind<TokenKind::case_keyword>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			ENCLOSED_EXPRESSION* pCaseValue = parse<ENCLOSED_EXPRESSION>();
+
+			if (pCaseValue == nullptr)
+			{
+				return nullptr;
+			}
+
+			Token* pCaptureNameToken = nullptr;
+			if (token()->Kind == TokenKind::arrow)
+			{
+				(void)eat();
+
+				if (expectKind<TokenKind::identifier>(&pCaptureNameToken) != SUCCESS)
+				{
+					return nullptr;
+				}
+			}
+
+			STATEMENT* pStatement = parse<STATEMENT>();
+
+			if (pStatement == nullptr)
+			{
+				return nullptr;
+			}
+
+			cases.push_back({ pCaseValue->pExpression, pCaptureNameToken, pStatement });
+		}
+
+		(void)eat();
+
+		return createNode(
+			SWITCH_STATEMENT
+			{
+				.pSwitchValue = pSwitchValue->pExpression,
+				.Cases = std::move(cases)
 			}
 		);
 	}
@@ -2445,6 +2663,17 @@ namespace AlloyCompiler
 			}
 
 			return createNode(STATEMENT(pIfStatement));
+		}
+
+		case TokenKind::switch_keyword:
+		{
+			SWITCH_STATEMENT* pSwitchStatement = parse<SWITCH_STATEMENT>();
+			if (pSwitchStatement == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(STATEMENT(pSwitchStatement));
 		}
 
 		case TokenKind::open_brace:

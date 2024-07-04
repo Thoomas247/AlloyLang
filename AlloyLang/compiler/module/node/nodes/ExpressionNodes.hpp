@@ -41,6 +41,13 @@ namespace AlloyCompiler
 		EXPRESSION* pExpression;
 	};
 
+	struct ENUM_VALUE
+	{
+		TYPE_NAME* pEnumName;
+		Token* pEnumValueNameToken;
+		EXPRESSION* pPayloadValue;	// optional, only for enum values which can hold a payload
+	};
+
 	struct ARRAY_ACCESS
 	{
 		EXPRESSION* pArray;

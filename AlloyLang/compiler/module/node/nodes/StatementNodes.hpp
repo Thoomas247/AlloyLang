@@ -23,6 +23,13 @@ namespace AlloyCompiler
 		EXPRESSION* pCondition;
 		STATEMENT* pStatement;
 		STATEMENT* pElseStatement;
+		Token* pCaptureNameToken;	// optional, can only be used with enums
+	};
+
+	struct SWITCH_STATEMENT
+	{
+		EXPRESSION* pSwitchValue;
+		std::vector<std::tuple<EXPRESSION*, Token*, STATEMENT*>> Cases;	// Token* is optional and represents the name of the capture
 	};
 
 	struct STATEMENT_BLOCK

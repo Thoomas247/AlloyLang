@@ -37,6 +37,8 @@ namespace AlloyCompiler
 		while_keyword,
 		if_keyword,
 		else_keyword,
+		switch_keyword,
+		case_keyword,
 		return_keyword,
 
 		new_keyword,
@@ -62,6 +64,8 @@ namespace AlloyCompiler
 		close_brace,
 		open_bracket,
 		close_bracket,
+
+		pipe_operator,
 
 		assignment_operator,
 
@@ -115,6 +119,8 @@ namespace AlloyCompiler
 		{ TokenKind::while_keyword,			"while" },
 		{ TokenKind::if_keyword,			"if" },
 		{ TokenKind::else_keyword,			"else" },
+		{ TokenKind::switch_keyword,		"switch" },
+		{ TokenKind::case_keyword,			"case" },
 		{ TokenKind::return_keyword,		"return" },
 
 		{ TokenKind::new_keyword,			"new" },
@@ -137,6 +143,8 @@ namespace AlloyCompiler
 		{ TokenKind::close_brace,			"}" },
 		{ TokenKind::open_bracket,			"[" },
 		{ TokenKind::close_bracket,			"]" },
+
+		{ TokenKind::pipe_operator,			"|" },
 
 		{ TokenKind::assignment_operator,	"=" },
 
@@ -176,6 +184,8 @@ namespace AlloyCompiler
 		{ "while", TokenKind::while_keyword },
 		{ "if", TokenKind::if_keyword },
 		{ "else", TokenKind::else_keyword },
+		{ "switch", TokenKind::switch_keyword },
+		{ "case", TokenKind::case_keyword },
 		{ "return", TokenKind::return_keyword },
 
 		{ "new", TokenKind::new_keyword },
@@ -201,6 +211,8 @@ namespace AlloyCompiler
 		{ "}", TokenKind::close_brace },
 		{ "[", TokenKind::open_bracket },
 		{ "]", TokenKind::close_bracket },
+
+		{ "|", TokenKind::pipe_operator },
 
 		{ "=", TokenKind::assignment_operator },
 

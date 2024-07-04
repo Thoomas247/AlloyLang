@@ -188,7 +188,7 @@ namespace AlloyCompiler
 	}
 
 	template<typename ...Args>
-	inline constexpr void NodeBuffer::logErrorAtToken(Token* pToken, const std::string& format, Args&& ...args)
+	constexpr void NodeBuffer::logErrorAtToken(Token* pToken, const std::string& format, Args&& ...args)
 	{
 		const Location& location = pToken->Location;
 		const size_t tokenSize = pToken->Value.size();

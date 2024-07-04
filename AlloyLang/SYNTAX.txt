@@ -25,6 +25,8 @@
 	while_keyword:					'while' ;
 	if_keyword:						'if' ;
 	else_keyword:					'else' ;
+	switch_keyword:					'switch' ;
+	case_keyword:					'case' ;
 	return_keyword:					'return' ;
 
 	new_keyword:					'new' ;
@@ -51,6 +53,8 @@
 	open_bracket:					'[' ;
 	close_bracket:					']' ;
 
+	pipe_operator:					'|' ;
+
 	assignment_operator:			'=' ;
 
 	unary_operator:					'!' | '-' | '&' ;
@@ -65,10 +69,11 @@
 
 	(* - Types - *)
 
-	TYPE:						[ reference | pointer ] ( TYPE_NAME | STRUCT_TYPE | ARRAY_TYPE | MACRO_CALL ) ;
+	TYPE:						[ reference | pointer ] ( TYPE_NAME | STRUCT_TYPE | ENUM_TYPE | ARRAY_TYPE | MACRO_CALL ) ;
 
 		TYPE_NAME:					( identifier | long_identifier ) [ open_paren TYPE { comma TYPE } close_paren ] ;
-		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { identifier colon TYPE } ] close_brace ;
+		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { comma identifier colon TYPE } ] close_brace ;
+		ENUM_TYPE:					enum_keyword open_brace identifier [ colon TYPE ] { comma identifier [ colon TYPE ] } close_brace ;
 		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
 		
 	TYPE_IDENTIFIER:			identifier [ open_paren GENERIC_PARAMETER { comma GENERIC_PARAMETER } close_paren ] ;
@@ -129,6 +134,7 @@
 							| POINTER_MOVE
 							| INITIALIZER_LIST
 							| ENCLOSED_EXPRESSION
+							| ENUM_VALUE
 							; 
 			LITERAL:				integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
 			CONSTRUCTOR:			TYPE_NAME open_brace [ identifier assignment_operator EXPRESSION { comma identifier assignment_operator EXPRESSION } ] close_brace ;
@@ -136,6 +142,7 @@
 			POINTER_MOVE:			move_keyword VARIABLE ; (* TODO: this should be more than just VARIABLE *)
 			INITIALIZER_LIST:		open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
 			ENCLOSED_EXPRESSION:	open_paren EXPRESSION close_paren ;
+			ENUM_VALUE:				TYPE_NAME pipe_operator identifier [ open_paren EXPRESSION close_paren ] ;
 
 		POSTFIX:		ARRAY_ACCESS | MEMBER_ACCESS ;
 			ARRAY_ACCESS:			EXPRESSION open_bracket EXPRESSION close_bracket ;
@@ -156,6 +163,7 @@
 					| FOR_LOOP
 					| WHILE_LOOP
 					| IF_STATEMENT
+					| SWITCH_STATEMENT
 					| STATEMENT_BLOCK
 					| RETURN
 					;
@@ -163,9 +171,11 @@
 		FOR_LOOP:			for_keyword open_paren EXPRESSION semicolon EXPRESSION semicolon EXPRESSION close_paren STATEMENT ;
 		WHILE_LOOP:			while_keyword ENCLOSED_EXPRESSION STATEMENT ;
 		IF_STATEMENT:		if_keyword ENCLOSED_EXPRESSION STATEMENT [ else_keyword STATEMENT ] ;
+		SWITCH_STATEMENT:	switch_keyword ENCLOSED_EXPRESSION open_brace 
+							{ case_keyword ENCLOSED_EXPRESSION [ arrow identifier ] STATEMENT } 
+							close_brace ;
 		STATEMENT_BLOCK:	open_brace { STATEMENT } close_brace ;
 		RETURN:				return_keyword [ EXPRESSION ] semicolon ;
-
 
 	
 	(* - Annotations - *)

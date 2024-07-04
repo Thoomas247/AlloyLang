@@ -18,6 +18,11 @@ namespace AlloyCompiler
 		std::vector<std::pair<Token*, TYPE*>> Members;
 	};
 
+	struct ENUM_TYPE
+	{
+		std::vector<std::pair<Token*, TYPE*>> Members;	// TYPE of member is optional
+	};
+
 	struct ARRAY_TYPE
 	{
 		TYPE* pElementType;
@@ -27,7 +32,7 @@ namespace AlloyCompiler
 	struct TYPE
 	{
 		TypeModifier Modifier;
-		VariantNode<TYPE_NAME, STRUCT_TYPE, ARRAY_TYPE, MACRO_CALL> Type;
+		VariantNode<TYPE_NAME, STRUCT_TYPE, ENUM_TYPE, ARRAY_TYPE, MACRO_CALL> Type;
 	};
 
 	struct TYPE_IDENTIFIER

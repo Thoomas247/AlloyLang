@@ -1,5 +1,42 @@
 extern printf (const str: String, ...) -> i64;
 
+// enum with no payload
+type PlayerTeam = enum
+{
+	Red,
+	Blue
+};
+
+// enum with payload
+type Result(type E) = enum
+{
+	Success,
+	Error: E,
+};
+
+fn use_enum() -> bool
+{
+	var team = PlayerTeam|Red;
+
+	const result = Result(i32)|Error(24);
+
+	switch (result)
+	{
+		case (Result(i32)|Success)
+			return true;
+		case (Result(i32)|Error) -> error
+		{
+			printf("Error %d!", error);
+		}
+	}
+
+	if (result == Result(i32)|Error) -> error
+	{
+		printf("Error %d!", error);
+	}
+
+}
+
 type GenericType(type A, type B, type C) = struct
 {
 	a: A,
@@ -54,7 +91,6 @@ fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
 					
 	return result;
 }
-
 
 fn main() -> i64
 {
