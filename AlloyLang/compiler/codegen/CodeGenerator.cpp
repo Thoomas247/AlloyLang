@@ -1812,7 +1812,7 @@ namespace AlloyCompiler
 		}
 
 		// emit the condition
-		llvm::Value* conditionVal;
+		llvm::Value* conditionVal = nullptr;
 		if (forLoop.pCondition != nullptr) {
 			conditionVal = generateExpression(moduleTable, state, *forLoop.pCondition, { nullptr, nullptr });
 
@@ -2008,6 +2008,78 @@ namespace AlloyCompiler
 		return state.Builder->CreateBr(state.FuncExitBlock);
 	}
 
+	llvm::Value* generateSwitchStatement(ModuleTable& moduleTable, LLVMState& state, const SWITCH_STATEMENT& statement)
+	{
+		llvm::Value* result = nullptr;
+		llvm::SwitchInst* switchInst = nullptr;
+		llvm::BasicBlock* afterBlock = nullptr;
+		llvm::BasicBlock* switchBlock = nullptr;
+
+		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
+		ASSERT(func != nullptr, "No function to insert into!");
+
+		// generate and check the condition expression for the switch statement
+		llvm::Value* conditionVal = generateExpression(moduleTable, state, *statement.pSwitchValue, { nullptr, nullptr });
+		if (conditionVal == nullptr)
+		{
+			goto failed;
+		}
+
+		// create a new basic block to start insertion into
+		switchBlock = llvm::BasicBlock::Create(*state.Context, "switch", func);
+
+		// insert an explicit fall through from the current block to the switchBlock
+		state.Builder->CreateBr(switchBlock);
+
+		// start insertion into the switchBlock
+		state.Builder->SetInsertPoint(switchBlock);
+
+		// create the default block and insert it
+		afterBlock = llvm::BasicBlock::Create(*state.Context, "default", func);
+
+		// create an llvm switch instruction class, default branch is set to null
+		// Note: if this line asserts in LLVM, make sure SDL checks are off in the compiler settings
+		switchInst = state.Builder->CreateSwitch(conditionVal, afterBlock, statement.Cases.size());
+
+		for (auto& caseStmt : statement.Cases) {
+			EXPRESSION* expr = std::get<0>(caseStmt);
+			llvm::Value* cond = generateExpression(moduleTable, state, *expr, {});
+			if (!llvm::isa<llvm::ConstantInt>(cond)) {
+				logErrorAtCurrentPosition(std::get<1>(caseStmt), "Switch/Case condition is not a constant integer!");
+				goto failed;
+			}
+
+			// create a new basic block to start insertion into
+			llvm::BasicBlock* caseBlock = llvm::BasicBlock::Create(*state.Context, "case", func);
+
+			// start insertion into the caseBlock
+			state.Builder->SetInsertPoint(caseBlock);
+
+			// generate the body of the case statement (can be empty)
+			if (std::get<2>(caseStmt) != nullptr) {
+				llvm::Value* bodyVal = generateStatement(moduleTable, state, *std::get<2>(caseStmt));
+
+				if (bodyVal == nullptr)
+				{
+					logErrorAtCurrentPosition(std::get<1>(caseStmt),
+						"Error generating case statement!");
+					goto failed;
+				}
+			}
+
+			switchInst->addCase(static_cast<llvm::ConstantInt*>(cond), caseBlock);
+		}
+
+		// any new code will be inserted in afterBlock
+		state.Builder->SetInsertPoint(afterBlock);
+
+		// switch expr always returns 0.0
+		result = llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
+
+	failed:
+		return result;
+	}
+
 	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement)
 	{
 		llvm::Value* result = nullptr;
@@ -2035,6 +2107,9 @@ namespace AlloyCompiler
 		}
 		else if (statement.Is<RETURN>()) {
 			result = generateReturnStatement(moduleTable, state, *statement.Get<RETURN>());
+		}
+		else if (statement.Is<SWITCH_STATEMENT>()) {
+			result = generateSwitchStatement(moduleTable, state, *statement.Get<SWITCH_STATEMENT>());
 		}
 		else {
 			ASSERT(false, "Unknown statement node kind!");

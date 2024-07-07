@@ -149,6 +149,38 @@ namespace unittests
 			RunTest(TestStr, 65536);
 		}
 
+		TEST_METHOD(SwitchCase)
+		{
+			constexpr auto TestStr = R"(
+				extern printf (const str : String, ...) -> i64;
+
+				fn main () -> i64
+				{
+					var res : i64 = 1;
+
+					switch (res)
+					{
+						case (2)
+						{
+							printf("Error %d!", res);
+							return res;
+						}
+						case (1)
+						{
+							printf("Success %d!", res);
+							return res;
+						}
+					}
+
+					res = 0;
+					return res;
+				}
+			)";
+			std::string expected = "Success 1!";
+
+			RunTest(TestStr, 1);
+		}
+
 		TEST_METHOD(Structures)
 		{
 			constexpr auto TestStr = R"(
