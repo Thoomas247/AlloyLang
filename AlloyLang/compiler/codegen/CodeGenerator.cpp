@@ -1174,11 +1174,13 @@ namespace AlloyCompiler
 				if (result.Code == SearchResultCode::NotFound)
 				{
 					// TODO: error not found
+					ASSERT(false, "Could not find function!");
 					goto error;
 				}
 				else if (result.Code == SearchResultCode::Inaccessible)
 				{
 					// TODO: error inaccessible
+					ASSERT(false, "Function is inaccessible!");
 					goto error;
 				}
 				else
@@ -1209,11 +1211,13 @@ namespace AlloyCompiler
 				if (result.Code == SearchResultCode::NotFound)
 				{
 					// TODO: error not found
+					ASSERT(false, "Could not find function!");
 					goto error;
 				}
 				else if (result.Code == SearchResultCode::Inaccessible)
 				{
 					// TODO: error inaccessible
+					ASSERT(false, "Function is inaccessible!");
 					goto error;
 				}
 				else
@@ -1243,12 +1247,14 @@ namespace AlloyCompiler
 				if (externResult.Code == SearchResultCode::NotFound)
 				{
 					// TODO: error not found
+					ASSERT(false, "Could not find function!");
 					goto error;
 				}
 
 				else if (externResult.Code == SearchResultCode::Inaccessible)
 				{
 					// TODO: error inaccessible
+					ASSERT(false, "Function is inaccessible!");
 					goto error;
 				}
 
@@ -1260,6 +1266,7 @@ namespace AlloyCompiler
 			else if (funcResult.Code == SearchResultCode::Inaccessible)
 			{
 				// TODO: error inaccessible
+				ASSERT(false, "Function is inaccessible!");
 				goto error;
 			}
 			else

@@ -8,16 +8,29 @@ namespace AlloyCompiler
 		, m_NodeBuffer(m_Source, m_TokenBuffer)
 	{}
 
-	void Module::Generate()
+	bool Module::Generate()
 	{
-		m_Source.ReadFile();
-		m_TokenBuffer.Tokenize();
-		m_NodeBuffer.Parse();
+		if (!m_Source.ReadFile())
+		{
+			return false;
+		}
+
+		if (!m_TokenBuffer.Tokenize())
+		{
+			return false;
+		}
+
+		if (!m_NodeBuffer.Parse())
+		{
+			return false;
+		}
+
+		return true;
 	}
 
 	void Module::Generate(const std::string& source)
 	{
-		m_Source.setSourceString(source);
+		m_Source.SetSourceString(source);
 		m_TokenBuffer.Tokenize();
 		m_NodeBuffer.Parse();
 	}

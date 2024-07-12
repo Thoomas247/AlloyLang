@@ -10,7 +10,7 @@ namespace AlloyCompiler
 	public:
 		Module(const fs::path& filePath);
 
-		void Generate();
+		bool Generate();
 		void Generate(const std::string& source);
 		const NodeBuffer& GetNodeBuffer() const;
 

@@ -47,7 +47,7 @@ namespace AlloyCompiler
 		}
 
 		NodeBuffer(const Source& source, TokenBuffer& tokenBuffer);
-		void Parse();
+		bool Parse();
 
 		const std::vector<std::string_view>& GetImportedModules() const
 		{

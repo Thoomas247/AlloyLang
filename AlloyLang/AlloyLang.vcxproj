@@ -163,13 +163,15 @@
     <ClInclude Include="compiler\module\node\nodes\TypeNodes.hpp" />
     <ClInclude Include="compiler\module\node\nodes\VariableNodes.hpp" />
     <ClInclude Include="compiler\module\node\nodes\VariantNodes.hpp" />
-    <ClInclude Include="TestString.hpp" />
     <ClInclude Include="compiler\module\source\Source.hpp" />
     <ClInclude Include="compiler\module\token\Token.hpp" />
     <ClInclude Include="compiler\module\token\TokenBuffer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.alloy" />
+    <None Include="test\Basic\main.alloy" />
+    <None Include="test\MultipleFiles\main.alloy" />
+    <None Include="test\MultipleFiles\other.alloy" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="docs\Coding Rules.txt" />

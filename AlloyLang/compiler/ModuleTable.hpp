@@ -137,11 +137,15 @@ namespace AlloyCompiler
 			// look in the module which the symbol name refers to
 			Definition<T> definition = getDefinitionInModule(getDefinitionFn, moduleAndSymbolName.ModuleName, moduleAndSymbolName.SymbolName);
 
-			if (definition.Access == Visibility::Private)
+			if (definition.IsNull())
+			{
+				result.Code = SearchResultCode::NotFound;
+			}
+			else if (definition.Access == Visibility::Private)
 			{
 				result.Code = SearchResultCode::Inaccessible;
 			}
-			else if (definition.pDefinition != nullptr)
+			else
 			{
 				result.Code = SearchResultCode::Found;
 				result.pDefiniton = definition.pDefinition;

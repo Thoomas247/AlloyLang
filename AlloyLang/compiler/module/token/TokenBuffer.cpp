@@ -11,7 +11,7 @@ namespace AlloyCompiler
 	{
 	}
 
-	void TokenBuffer::Tokenize()
+	bool TokenBuffer::Tokenize()
 	{
 		do
 		{
@@ -48,10 +48,12 @@ namespace AlloyCompiler
 				continue;
 
 			logErrorAtCurrentPosition("Unexpected symbol '{0}'!", current());
+			return false;
 
 		} while (hasNext());
 
 		addToken(TokenKind::end_of_file, createStringView(index(), index()), location());
+		return true;
 	}
 
 	Token* TokenBuffer::GetToken(size_t index)

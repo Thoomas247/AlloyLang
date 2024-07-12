@@ -1,0 +1,59 @@
+extern printf (const str : String, const param : f64) -> i64;
+
+type Vector3 = struct
+{
+	x : f32,
+	y : f32,
+	z : f32
+};
+
+type Transform = struct
+{
+	position : Vector3,
+	rotation : Vector3,
+	scale : Vector3
+};
+
+fn translate(const point : Vector3, const vector : Vector3) -> Vector3
+{
+	var result : Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
+	
+	result.x = point.x + vector.x;
+	result.y = point.y + vector.y;
+	result.z = point.z + vector.z;
+	
+	return result;
+}
+
+fn main () -> i64
+{
+	var a : f32 = 32.0;
+	var expected : f32 = 20480.0;
+	var result : i64 = 0;
+	var test : Vector3 = 
+		Vector3 
+		{ 
+			x = 32.0, 
+			y = 64.0, 
+			z = 0.0 
+		};
+
+	var test2 : Transform = 
+		Transform
+		{
+			position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
+			rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
+			scale = test
+		};
+
+	const translation : Vector3 = Vector3 { x = 0, y = 0, z = 10 };
+
+	test.z = translate(test, translation).z;
+	test2.rotation.y = 20.0;
+
+	printf("result = %f", test.x * test2.scale.y * test.z);
+	if (test.x * test2.scale.y * test.z == expected)
+		return 1;
+	else
+		return 0;
+}

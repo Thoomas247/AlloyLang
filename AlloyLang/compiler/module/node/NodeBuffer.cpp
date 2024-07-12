@@ -1815,6 +1815,7 @@ namespace AlloyCompiler
 			return createNode(EXPRESSION(createNode(PRIMARY(pVariableDefinition))));
 		}
 
+		case long_identifier:
 		case identifier:
 		{
 			// ambiguous case, look further ahead
@@ -2848,7 +2849,7 @@ namespace AlloyCompiler
 	{
 	}
 
-	void NodeBuffer::Parse()
+	bool NodeBuffer::Parse()
 	{
 		m_Allocator.Reset(m_TokenBuffer.NumTokens() * 80);	// TODO: remove magic number
 
@@ -2861,7 +2862,7 @@ namespace AlloyCompiler
 			{
 				if (getAnnotation() != SUCCESS)
 				{
-					ASSERT(false, "");
+					return false;
 				}
 			}
 
@@ -2870,7 +2871,7 @@ namespace AlloyCompiler
 			{
 				if (getImport() != SUCCESS)
 				{
-					ASSERT(false, "");
+					return false;
 				}
 
 				continue;
@@ -2898,13 +2899,13 @@ namespace AlloyCompiler
 
 				if (pMacroDefinition == nullptr)
 				{
-					ASSERT(false, "");
+					return false;
 				}
 
 				if (m_AllSymbolNames.contains(pMacroDefinition->pNameToken->Value))
 				{
 					logErrorAtToken(pMacroDefinition->pNameToken, "Symbol with name '{0}' already exists in this module.", pMacroDefinition->pNameToken->Value);
-					ASSERT(false, "");
+					return false;
 				}
 
 				m_MacroDefinitions[std::string(pMacroDefinition->pNameToken->Value)] = Definition<MACRO_DEFINITION>(visibility, pMacroDefinition);
@@ -2919,14 +2920,14 @@ namespace AlloyCompiler
 
 				if (pTypeDefinition == nullptr)
 				{
-					ASSERT(false, "");
+					return false;
 				}
 
 				if (m_AllSymbolNames.contains(pTypeDefinition->pTypeIdentifier->pNameToken->Value))
 				{
 					logErrorAtToken(pTypeDefinition->pTypeIdentifier->pNameToken,
 						"Symbol with name '{0}' already exists in this module.", pTypeDefinition->pTypeIdentifier->pNameToken->Value);
-					ASSERT(false, "");
+					return false;
 				}
 
 				m_TypeDefinitions[std::string(pTypeDefinition->pTypeIdentifier->pNameToken->Value)] = Definition<TYPE_DEFINITION>(visibility, pTypeDefinition);
@@ -2941,7 +2942,7 @@ namespace AlloyCompiler
 
 				if (pFunctionDefinition == nullptr)
 				{
-					ASSERT(false, "");
+					return false;
 				}
 
 				Token* pFunctionNameToken = pFunctionDefinition->pFunctionNameToken;
@@ -2955,7 +2956,7 @@ namespace AlloyCompiler
 					{
 						logErrorAtToken(pFunctionNameToken, "Member function '{0}' is already defined for type '{1}'.",
 							pFunctionNameToken->Value, pTypeNameToken->Value);
-						ASSERT(false, "");
+						return false;
 					}
 
 					m_FunctionDefinitions[fullFunctionName] = Definition<FUNCTION_DEFINITION>(visibility, pFunctionDefinition);
@@ -2967,7 +2968,7 @@ namespace AlloyCompiler
 					if (m_AllSymbolNames.contains(pFunctionNameToken->Value))
 					{
 						logErrorAtToken(pFunctionNameToken, "Symbol with name '{0}' already exists in this module.", pFunctionNameToken->Value);
-						ASSERT(false, "");
+						return false;
 					}
 
 					m_FunctionDefinitions[std::string(pFunctionNameToken->Value)] = Definition<FUNCTION_DEFINITION>(visibility, pFunctionDefinition);
@@ -2983,14 +2984,14 @@ namespace AlloyCompiler
 
 				if (pExternDefinition == nullptr)
 				{
-					ASSERT(false, "");
+					return false;
 				}
 
 				if (m_AllSymbolNames.contains(pExternDefinition->pNameToken->Value))
 				{
 					logErrorAtToken(pExternDefinition->pNameToken,
 						"Symbol with name '{0}' already exists in this module.", pExternDefinition->pNameToken->Value);
-					ASSERT(false, "");
+					return false;
 				}
 
 				m_ExternDefinitions[std::string(pExternDefinition->pNameToken->Value)] = Definition<EXTERN_DEFINITION>(visibility, pExternDefinition);
@@ -3003,9 +3004,11 @@ namespace AlloyCompiler
 			{
 				(void)expectKind<macro_keyword, type_keyword, function_keyword, extern_keyword>();
 				(void)eat();
-				break;
+				return false;
 			}
 			}
 		}
+
+		return true;
 	}
 }

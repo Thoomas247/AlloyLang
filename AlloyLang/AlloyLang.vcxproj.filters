@@ -56,9 +56,6 @@
     <ClInclude Include="log\Log.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="TestString.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="compiler\module\source\Source.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -131,6 +128,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.alloy" />
+    <None Include="test\Basic\main.alloy" />
+    <None Include="test\MultipleFiles\main.alloy" />
+    <None Include="test\MultipleFiles\other.alloy" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="docs\Parser Issues.txt" />

@@ -52,7 +52,11 @@ namespace AlloyCompiler
 
 		for (auto& [name, module] : m_Modules)
 		{
-			module.Generate();
+			if (!module.Generate())
+			{
+				Log::Error("Failed to compile module '{0}'. See output for errors.", name);
+				return;
+			}
 		}
 
 		ModuleTable moduleTable(m_Modules, getModuleName(m_MainFilePath));

@@ -1,0 +1,23 @@
+extern printf (const str : String, const param : i64) -> i64;
+	
+fn test (var a : i64, var b : &i64) -> i64
+{
+	b = a;
+	return a;
+}
+	
+fn main () -> i64
+{				
+	var a : i64 = 3;
+	var b : i64 = 0;
+	test(a, &b);
+
+	// array of references to i64
+	var refArray : [&i64; 3] = { &a, &b, &a };
+
+	printf("b = %d", refArray[1]);
+	if (b == 3)
+		return 1;
+	else
+		return 0;
+}

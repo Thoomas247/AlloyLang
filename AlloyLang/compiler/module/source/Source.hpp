@@ -57,7 +57,7 @@ namespace AlloyCompiler
 		/// <summary>
 		/// Set source to a string rather than a file
 		/// </summary>
-		void setSourceString(const std::string& source) { m_SourceString = source; }
+		void SetSourceString(const std::string& source) { m_SourceString = source; }
 
 	private:
 		fs::path m_SourceFilePath;

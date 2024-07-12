@@ -12,7 +12,7 @@ namespace AlloyCompiler
 	public:
 		TokenBuffer(const Source& source);
 
-		void Tokenize();
+		bool Tokenize();
 
 		Token* GetToken(size_t index);
 		size_t NumTokens() const;
