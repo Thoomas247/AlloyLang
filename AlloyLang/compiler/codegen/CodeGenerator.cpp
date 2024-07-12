@@ -275,12 +275,14 @@ namespace AlloyCompiler
 		}
 		else {
 			const FUNCTION_PARAMETER* parameter = functionType.Parameters[index];
-			ASSERT(parameter->Is<VARIABLE_DECLARATION>(), "TODO: add support for generics in codegen");
-
-			// TODO: fix this
-			// temporary hack to get the code compiling
-			VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
-			return (pParameterVariableDeclaration->VarType == VariableType::Constant);
+			if (parameter->Is<VARIABLE_DECLARATION>()) {
+				VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
+				return (pParameterVariableDeclaration->VarType == VariableType::Constant);
+			}
+			else {
+				ASSERT(false, "isFunctionParameterConst can only be called on variable parameters and not on types!");
+				return false;
+			}
 		}
 	}
 #pragma endregion
@@ -619,8 +621,8 @@ namespace AlloyCompiler
 		if (state.Module->getFunction(name))
 		{
 			// TODO: replace '@' in mangled name by ':' for error messages
-			logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' already defined!", name);
-			return nullptr;
+			// logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' already defined!", name);
+			return state.Module->getFunction(name);
 		}
 
 		// retrieve the parameter types
@@ -1134,6 +1136,7 @@ namespace AlloyCompiler
 	llvm::Value* generateFunctionCallExpression(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
 	{
 		std::string functionName(functionCallExpressionNode.pFunctionNameToken->Value);
+		std::string mangledName(functionName);
 		std::vector<llvm::Value*> args;
 		int argi = 0;	// argument index currently processed
 		llvm::Value* result = nullptr;
@@ -1163,7 +1166,7 @@ namespace AlloyCompiler
 			{
 				// non-static member function call
 				std::string_view typeName = state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType());
-				std::string mangledName = NodeBuffer::GetMangledName(typeName, functionName);
+				mangledName = NodeBuffer::GetMangledName(typeName, functionName);
 
 				// also retrieve the original function definition
 				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
@@ -1205,7 +1208,7 @@ namespace AlloyCompiler
 			else if (state.NamedValues.GetType(varOrTypeName) != nullptr)
 			{
 				// static member function call
-				std::string mangledName = NodeBuffer::GetMangledName(varOrTypeName, functionName);
+				mangledName = NodeBuffer::GetMangledName(varOrTypeName, functionName);
 
 				// also retrieve the original function definition
 				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
@@ -1287,25 +1290,25 @@ namespace AlloyCompiler
 		// check if function is already in the parser and process it
 		if (!calleeFunc)
 		{
-			ASSERT(false, "Defining a new function while another function is already being defined is not working, all functions have to be pre-processed in Generate!");
+///			ASSERT(false, "Defining a new function while another function is already being defined is not working, all functions have to be pre-processed in Generate!");
 
-#if 0
-			auto functionResult = moduleTable.GetFunctionDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/true);
-			if (functionResult.Code == SearchErrorCode::Success)
+#if 1
+			auto functionResult = moduleTable.GetFunctionDefinition(mangledName);
+			if (functionResult.Code == SearchResultCode::Found)
 			{
 
 				// function found, process it
-				calleeFunc = generateFunctionDefinition(moduleTable, state, *functionResult.pValue);
+				calleeFunc = generateFunctionDefinition(moduleTable, state, *functionResult.pDefiniton, moduleTable.GetCurrentContext());
 
 			}
 			else
 			{
-				auto externResult = moduleTable.GetExternDefinition(functionCallExpressionNode.pFunctionNameToken, /*emitErrors*/true);
+				auto externResult = moduleTable.GetExternDefinition(mangledName);
 
-				if (externResult.Code == SearchErrorCode::Success)
+				if (externResult.Code == SearchResultCode::Found)
 				{
 					// external function found, process it
-					calleeFunc = generateExternDefinition(moduleTable, state, *externResult.pValue);
+					calleeFunc = generateExternDefinition(moduleTable, state, *externResult.pDefiniton, moduleTable.GetCurrentContext());
 				}
 			}
 #endif
@@ -2228,6 +2231,10 @@ failed:
 			return nullptr;
 		}
 
+		// create a new builder for this function, this will allow us to generate multiple functions in parallel
+		llvm::IRBuilder<>* PreviousBuilder = state.Builder.release();
+		state.Builder.reset(new llvm::IRBuilder<>(*state.Context));
+
 		// push a new scope for the function
 		state.NamedValues.PushScope(func->getName().str());
 
@@ -2256,6 +2263,7 @@ failed:
 				state.NamedValues.FreeHeapPointers(*state.Builder);
 				state.NamedValues.PopScope();
 				state.CurrentReturnValue = nullptr;
+				state.Builder.reset(PreviousBuilder);
 				return nullptr;
 			}
 
@@ -2291,6 +2299,7 @@ failed:
 				state.NamedValues.PopScope();
 				state.CurrentReturnValue = previousReturnValue;
 				state.FuncExitBlock = previousExitBlock;
+				state.Builder.reset(PreviousBuilder);
 				return nullptr;
 			}
 		}
@@ -2332,7 +2341,7 @@ failed:
 			state.FPM->run(*func, *state.FAM);
 		}
 
-		state.CurrentReturnValue = nullptr;
+		state.Builder.reset(PreviousBuilder);
 
 		return func;
 	}
@@ -2401,7 +2410,7 @@ failed:
 				generateExternDefinition(moduleTable, state, *func.pDefinition, "");
 			}
 
-			// pre-process all function definitions leaving the main function till the end
+			// pre - process all function definitions leaving the main function till the end
 			for (auto& [funcName, func] : module.GetNodeBuffer().GetFunctionDefinitions())
 			{
 				if (funcName != "main")

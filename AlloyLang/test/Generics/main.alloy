@@ -13,6 +13,19 @@ type PairOf(type T1, type T2) = struct
 	y: T2
 };
 
+fn Compare(type T, var a : T, var b : T)
+{
+	if (a == b)
+		return 0;
+	else
+	{
+		if (a > b)
+			return 1;
+		else
+			return -1;
+	}
+}
+
 type I32Vec3 = Vector3Of(i32);
 type F64Vec3 = Vector3Of(f64);
 type I32StringPair = PairOf(i32, String);
