@@ -1,11 +1,10 @@
 #include "Compiler.hpp"
 #include "ModuleTable.hpp"
-#include "codegen/CodeGenerator.hpp"
 
 namespace AlloyCompiler
 {
-	Compiler::Compiler(const std::string& mainFilePath)
-		: m_MainFilePath(fs::absolute(mainFilePath))
+	Compiler::Compiler(const std::string& mainFilePath, bool optimize)
+		: m_MainFilePath(fs::absolute(mainFilePath)), m_LLVMState(optimize)
 	{}
 
 	void Compiler::Compile()
@@ -61,26 +60,12 @@ namespace AlloyCompiler
 
 		ModuleTable moduleTable(m_Modules, getModuleName(m_MainFilePath));
 
-		LLVMState llvmState(true);
-		Generate(moduleTable, llvmState);
+		Generate(moduleTable, m_LLVMState);
 	}
 
-	int Compiler::Compile(const std::string& sourceString, bool execute)
+	int Compiler::Execute()
 	{
-		m_Modules.emplace(".", "");
-		m_Modules.at(".").Generate(sourceString);
-
-		ModuleTable moduleTable(m_Modules, getModuleName(m_MainFilePath));
-
-		LLVMState llvmState(true);
-		Generate(moduleTable, llvmState);
-
-		if (execute) {
-			return Execute(llvmState);
-		}
-		else {
-			return 0;
-		}
+		return AlloyCompiler::Execute(m_LLVMState);
 	}
 
 	std::string Compiler::getModuleName(const fs::path& path)

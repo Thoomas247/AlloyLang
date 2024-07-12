@@ -7,6 +7,6 @@ int main(int argc, char* argv[])
 {
 	ASSERT(argc == 2, "Invalid number of arguments!");
 
-	Compiler compiler(argv[1]);
+	Compiler compiler(argv[1], /*optimize*/true);
 	compiler.Compile();
 }

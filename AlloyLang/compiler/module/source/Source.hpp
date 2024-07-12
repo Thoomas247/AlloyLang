@@ -54,11 +54,6 @@ namespace AlloyCompiler
 		/// </summary>
 		std::string_view CreateStringView(size_t start, size_t end) const;
 
-		/// <summary>
-		/// Set source to a string rather than a file
-		/// </summary>
-		void SetSourceString(const std::string& source) { m_SourceString = source; }
-
 	private:
 		fs::path m_SourceFilePath;
 		std::string m_SourceString;

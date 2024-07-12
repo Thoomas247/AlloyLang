@@ -9,9 +9,9 @@ namespace AlloyCompiler
 	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
 	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
 	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
-	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition);
+	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName);
 	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::vector<TYPE*>& genericArguments);
-	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition);
+	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition, const std::string& moduleName);
 
 #pragma region Util
 
@@ -595,7 +595,7 @@ namespace AlloyCompiler
 	}
 
 	llvm::Function* generateFunctionDeclaration(ModuleTable& moduleTable, LLVMState& state, 
-												const FUNCTION_DEFINITION& functionDeclarationNode)
+												const FUNCTION_DEFINITION& functionDeclarationNode, const std::string& moduleName)
 	{
 		//
 		// If type is not empty, we are generating a member function in the form of Type@Name
@@ -608,6 +608,11 @@ namespace AlloyCompiler
 		else
 		{
 			name = NodeBuffer::GetMangledName(functionDeclarationNode.pTypeIdentifier->pNameToken, functionDeclarationNode.pFunctionNameToken);
+		}
+
+		if (!moduleName.empty())
+		{
+			name = moduleName + "::" + name;
 		}
 
 		// check if function already exists
@@ -1160,16 +1165,16 @@ namespace AlloyCompiler
 				std::string_view typeName = state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType());
 				std::string mangledName = NodeBuffer::GetMangledName(typeName, functionName);
 
+				// also retrieve the original function definition
+				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
+
 				// look up the function in the global module table
-				calleeFunc = state.Module->getFunction(mangledName);
+				calleeFunc = state.Module->getFunction(result.MangledName);
 				if (calleeFunc == nullptr)
 				{
 					logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find member function '{0}:{1}'!", typeName, functionName);
 					goto error;
 				}
-
-				// also retrieve the original function definition
-				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
 				
 				if (result.Code == SearchResultCode::NotFound)
 				{
@@ -1202,11 +1207,11 @@ namespace AlloyCompiler
 				// static member function call
 				std::string mangledName = NodeBuffer::GetMangledName(varOrTypeName, functionName);
 
-				// look up the function in the global module table
-				calleeFunc = state.Module->getFunction(mangledName);
-
 				// also retrieve the original function definition
 				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
+
+				// look up the function in the global module table
+				calleeFunc = state.Module->getFunction(result.MangledName);
 
 				if (result.Code == SearchResultCode::NotFound)
 				{
@@ -1233,16 +1238,19 @@ namespace AlloyCompiler
 		}
 		else
 		{
-			// look up the function in the global module table
-			calleeFunc = state.Module->getFunction(std::string(functionName));
-
 			// also retrieve the original function definition
 			SearchResult<FUNCTION_DEFINITION> funcResult = moduleTable.GetFunctionDefinition(functionName);
+
+			// look up the function in the global module table
+			calleeFunc = state.Module->getFunction(funcResult.MangledName);
 
 			if (funcResult.Code == SearchResultCode::NotFound)
 			{
 				// could also be an extern
 				SearchResult<EXTERN_DEFINITION> externResult = moduleTable.GetExternDefinition(functionName);
+
+				// look up the function in the global module table
+				calleeFunc = state.Module->getFunction(functionName);
 
 				if (externResult.Code == SearchResultCode::NotFound)
 				{
@@ -2129,10 +2137,10 @@ namespace AlloyCompiler
 
 #pragma region Definitions
 
-	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition )
+	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition, const std::string& moduleName)
 	{
 		FUNCTION_DEFINITION functionDefinition = { nullptr, externDefinition.pNameToken, externDefinition.pFunctionType, nullptr };
-		return generateFunctionDeclaration(moduleTable, state, functionDefinition);
+		return generateFunctionDeclaration(moduleTable, state, functionDefinition, moduleName);
 	}
 
 	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
@@ -2207,13 +2215,13 @@ failed:
 	}
 
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, 
-												const FUNCTION_DEFINITION& functionDefinition)
+												const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName)
 	{
 		//
 		// Generate either a global function definition or a member function definition
 		// If type is other than an empty string, we are defining a member function, in which case the name of the function is defined as Type@Name in LLVM
 		//
-		llvm::Function* func = generateFunctionDeclaration(moduleTable, state, functionDefinition);
+		llvm::Function* func = generateFunctionDeclaration(moduleTable, state, functionDefinition, moduleName);
 
 		if (func == nullptr)
 		{
@@ -2385,25 +2393,26 @@ failed:
 		}
 		*/
 
-		for (auto& [name, module] : moduleTable.GetModules())
+		for (auto& [moduleName, module] : moduleTable.GetModules())
 		{
 			// pre-process all extern function definitions
-			for (auto& [name, func] : module.GetNodeBuffer().GetExternDefinitions())
+			for (auto& [funcName, func] : module.GetNodeBuffer().GetExternDefinitions())
 			{
-				generateExternDefinition(moduleTable, state, *func.pDefinition);
+				generateExternDefinition(moduleTable, state, *func.pDefinition, "");
 			}
 
 			// pre-process all function definitions leaving the main function till the end
-			for (auto& [name, func] : module.GetNodeBuffer().GetFunctionDefinitions())
+			for (auto& [funcName, func] : module.GetNodeBuffer().GetFunctionDefinitions())
 			{
-				if (name != "main")
+				if (funcName != "main")
 				{
-					generateFunctionDefinition(moduleTable, state, *func.pDefinition);
+					generateFunctionDefinition(moduleTable, state, *func.pDefinition, moduleName);
 				}
 			}
 		}
 
-		llvm::Function* result = generateFunctionDefinition(moduleTable, state, *pMainFunction);
+		llvm::Function* result = generateFunctionDefinition(moduleTable, state, *pMainFunction, moduleTable.GetCurrentContext());
+		state.MainFunctionName = moduleTable.GetCurrentContext() + "::main";
 
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
@@ -2434,9 +2443,9 @@ failed:
 		llvm::Error err = jit->addIRModule(llvm::orc::ThreadSafeModule(std::move(state.Module), std::move(state.Context)));
 		if (!err) {
 			// look up the JIT'd function, cast it to a function pointer, then call it.
-			auto mainAddr = jit->lookup("main");
+			auto mainAddr = jit->lookup(state.MainFunctionName);
 			if (auto E = mainAddr.takeError()) {
-				ASSERT(false, "Cannot find main entry point!");
+				ASSERT(false, "Cannot find main entry point {0}!", state.MainFunctionName);
 				Log::Error("Error locating main entry point: {0}", toString(std::move(E)));
 				return -1;
 			}

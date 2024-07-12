@@ -17,20 +17,15 @@ namespace AlloyCompiler
 	{
 		SearchResultCode Code;
 		T* pDefiniton;
-
-		SearchResult(SearchResultCode code)
-			: Code(code), pDefiniton(nullptr)
-		{}
-
-		SearchResult(SearchResultCode code, T* pDefinition)
-			: Code(SearchResultCode::NotFound), pDefiniton(pDefinition)
-		{}
+		std::string MangledName;
 	};
 
 	class ModuleTable
 	{
 	public:
 		ModuleTable(std::unordered_map<std::string, Module>& modules, const std::string& mainModuleName);
+
+		const std::string& GetCurrentContext() const;
 
 		void PushContext(const std::string& moduleName);
 		void PopContext();
@@ -54,12 +49,19 @@ namespace AlloyCompiler
 			std::string_view SymbolName;
 		};
 
+		template <typename T>
+		struct ModuleDefinitionPair
+		{
+			std::string ModuleName;
+			Definition<T> Definition;
+		};
+
 	private:
 		ModuleAndSymbolName splitName(const std::string_view& name) const;
 		std::string getRelativePath(const std::string_view& rootName, const std::string_view& moduleName) const;
 
 		template <typename T>
-		Definition<T> getDefinitionInModule(GetDefinitionFn<T> getDefinitionFn, const std::string_view& moduleName, const std::string_view& symbolName) const;
+		ModuleDefinitionPair<T> getDefinitionInModule(GetDefinitionFn<T> getDefinitionFn, const std::string_view& moduleName, const std::string_view& symbolName) const;
 
 		template <typename T>
 		SearchResult<T> getDefinition(GetDefinitionFn<T> getDefinitionFn, const std::string_view& name) const;
@@ -70,16 +72,19 @@ namespace AlloyCompiler
 	};
 
 	template<typename T>
-	inline Definition<T> ModuleTable::getDefinitionInModule(GetDefinitionFn<T> getDefinitionFn, const std::string_view& moduleName, const std::string_view& symbolName) const
+	ModuleTable::ModuleDefinitionPair<T> ModuleTable::getDefinitionInModule(GetDefinitionFn<T> getDefinitionFn, const std::string_view& moduleName, const std::string_view& symbolName) const
 	{
 		ASSERT(m_Modules.contains(std::string(moduleName)), "Module does not exist!");
 
 		Module& givenModule = m_Modules.at(std::string(moduleName));
 
-		// look in given module
-		Definition<T> definition = getDefinitionFn(givenModule, symbolName);
+		ModuleDefinitionPair<T> result;
 
-		if (definition.IsNull())
+		// look in given module
+		result.Definition = getDefinitionFn(givenModule, symbolName);
+		result.ModuleName = moduleName;
+
+		if (result.Definition.IsNull())
 		{
 			// look in all the modules the given module imports
 			for (const std::string_view& importName : givenModule.GetNodeBuffer().GetImportedModules())
@@ -90,65 +95,75 @@ namespace AlloyCompiler
 				{
 					Module& relativeModule = m_Modules.at(relativeModuleName);
 
-					definition = getDefinitionFn(relativeModule, symbolName);
+					result.Definition = getDefinitionFn(relativeModule, symbolName);
+					result.ModuleName = relativeModuleName;
 				}
 				else if (m_Modules.contains(std::string(importName)))
 				{
 					Module& absoluteModule = m_Modules.at(std::string(importName));
 
-					definition = getDefinitionFn(absoluteModule, symbolName);
+					result.Definition = getDefinitionFn(absoluteModule, symbolName);
+					result.ModuleName = importName;
 				}
 				else
 				{
 					ASSERT(false, "Import does not exist! This should be unreachable.");
 				}
 
-				if (!definition.IsNull())
+				if (!result.Definition.IsNull())
 				{
 					break;
 				}
 			}
 		}
 
-		return definition;
+		return result;
 	}
 
 	template<typename T>
-	inline SearchResult<T> ModuleTable::getDefinition(GetDefinitionFn<T> getDefinitionFn, const std::string_view& name) const
+	SearchResult<T> ModuleTable::getDefinition(GetDefinitionFn<T> getDefinitionFn, const std::string_view& name) const
 	{
 		const Module& currentModule = m_Modules.at(std::string(m_ContextStack.back()));
 		auto moduleAndSymbolName = splitName(name);
 
-		SearchResult<T> result(SearchResultCode::NotFound);
+		ModuleDefinitionPair<T> moduleAndDefinition;
+
+		SearchResult<T> result{};
 
 		if (moduleAndSymbolName.ModuleName.empty())
 		{
 			// look in current module
-			Definition<T> definition = getDefinitionInModule(getDefinitionFn, m_ContextStack.back(), moduleAndSymbolName.SymbolName);
+			moduleAndDefinition = getDefinitionInModule(getDefinitionFn, m_ContextStack.back(), moduleAndSymbolName.SymbolName);
 
-			if (definition.pDefinition != nullptr)
+			if (moduleAndDefinition.Definition.IsNull())
+			{
+				result.Code = SearchResultCode::NotFound;
+			}
+			else
 			{
 				result.Code = SearchResultCode::Found;
-				result.pDefiniton = definition.pDefinition;
+				result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
+				result.MangledName = moduleAndDefinition.ModuleName + "::" + std::string(moduleAndSymbolName.SymbolName);
 			}
 		}
 		else
 		{
 			// look in the module which the symbol name refers to
-			Definition<T> definition = getDefinitionInModule(getDefinitionFn, moduleAndSymbolName.ModuleName, moduleAndSymbolName.SymbolName);
+			moduleAndDefinition = getDefinitionInModule(getDefinitionFn, moduleAndSymbolName.ModuleName, moduleAndSymbolName.SymbolName);
 
-			if (definition.IsNull())
+			if (moduleAndDefinition.Definition.IsNull())
 			{
 				result.Code = SearchResultCode::NotFound;
 			}
-			else if (definition.Access == Visibility::Private)
+			else if (moduleAndDefinition.Definition.Access == Visibility::Private)
 			{
 				result.Code = SearchResultCode::Inaccessible;
 			}
 			else
 			{
 				result.Code = SearchResultCode::Found;
-				result.pDefiniton = definition.pDefinition;
+				result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
+				result.MangledName = moduleAndDefinition.ModuleName + "::" + std::string(moduleAndSymbolName.SymbolName);
 			}
 		}
 

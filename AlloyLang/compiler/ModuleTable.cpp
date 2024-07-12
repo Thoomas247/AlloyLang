@@ -7,6 +7,11 @@ namespace AlloyCompiler
 	{
 	}
 
+	const std::string& ModuleTable::GetCurrentContext() const
+	{
+		return m_ContextStack.back();
+	}
+
 	void ModuleTable::PushContext(const std::string& moduleName)
 	{
 		m_ContextStack.push_back(moduleName);

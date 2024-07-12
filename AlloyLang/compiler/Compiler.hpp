@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include "module/Module.hpp"
+#include "codegen/CodeGenerator.hpp"
 
 namespace AlloyCompiler
 {
@@ -13,14 +14,9 @@ namespace AlloyCompiler
 	class Compiler
 	{
 	public:
-		Compiler(const std::string& mainFilePath);
+		Compiler(const std::string& mainFilePath, bool optimize);
 		void Compile();
-
-		///
-		/// Compile a single string, needed for unit tests
-		/// Also executes the code if required
-		///
-		int Compile(const std::string& sourceString, bool Execute);
+		int Execute();
 
 	private:
 		std::string getModuleName(const fs::path& path);
@@ -28,6 +24,7 @@ namespace AlloyCompiler
 	private:
 		fs::path m_MainFilePath;
 		std::unordered_map<std::string, Module> m_Modules;
+		LLVMState m_LLVMState;
 	};
 
 }

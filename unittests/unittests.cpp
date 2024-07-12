@@ -35,10 +35,11 @@ namespace unittests
 	TEST_CLASS(LLVMCodeGeneratorUnitTests)
 	{
 	private:
-		void RunTest(const std::string& code, int expected)
+		void RunTest(const std::string& path, int expected)
 		{
-			Compiler compiler("");
-			int result = compiler.Compile(code, true);
+			Compiler compiler(path, /*optimize*/true);
+			compiler.Compile();
+			int result = compiler.Execute();
 
 #if 0
 			// retrieve result and compare with expected data
@@ -54,488 +55,67 @@ namespace unittests
 
 		TEST_METHOD(BasicTest)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String) -> i32;
-
-				fn test (const i : i64) -> i64
-				{
-					const j : i64 = 2;	// this is ok
-					// this will fail: i = 3;
-					return i;
-				}
-
-				fn main () -> i64
-				{
-					printf("Basic");
-					return test(1);
-				}
-			)";
-			std::string expected_ = "Basic";
-			RunTest(TestStr, 1);
+			RunTest("../../AlloyLang/test/Basic/main.alloy", 1);
 		}
 
 		TEST_METHOD(IfStatements)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String, const param : i64) -> i64;
-
-				fn mul (const a : i64, const b : i64) -> i64
-				{
-					var ret : i64 = 0;
-					if (a == 1)
-						ret = b;
-					else
-						ret = a * b;
-					return ret;
-				}
-
-				fn main () -> i64
-				{
-					printf("3 x 5 = %d", mul(3, 5));
-					return mul(3, 5);
-				}
-			)";
-			std::string expected = "3 x 5 = 15";
-			RunTest(TestStr, 15);
+			RunTest("../../AlloyLang/test/IfStatements/main.alloy", 15);
 		}
 
-		TEST_METHOD(ForLoop)
+		TEST_METHOD(ForLoops)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String, const param : i64) -> i64;
-
-				fn mul (const a : i64, const b : i64) -> i64
-				{
-					var ret : i64 = 0;
-					for (var i : i64 = 0; i < a; i = i + 1) {
-						ret = ret + b;
-					}
-					return ret;
-				}
-
-				fn main () -> i64
-				{
-					printf("3 x 5 = %d", mul(3, 5));
-					return mul(3, 5);
-				}
-			)";
-			std::string expected = "3 x 5 = 15";
-
-			RunTest(TestStr, 15);
+			RunTest("../../AlloyLang/test/ForLoops/main.alloy", 15);
 		}
 
-		TEST_METHOD(WhileLoop)
+		TEST_METHOD(WhileLoops)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String, const param : i64) -> i64;
-
-				fn main () -> i64
-				{
-					var a : i64 = 4;
-					var i : i64 = 0;
-					var res : i64 = 2;
-					while (i < a)
-					{
-						res = res * res;
-						i = i + 1;
-					}
-					printf("2 ^ 16 = %d", res);
-					return res;
-				}
-	
-			)";
-			std::string expected = "2 ^ 16 = 65536";
-
-			RunTest(TestStr, 65536);
+			RunTest("../../AlloyLang/test/WhileLoops/main.alloy", 65536);
 		}
 
-		TEST_METHOD(SwitchCase)
+		TEST_METHOD(SwitchCases)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String, ...) -> i64;
-
-				fn main () -> i64
-				{
-					var res : i64 = 1;
-
-					switch (res)
-					{
-						case (2)
-						{
-							printf("Error %d!", res);
-							return res;
-						}
-						case (1)
-						{
-							printf("Success %d!", res);
-							return res;
-						}
-					}
-
-					res = 0;
-					return res;
-				}
-			)";
-			std::string expected = "Success 1!";
-
-			RunTest(TestStr, 1);
+			RunTest("../../AlloyLang/test/SwitchCases/main.alloy", 1);
 		}
 
-		TEST_METHOD(Structures)
+		TEST_METHOD(Structs)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String, const param : f64) -> i64;
-
-				type Vector3 = struct
-				{
-					x : f32,
-					y : f32,
-					z : f32
-				};
-
-				type Transform = struct
-				{
-					position : Vector3,
-					rotation : Vector3,
-					scale : Vector3
-				};
-
-				fn translate(const point : Vector3, const vector : Vector3) -> Vector3
-				{
-					var result : Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
-					
-					result.x = point.x + vector.x;
-					result.y = point.y + vector.y;
-					result.z = point.z + vector.z;
-					
-					return result;
-				}
-
-				fn main () -> i64
-				{
-					var a : f32 = 32.0;
-					var expected : f32 = 20480.0;
-					var result : i64 = 0;
-					var test : Vector3 = 
-						Vector3 
-						{ 
-							x = 32.0, 
-							y = 64.0, 
-							z = 0.0 
-						};
-
-					var test2 : Transform = 
-						Transform
-						{
-							position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
-							rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
-							scale = test
-						};
-
-					const translation : Vector3 = Vector3 { x = 0, y = 0, z = 10 };
-
-					test.z = translate(test, translation).z;
-					test2.rotation.y = 20.0;
-
-					printf("result = %f", test.x * test2.scale.y * test.z);
-					if (test.x * test2.scale.y * test.z == expected)
-						return 1;
-					else
-						return 0;
-				}
-			)";
-			std::string expected = "result = 20480.000000";
-
-			RunTest(TestStr, 1);
+			RunTest("../../AlloyLang/test/Structs/main.alloy", 1);
 		}
 
 		TEST_METHOD(Arrays)
 		{
-			constexpr auto TestStr = R"(
-			extern printf (const str : String, const param : i64) -> i64;
-
-			fn main () -> i64
-			{
-				var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-				var expected : i64 = 1*2*3*4*5*6*7*8*9*10;
-				var result : i64 = 1;
-
-				array[2] = 3;
-
-				for (var i : i32 = 0; i < 10; i = i + 1) {
-						result = result * array[i];
-					}
-
-				printf("result = %d", result);
-				if (result == expected)
-					result = 1;
-				else
-					result = 0;
-				return result;
-			}
-			)";
-			std::string expected = "result = 3628800";
-
-			RunTest(TestStr, 1);
+			RunTest("../../AlloyLang/test/Arrays/main.alloy", 1);
 		}
 
-		TEST_METHOD(ArraysInStructures)
+		TEST_METHOD(ArraysInStructs)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String, const param : f64) -> i64;
-
-				type Vector3 = struct
-				{
-					x : f64,
-					y : f64,
-					z : f64
-				};
-
-				type StructWithArray = struct
-				{
-					x : i64,
-					array : [f64; 2]
-				};
-
-				fn translate(const point : Vector3, const vector : Vector3) -> Vector3
-				{
-					var result : Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
-					
-					result.x = point.x + vector.x;
-					result.y = point.y + vector.y;
-					result.z = point.z + vector.z;
-					
-					return result;
-				}
-
-				fn main () -> i64
-				{
-					var test : Vector3 = 
-						Vector3 
-						{ 
-							x = 32.0, 
-							y = 64.0, 
-							z = 5.0 
-						};
-
-					var atest : StructWithArray = 
-						StructWithArray
-						{
-							x = 2,
-							array = { 10.0, 20.0 }
-						};
-					test.z = atest.array[0];
-					test.z = translate(test, test).z;
-
-					printf("result = %f", test.z);
-
-					if (test.z == 20.0)
-						return 1;
-					else
-						return 0;
-				}
-			)";
-			std::string expected = "result = 20.0000";
-			RunTest(TestStr, 1);
+			RunTest("../../AlloyLang/test/ArraysInStructs/main.alloy", 1);
 		}
 
 		TEST_METHOD(Pointers)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String, const param : i64) -> i64;
-	
-				type TestStruct = struct
-				{
-					a : i64,
-					b : i64
-				};
-	
-				fn main () -> i64
-				{				
-					// array of i64
-					var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-
-					// new keyword allocates value of expression on heap and returns pointer to it
-					const a : TestStruct = TestStruct { a = 2, b = 5 };
-					var ptr1 : *TestStruct = new a;
-					var ptr2 : *[i64] = new [123; 4];
-					var ptr3 : *i64 = new 3;
-			
-					// array of pointers to i64
-					const ptrArray : [*i64; 3] = { new array[1], new a.b, new 12 };
-
-					// array of i64 from ptrArray
-					const arr : [i64; 3] = { ptrArray[0], ptrArray[1], ptrArray[2] };
-
-					// no dereference needed to perform operations on value being pointed to
-					ptr1.a = ptr1.b + 1;
-					ptr2[1] = ptr2[1] + 1;
-
-					// change ownership of pointed value to new pointer
-					// old ptr is now invalid and cannot be used
-					var new_ptr : *i64 = move ptr3;
-
-					printf("ptr1.a = %d\n", ptr1.a);
-					printf("ptr2[1] = %d\n", ptr2[1]);
-					printf("ptrArray[0] * array[1] * ptrArray[2] * new_ptr = 2 * 5 * 12 * 3 = %d", ptrArray[0] * arr[1] * ptrArray[2] * new_ptr);
-					if (ptr1.a == 6 && ptr2[1] == 124 && ptrArray[0] * arr[1] * ptrArray[2]  * new_ptr == 360)
-						return 1;
-					else
-						return 0;
-				}
-					)";
-			std::string expected = "ptr1.a = 6\nptr2[1] = 124\n";
-
-			RunTest(TestStr, 1);
+			RunTest("../../AlloyLang/test/Pointers/main.alloy", 1);
 		}
 
 		TEST_METHOD(References)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String, const param : i64) -> i64;
-	
-				fn test (var a : i64, var b : &i64) -> i64
-				{
-					b = a;
-					return a;
-				}
-	
-				fn main () -> i64
-				{				
-					var a : i64 = 3;
-					var b : i64 = 0;
-					test(a, &b);
-
-					// array of references to i64
-					var refArray : [&i64; 3] = { &a, &b, &a };
-
-					printf("b = %d", refArray[1]);
-					if (b == 3)
-						return 1;
-					else
-						return 0;
-				}
-			)";
-			std::string expected = "b = 3";
-
-			RunTest(TestStr, 1);
+			RunTest("../../AlloyLang/test/References/main.alloy", 1);
 		}
 
 		TEST_METHOD(MemberFunctions)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str: String, ...) -> i64;
-
-				type Vector3 = struct
-				{
-					x: f64,
-					y: f64,
-					z: f64,
-				};
-
-				type Quaternion = struct
-				{
-					x: f64,
-					y: f64,
-					z: f64,
-					w: f64,
-				};
-
-				fn Quaternion:rotate(var q: &Quaternion)
-				{
-	
-				}
-
-				fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: &f64) -> Quaternion
-				{
-					var q: Quaternion = Quaternion { x = 0, y = 0, z = 0, w = 0 };
-
-					q.x = qA.x + (qB.x - qA.x) * t;
-					q.y = qA.y + (qB.y - qA.y) * t;
-					q.z = qA.z + (qB.z - qA.z) * t;
-					q.w = qA.w + (qB.x - qA.w) * t;
-
-					return q;
-				}
-
-				fn Vector3:print(const v : &Self)
-				{
-					printf("[ %f, %f, %f ]", v.x, v.y, v.z);
-				}
-
-				fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
-				{
-					var result: Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
-					
-					result.x = point.x + vector.x;
-					result.y = point.y + vector.y;
-					result.z = point.z + vector.z;
-					
-					return result;
-				}
-
-
-				fn main() -> i64
-				{
-					var vec: Vector3 = Vector3 { x = 0, y = 0, z = 0 };
-
-					vec = Vector3:translate(&vec, Vector3 { x = 10, y = -3, z = 2 });
-					vec:print();
-
-					if (vec.x * vec.y * vec.z == -60.0)
-						return 1;
-					else
-						return 0;
-				}
-			)";
-			std::string expected = "[ 10.000000, -3.000000, 2.000000 ]";
-
-			RunTest(TestStr, 1);
+			RunTest("../../AlloyLang/test/MemberFunctions/main.alloy", 1);
 		}
 
 		TEST_METHOD(Generics)
 		{
-			constexpr auto TestStr = R"(
-				extern printf (const str : String) -> i32;
+			RunTest("../../AlloyLang/test/Generics/main.alloy", 1);
+		}
 
-				type Vector3Of(type T1) = struct
-				{
-					x: T1,
-					y: T1,
-					z: T1,
-				};
-
-				type PairOf(type T1, type T2) = struct
-				{
-					x: T1,
-					y: T2
-				};
-
-				type I32Vec3 = Vector3Of(i32);
-				type F64Vec3 = Vector3Of(f64);
-				type I32StringPair = PairOf(i32, String);
-
-				fn main () -> i64
-				{
-					var temp32 : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
-					var temp64 : I32Vec3 = I32Vec3 { x=2, y=3, z=2 };
-					var tempF64 : F64Vec3 = F64Vec3 { x = 2.0, y = 3.0, z = 3.0 }; 
-					var pair : I32StringPair = I32StringPair { x = 1, y = "Hello" };
-
-					if (temp32.y > temp32.x)
-					{
-						printf(pair.y);
-						return 1;
-					}
-					else
-					{
-						printf("Bye");
-						return 0;
-					}
-				}
-			)";
-			std::string expected_ = "Hello";
-			RunTest(TestStr, 1);
+		TEST_METHOD(MultipleFiles)
+		{
+			RunTest("../../AlloyLang/test/MultipleFiles/main.alloy", 32 * 43);
 		}
 	};
 }

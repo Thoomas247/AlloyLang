@@ -11,7 +11,6 @@ namespace AlloyCompiler
 		Module(const fs::path& filePath);
 
 		bool Generate();
-		void Generate(const std::string& source);
 		const NodeBuffer& GetNodeBuffer() const;
 
 		Definition<MACRO_DEFINITION> GetMacroDefinition(const std::string_view& name);

@@ -25,6 +25,7 @@ namespace AlloyCompiler
 		std::unique_ptr<llvm::IRBuilder<>> Builder;
 		std::unique_ptr<llvm::Module> Module;
 		NamedValues NamedValues;
+		std::string MainFunctionName;
 
 		llvm::AllocaInst* CurrentReturnValue = nullptr;		// keep track of the return value of the current function, the value also includes the type
 		llvm::BasicBlock* FuncExitBlock = nullptr;		// to avoid having multiple returns, we simply branch to this BasicBlock

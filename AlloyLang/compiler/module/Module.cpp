@@ -28,14 +28,6 @@ namespace AlloyCompiler
 		return true;
 	}
 
-	void Module::Generate(const std::string& source)
-	{
-		m_Source.SetSourceString(source);
-		m_TokenBuffer.Tokenize();
-		m_NodeBuffer.Parse();
-	}
-
-
 	const NodeBuffer& Module::GetNodeBuffer() const
 	{
 		return m_NodeBuffer;
