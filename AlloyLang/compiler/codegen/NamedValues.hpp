@@ -41,7 +41,7 @@ namespace AlloyCompiler
 		void PushScope(const std::string_view& name);
 		void PopScope();
 
-		ValueTypePair* GetValue(const std::string& name);
+		ValueTypePair* GetValue(const std::string& name, bool searchInParents = true);
 		void InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit);
 		bool RemoveValue(const std::string& name);
 

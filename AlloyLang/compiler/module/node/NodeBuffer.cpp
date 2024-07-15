@@ -2950,7 +2950,7 @@ namespace AlloyCompiler
 				if (pFunctionDefinition->pTypeIdentifier != nullptr)
 				{
 					Token* pTypeNameToken = pFunctionDefinition->pTypeIdentifier->pNameToken;
-					const std::string fullFunctionName = GetMangledName(pTypeNameToken, pFunctionNameToken);
+					const std::string fullFunctionName = GetMangledName("", pTypeNameToken, pFunctionNameToken, {});
 
 					if (m_FunctionDefinitions.contains(fullFunctionName))
 					{

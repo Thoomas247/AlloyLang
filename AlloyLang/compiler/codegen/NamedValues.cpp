@@ -71,8 +71,11 @@ namespace AlloyCompiler
 	}
 
 
-	ValueTypePair* NamedValues::GetValue(const std::string& name)
+	ValueTypePair* NamedValues::GetValue(const std::string& name, bool searchInParents /*= true*/)
 	{
+		//
+		// searchInParents can be set to false in situations where we need to search the current level only and not go through the parent tree
+		//
 		ValueTypePair* result = nullptr;
 
 		// look for the value starting from the current scope and going up
@@ -85,6 +88,8 @@ namespace AlloyCompiler
 				result = &found->second;
 				break;
 			}
+			if (!searchInParents)
+				break;
 		}
 
 		return result;
