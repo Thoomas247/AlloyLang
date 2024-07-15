@@ -155,7 +155,8 @@ namespace AlloyCompiler
 			{
 				result.Code = SearchResultCode::NotFound;
 			}
-			else if (moduleAndDefinition.Definition.Access == Visibility::Private)
+			else if (moduleAndDefinition.Definition.Access == Visibility::Private
+					&& moduleAndDefinition.ModuleName != moduleAndSymbolName.ModuleName)		// if the symbol is private, we can still access it from within the same module
 			{
 				result.Code = SearchResultCode::Inaccessible;
 			}
