@@ -1,5 +1,7 @@
 
 fn main() -> i64
 {
+	var o: other::OtherType = other::OtherType { num = 2, num2 = 54 };
+
 	return other::i64_mul(32, 43);
 }

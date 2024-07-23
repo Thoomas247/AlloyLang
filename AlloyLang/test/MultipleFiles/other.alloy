@@ -3,3 +3,9 @@ pub fn i64_mul(const a: i64, const b: i64) -> i64
 {
 	return a * b;
 }
+
+pub type OtherType = struct
+{
+	num: i32,
+	num2: u32,
+};
