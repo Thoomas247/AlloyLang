@@ -18,6 +18,7 @@ namespace AlloyCompiler
 		SearchResultCode Code;
 		T* pDefiniton;
 		std::string MangledName;
+		std::string ModuleName;
 	};
 
 	class ModuleTable
@@ -143,7 +144,8 @@ namespace AlloyCompiler
 			{
 				result.Code = SearchResultCode::Found;
 				result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
-				result.MangledName = moduleAndDefinition.ModuleName + "::" + std::string(moduleAndSymbolName.SymbolName);
+				result.MangledName = m_ContextStack.back() + "::" + std::string(moduleAndSymbolName.SymbolName);
+				result.ModuleName = m_ContextStack.back();
 			}
 		}
 		else
@@ -165,6 +167,7 @@ namespace AlloyCompiler
 				result.Code = SearchResultCode::Found;
 				result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
 				result.MangledName = moduleAndDefinition.ModuleName + "::" + std::string(moduleAndSymbolName.SymbolName);
+				result.ModuleName = moduleAndDefinition.ModuleName;
 			}
 		}
 
