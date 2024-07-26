@@ -113,6 +113,11 @@ namespace unittests
 			RunTest("../../AlloyLang/test/Generics/main.alloy", 1);
 		}
 
+		TEST_METHOD(GenericFunctionss)
+		{
+			RunTest("../../AlloyLang/test/GenericFunctions/main.alloy", 0);
+		}
+
 		TEST_METHOD(MultipleFiles)
 		{
 			RunTest("../../AlloyLang/test/MultipleFiles/main.alloy", 32 * 43);

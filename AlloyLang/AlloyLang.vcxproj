@@ -170,6 +170,7 @@
   <ItemGroup>
     <None Include="CGTest.alloy" />
     <None Include="test\Basic\main.alloy" />
+    <None Include="test\GenericFunctions\main.alloy" />
     <None Include="test\MultipleFiles\main.alloy" />
     <None Include="test\MultipleFiles\other.alloy" />
   </ItemGroup>

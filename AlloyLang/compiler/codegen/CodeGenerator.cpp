@@ -263,10 +263,117 @@ namespace AlloyCompiler
 		return type;
 	}
 
+	std::string getExtendedFunctionName(const std::string_view& moduleName, const std::string_view& typeName, const std::string_view& functionName,
+		const std::vector<FUNCTION_PARAMETER*>& functionParameters,
+		const std::vector<EXPRESSION*>& functionArguments,
+		std::unordered_map<std::string, std::string>& typeMap
+		)
+	{
+		//
+		// Returns moduleName::typeName@functionName@type1@type2...
+		// the types are retrieved from the function parameters in the case of generic functions
+		// 
+		// Support for generics:
+		// The parameter list "parameters" is needed in order to determine if any parameter is a type
+		// The functionArguments list is needed to know what is the type refered to by the corresponding parameter
+		//
+		std::string mangled(moduleName);
+		if (!mangled.empty())
+			mangled += "::";
+		if (!typeName.empty()) {
+			mangled += typeName;
+			mangled += "@";
+		}
+		mangled += std::string(functionName);
+		int argument = 0;
+		for (FUNCTION_PARAMETER* parameter : functionParameters) {
+			if (parameter->Is<GENERIC_PARAMETER>()) {
+				GENERIC_PARAMETER* type = parameter->Get<GENERIC_PARAMETER>();
+				EXPRESSION* exp = functionArguments[argument];
+				PRIMARY* primary = nullptr;
+				if (exp->Is<PRIMARY>())
+					primary = exp->Get<PRIMARY>();
+				if (primary == nullptr
+					|| !primary->Is<VARIABLE>()
+					)
+				{
+					// we are expecting a literal expression representing a type, nothing else
+					logErrorAtCurrentPosition(type->pIdentifierToken, "Expected a literal expression representing a type!");
+					mangled =  "";
+					goto failed;
+				}
+
+				VARIABLE* var = exp->Get<PRIMARY>()->Get<VARIABLE>();
+
+				// check that the generic parameter has not been encountered already
+				if (typeMap.contains(std::string(var->pNameToken->Value))) {
+					logErrorAtCurrentPosition(type->pIdentifierToken, "Type {0} cannot be defined more than once!", type->pIdentifierToken->Value);
+					mangled = "";
+					goto failed;
+				}
+
+				mangled += "@";
+				mangled += var->pNameToken->Value;
+
+				typeMap[std::string(type->pIdentifierToken->Value)] = std::string(var->pNameToken->Value);
+			}
+			argument++;
+		}
+
+	failed:
+		return mangled;
+	}
+
+	std::string getExtendedFunctionName(const std::string_view& moduleName, Token* pTypeNameToken, Token* pFunctionNameToken,
+		const std::vector<FUNCTION_PARAMETER*>& functionParameters,
+		const std::vector<EXPRESSION*>& functionArguments,
+		std::unordered_map<std::string, std::string>& typeMap
+		)
+	{
+		return getExtendedFunctionName(moduleName,
+			pTypeNameToken ? pTypeNameToken->Value : "",
+			pFunctionNameToken->Value,
+			functionParameters,
+			functionArguments,
+			typeMap
+			);
+	}
+
+
 	//
 	// Helper function to determine if a function parameter is declared as const
 	//
 	bool isFunctionParameterConst(const FUNCTION_TYPE& functionType, int index) {
+
+		bool result = false;
+		for (int i = 0; i < functionType.Parameters.size(); i++) {
+			const FUNCTION_PARAMETER* parameter = functionType.Parameters[i];
+
+			// we are skipping the generic type parameters as these are not really function parameters as far as llvm is concerned
+			if (parameter->Is<GENERIC_PARAMETER>()) {
+				index++;
+				continue;
+			}
+
+			if (i == index) {
+				if (parameter->Is<VARIABLE_DECLARATION>()) {
+					VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
+					result = (pParameterVariableDeclaration->VarType == VariableType::Constant);;
+				}
+				else {
+					ASSERT(false, "isFunctionParameterConst can only be called on variable parameters and not on types!");
+				}
+				break;
+			}
+		}
+
+		return result;
+	}
+
+	//
+	// Helper function to determine if a function parameter is a type
+	//
+	bool isFunctionParameterGeneric(const FUNCTION_TYPE& functionType, int index) {
 
 		// for functions with variable parameters, we can only check the known parameters
 		if (functionType.IsVarArg
@@ -275,12 +382,10 @@ namespace AlloyCompiler
 		}
 		else {
 			const FUNCTION_PARAMETER* parameter = functionType.Parameters[index];
-			if (parameter->Is<VARIABLE_DECLARATION>()) {
-				VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
-				return (pParameterVariableDeclaration->VarType == VariableType::Constant);
+			if (parameter->Is<GENERIC_PARAMETER>()) {
+				return true;
 			}
 			else {
-				ASSERT(false, "isFunctionParameterConst can only be called on variable parameters and not on types!");
 				return false;
 			}
 		}
@@ -598,22 +703,35 @@ else {
 
 	llvm::Function* generateFunctionDeclaration(ModuleTable& moduleTable, LLVMState& state,
 		const FUNCTION_DEFINITION& functionDeclarationNode, const std::string& moduleName,
-		const std::vector<EXPRESSION*>& functionArguments)
+		const std::vector<EXPRESSION*>& functionArguments,
+		std::unordered_map<std::string, std::string>& typeMap		// map from the generic type to the actual function parameter type
+		)
 	{
 		//
 		// If type is not empty, we are generating a member function in the form of Type@Name
-		// If the parameter list contains types (generic functions), also add the type names to the mangled name
+		// If the parameter list contains types (generic functions), also add the type names and function arguments to the mangled name
 		//
-		std::string name = NodeBuffer::GetMangledName(moduleName, functionDeclarationNode.pTypeIdentifier ? functionDeclarationNode.pTypeIdentifier->pNameToken : nullptr,
+		
+		std::string name = getExtendedFunctionName(moduleName,
+			functionDeclarationNode.pTypeIdentifier ? functionDeclarationNode.pTypeIdentifier->pNameToken : nullptr,
 			functionDeclarationNode.pFunctionNameToken,
-			functionArguments);
+			functionDeclarationNode.pFunctionType->Parameters,
+			functionArguments,
+			typeMap
+			);
+
+		if (name.empty()) {
+			logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' invalid declaration!", name);
+			return nullptr;
+		}
 
 		// check if function already exists
 		if (state.Module->getFunction(name))
 		{
-			// TODO: replace '@' in mangled name by ':' for error messages
-			// logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' already defined!", name);
-			return state.Module->getFunction(name);
+			// Replace '@' in mangled name by ':' for error messages
+			std::string ename = name.replace(name.begin(), name.end(), '@', ':');
+			logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' already defined!", ename);
+			return nullptr;
 		}
 
 		// retrieve the parameter types
@@ -630,8 +748,7 @@ else {
 		for (FUNCTION_PARAMETER* parameter : functionDeclarationNode.pFunctionType->Parameters)
 		{
 			if (parameter->Is<GENERIC_PARAMETER>()) {
-				GENERIC_PARAMETER* pGenericParameter = parameter->Get<GENERIC_PARAMETER>();
-
+				// nothing to do at this point... processing the type later when it is used
 			}
 			else {
 
@@ -641,7 +758,7 @@ else {
 				TypeModifier modifier = TypeModifier::None;
 				TypeSubtypePair identifierType = generateTypeIdentifier(moduleTable, state, *pParameterVariableDeclaration->pType,
 					(functionDeclarationNode.pTypeIdentifier ? functionDeclarationNode.pTypeIdentifier->pNameToken : nullptr),
-					modifier, nullptr);
+					modifier, &typeMap);
 
 				if (!identifierType.type)
 				{
@@ -690,26 +807,35 @@ else {
 		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, name, *state.Module);
 
 		// set names for all arguments
-		for (size_t i = 0; i < function->arg_size(); i++)
+		// i is the index in the function parameters list
+		// arg is the index of the argument of the llvm function
+		for (size_t i = 0, arg = 0; i < functionDeclarationNode.pFunctionType->Parameters.size(); i++)
 		{
-			// TODO: fix this
-			// temporary hack to get the code compiling
-			//const std::string_view paramName = functionDeclarationNode.pFunctionType->Parameters[i]->pNameToken->Value;
-			const std::string_view paramName = functionDeclarationNode.pFunctionType->Parameters[i]->Get<VARIABLE_DECLARATION>()->pNameToken->Value;
-
-			function->getArg(i)->setName(paramName);
-
-			// set the ByRef attribute on parameters passed byref
-			if (paramModifiers[i] == TypeModifier::Reference) {
-				function->addAttributeAtIndex(i+1, llvm::Attribute::getWithByRefType(*state.Context, paramSubTypes[i]));
+			FUNCTION_PARAMETER* parameter = functionDeclarationNode.pFunctionType->Parameters[i];
+			if (parameter->Is<GENERIC_PARAMETER>()) {
+				// nothing to do at this point...
 			}
+			else {
 
-			/* ReadOnly is not the same as const and LLVM does not accept ReadOnly on anything other than pointers
-			// set the ReadOnly attribute on parameters passed as const
-			if (paramVarTypes[i] == VariableType::Constant) {
-				function->addAttributeAtIndex(i+1, llvm::Attribute::get(*state.Context, llvm::Attribute::AttrKind::ReadOnly));
+				ASSERT(parameter->Is<VARIABLE_DECLARATION>(), "If not a generic parameter, this must be a variable declaration!");
+				const std::string_view paramName = parameter->Get<VARIABLE_DECLARATION>()->pNameToken->Value;
+
+				function->getArg(arg)->setName(paramName);
+
+				// set the ByRef attribute on parameters passed byref
+				if (paramModifiers[arg] == TypeModifier::Reference) {
+					function->addAttributeAtIndex(arg + 1, llvm::Attribute::getWithByRefType(*state.Context, paramSubTypes[arg]));
+				}
+
+				/* ReadOnly is not the same as const and LLVM does not accept ReadOnly on anything other than pointers
+				// set the ReadOnly attribute on parameters passed as const
+				if (paramVarTypes[arg] == VariableType::Constant) {
+					function->addAttributeAtIndex(arg+1, llvm::Attribute::get(*state.Context, llvm::Attribute::AttrKind::ReadOnly));
+				}
+				*/
+
+				arg++;
 			}
-			*/
 		}
 
 		return function;
@@ -1161,7 +1287,7 @@ else {
 			{
 				// non-static member function call
 				std::string_view typeName = state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType());
-				mangledName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeName, functionName, Arguments);
+				mangledName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeName, functionName);
 
 				// also retrieve the original function definition
 				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
@@ -1204,7 +1330,7 @@ else {
 			else if (state.NamedValues.GetType(varOrTypeName) != nullptr)
 			{
 				// static member function call
-				mangledName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), varOrTypeName, functionName, Arguments);
+				mangledName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), varOrTypeName, functionName);
 
 				// also retrieve the original function definition
 				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
@@ -1333,12 +1459,15 @@ else {
 			argi = 1;
 		}
 
-		// if the function was found, check for argument count mismatch (not counting the additional arguments that we added
+		/* if the function was found, check for argument count mismatch(not counting the additional arguments that we added
+		* this test does not work with generic functions as the type parameters are not actual parameters
+		* a more accurate test in done in the loop below
 		if (!calleeFunc->isVarArg() && calleeFunc->arg_size() != Arguments.size() + argi)
 		{
 			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
 			goto error;
 		}
+		*/
 
 		// evaluate all the arguments
 		for (size_t i = 0; i < Arguments.size(); i++, argi++)
@@ -1350,6 +1479,12 @@ else {
 			TypeSubtypePair argType = { (i < calleeFunc->arg_size() ? calleeFunc->getArg(argi)->getType() : nullptr), nullptr };
 
 			llvm::Value* argVal = nullptr;
+
+			// check if this is a type in a generic function call, in which case do not evaluate it
+			bool isType = isFunctionParameterGeneric(*pCalleeFunctionType, argi);
+			if (isType) {
+				continue;
+			}
 
 			// check if the function parameter was declared as const
 			bool isConst = isFunctionParameterConst(*pCalleeFunctionType, argi); 
@@ -1418,7 +1553,14 @@ else {
 					}
 				}
 			}
+
 			args.push_back(argVal);
+		}
+
+		if (!calleeFunc->isVarArg() && calleeFunc->arg_size() != args.size())
+		{
+			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
+			goto error;
 		}
 
 		result = state.Builder->CreateCall(calleeFunc, args);
@@ -1574,7 +1716,11 @@ else {
 
 			if (expressionVal)
 			{
-				result = state.Builder->CreateFNeg(expressionVal, "negtmp");
+				bool isFloatingPoint = expressionVal->getType()->isFloatingPointTy();
+				if (isFloatingPoint)
+					result = state.Builder->CreateFNeg(expressionVal, "negtmp");
+				else
+					result = state.Builder->CreateNeg(expressionVal, "negtmp");
 			}
 		}
 		else
@@ -2139,7 +2285,8 @@ else {
 	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition, const std::string& moduleName)
 	{
 		FUNCTION_DEFINITION functionDefinition = { nullptr, externDefinition.pNameToken, externDefinition.pFunctionType, nullptr };
-		return generateFunctionDeclaration(moduleTable, state, functionDefinition, moduleName, {});
+		std::unordered_map<std::string, std::string> typeMap;
+		return generateFunctionDeclaration(moduleTable, state, functionDefinition, moduleName, {}, typeMap);
 	}
 
 	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
@@ -2221,7 +2368,9 @@ failed:
 		// Generate either a global function definition or a member function definition
 		// If type is other than an empty string, we are defining a member function, in which case the name of the function is defined as Type@Name in LLVM
 		//
-		llvm::Function* func = generateFunctionDeclaration(moduleTable, state, functionDefinition, moduleName, functionArguments);
+		std::unordered_map<std::string, std::string> typeMap;		// this is a map from the generic type to the actual function parameter type
+
+		llvm::Function* func = generateFunctionDeclaration(moduleTable, state, functionDefinition, moduleName, functionArguments, typeMap);
 
 		if (func == nullptr)
 		{
@@ -2234,6 +2383,11 @@ failed:
 
 		// push a new scope for the function
 		state.NamedValues.PushScope(func->getName().str());
+
+		// for generic functions, build the generic types map
+		for (auto t : typeMap) {
+			state.NamedValues.SetGenericType(t.first, t.second);
+		}
 
 		// create a new basic block to start insertion into
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", func);

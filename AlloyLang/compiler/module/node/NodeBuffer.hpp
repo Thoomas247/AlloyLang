@@ -18,35 +18,19 @@ namespace AlloyCompiler
 		using NodeMap = std::unordered_map<std::string, Definition<T>>;
 
 	public:
-		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::string_view& functionName,
-											const std::vector<EXPRESSION*>& functionArguments)
+		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::string_view& functionName)
 		{
 			//
-			// Returns moduleName::typeName@functionName@type1@type2...
-			// the types are retrieved from the function parameters in the case of generic functions
+			// Returns moduleName::typeName@functionName
 			//
-			std::string mangled(moduleName);
-			if (!mangled.empty())
-				mangled += "::";
-			if (!typeName.empty()) {
-				mangled += typeName;
-				mangled += "@";
-			}
-			mangled += std::string(functionName);
-			/*for (FUNCTION_PARAMETER* parameter : functionArguments) {
-				if (parameter->Is<TYPE>()) {
-					TYPE* type = parameter->Get<TYPE>();
-					mangled += "@";
-				}
-			}
-			*/
-			return mangled;
+			return std::string(typeName) + "@" + std::string(functionName);
 		}
 
-		static std::string GetMangledName(const std::string_view& moduleName, Token* pTypeNameToken, Token* pFunctionNameToken,
-											const std::vector<EXPRESSION*>& functionArguments)
+		static std::string GetMangledName(const std::string_view& moduleName, Token* pTypeNameToken, Token* pFunctionNameToken)
 		{
-			return GetMangledName(moduleName, pTypeNameToken ? pTypeNameToken->Value : "", pFunctionNameToken->Value, functionArguments);
+			return GetMangledName(moduleName, 
+								pTypeNameToken ? pTypeNameToken->Value : "", 
+								pFunctionNameToken->Value);
 		}
 
 		//

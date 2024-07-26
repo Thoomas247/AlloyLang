@@ -224,4 +224,26 @@ namespace AlloyCompiler
 		return nullptr;
 	}
 
+	// support for generic function parameters
+	std::string NamedValues::GetGenericType(const std::string& typeName)
+	{
+		auto found = m_ScopeStack.back().GenericTypeMap.find(typeName);
+		if (found == m_ScopeStack.back().GenericTypeMap.end()) {
+			return "";
+		}
+		else {
+			return found->second;
+		}
+	}
+
+	void NamedValues::SetGenericType(const std::string& typeName, const std::string& Type)
+	{
+		m_ScopeStack.back().GenericTypeMap[typeName] = Type;
+	}
+
+	std::unordered_map<std::string, std::string> NamedValues::GetGenericTypeMap()
+	{
+		return m_ScopeStack.back().GenericTypeMap;
+	}
+
 }
