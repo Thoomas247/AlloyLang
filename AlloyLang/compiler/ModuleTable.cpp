@@ -34,8 +34,34 @@ namespace AlloyCompiler
 		return getDefinition(fn, name);
 	}
 
+	
+
 	SearchResult<TYPE_DEFINITION> ModuleTable::GetTypeDefinition(const std::string_view& name) const
 	{
+		static const std::unordered_set<std::string_view> s_BuiltInTypes
+		{
+			"String",
+
+			"bool",
+
+			"i8", "i16", "i32", "i64",
+
+			"u8", "u16", "u32", "u64",
+
+			"f32", "f64",
+		};
+
+		if (s_BuiltInTypes.contains(name))
+		{
+			SearchResult<TYPE_DEFINITION> result;
+			result.Code = SearchResultCode::Found;
+			result.MangledName = name;
+			result.ModuleName = "";
+			result.pDefiniton = nullptr;
+
+			return result;
+		}
+
 		GetDefinitionFn<TYPE_DEFINITION> fn = [](Module& module, const std::string_view& name) -> Definition<TYPE_DEFINITION>
 			{
 				return module.GetTypeDefinition(name);
