@@ -35,12 +35,6 @@ namespace AlloyCompiler
 		STATEMENT_BLOCK* pBody;
 	};
 
-	struct EXTERN_DEFINITION
-	{
-		Token* pNameToken;
-		FUNCTION_TYPE* pFunctionType;
-	};
-
 	struct FUNCTION_CALL
 	{
 		TYPE_NAME* pTypeOrVariableName;	// optional, can contain name of variable OR name of type, TYPE_NAME is used because it can handle both cases

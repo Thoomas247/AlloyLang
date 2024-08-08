@@ -80,16 +80,6 @@ namespace AlloyCompiler
 		return getDefinition(fn, name);
 	}
 
-	SearchResult<EXTERN_DEFINITION> ModuleTable::GetExternDefinition(const std::string_view& name) const
-	{
-		GetDefinitionFn<EXTERN_DEFINITION> fn = [](Module& module, const std::string_view& name) -> Definition<EXTERN_DEFINITION>
-			{
-				return module.GetExternDefinition(name);
-			};
-
-		return getDefinition(fn, name);
-	}
-
 	FUNCTION_DEFINITION* ModuleTable::GetMainFunction()
 	{
 		Module& mainModule = m_Modules.at(m_ContextStack[0]);

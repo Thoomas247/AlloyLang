@@ -34,7 +34,6 @@ namespace AlloyCompiler
 		SearchResult<MACRO_DEFINITION> GetMacroDefinition(const std::string_view& name) const;
 		SearchResult<TYPE_DEFINITION> GetTypeDefinition(const std::string_view& name) const;
 		SearchResult<FUNCTION_DEFINITION> GetFunctionDefinition(const std::string_view& name) const;
-		SearchResult<EXTERN_DEFINITION> GetExternDefinition(const std::string_view& name) const;
 
 		FUNCTION_DEFINITION* GetMainFunction();
 

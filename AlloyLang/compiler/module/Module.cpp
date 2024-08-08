@@ -47,9 +47,4 @@ namespace AlloyCompiler
 	{
 		return getDefinition(m_NodeBuffer.GetFunctionDefinitions(), name);
 	}
-
-	Definition<EXTERN_DEFINITION> Module::GetExternDefinition(const std::string_view& name)
-	{
-		return getDefinition(m_NodeBuffer.GetExternDefinitions(), name);
-	}
 }

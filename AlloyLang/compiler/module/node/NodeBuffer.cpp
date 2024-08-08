@@ -922,14 +922,17 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		if (expectKind<TokenKind::function_keyword>() != SUCCESS)
+		Token* pFnKeywordToken = nullptr;
+		if (expectKind<TokenKind::function_keyword, TokenKind::extern_keyword>(&pFnKeywordToken) != SUCCESS)
 		{
 			return nullptr;
 		}
 
+		const bool isExtern = pFnKeywordToken->Kind == TokenKind::extern_keyword;
+
 		TYPE_IDENTIFIER* pTypeIdentifier = nullptr;
-		if (peekToken()->Kind == TokenKind::colon
-			|| peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon)
+		if (!isExtern
+			&& (peekToken()->Kind == TokenKind::colon || peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon))
 		{
 			pTypeIdentifier = parse<TYPE_IDENTIFIER>();
 
@@ -947,16 +950,27 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/false, /*allowSelf*/true);
+		const bool allowSelf = !isExtern && pTypeIdentifier != nullptr;
+		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/isExtern, /*allowSelf*/allowSelf);
 
 		if (pFunctionType == nullptr)
 		{
 			return nullptr;
 		}
 
-		STATEMENT_BLOCK* pBody = parse<STATEMENT_BLOCK>();
+		STATEMENT_BLOCK* pBody = nullptr;
+		
+		if (!isExtern)
+		{
+			pBody = parse<STATEMENT_BLOCK>();
 
-		if (pBody == nullptr)
+			if (pBody == nullptr)
+			{
+				return nullptr;
+			}
+		}
+
+		else if (expectKind<TokenKind::semicolon>() != SUCCESS)
 		{
 			return nullptr;
 		}
@@ -968,46 +982,6 @@ namespace AlloyCompiler
 				.pFunctionNameToken = pFunctionNameToken,
 				.pFunctionType = pFunctionType,
 				.pBody = pBody
-			}
-		);
-	}
-
-	template<>
-	EXTERN_DEFINITION* NodeBuffer::parse()
-	{
-		if (checkAnnotations({ }) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::extern_keyword>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		Token* pFunctionNameToken = nullptr;
-		if (expectKind<TokenKind::identifier>(&pFunctionNameToken) != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/true, /*allowSelf*/false);
-
-		if (pFunctionType == nullptr)
-		{
-			return nullptr;
-		}
-
-		if (expectKind<TokenKind::semicolon>() != SUCCESS)
-		{
-			return nullptr;
-		}
-
-		return createNode(
-			EXTERN_DEFINITION
-			{
-				.pNameToken = pFunctionNameToken,
-				.pFunctionType = pFunctionType
 			}
 		);
 	}
@@ -2937,6 +2911,7 @@ namespace AlloyCompiler
 			}
 
 			case function_keyword:
+			case extern_keyword:
 			{
 				FUNCTION_DEFINITION* pFunctionDefinition = parse<FUNCTION_DEFINITION>();
 
@@ -2974,28 +2949,6 @@ namespace AlloyCompiler
 					m_FunctionDefinitions[std::string(pFunctionNameToken->Value)] = Definition<FUNCTION_DEFINITION>(visibility, pFunctionDefinition);
 					m_AllSymbolNames.insert(pFunctionNameToken->Value);
 				}
-
-				break;
-			}
-
-			case extern_keyword:
-			{
-				EXTERN_DEFINITION* pExternDefinition = parse<EXTERN_DEFINITION>();
-
-				if (pExternDefinition == nullptr)
-				{
-					return false;
-				}
-
-				if (m_AllSymbolNames.contains(pExternDefinition->pNameToken->Value))
-				{
-					logErrorAtToken(pExternDefinition->pNameToken,
-						"Symbol with name '{0}' already exists in this module.", pExternDefinition->pNameToken->Value);
-					return false;
-				}
-
-				m_ExternDefinitions[std::string(pExternDefinition->pNameToken->Value)] = Definition<EXTERN_DEFINITION>(visibility, pExternDefinition);
-				m_AllSymbolNames.insert(pExternDefinition->pNameToken->Value);
 
 				break;
 			}

@@ -16,7 +16,6 @@ namespace AlloyCompiler
 		Definition<MACRO_DEFINITION> GetMacroDefinition(const std::string_view& name);
 		Definition<TYPE_DEFINITION> GetTypeDefinition(const std::string_view& name);
 		Definition<FUNCTION_DEFINITION> GetFunctionDefinition(const std::string_view& name);
-		Definition<EXTERN_DEFINITION> GetExternDefinition(const std::string_view& name);
 
 	private:
 		template <typename T>
