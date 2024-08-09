@@ -10,8 +10,8 @@ namespace AlloyCompiler
 	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
 	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName, const std::vector<EXPRESSION*>& functionArguments);
-	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::vector<TYPE*>& genericArguments);
-	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition, const std::string& moduleName);
+	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::string& moduleName, const std::vector<TYPE*>& genericArguments);
+	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& externDefinition, const std::string& moduleName);
 
 #pragma region Util
 
@@ -227,36 +227,41 @@ namespace AlloyCompiler
 		// Helper function to return an llvm type given its type name
 		// Also searches the named nodes if the type has not been defined yet and define it
 		//
-		std::string name = NodeBuffer::GetMangledName(pNameToken->Value, genericArguments);
-		
+
+		llvm::Type* type = nullptr;
+		std::string mangledName(pNameToken->Value);
+
 		// if we have a type map that contains the requested type, retrieve the actual type, e.g. T might be an i32
 		if (genericTypeMap != nullptr
-			&& genericTypeMap->contains(name)
+			&& genericTypeMap->contains(mangledName)
 			) {
-			name = genericTypeMap->at(name);
+			mangledName = genericTypeMap->at(mangledName);
 		}
-		llvm::Type* type = state.NamedValues.GetType(name);
 
-		if (type == nullptr)
-		{
-			// type not found, it might not have been processed yet
-			// try to locate it in the program and process it
+		type = state.NamedValues.GetType(mangledName);
+		if (nullptr == type) {
 
-			SearchResult<TYPE_DEFINITION> result = moduleTable.GetTypeDefinition(pNameToken->Value);
+			// search for the type definition in the module table
+			SearchResult<TYPE_DEFINITION> result = moduleTable.GetTypeDefinition(mangledName);
 
 			if (result.Code == SearchResultCode::NotFound)
 			{
 				logErrorAtCurrentPosition(pNameToken, "Type '{0}' does not exist.", pNameToken->Value);
 			}
-
 			else if (result.Code == SearchResultCode::Inaccessible)
 			{
 				logErrorAtCurrentPosition(pNameToken, "Type '{0}' is private and cannot be accessed here.", pNameToken->Value);
 			}
 			else
 			{
-				generateTypeDefinition(moduleTable, state, *result.pDefiniton, genericArguments);
-				type = state.NamedValues.GetType(name);
+				mangledName = NodeBuffer::GetMangledName("", result.MangledName, genericArguments);
+
+				// now check if this type has already been defined
+				type = state.NamedValues.GetType(mangledName);
+				if (nullptr == type) {
+					// if not already defined, try to define it now
+					type = generateTypeDefinition(moduleTable, state, *result.pDefiniton, result.ModuleName, genericArguments);
+				}
 			}
 		}
 
@@ -640,13 +645,13 @@ namespace AlloyCompiler
 	{
 		// TODO: var and const
 
-TypeModifier modifier = TypeModifier::None;
-if (typeDeclarationNode.pReturnType->pType == nullptr) {
-	return {};
-}
-else {
-	return generateTypeIdentifier(moduleTable, state, *typeDeclarationNode.pReturnType->pType, nullptr, modifier, nullptr);
-}
+		TypeModifier modifier = TypeModifier::None;
+		if (typeDeclarationNode.pReturnType->pType == nullptr) {
+			return {};
+		}
+		else {
+			return generateTypeIdentifier(moduleTable, state, *typeDeclarationNode.pReturnType->pType, nullptr, modifier, nullptr);
+		}
 	}
 
 	llvm::Value* generateVariableDeclaration(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DECLARATION& variableDeclarationNode,
@@ -729,7 +734,8 @@ else {
 		if (state.Module->getFunction(name))
 		{
 			// Replace '@' in mangled name by ':' for error messages
-			std::string ename = name.replace(name.begin(), name.end(), '@', ':');
+			std::string ename = name;
+			std::replace(ename.begin(), ename.end(), '@', ':');
 			logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' already defined!", ename);
 			return nullptr;
 		}
@@ -847,8 +853,11 @@ else {
 
 	llvm::Value* generateConstructorExpression(ModuleTable& moduleTable, LLVMState& state, const CONSTRUCTOR& constructorExpression)
 	{
+		// search for the struct definition in the module table
+		SearchResult<TYPE_DEFINITION> result = moduleTable.GetTypeDefinition(constructorExpression.pType->pNameToken->Value);
+
 		// create mangled structure name (if needed)
-		std::string structName = NodeBuffer::GetMangledName(constructorExpression.pType->pNameToken->Value, constructorExpression.pType->GenericArguments);
+		std::string structName = NodeBuffer::GetMangledName("", result.MangledName, constructorExpression.pType->GenericArguments);
 
 		llvm::StructType* structType = static_cast<llvm::StructType*>(state.NamedValues.GetType(structName));
 
@@ -1262,10 +1271,10 @@ else {
 		int argi = 0;	// argument index currently processed
 		llvm::Value* result = nullptr;
 		llvm::Function* calleeFunc = nullptr;
-		FUNCTION_TYPE* pCalleeFunctionType = nullptr;	// in addition to the LLVM function definition, we need the original function definition in order to properly handle const parameters
+		FUNCTION_TYPE* pCalleeFunctionType = nullptr;	// in addition to the LLVM function definition, we need the original function definition in order to properly handle generic and const parameters
 		bool insertSelfAsFirstParam = false;		// indicates whether the first parameter should be the variable value in the case of member function calls
-		std::vector<EXPRESSION*> Arguments(functionCallExpressionNode.Arguments);
-													// creating a copy of the arguments as we might need to insert new elements
+		std::vector<EXPRESSION*> Arguments(functionCallExpressionNode.Arguments);	// creating a copy of the arguments as we might need to insert new elements
+		SearchResult<FUNCTION_DEFINITION> funcResult;
 
 		// handle member function calls
 		/*
@@ -1283,157 +1292,60 @@ else {
 		if (functionCallExpressionNode.pTypeOrVariableName != nullptr)
 		{
 			const std::string varOrTypeName(functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
+
 			if (state.NamedValues.GetValue(varOrTypeName) != nullptr)
 			{
 				// non-static member function call
 				std::string_view typeName = state.NamedValues.GetTypeName(state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType());
-				mangledName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeName, functionName);
+				mangledName = NodeBuffer::GetMangledName("", typeName, functionName);
 
-				// also retrieve the original function definition
-				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
-
-				/* look up the function in the global module table
-				calleeFunc = state.Module->getFunction(result.MangledName);
-				if (calleeFunc == nullptr)
-				{
-					logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find member function '{0}:{1}'!", typeName, functionName);
-					goto error;
-				}
-				*/
-				
-				if (result.Code == SearchResultCode::NotFound)
-				{
-					// TODO: error not found
-					ASSERT(false, "Could not find function!");
-					goto error;
-				}
-				else if (result.Code == SearchResultCode::Inaccessible)
-				{
-					// TODO: error inaccessible
-					ASSERT(false, "Function is inaccessible!");
-					goto error;
-				}
-				else
-				{
-					pCalleeFunctionType = result.pDefiniton->pFunctionType;
-				}
-
-				/* TBD:check that the first argument is of the right type
-				if (calleeFunc->arg_size() < 1 || calleeFunc->getArg(0)->getType() != state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType()) {
-					logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "The first parameter of member function '{0}' is not of the right type!", functionName);
-					goto error;
-				}
-				*/
 				insertSelfAsFirstParam = true;
 			}
-
-			else if (state.NamedValues.GetType(varOrTypeName) != nullptr)
-			{
-				// static member function call
-				mangledName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), varOrTypeName, functionName);
-
-				// also retrieve the original function definition
-				SearchResult<FUNCTION_DEFINITION> result = moduleTable.GetFunctionDefinition(mangledName);
-
-				// look up the function in the global module table
-				calleeFunc = state.Module->getFunction(result.MangledName);
-
-				if (result.Code == SearchResultCode::NotFound)
-				{
-					// TODO: error not found
-					ASSERT(false, "Could not find function!");
+			else {
+				llvm::Type* type = getTypeFromTypeName(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->pNameToken, {}, nullptr);
+				if (type != nullptr) {
+					// static member function call
+					mangledName = NodeBuffer::GetMangledName("", varOrTypeName, functionName);
+				}
+				else {
+					logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Not a variable or type name '{0}'!", varOrTypeName);
 					goto error;
 				}
-				else if (result.Code == SearchResultCode::Inaccessible)
-				{
-					// TODO: error inaccessible
-					ASSERT(false, "Function is inaccessible!");
-					goto error;
-				}
-				else
-				{
-					pCalleeFunctionType = result.pDefiniton->pFunctionType;
-				}
 			}
-			else
-			{
-				logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Not a variable or type name '{0}'!", varOrTypeName);
-				goto error;
-			}
+		}
+
+		// retrieve the original function definition
+		funcResult = moduleTable.GetFunctionDefinition(mangledName);
+
+		if (funcResult.Code == SearchResultCode::NotFound)
+		{
+			// TODO: error not found
+			ASSERT(false, "Could not find function!");
+			goto error;
+		}
+		else if (funcResult.Code == SearchResultCode::Inaccessible)
+		{
+			// TODO: error inaccessible
+			ASSERT(false, "Function is inaccessible!");
+			goto error;
 		}
 		else
 		{
-			// also retrieve the original function definition
-			SearchResult<FUNCTION_DEFINITION> funcResult = moduleTable.GetFunctionDefinition(functionName);
+			pCalleeFunctionType = funcResult.pDefiniton->pFunctionType;
 
 			// look up the function in the global module table
-			calleeFunc = state.Module->getFunction(funcResult.MangledName);
-
-			if (funcResult.Code == SearchResultCode::NotFound)
-			{
-				// could also be an extern
-				SearchResult<EXTERN_DEFINITION> externResult = moduleTable.GetExternDefinition(functionName);
-
-				// look up the function in the global module table
-				calleeFunc = state.Module->getFunction(functionName);
-
-				if (externResult.Code == SearchResultCode::NotFound)
-				{
-					// TODO: error not found
-					ASSERT(false, "Could not find function!");
-					goto error;
-				}
-
-				else if (externResult.Code == SearchResultCode::Inaccessible)
-				{
-					// TODO: error inaccessible
-					ASSERT(false, "Function is inaccessible!");
-					goto error;
-				}
-
-				else
-				{
-					pCalleeFunctionType = externResult.pDefiniton->pFunctionType;
-				}
-			}
-			else if (funcResult.Code == SearchResultCode::Inaccessible)
-			{
-				// TODO: error inaccessible
-				ASSERT(false, "Function is inaccessible!");
-				goto error;
-			}
-			else
-			{
-				pCalleeFunctionType = funcResult.pDefiniton->pFunctionType;
-			}
+			// for generic functions, we need the full function name including any generic parameters
+			std::unordered_map<std::string, std::string> typeMap;
+			calleeFunc = state.Module->getFunction(getExtendedFunctionName("", "", funcResult.MangledName, funcResult.pDefiniton->pFunctionType->Parameters, Arguments, typeMap));
 		}
 
 		// function not found, it might not have been processed yet
 		// check if function is already in the parser and process it
 		if (!calleeFunc)
 		{
-///			ASSERT(false, "Defining a new function while another function is already being defined is not working, all functions have to be pre-processed in Generate!");
+			calleeFunc = generateFunctionDefinition(moduleTable, state, *funcResult.pDefiniton, funcResult.ModuleName, Arguments);
 
-#if 1
-			auto functionResult = moduleTable.GetFunctionDefinition(mangledName);
-			if (functionResult.Code == SearchResultCode::Found)
-			{
-
-				// function found, process it
-				calleeFunc = generateFunctionDefinition(moduleTable, state, *functionResult.pDefiniton, moduleTable.GetCurrentContext(), Arguments);
-
-			}
-			else
-			{
-				auto externResult = moduleTable.GetExternDefinition(mangledName);
-
-				if (externResult.Code == SearchResultCode::Found)
-				{
-					// external function found, process it
-					calleeFunc = generateExternDefinition(moduleTable, state, *externResult.pDefiniton, moduleTable.GetCurrentContext());
-				}
-			}
-#endif
+			ASSERT(Arguments.size() > 0 || calleeFunc == state.Module->getFunction(funcResult.MangledName), "Function was not generated with the right name!");
 		}
 
 		if (!calleeFunc
@@ -2282,11 +2194,10 @@ else {
 
 #pragma region Definitions
 
-	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const EXTERN_DEFINITION& externDefinition, const std::string& moduleName)
+	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& externDefinition, const std::string& moduleName)
 	{
-		FUNCTION_DEFINITION functionDefinition = { nullptr, externDefinition.pNameToken, externDefinition.pFunctionType, nullptr };
 		std::unordered_map<std::string, std::string> typeMap;
-		return generateFunctionDeclaration(moduleTable, state, functionDefinition, moduleName, {}, typeMap);
+		return generateFunctionDeclaration(moduleTable, state, externDefinition, moduleName, {}, typeMap);
 	}
 
 	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition)
@@ -2304,7 +2215,7 @@ else {
 		std::unordered_map<std::string, std::string> genericMap;
 
 		// create mangled structure name (if needed)
-		std::string structName = NodeBuffer::GetMangledName(typeIdentifier.pNameToken->Value, genericArguments);
+		std::string structName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeIdentifier.pNameToken->Value, genericArguments);
 
 		if (genericArguments.size() != typeIdentifier.GenericParameters.size())
 		{
@@ -2369,12 +2280,16 @@ failed:
 		// If type is other than an empty string, we are defining a member function, in which case the name of the function is defined as Type@Name in LLVM
 		//
 		std::unordered_map<std::string, std::string> typeMap;		// this is a map from the generic type to the actual function parameter type
+		moduleTable.PushContext(moduleName);
 
 		llvm::Function* func = generateFunctionDeclaration(moduleTable, state, functionDefinition, moduleName, functionArguments, typeMap);
 
-		if (func == nullptr)
+		if (func == nullptr
+			|| functionDefinition.pBody == nullptr		// this is the case for external function definitions
+			)
 		{
-			return nullptr;
+			moduleTable.PopContext();
+			return func;
 		}
 
 		// create a new builder for this function, this will allow us to generate multiple functions in parallel
@@ -2418,6 +2333,7 @@ failed:
 				state.NamedValues.PopScope();
 				state.CurrentReturnValue = previousReturnValue;
 				state.Builder.reset(PreviousBuilder);
+				moduleTable.PopContext();
 				return nullptr;
 			}
 
@@ -2454,6 +2370,7 @@ failed:
 				state.CurrentReturnValue = previousReturnValue;
 				state.FuncExitBlock = previousExitBlock;
 				state.Builder.reset(PreviousBuilder);
+				moduleTable.PopContext();
 				return nullptr;
 			}
 		}
@@ -2496,13 +2413,17 @@ failed:
 		}
 
 		state.Builder.reset(PreviousBuilder);
+		moduleTable.PopContext();
 
 		return func;
 	}
 
-	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition,
+	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, 
+										const TYPE_DEFINITION& typeDefinition, const std::string& moduleName, 
 										const std::vector<TYPE*>& genericArguments)
 	{
+		moduleTable.PushContext(moduleName);
+
 		llvm::Type* result = nullptr;
 
 		if (typeDefinition.pType->Type.Is<STRUCT_TYPE>()) {
@@ -2515,20 +2436,24 @@ failed:
 
 			// insert the new type (which is a copy of the type it refers to) into the namedValues of the current scope
 			if (result != nullptr) {
+				// search for the type definition in the module table, we need to retrieve the actual mangled name
+				SearchResult<TYPE_DEFINITION> secondTypeDefinition = moduleTable.GetTypeDefinition(typeDefinition.pTypeIdentifier->pNameToken->Value);
 				bool isStruct = result->isStructTy();
 				if (isStruct) {
 					std::unordered_map<std::string_view, NamedValues::StructMemberInfo> structMembers;
 					state.NamedValues.GetStructMembers(state.NamedValues.GetTypeName(result), structMembers);
-					state.NamedValues.InsertType(std::string(typeDefinition.pTypeIdentifier->pNameToken->Value), result, true, structMembers);
+					state.NamedValues.InsertType(secondTypeDefinition.MangledName, result, true, structMembers);
 				}
 				else {
-					state.NamedValues.InsertType(std::string(typeName->pNameToken->Value), result, false);
+					state.NamedValues.InsertType(secondTypeDefinition.MangledName, result, false);
 				}
 			}
 		}
 		else {
 			ASSERT(false, "Type definition not implemented!");
 		}
+
+		moduleTable.PopContext();
 
 		return result;
 	}
@@ -2556,15 +2481,9 @@ failed:
 		}
 		*/
 
+		/* pre - process all function definitions leaving the main function till the end
 		for (auto& [moduleName, module] : moduleTable.GetModules())
 		{
-			// pre-process all extern function definitions
-			for (auto& [funcName, func] : module.GetNodeBuffer().GetExternDefinitions())
-			{
-				generateExternDefinition(moduleTable, state, *func.pDefinition, "");
-			}
-
-			/* pre - process all function definitions leaving the main function till the end
 			for (auto& [funcName, func] : module.GetNodeBuffer().GetFunctionDefinitions())
 			{
 				if (funcName != "main")
@@ -2572,8 +2491,8 @@ failed:
 					generateFunctionDefinition(moduleTable, state, *func.pDefinition, moduleName, {});
 				}
 			}
-			*/
-		}
+
+			}*/
 
 		llvm::Function* result = generateFunctionDefinition(moduleTable, state, *pMainFunction, moduleTable.GetCurrentContext(), {});
 		state.MainFunctionName = moduleTable.GetCurrentContext() + "::main";

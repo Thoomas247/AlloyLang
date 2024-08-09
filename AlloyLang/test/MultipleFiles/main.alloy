@@ -1,7 +1,9 @@
+extern printf (const str: String, ...) -> i64;
 
 fn main() -> i64
 {
 	var o: other::OtherType = other::OtherType { num = 2, num2 = 54 };
 
-	return other::i64_mul(32, 43);
+	printf("32 x 43 = %d", other::i64_mul(i64, 32, 43));
+	return other::i64_mul(i64, 32, 43);
 }

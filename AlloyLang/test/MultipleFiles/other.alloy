@@ -1,5 +1,5 @@
 
-pub fn i64_mul(const a: i64, const b: i64) -> i64
+pub fn i64_mul(type T, const a: T, const b: T) -> i64
 {
 	return a * b;
 }

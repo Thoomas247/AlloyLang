@@ -77,7 +77,16 @@ namespace AlloyCompiler
 				return module.GetFunctionDefinition(name);
 			};
 
-		return getDefinition(fn, name);
+		auto result = getDefinition(fn, name);
+
+		// do not include module name if extern
+		if (result.pDefiniton->pBody == nullptr)
+		{
+			result.MangledName = result.pDefiniton->pFunctionNameToken->Value;
+			result.ModuleName = "";
+		}
+
+		return result;
 	}
 
 	FUNCTION_DEFINITION* ModuleTable::GetMainFunction()

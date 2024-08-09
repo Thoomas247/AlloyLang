@@ -23,7 +23,14 @@ namespace AlloyCompiler
 			//
 			// Returns moduleName::typeName@functionName
 			//
-			return std::string(typeName) + "@" + std::string(functionName);
+			std::string result;
+
+			if (!moduleName.empty())
+			{
+				result = std::string(moduleName) + "::";
+			}
+			result += std::string(typeName) + "@" + std::string(functionName);
+			return result;
 		}
 
 		static std::string GetMangledName(const std::string_view& moduleName, Token* pTypeNameToken, Token* pFunctionNameToken)
@@ -36,9 +43,12 @@ namespace AlloyCompiler
 		//
 		// return the mangled name for a type with generic arguments
 		//
-		static std::string GetMangledName(const std::string_view& typeName, const std::vector<TYPE*>& genericArguments)
+		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::vector<TYPE*>& genericArguments)
 		{
-			std::string mangledName(typeName);
+			std::string mangledName(moduleName);
+			if (!mangledName.empty())
+				mangledName += "::";
+			mangledName += std::string(typeName);
 
 			if (!genericArguments.empty()) {
 				for (auto& t : genericArguments) {
