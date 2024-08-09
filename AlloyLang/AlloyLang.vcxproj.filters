@@ -132,6 +132,7 @@
     <None Include="test\MultipleFiles\main.alloy" />
     <None Include="test\MultipleFiles\other.alloy" />
     <None Include="test\GenericFunctions\main.alloy" />
+    <None Include="test\MultipleFiles\lib\list.alloy" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="docs\Parser Issues.txt" />

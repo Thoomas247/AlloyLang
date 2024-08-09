@@ -1,9 +1,15 @@
+import lib::list;
+
 extern printf (const str: String, ...) -> i64;
 
 fn main() -> i64
 {
-	var o: other::OtherType = other::OtherType { num = 2, num2 = 54 };
+	var list: List(i32) = List(i32):create();
 
-	printf("32 x 43 = %d", other::i64_mul(i64, 32, 43));
-	return other::i64_mul(i64, 32, 43);
+	list:add(32);
+	list:add(45);
+
+	printf("list.arr[1] = %d", list.arr[1]);
+
+	return list.arr[1];
 }
