@@ -2867,6 +2867,28 @@ namespace AlloyCompiler
 
 			switch (token()->Kind)
 			{
+			case variable_keyword:
+			case constant_keyword:
+			{
+				VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
+
+				if (pVariableDefinition == nullptr)
+				{
+					return false;
+				}
+
+				if (m_AllSymbolNames.contains(pVariableDefinition->pDeclaration->pNameToken->Value))
+				{
+					logErrorAtToken(pVariableDefinition->pDeclaration->pNameToken, "Symbol with name '{0}' already exists in this module.", pVariableDefinition->pDeclaration->pNameToken->Value);
+					return false;
+				}
+
+				m_GlobalVariableDefinitions[std::string(pVariableDefinition->pDeclaration->pNameToken->Value)] = Definition<VARIABLE_DEFINITION>(visibility, pVariableDefinition);
+				m_AllSymbolNames.insert(pVariableDefinition->pDeclaration->pNameToken->Value);
+
+				break;
+			}
+
 			case macro_keyword:
 			{
 				MACRO_DEFINITION* pMacroDefinition = parse<MACRO_DEFINITION>();

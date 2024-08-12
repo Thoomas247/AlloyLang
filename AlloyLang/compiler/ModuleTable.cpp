@@ -89,6 +89,16 @@ namespace AlloyCompiler
 		return result;
 	}
 
+	SearchResult<VARIABLE_DEFINITION> ModuleTable::GetGlobalVariableDefinition(const std::string_view& name) const
+	{
+		GetDefinitionFn<VARIABLE_DEFINITION> fn = [](Module& module, const std::string_view& name) -> Definition<VARIABLE_DEFINITION>
+			{
+				return module.GetGlobalVariableDefinition(name);
+			};
+
+		return getDefinition(fn, name);
+	}
+
 	FUNCTION_DEFINITION* ModuleTable::GetMainFunction()
 	{
 		Module& mainModule = m_Modules.at(m_ContextStack[0]);

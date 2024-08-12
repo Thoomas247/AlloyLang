@@ -84,6 +84,11 @@ namespace AlloyCompiler
 			return m_FunctionDefinitions;
 		}
 
+		const NodeMap<VARIABLE_DEFINITION>& GetGlobalVariableDefinitions() const
+		{
+			return m_GlobalVariableDefinitions;
+		}
+
 	private:
 		enum Result
 		{
@@ -170,6 +175,7 @@ namespace AlloyCompiler
 		NodeMap<MACRO_DEFINITION> m_MacroDefinitions;
 		NodeMap<TYPE_DEFINITION> m_TypeDefinitions;
 		NodeMap<FUNCTION_DEFINITION> m_FunctionDefinitions;
+		NodeMap<VARIABLE_DEFINITION> m_GlobalVariableDefinitions;
 
 		std::unordered_set<std::string_view> m_AllSymbolNames;
 		std::vector<std::string_view> m_ImportedModules;
