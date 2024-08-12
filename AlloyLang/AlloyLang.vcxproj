@@ -176,6 +176,7 @@
     <None Include="test\MultipleFiles\other.alloy" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="AlloyLang.txt" />
     <Text Include="docs\Coding Rules.txt" />
     <Text Include="docs\ECS Outline.txt" />
     <Text Include="docs\Enums.txt" />
@@ -186,6 +187,7 @@
     <Text Include="docs\Node Changes.txt" />
     <Text Include="docs\Parser Issues.txt" />
     <Text Include="SYNTAX.txt" />
+    <Text Include="TODO.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

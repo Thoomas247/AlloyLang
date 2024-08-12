@@ -145,5 +145,7 @@
     <Text Include="docs\Generics.txt" />
     <Text Include="SYNTAX.txt" />
     <Text Include="docs\Enums.txt" />
+    <Text Include="TODO.txt" />
+    <Text Include="AlloyLang.txt" />
   </ItemGroup>
 </Project>
