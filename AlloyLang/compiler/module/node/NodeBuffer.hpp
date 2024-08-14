@@ -17,6 +17,8 @@ namespace AlloyCompiler
 		template<typename T>
 		using NodeMap = std::unordered_map<std::string, Definition<T>>;
 
+		using ImportedModulesMap = std::unordered_map<std::string_view, std::vector<std::string_view>>;
+
 	public:
 		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::string_view& functionName)
 		{
@@ -92,7 +94,7 @@ namespace AlloyCompiler
 		NodeBuffer(const Source& source, TokenBuffer& tokenBuffer);
 		bool Parse();
 
-		const std::vector<std::string_view>& GetImportedModules() const
+		const ImportedModulesMap& GetImportedModules() const
 		{
 			return m_ImportedModules;
 		}
@@ -206,7 +208,7 @@ namespace AlloyCompiler
 		NodeMap<VARIABLE_DEFINITION> m_GlobalVariableDefinitions;
 
 		std::unordered_set<std::string_view> m_AllSymbolNames;
-		std::vector<std::string_view> m_ImportedModules;
+		ImportedModulesMap m_ImportedModules;
 
 		AnnotationMap m_CurrentAnnotations;
 		size_t m_CurrentTokenIndex;

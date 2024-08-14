@@ -6,8 +6,8 @@
 // global variables
 ////////////////////////
 
-const globalA : i64 = 2;
-var globalB : u32 = 40;
+const globalA: i64 = 2;
+var globalB: u32 = 40;
 
 ////////////////////////
 // types

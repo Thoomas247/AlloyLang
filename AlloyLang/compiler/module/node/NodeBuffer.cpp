@@ -2801,13 +2801,28 @@ namespace AlloyCompiler
 			return result;
 		}
 
+		std::string_view alias = "";
+		if (token()->Kind == TokenKind::as_keyword)
+		{
+			(void)eat();
+
+			Token* pAliasToken = nullptr;
+			result = expectKind<TokenKind::identifier, TokenKind::long_identifier>(&pAliasToken);
+			if (result != SUCCESS)
+			{
+				return result;
+			}
+
+			alias = pAliasToken->Value;
+		}
+
 		result = expectKind<TokenKind::semicolon>();
 		if (result != SUCCESS)
 		{
 			return result;
 		}
 
-		m_ImportedModules.push_back(pIdentifierToken->Value);
+		m_ImportedModules[alias].push_back(pIdentifierToken->Value);
 
 		return result;
 	}

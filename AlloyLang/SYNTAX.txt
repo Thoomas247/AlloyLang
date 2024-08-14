@@ -12,6 +12,7 @@
 	macro_keyword:					'macro' ;
 
 	import_keyword:					'import' ;
+	as_keyword:						'as' ;
 
 	public_keyword:					'pub' ;
 	export_keyword:					'exp' ;
@@ -185,4 +186,4 @@
 
 	(* - Modules - *)
 
-	MODULE_IMPORT:				import_keyword ( identifier | long_identifier ) semicolon ;
+	MODULE_IMPORT:				import_keyword ( identifier | long_identifier ) [ as_keyword ( identifier | long_identifier ) ] semicolon ;

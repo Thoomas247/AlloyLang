@@ -1,0 +1,13 @@
+import lib::log;
+import lib::math as math;
+
+fn main() -> i32
+{
+	const v1: lib::math::Vector3 = lib::math::Vector3 { x = 1, y = 2, z = 3 };
+	const v2: math::Vector3 = math::Vector3 { x = 3, y = 5, z = 4 };
+
+	log_i32(v1.y);
+	lib::log::log_i32(v1.z);
+
+	return v2.x;
+}

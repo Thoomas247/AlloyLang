@@ -75,47 +75,21 @@ namespace AlloyCompiler
 	template<typename T>
 	ModuleTable::ModuleDefinitionPair<T> ModuleTable::getDefinitionInModule(GetDefinitionFn<T> getDefinitionFn, const std::string_view& moduleName, const std::string_view& symbolName) const
 	{
-		ASSERT(m_Modules.contains(std::string(moduleName)), "Module does not exist!");
+		std::string realModuleName = std::string(moduleName);
 
-		Module& givenModule = m_Modules.at(std::string(moduleName));
+		if (realModuleName.empty())
+		{
+			realModuleName = m_ContextStack.back();
+		}
 
 		ModuleDefinitionPair<T> result;
 
-		// look in given module
-		result.Definition = getDefinitionFn(givenModule, symbolName);
-		result.ModuleName = moduleName;
-
-		if (result.Definition.IsNull())
+		if (m_Modules.contains(realModuleName))
 		{
-			// look in all the modules the given module imports
-			for (const std::string_view& importName : givenModule.GetNodeBuffer().GetImportedModules())
-			{
-				const std::string relativeModuleName = getRelativePath(moduleName, importName);
+			Module& givenModule = m_Modules.at(realModuleName);
 
-				if (m_Modules.contains(relativeModuleName))
-				{
-					Module& relativeModule = m_Modules.at(relativeModuleName);
-
-					result.Definition = getDefinitionFn(relativeModule, symbolName);
-					result.ModuleName = relativeModuleName;
-				}
-				else if (m_Modules.contains(std::string(importName)))
-				{
-					Module& absoluteModule = m_Modules.at(std::string(importName));
-
-					result.Definition = getDefinitionFn(absoluteModule, symbolName);
-					result.ModuleName = importName;
-				}
-				else
-				{
-					ASSERT(false, "Import does not exist! This should be unreachable.");
-				}
-
-				if (!result.Definition.IsNull())
-				{
-					break;
-				}
-			}
+			result.Definition = getDefinitionFn(givenModule, symbolName);
+			result.ModuleName = moduleName;
 		}
 
 		return result;
@@ -124,51 +98,80 @@ namespace AlloyCompiler
 	template<typename T>
 	SearchResult<T> ModuleTable::getDefinition(GetDefinitionFn<T> getDefinitionFn, const std::string_view& name) const
 	{
-		const Module& currentModule = m_Modules.at(std::string(m_ContextStack.back()));
-		auto moduleAndSymbolName = splitName(name);
+		Module& currentModule = m_Modules.at(std::string(m_ContextStack.back()));
 
-		ModuleDefinitionPair<T> moduleAndDefinition;
+		std::string moduleName;
+		std::string symbolName;
+		{
+			auto moduleAndSymbolName = splitName(name);
+			moduleName = moduleAndSymbolName.ModuleName;
+			symbolName = moduleAndSymbolName.SymbolName;
+		}
+
+		// check whatever the given module is for the symbol
+		ModuleDefinitionPair<T> moduleAndDefinition = getDefinitionInModule(getDefinitionFn, moduleName, symbolName);
+
+		// if not found in given module, check if any alias matches the given module name, and check in those aliased modules
+		const auto& importedModules = currentModule.GetNodeBuffer().GetImportedModules();
+		if (moduleAndDefinition.Definition.IsNull() && importedModules.contains(moduleName))
+		{
+			// get every real module name which was renamed to the given module name
+			for (const std::string_view& importName : importedModules.at(moduleName))
+			{
+				const std::string relativeModuleName = getRelativePath(moduleName, importName);
+				const std::string absoluteModuleName = std::string(importName);
+
+				// check at path relative to current context
+				if (m_Modules.contains(relativeModuleName))
+				{
+					moduleAndDefinition = getDefinitionInModule(getDefinitionFn, relativeModuleName, symbolName);
+				}
+
+				// check at path relative to project root
+				else if (m_Modules.contains(absoluteModuleName))
+				{
+					moduleAndDefinition = getDefinitionInModule(getDefinitionFn, absoluteModuleName, symbolName);
+				}
+
+				else
+				{
+					ASSERT(false, "Import does not exist! This should be unreachable.");
+				}
+
+				// stop looking if found
+				if (!moduleAndDefinition.Definition.IsNull())
+				{
+					break;
+				}
+			}
+		}
 
 		SearchResult<T> result{};
 
-		if (moduleAndSymbolName.ModuleName.empty())
+		if (moduleAndDefinition.Definition.IsNull())
 		{
-			// look in current module
-			moduleAndDefinition = getDefinitionInModule(getDefinitionFn, m_ContextStack.back(), moduleAndSymbolName.SymbolName);
-
-			if (moduleAndDefinition.Definition.IsNull())
-			{
-				result.Code = SearchResultCode::NotFound;
-			}
-			else
-			{
-				result.Code = SearchResultCode::Found;
-				result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
-				result.MangledName = m_ContextStack.back() + "::" + std::string(moduleAndSymbolName.SymbolName);
-				result.ModuleName = m_ContextStack.back();
-			}
+			result.Code = SearchResultCode::NotFound;
+			result.MangledName = "";
+			result.ModuleName = "";
+			result.pDefiniton = nullptr;
 		}
+
+		else if (moduleAndDefinition.Definition.Access == Visibility::Private
+			&& !moduleAndDefinition.ModuleName.empty()
+			&& moduleAndDefinition.ModuleName != m_ContextStack.back())
+		{
+			result.Code = SearchResultCode::Inaccessible;
+			result.MangledName = moduleAndDefinition.ModuleName + "::" + symbolName;
+			result.ModuleName = moduleAndDefinition.ModuleName;
+			result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
+		}
+		
 		else
 		{
-			// look in the module which the symbol name refers to
-			moduleAndDefinition = getDefinitionInModule(getDefinitionFn, moduleAndSymbolName.ModuleName, moduleAndSymbolName.SymbolName);
-
-			if (moduleAndDefinition.Definition.IsNull())
-			{
-				result.Code = SearchResultCode::NotFound;
-			}
-			else if (moduleAndDefinition.Definition.Access == Visibility::Private
-					&& moduleAndDefinition.ModuleName != moduleAndSymbolName.ModuleName)		// if the symbol is private, we can still access it from within the same module
-			{
-				result.Code = SearchResultCode::Inaccessible;
-			}
-			else
-			{
-				result.Code = SearchResultCode::Found;
-				result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
-				result.MangledName = moduleAndDefinition.ModuleName + "::" + std::string(moduleAndSymbolName.SymbolName);
-				result.ModuleName = moduleAndDefinition.ModuleName;
-			}
+			result.Code = SearchResultCode::Found;
+			result.MangledName = moduleAndDefinition.ModuleName + "::" + symbolName;
+			result.ModuleName = moduleAndDefinition.ModuleName;
+			result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
 		}
 
 		return result;
