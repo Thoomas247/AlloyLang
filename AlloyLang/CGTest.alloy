@@ -1,242 +1,33 @@
-extern printf (const str: String, ...) -> i64;
 
-// enum with no payload
-type PlayerTeam = enum
+type List(type T) = struct
 {
-	Red,
-	Blue
+	capacity: u64,
+	size: u64,
 };
 
-// enum with payload
-type Result(type E) = enum
+fn List(type T):create(const size: u64, const capacity: u64) -> List(T)
 {
-	Success,
-	Error: E,
-};
-
-fn use_enum()
-{
-	var team = PlayerTeam|Red;
-
-	const result = Result(i32)|Error(24);
-
-	switch (result)
-	{
-		case (Result(i32)|Success)
-			return true;
-		case (Result(i32)|Error) -> error
-		{
-			printf("Error %d!", error);
-		}
-	}
-
-	if (result == Result(i32)|Error) -> error
-	{
-		printf("Error %d!", error);
-	}
-
-}
-
-type GenericType(type A, type B, type C) = struct
-{
-	a: A,
-	b: B,
-	c: C,
-};
-
-type Vector3 = struct
-{
-	x: f64,
-	y: f64,
-	z: f64,
-};
-
-type Quaternion = struct
-{
-	x: f64,
-	y: f64,
-	z: f64,
-	w: f64,
-};
-
-fn Quaternion:rotate(var q: &Quaternion)
-{
-	
-}
-
-fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: &f64) -> Quaternion
-{
-	var q: Quaternion = Quaternion { x = 0, y = 0, z = 0, w = 0 };
-
-	q.x = qA.x + (qB.x - qA.x) * t;
-	q.y = qA.y + (qB.y - qA.y) * t;
-	q.z = qA.z + (qB.z - qA.z) * t;
-	q.w = qA.w + (qB.x - qA.w) * t;
-
-	return q;
-}
-
-fn Vector3:print(const v : &Self)
-{
-	printf("[ %f, %f, %f ]", v.x, v.y, v.z);
-}
-
-fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
-{
-	var result: Vector3 = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
-					
-	result.x = point.x + vector.x;
-	result.y = point.y + vector.y;
-	result.z = point.z + vector.z;
-					
-	return result;
+	return List(T) { capacity = capacity, size = size };
 }
 
 fn main() -> i64
 {
-	var vec: Vector3 = Vector3 { x = 0, y = 0, z = 0 };
-
-	var obj: GenericType(i64, u32, f32) = GenericType(i64, u32, f32) { a = 2, b = 3, c = 1.0 };
-
-	vec = Vector3:translate(&vec, Vector3 { x = 10, y = -3, z = 2 });
-	vec:print();
-
-	if (vec.x * vec.y * vec.z == -60.0)
-		return 1;
-	else
-		return 0;
-}
-
-
-/*
-import standard::io;	// bring every public or exported symbol from standard::io into this scope
-						// similar to doing "using namespace ..." in C++
-						// not required to access symbols in other files
-
-extern printf (const str: String, ...) -> i64;
-
-/* Macros */
-
-type Entity = u64;
-
-macro make_ptr_array(type T) -> type
-{
-	return [*T];
-}
-
-macro test_macro(type T) -> type
-{
-	type ptrArrayT = @make_ptr_array(T);
-
-	return struct { ptrArray: ptrArrayT };
-}
-
-
-/* Math Utilities */
-
-type Vector3 = struct
-{
-	x: f64,
-	y: f64,
-	z: f64,
-};
-
-type Quaternion = struct
-{
-	x: f64,
-	y: f64,
-	z: f64,
-	w: f64,
-};
-
-fn Quaternion:rotate(var q: &Quaternion)
-{
-	
-}
-
-fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: &f64) -> Quaternion
-{
-	var q: Quaternion = Quaternion { x = 0, y = 0, z = 0, w = 0 };
-
-	q.x = qA.x + (qB.x - qA.x) * t;
-	q.y = qA.y + (qB.y - qA.y) * t;
-	q.z = qA.z + (qB.z - qA.z) * t;
-	q.w = qA.w + (qB.x - qA.w) * t;
-
-	return q;
-}
-
-fn Vector3:print(const v : &Self)
-{
-	printf("[ %f, %f, %f ]", v.x, v.y, v.z);
-}
-
-fn Vector3:translate(const point : &Vector3, const vector : &Vector3) -> Vector3
-{
-	var result = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
-					
-	result.x = point.x + vector.x;
-	result.y = point.y + vector.y;
-	result.z = point.z + vector.z;
-					
-	return result;
-}
-
-
-/* Generics */
-
-// types can be made generic
-type Result(type T) = struct
-{
-	success: bool,
-	value: T
-};
-
-fn Result(type T):some_func()
-{
-	
-}
-
-// the 'Any' type can be used to specify that a parameter can be of any type
-fn serialize(const obj: &Any)
-{
-	// do serialization...
-}
-
-// generics can be used in member functions in the same ways as in normal functions
-// they can also be used to add a member function to any type
-fn Any:serialize(const obj: &Self)
-{
-	// do serialization...
-}
-
-// the type of a parameter can be obtained via the @type_of() macro used on a previous parameter
-fn compare(const objA: &Any, const objA: &@type_of(objA)) -> i32
-{
-	// do comparison...
-}
-
-// otherwise, a type can be explicitly passed in
-fn try_cast(const obj: &Any, type To) -> Result(To)
-{
-	// try to cast...
-
-	return Result(To) { success = false, value = To {} };
-}
-
-
-/* Main */
-
-fn main() -> i64
-{
-	var vec = Vector3 { x = 0, y = 0, z = 0 };
-
-	renderer::opengl:Init();
-
-	vec = Vector3:translate(&vec, Vector3 { x = 10, y = -3, z = 2 });
-	vec:print();
+	var l : List(i32) = List(i32):create(10, 20);
 
 	return 0;
 }
 
+/*
+type Vector3Of(type T1) = struct
+{
+	x: T1,
+	y: T1,
+	z: T1,
+};
+
+fn main () -> i64
+{
+	var temp32 : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
+	return 0;
+}
 */

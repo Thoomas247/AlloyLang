@@ -43,7 +43,8 @@ namespace AlloyCompiler
 		//
 		// return the mangled name for a type with generic arguments
 		//
-		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::vector<TYPE*>& genericArguments)
+		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::vector<TYPE*>& genericArguments,
+			const std::unordered_map<std::string, std::string>& genericTypeMap)
 		{
 			std::string mangledName(moduleName);
 			if (!mangledName.empty())
@@ -53,8 +54,35 @@ namespace AlloyCompiler
 			if (!genericArguments.empty()) {
 				for (auto& t : genericArguments) {
 					if (t->Type.Is<TYPE_NAME>()) {
-						mangledName = mangledName + "@" + std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value);
+						if (genericTypeMap.contains(std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value)))
+							mangledName = mangledName + "@" + genericTypeMap.at(std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value));
+						else
+							mangledName = mangledName + "@" + std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value);
 					}
+				}
+			}
+
+			return mangledName;
+		}
+
+		//
+		// return the mangled name for a type with generic arguments
+		// Same as the previous function, but now with a vector of GENERIC_PARAMETERs and not TYPEs
+		//
+		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::vector<GENERIC_PARAMETER*>& genericParameters,
+			const std::unordered_map<std::string, std::string>& genericTypeMap)
+		{
+			std::string mangledName(moduleName);
+			if (!mangledName.empty())
+				mangledName += "::";
+			mangledName += std::string(typeName);
+
+			if (!genericParameters.empty()) {
+				for (auto& t : genericParameters) {
+					if (genericTypeMap.contains(std::string(t->pIdentifierToken->Value)))
+						mangledName = mangledName + "@" + genericTypeMap.at(std::string(t->pIdentifierToken->Value));
+					else
+						mangledName = mangledName + "@" + std::string(t->pIdentifierToken->Value);
 				}
 			}
 

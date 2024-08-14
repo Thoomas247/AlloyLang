@@ -80,7 +80,7 @@ namespace AlloyCompiler
 		auto result = getDefinition(fn, name);
 
 		// do not include module name if extern
-		if (result.pDefiniton->pBody == nullptr)
+		if (result.pDefiniton && result.pDefiniton->pBody == nullptr)
 		{
 			result.MangledName = result.pDefiniton->pFunctionNameToken->Value;
 			result.ModuleName = "";
