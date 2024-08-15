@@ -4,7 +4,7 @@ TODO for version 0.1 release:
 	[] built-in cast functions for built-in types (f32:to_u32(), u64:to_u8(), ...)
 	[] global variables
 	[] array sizes as part of arrays
-	[] allow arrays allocated on the heap to be empty (ie allow 'var arr: *[T] = {};')
+	[] allow arrays allocated on the heap to be empty (ie allow 'var arr: *[T] = new {};')
 	[] ensure '&' operator is implemented properly, see references examples in AlloyLang.txt
 	[x] 'import ... as ...;'
 	[] variable type inferring at definition
