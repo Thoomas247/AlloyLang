@@ -89,7 +89,7 @@ namespace AlloyCompiler
 			Module& givenModule = m_Modules.at(realModuleName);
 
 			result.Definition = getDefinitionFn(givenModule, symbolName);
-			result.ModuleName = moduleName;
+			result.ModuleName = realModuleName;
 		}
 
 		return result;

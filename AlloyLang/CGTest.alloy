@@ -1,23 +1,5 @@
+extern printf (const str : String, ...) -> i32;
 
-type List(type T) = struct
-{
-	capacity: u64,
-	size: u64,
-};
-
-fn List(type T):create(const size: u64, const capacity: u64) -> List(T)
-{
-	return List(T) { capacity = capacity, size = size };
-}
-
-fn main() -> i64
-{
-	var l : List(i32) = List(i32):create(10, 20);
-
-	return 0;
-}
-
-/*
 type Vector3Of(type T1) = struct
 {
 	x: T1,
@@ -27,7 +9,8 @@ type Vector3Of(type T1) = struct
 
 fn main () -> i64
 {
-	var temp32 : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
-	return 0;
+	var temp : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
+	var temp32 = Vector3Of(i32) { x=1, y=2, z=3 };
+	printf("y = %d", temp32.y);
+	return temp32.y;
 }
-*/

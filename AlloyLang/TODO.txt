@@ -7,7 +7,7 @@ TODO for version 0.1 release:
 	[] allow arrays allocated on the heap to be empty (ie allow 'var arr: *[T] = new {};')
 	[] ensure '&' operator is implemented properly, see references examples in AlloyLang.txt
 	[x] 'import ... as ...;'
-	[] variable type inferring at definition
+	[x] variable type inferring at definition
 
 TODO for version 0.2 release:
 	[] 'pub' and 'exp' at struct member level
