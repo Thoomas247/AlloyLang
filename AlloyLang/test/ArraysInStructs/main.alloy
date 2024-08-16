@@ -1,4 +1,4 @@
-extern printf (const str : String, const param : f64) -> i64;
+	extern printf (const str : String, const param : f64) -> i64;
 
 type Vector3 = struct
 {
@@ -15,7 +15,7 @@ type StructWithArray = struct
 
 fn translate(const point : Vector3, const vector : Vector3) -> Vector3
 {
-	var result : Vector3 { x = 0.00, y = 0.00, z = 0.00 };
+	var result = Vector3 { x = 0.00, y = 0.00, z = 0.00 };
 	
 	result.x = point.x + vector.x;
 	result.y = point.y + vector.y;
