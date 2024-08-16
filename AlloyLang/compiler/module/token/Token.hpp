@@ -24,6 +24,7 @@ namespace AlloyCompiler
 		macro_keyword,
 
 		import_keyword,
+		as_keyword,
 
 		public_keyword,
 		export_keyword,
@@ -103,6 +104,7 @@ namespace AlloyCompiler
 		{ TokenKind::macro_keyword,			"macro" },
 
 		{ TokenKind::import_keyword,		"import" },
+		{ TokenKind::as_keyword,			"as" },
 
 		{ TokenKind::public_keyword,		"pub" },
 		{ TokenKind::export_keyword,		"exp" },
@@ -171,6 +173,7 @@ namespace AlloyCompiler
 		{ "macro", TokenKind::macro_keyword },
 
 		{ "import", TokenKind::import_keyword },
+		{ "as", TokenKind::as_keyword },
 
 		{ "pub", TokenKind::public_keyword },
 		{ "exp", TokenKind::export_keyword },

@@ -56,15 +56,20 @@ namespace AlloyCompiler
 		/// Returns -1 if the struct does not exist, -2 if the member does not exist.
 		/// </summary>
 		NamedValues::StructMemberInfo GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
-		std::string_view GetTypeName(llvm::Type* type);
+		std::string_view GetTypeName(const llvm::Type* type);
 
-		void InsertType(const std::string& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, StructMemberInfo> structMembers = {});
+		void InsertType(const std::string& name, llvm::Type* type, bool isStruct, const std::unordered_map<std::string_view, StructMemberInfo>& structMembers = {},
+			const std::unordered_map<std::string, std::string>& genericTypeMap = {});
 		bool GetStructMembers(const std::string_view& structName, std::unordered_map<std::string_view, StructMemberInfo>& structMembers);
 
 		// support for generic function parameters
 		std::string GetGenericType(const std::string& typeName);
 		void SetGenericType(const std::string& typeName, const std::string& realType);
+
+		// returns the current function's generic type map
 		std::unordered_map<std::string, std::string> GetGenericTypeMap();
+		// returns the generic type map for a specific type
+		bool GetGenericTypeMap(const std::string_view& structName, std::unordered_map<std::string, std::string>& genericTypeMap);
 
 		// should be called before PopScope in order to free memory allocated on the heap
 		void FreeHeapPointers(llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>& builder);
@@ -75,7 +80,8 @@ namespace AlloyCompiler
 			llvm::Type* Type;
 			std::string_view Name;
 			bool IsStruct;
-			std::unordered_map < std::string_view, StructMemberInfo > StructMembers;
+			std::unordered_map<std::string_view, StructMemberInfo> StructMembers;
+			std::unordered_map<std::string, std::string> genericTypeMap;
 		};
 
 		struct Scope
@@ -83,7 +89,7 @@ namespace AlloyCompiler
 			std::string_view Name;
 			std::unordered_map<std::string, ValueTypePair> Values;
 			std::unordered_map<std::string, TypeInfo> Types;
-			std::unordered_map<llvm::Type*, std::string> TypeNames; // used for error messages
+			std::unordered_map<const llvm::Type*, std::string> TypeNames; // used for error messages
 			std::unordered_map<std::string, std::string> GenericTypeMap;	// this is a map from the generic types to the actual function parameter types
 
 			Scope(const std::string_view& name)

@@ -1,0 +1,6 @@
+extern printf(const fmt: String, ...);
+
+pub fn log_i32(const num: i32)
+{
+	printf("%d", num);
+}

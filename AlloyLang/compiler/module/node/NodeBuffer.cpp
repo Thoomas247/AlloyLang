@@ -2801,13 +2801,28 @@ namespace AlloyCompiler
 			return result;
 		}
 
+		std::string_view alias = "";
+		if (token()->Kind == TokenKind::as_keyword)
+		{
+			(void)eat();
+
+			Token* pAliasToken = nullptr;
+			result = expectKind<TokenKind::identifier, TokenKind::long_identifier>(&pAliasToken);
+			if (result != SUCCESS)
+			{
+				return result;
+			}
+
+			alias = pAliasToken->Value;
+		}
+
 		result = expectKind<TokenKind::semicolon>();
 		if (result != SUCCESS)
 		{
 			return result;
 		}
 
-		m_ImportedModules.push_back(pIdentifierToken->Value);
+		m_ImportedModules[alias].push_back(pIdentifierToken->Value);
 
 		return result;
 	}
@@ -2867,6 +2882,28 @@ namespace AlloyCompiler
 
 			switch (token()->Kind)
 			{
+			case variable_keyword:
+			case constant_keyword:
+			{
+				VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
+
+				if (pVariableDefinition == nullptr)
+				{
+					return false;
+				}
+
+				if (m_AllSymbolNames.contains(pVariableDefinition->pDeclaration->pNameToken->Value))
+				{
+					logErrorAtToken(pVariableDefinition->pDeclaration->pNameToken, "Symbol with name '{0}' already exists in this module.", pVariableDefinition->pDeclaration->pNameToken->Value);
+					return false;
+				}
+
+				m_GlobalVariableDefinitions[std::string(pVariableDefinition->pDeclaration->pNameToken->Value)] = Definition<VARIABLE_DEFINITION>(visibility, pVariableDefinition);
+				m_AllSymbolNames.insert(pVariableDefinition->pDeclaration->pNameToken->Value);
+
+				break;
+			}
+
 			case macro_keyword:
 			{
 				MACRO_DEFINITION* pMacroDefinition = parse<MACRO_DEFINITION>();

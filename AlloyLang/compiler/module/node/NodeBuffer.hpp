@@ -17,6 +17,8 @@ namespace AlloyCompiler
 		template<typename T>
 		using NodeMap = std::unordered_map<std::string, Definition<T>>;
 
+		using ImportedModulesMap = std::unordered_map<std::string_view, std::vector<std::string_view>>;
+
 	public:
 		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::string_view& functionName)
 		{
@@ -43,7 +45,8 @@ namespace AlloyCompiler
 		//
 		// return the mangled name for a type with generic arguments
 		//
-		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::vector<TYPE*>& genericArguments)
+		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::vector<TYPE*>& genericArguments,
+			const std::unordered_map<std::string, std::string>& genericTypeMap)
 		{
 			std::string mangledName(moduleName);
 			if (!mangledName.empty())
@@ -53,8 +56,35 @@ namespace AlloyCompiler
 			if (!genericArguments.empty()) {
 				for (auto& t : genericArguments) {
 					if (t->Type.Is<TYPE_NAME>()) {
-						mangledName = mangledName + "@" + std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value);
+						if (genericTypeMap.contains(std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value)))
+							mangledName = mangledName + "@" + genericTypeMap.at(std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value));
+						else
+							mangledName = mangledName + "@" + std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value);
 					}
+				}
+			}
+
+			return mangledName;
+		}
+
+		//
+		// return the mangled name for a type with generic arguments
+		// Same as the previous function, but now with a vector of GENERIC_PARAMETERs and not TYPEs
+		//
+		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::vector<GENERIC_PARAMETER*>& genericParameters,
+			const std::unordered_map<std::string, std::string>& genericTypeMap)
+		{
+			std::string mangledName(moduleName);
+			if (!mangledName.empty())
+				mangledName += "::";
+			mangledName += std::string(typeName);
+
+			if (!genericParameters.empty()) {
+				for (auto& t : genericParameters) {
+					if (genericTypeMap.contains(std::string(t->pIdentifierToken->Value)))
+						mangledName = mangledName + "@" + genericTypeMap.at(std::string(t->pIdentifierToken->Value));
+					else
+						mangledName = mangledName + "@" + std::string(t->pIdentifierToken->Value);
 				}
 			}
 
@@ -64,7 +94,7 @@ namespace AlloyCompiler
 		NodeBuffer(const Source& source, TokenBuffer& tokenBuffer);
 		bool Parse();
 
-		const std::vector<std::string_view>& GetImportedModules() const
+		const ImportedModulesMap& GetImportedModules() const
 		{
 			return m_ImportedModules;
 		}
@@ -82,6 +112,11 @@ namespace AlloyCompiler
 		const NodeMap<FUNCTION_DEFINITION>& GetFunctionDefinitions() const
 		{
 			return m_FunctionDefinitions;
+		}
+
+		const NodeMap<VARIABLE_DEFINITION>& GetGlobalVariableDefinitions() const
+		{
+			return m_GlobalVariableDefinitions;
 		}
 
 	private:
@@ -170,9 +205,10 @@ namespace AlloyCompiler
 		NodeMap<MACRO_DEFINITION> m_MacroDefinitions;
 		NodeMap<TYPE_DEFINITION> m_TypeDefinitions;
 		NodeMap<FUNCTION_DEFINITION> m_FunctionDefinitions;
+		NodeMap<VARIABLE_DEFINITION> m_GlobalVariableDefinitions;
 
 		std::unordered_set<std::string_view> m_AllSymbolNames;
-		std::vector<std::string_view> m_ImportedModules;
+		ImportedModulesMap m_ImportedModules;
 
 		AnnotationMap m_CurrentAnnotations;
 		size_t m_CurrentTokenIndex;

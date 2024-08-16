@@ -6,7 +6,7 @@ exp type List(type T) = struct
 	arr: *[T; 1],
 };
 
-exp fn List(type T):create(const default: &T, const capacity: u64)
+exp fn List(type T):create(const default: &T, const capacity: u64) -> List(T)
 {
 	return List(T) { capacity = capacity, size = 0, arr = new [default; capacity] };
 }

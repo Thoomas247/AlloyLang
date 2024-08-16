@@ -171,11 +171,12 @@
     <None Include="CGTest.alloy" />
     <None Include="test\Basic\main.alloy" />
     <None Include="test\GenericFunctions\main.alloy" />
-    <None Include="test\MultipleFiles\lib\list.alloy" />
-    <None Include="test\MultipleFiles\main.alloy" />
-    <None Include="test\MultipleFiles\other.alloy" />
+    <None Include="test\MultipleFiles2\lib\log.alloy" />
+    <None Include="test\MultipleFiles2\lib\math.alloy" />
+    <None Include="test\MultipleFiles2\main.alloy" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="AlloyLang.txt" />
     <Text Include="docs\Coding Rules.txt" />
     <Text Include="docs\ECS Outline.txt" />
     <Text Include="docs\Enums.txt" />
@@ -186,6 +187,7 @@
     <Text Include="docs\Node Changes.txt" />
     <Text Include="docs\Parser Issues.txt" />
     <Text Include="SYNTAX.txt" />
+    <Text Include="TODO.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

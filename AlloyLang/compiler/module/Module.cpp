@@ -47,4 +47,9 @@ namespace AlloyCompiler
 	{
 		return getDefinition(m_NodeBuffer.GetFunctionDefinitions(), name);
 	}
+
+	Definition<VARIABLE_DEFINITION> Module::GetGlobalVariableDefinition(const std::string_view& name)
+	{
+		return getDefinition(m_NodeBuffer.GetGlobalVariableDefinitions(), name);
+	}
 }

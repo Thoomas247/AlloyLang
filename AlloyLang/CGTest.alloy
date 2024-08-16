@@ -1,12 +1,16 @@
-extern printf (const str: String, ...) -> i64;
+extern printf (const str : String, ...) -> i32;
 
-
-/* Main */
-
-fn main() -> i64
+type Vector3Of(type T1) = struct
 {
-	var vec : i64 = 0;
-	printf("vec = %d", vec);
-	return 0;
-}
+	x: T1,
+	y: T1,
+	z: T1,
+};
 
+fn main () -> i64
+{
+	var temp : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
+	var temp32 = Vector3Of(i32) { x=1, y=2, z=3 };
+	printf("y = %d", temp32.y);
+	return temp32.y;
+}

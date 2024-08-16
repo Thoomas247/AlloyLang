@@ -122,6 +122,11 @@ namespace unittests
 		{
 			RunTest("../../AlloyLang/test/MultipleFiles/main.alloy", 32 * 43);
 		}
+
+		TEST_METHOD(MultipleFile2)
+		{
+			RunTest("../../AlloyLang/test/MultipleFile2/main.alloy", 32 * 43);
+		}
 	};
 }
 

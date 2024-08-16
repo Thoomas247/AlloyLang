@@ -152,6 +152,20 @@ namespace AlloyCompiler
 		}
 	}
 
+	bool NamedValues::GetGenericTypeMap(const std::string_view& typeName, std::unordered_map<std::string, std::string>& genericTypeMap)
+	{
+		TypeInfo* typeInfo = findType(typeName);
+
+		if (typeInfo)
+		{
+			genericTypeMap = typeInfo->genericTypeMap;
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
 
 	NamedValues::StructMemberInfo NamedValues::GetMemberIndex(const std::string_view& structName, const std::string_view& memberName)
 	{
@@ -172,7 +186,7 @@ namespace AlloyCompiler
 		return it->second;
 	}
 
-	std::string_view NamedValues::GetTypeName(llvm::Type* type)
+	std::string_view NamedValues::GetTypeName(const llvm::Type* type)
 	{
 		// look for the type starting from the current scope and going up
 		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
@@ -189,7 +203,8 @@ namespace AlloyCompiler
 		return "";
 	}
 
-	void NamedValues::InsertType(const std::string& name, llvm::Type* type, bool isStruct, std::unordered_map<std::string_view, StructMemberInfo> structMembers)
+	void NamedValues::InsertType(const std::string& name, llvm::Type* type, bool isStruct, const std::unordered_map<std::string_view, StructMemberInfo>& structMembers,
+		const std::unordered_map<std::string, std::string>& genericTypeMap)
 	{
 		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
 		ASSERT(structMembers.empty() || isStruct, "Struct members can only be added to a struct type.");
@@ -199,6 +214,7 @@ namespace AlloyCompiler
 		typeInfo.Name = name;
 		typeInfo.IsStruct = isStruct;
 		typeInfo.StructMembers = structMembers;
+		typeInfo.genericTypeMap = genericTypeMap;
 
 		m_ScopeStack.back().Types[name] = typeInfo;
 		m_ScopeStack.back().TypeNames[type] = name;
@@ -245,5 +261,4 @@ namespace AlloyCompiler
 	{
 		return m_ScopeStack.back().GenericTypeMap;
 	}
-
 }

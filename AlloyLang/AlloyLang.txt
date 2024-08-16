@@ -1,0 +1,342 @@
+///////////////////////////////////////////////////////////////////////////////////////
+// This document outlines the features already in, or coming to, the Alloy language. //
+///////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////
+// global variables
+////////////////////////
+
+const globalA: i64 = 2;
+var globalB: u32 = 40;
+
+////////////////////////
+// types
+////////////////////////
+
+type A = struct
+{
+    num1: i64,
+    num2: u32,
+};
+
+type B = A;
+
+type C = *[A];
+
+type D = [B; 4];
+
+type E = enum
+{
+    value1,
+    value2: i64,
+    value3: A,
+};
+
+////////////////////////
+// functions
+////////////////////////
+
+fn do_something() -> A
+{
+
+}
+
+fn A:do_something(const self: &Self) // enums can also have member functions!
+{
+
+}
+
+extern printf(const fmt: String, ...);	// cannot be pub or exp!
+
+////////////////////////
+// statements
+////////////////////////
+
+if (globalA == 42)
+{
+   globalA = globalB;
+}
+
+if (enumValue == E|value2) -> val
+{
+    globalA = val;
+}
+
+// TODO: change for loops
+for (var i: u64 = 0; i < 24; i = i + 1)
+{
+    globalA = globalA + 1;
+}
+
+// TODO: change while loops
+while (globalA > 0)
+{
+    globalA = globalA / 2 - 4;
+}
+
+
+switch (globalA)
+{
+    case (2)
+    {
+        globalA = 2 * globalA;
+    }
+
+    else
+    {
+        globalA = 2;
+    }
+}
+
+switch (enumValue)
+{
+    case (E|value1 || E|value3) // cannot capture, value1 and value3 do not have the same payload
+    {
+        
+    }
+    case (E|value2) -> num
+    {
+
+    }
+    // else not required, no other possibilities
+}
+
+////////////////////////
+// arrays
+////////////////////////
+
+var arrA: [u64; 5] = { 1, 2, 3, 4, 5 };              // array of fixed size 5, values set manually
+var arrB: [u64; 4] = [32; 4];                        // array of fixed size 4, values all set to 32
+// stack-allocated arrays cannot be empty!
+
+var arrC: *[A] = new {};                             // array of size 0, currently empty, must be a pointer
+var arrD: *[i64] = new { 1, 2, 3 };                  // array of size 3, values set manually, must be a pointer
+var arrE: *[B] = new [B { num1 = 2, num2 = 4, }; 4]; // array of size 4, values all set to ..., must be a pointer
+
+////////////////////////
+// pointers
+////////////////////////
+
+var ptrA: *u64 = new 3;     // pointer to a heap-allocated u64 containing the value 3
+var ptrB: *u64 = new ptrA;  // pointer to a heap-allocated u64 containing the value 3, copied from ptrA
+var ptrC: *A = move ptrA;   // pointer to the value allocated by ptrA, ptrA now invalid!
+
+// Note: null ptrs are not allowed! to represent 'null', use enums with a payload, eg:
+type Optional(type T) = enum
+{
+    None,
+    Some: T,
+};
+
+type NullablePtr = Optional(u64);
+
+var ptrD: NullablePtr = NullablePtr|None;         // equivalent of nullptr
+var ptrE: NullablePtr = NullablePtr|Some(new 43); // payload is a pointer to a heap-allocated u64 containing the value 43
+
+// like any enum, this forces the user to handle 'null' values with if or switch
+
+////////////////////////
+// references
+////////////////////////
+
+var refA: &A = &ptrC;        // reference to the value pointer to by ptrC
+var refB: &i64 = &globalA;   // reference to globalA
+
+// the only way to change what the reference 'points to' is by using the & operator
+refA = &get_A();
+
+// without the & operator, we are using the value directly
+refA.num1 = 43;
+
+// just like pointers, null references are not allowed and an enum must be used to represent a 'null' reference!
+
+// Note: refrences and pointers themselves cannot be const, var and const refer to the value being pointed to, not to the reference or pointer itself
+
+////////////////////////
+// new loops
+////////////////////////
+
+// while loops and for loops can be used interchangeably in most contexts, so we want to give them each specific use
+
+// for loops should be used to iterate through an iterable type, such as an array
+// the index is optional, and indicates the index of the value we are accessing within the array
+for (value; array; index)
+{
+
+}
+
+for (value; array)
+{
+
+}
+
+// while loops are used to iterate in any other context, such as simply counting up
+// the second statement 'i = i + 2' is optional and runs after each execution of the loop
+// the second statement runs when continue is called, but not when break is called
+var i = 0;
+while (i < 10; i = i + 2)
+{
+
+}
+
+while (i < 10)
+{
+
+}
+
+////////////////////////
+// generics
+////////////////////////
+
+// types and functions can be made generic by adding a list of generic parameters
+type GenericType(type A, type B) = struct
+{
+    val1: A,
+    val2: B,
+};
+
+fn generic_function(type T, var obj: &T)
+{
+
+};
+
+// shorter way of writing the same as above
+fn generic_function_2(var obj: &Any)
+{
+
+};
+
+fn GenericType(type A, type B):generic_function_2(var obj: &Any)
+{
+
+};
+
+////////////////////////
+// function pointers
+////////////////////////
+
+type FunctionPtrTypeA = fn (var &A, const B) -> i64;
+type FunctionPtrTypeB = fn ();
+type FunctionPtrTypeC = fn () -> u32;
+
+fn some_func_A(var &A, const B) -> i64 {}
+fn some_func_B() {}
+fn some_func_C() -> u32 {}
+
+var funcPtrA: FunctionPtrTypeA = some_func_A;             // function pointer using the type defined above
+var funcPtrA2: fn (var &A, const B) -> i64 = some_func_A; // function pointer using the more verbose type
+
+// Note: funcPtrA and funcPtrA2 can both hold the function some_func_A, however, where FunctionPtrTypeA is expected, fn (var &A, const B) -> i64 cannot be used, and vice-versa
+// this is exactly the same as when we define a type A = OtherType; A and OtherType are separate types
+
+const funcPtrB: FunctionPtrTypeB = some_func_B;
+const funcPtrC: FunctionPtrTypeC  = some_func_C;
+
+// var and const work like for normal variables
+funcPtrA = some_other_func_A; // this is allowed
+// funcPtrB = some_other_func_B; // not allowed
+
+// function pointers should not have a reference or pointer modifier
+
+////////////////////////
+// traits
+////////////////////////
+
+// traits specify a list of functions which a type must implement if it implements the trait
+trait Comparable
+{
+    fn compare(const &Self, const &Comparable) -> i32; // no body here!
+    fn compare(const &Comparable, const &Comparable) -> i32; // no body here!
+};
+
+// Note: this trait requires two functions, one member function and one static member function
+// to differentiate between a non-static and static member function, Self is used for non-static functions
+// and the name of the trait ('Comparable' in this case) refers to the type implementing the trait
+
+trait Serializable
+{
+    fn serialize(const &Self) -> *[u8];
+};
+
+// they can also be empty as a way to 'tag' a type
+trait Component;
+
+// these traits can then be used to give a 'type' to generic type parameters
+// type T must implement the Component trait for this to compile!
+fn do_something(type T: Component, const component: &T) {}
+
+// multiple traits can be specified by using &:
+fn do_something_else(type T: Component & Serializable, const component: &T) {}
+
+// this means that type T must implement Component and Serializable to work with this function
+
+// some traits will be defined in the standard library, such as Default and Compare
+
+// traits will also be useable as interfaces, but instead of storing the virtual table on the type, it is stored on the pointer/ref:
+const component: *Component = new SomeComponent {...}; // SomeComponent must implement Component for this to work
+const component2: &Component = &component; // works with references as well
+component:update(); // the Component trait specifies that types should implement update(), so this should work
+component2:update(); // the reference/pointer itself contains the v-table to know which update to call
+
+////////////////////////
+// annotations
+////////////////////////
+
+// annotations can be used to add extra information to a type or function, such as specifying which traits they implement
+#[traits(Component, Serializable)]
+type Transform = struct
+{
+    x: f32,
+    y: f32,
+    z: f32,
+};
+
+// TODO: implement serialize for Serializable trait
+
+////////////////////////
+// macros
+////////////////////////
+
+// macros are functions which run at compile time, and can return information about a type or function
+// they are either built-in to the language, or written by the user
+// parameters can be anything, including types, functions, vars...
+// macro call arguments must be known at compile time, ie @some_macro(2) is allowed, but @some_macro(get_user_input()) is not
+macro @compile_time_list(type T) -> type {}
+macro @get_members(const obj: &Any) -> @compile_time_list(Any) {}
+
+// @compile_time_list returns a type, so we can use it as the return type of @get_members
+
+// for loops which use macros MUST be expandable at compile time!
+// if statements using macros MUST be evaluated at compile time!
+// for example, given the following code:
+var a: A = A { num1 = 0, num2 = 4 };
+for (member; @get_members(A))    // the result of @get_members(A)) is always known at compile time
+{
+    if (@is_basic_type(@type_of(member)))
+    {
+        member:do_something();  // note: if member does not have a function called do_something(), this is an error
+    }
+    else
+    {
+        member:do_something_else();
+    }
+}
+
+// the generated code should be equivalent to: 
+a.num1:do_something();
+a.num2:do_something();
+
+macro @create_component_enum() -> type
+{
+    type result : enum;
+
+    @add_enum_value(result, "None");
+
+    for (component; @get_types_with_annotation("Component"))
+    {
+        @add_enum_value_with_payload(enumType, @get_type_name(component), component);
+    }
+
+    return result;
+}
+

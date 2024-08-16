@@ -80,13 +80,23 @@ namespace AlloyCompiler
 		auto result = getDefinition(fn, name);
 
 		// do not include module name if extern
-		if (result.pDefiniton->pBody == nullptr)
+		if (result.pDefiniton && result.pDefiniton->pBody == nullptr)
 		{
 			result.MangledName = result.pDefiniton->pFunctionNameToken->Value;
 			result.ModuleName = "";
 		}
 
 		return result;
+	}
+
+	SearchResult<VARIABLE_DEFINITION> ModuleTable::GetGlobalVariableDefinition(const std::string_view& name) const
+	{
+		GetDefinitionFn<VARIABLE_DEFINITION> fn = [](Module& module, const std::string_view& name) -> Definition<VARIABLE_DEFINITION>
+			{
+				return module.GetGlobalVariableDefinition(name);
+			};
+
+		return getDefinition(fn, name);
 	}
 
 	FUNCTION_DEFINITION* ModuleTable::GetMainFunction()
