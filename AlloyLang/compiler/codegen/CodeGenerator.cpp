@@ -17,6 +17,9 @@ namespace AlloyCompiler
 
 	struct PtrValuePair
 	{
+		//
+		// structure that contains the pointer to a variable and its value
+		//
 		llvm::Value* Ptr = nullptr;
 		llvm::Value* Value = nullptr;
 		bool isConst = false;	// indicates that we are pointing to constant variables
@@ -89,12 +92,18 @@ namespace AlloyCompiler
 		case llvm::Type::IntegerTyID:
 		{
 			switch (newType->getTypeID()) {
+			//
+			// int to float or double
+			//
 			case llvm::Type::FloatTyID:
 			case llvm::Type::DoubleTyID:
 				value = state.Builder->CreateSIToFP(value, newType);
 				result = true;
 				break;
 
+			//
+			// int to int of another bitsize
+			//
 			case llvm::Type::IntegerTyID:
 				value = state.Builder->CreateIntCast(value, newType, true);
 				result = true;
@@ -110,6 +119,9 @@ namespace AlloyCompiler
 		case llvm::Type::FloatTyID:
 		{
 			switch (newType->getTypeID()) {
+			//
+			// float to double
+			// 
 			case llvm::Type::DoubleTyID:
 				value = state.Builder->CreateFPCast(value, newType);
 				result = true;
@@ -124,6 +136,9 @@ namespace AlloyCompiler
 		case llvm::Type::DoubleTyID:
 		{
 			switch (newType->getTypeID()) {
+			//
+			// double to float
+			//
 			case llvm::Type::FloatTyID:
 				value = state.Builder->CreateFPCast(value, newType);
 				result = true;
@@ -209,7 +224,8 @@ namespace AlloyCompiler
 	llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, llvm::Type* type, int numElements = 0)
 	{
 		//
-		// numElements added for array support
+		// For function definitions, allocate memory for function parameters in the entry block of the function
+		// numElements is the number of elements in an array, not used otherwise
 		//
 		llvm::IRBuilder<> tempBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
 		llvm::Value* elements = nullptr;
@@ -226,6 +242,8 @@ namespace AlloyCompiler
 		//
 		// Helper function to return an llvm type given its type name
 		// Also searches the named nodes if the type has not been defined yet and define it
+		// For generic types, genericArguments and genericTypeMap are used top map the generic type to an actual type (e.g. T to i32)
+		// This function assumes that the current module has been set by the caling function
 		//
 
 		llvm::Type* type = nullptr;
@@ -238,6 +256,7 @@ namespace AlloyCompiler
 			mangledName = genericTypeMap->at(mangledName);
 		}
 
+		// first we search for the basic hard-coded types
 		type = state.NamedValues.GetType(mangledName);
 		if (nullptr == type) {
 
@@ -261,6 +280,7 @@ namespace AlloyCompiler
 				if (nullptr == type) {
 					// if not already defined, try to define it now
 					type = generateTypeDefinition(moduleTable, state, *result.pDefiniton, result.ModuleName, genericArguments);
+					ASSERT(type == state.NamedValues.GetType(mangledName), "Type has been defined with a mangled name different from expected one!");
 				}
 			}
 		}
@@ -281,6 +301,7 @@ namespace AlloyCompiler
 		// Support for generics:
 		// The parameter list "parameters" is needed in order to determine if any parameter is a type
 		// The functionArguments list is needed to know what is the type refered to by the corresponding parameter
+		// On return, typeMap will contain a map from function parameter types to actual types
 		//
 		std::string mangled(moduleName);
 		if (!mangled.empty())
@@ -344,12 +365,12 @@ namespace AlloyCompiler
 			);
 	}
 
-
-	//
-	// Helper function to determine if a function parameter is declared as const
-	//
-	bool isFunctionParameterConst(const FUNCTION_TYPE& functionType, int index) {
-
+	bool isFunctionParameterConst(const FUNCTION_TYPE& functionType, int index)
+	{
+		//
+		// Helper function to determine if a function parameter is declared as const
+		// This function will skip any type parameter as these are not forwarded to llvm
+		//
 		bool result = false;
 		for (int i = 0; i < functionType.Parameters.size(); i++) {
 			const FUNCTION_PARAMETER* parameter = functionType.Parameters[i];
@@ -363,7 +384,7 @@ namespace AlloyCompiler
 			if (i == index) {
 				if (parameter->Is<VARIABLE_DECLARATION>()) {
 					VARIABLE_DECLARATION* pParameterVariableDeclaration = parameter->Get<VARIABLE_DECLARATION>();
-					result = (pParameterVariableDeclaration->VarType == VariableType::Constant);;
+					result = (pParameterVariableDeclaration->VarType == VariableType::Constant);
 				}
 				else {
 					ASSERT(false, "isFunctionParameterConst can only be called on variable parameters and not on types!");
@@ -375,11 +396,11 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	//
-	// Helper function to determine if a function parameter is a type
-	//
-	bool isFunctionParameterGeneric(const FUNCTION_TYPE& functionType, int index) {
-
+	bool isFunctionParameterGeneric(const FUNCTION_TYPE& functionType, int index)
+	{
+		//
+		// Helper function to determine if a function parameter is a type
+		//
 		// for functions with variable parameters, we can only check the known parameters
 		if (functionType.IsVarArg
 			&& index >= functionType.Parameters.size()) {
@@ -402,6 +423,10 @@ namespace AlloyCompiler
 	llvm::Value* generateLiteral(ModuleTable& moduleTable, LLVMState& state, const LITERAL& literalNode,
 								const TypeSubtypePair& identifierType)
 	{
+		//
+		// Convert a literal into an llvm value
+		// identifierType.type can be null, if provided it should contain the expected type
+		//
 		const std::string_view literalStr = literalNode.pValueToken->Value;
 		llvm::Value* result = nullptr;
 
@@ -411,11 +436,13 @@ namespace AlloyCompiler
 			thisType = static_cast<llvm::VectorType*>(thisType)->getElementType();		// for arrays, we want the element type, not the array itself
 		}
 
+		// TODO: allow negative values for ints and floats
+		// in the current implementation, an additional call to the unary "-" is made. This call is removed by the optimizers so there are no adverse effects
+
 		switch (literalNode.Type)
 		{
 		case LiteralType::Integer:
 		{
-			// TODO: allow negative values
 			uint64_t uintValue;
 			int bits = 64;	// default conversion to 64-bit integers
 			if (thisType && thisType->isIntegerTy()) {

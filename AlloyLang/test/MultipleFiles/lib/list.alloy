@@ -3,7 +3,7 @@ exp type List(type T) = struct
 {
 	capacity: u64,
 	size: u64,
-	arr: *[T],
+	arr: *[T; 1],
 };
 
 exp fn List(type T):create(const default: &T, const capacity: u64)
