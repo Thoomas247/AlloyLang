@@ -613,7 +613,7 @@ namespace AlloyCompiler
 		// handle array types
 		else
 		{
-			ASSERT(typeIdentifier.Type.Is<ARRAY_TYPE>(), "Expected type identifier node!");
+			ASSERT(typeIdentifier.Type.Is<ARRAY_TYPE>(), "Expected array type!");
 
 			uint64_t arraySize = 0;
 			const ARRAY_TYPE& type = *typeIdentifier.Type.Get<ARRAY_TYPE>();
@@ -2341,6 +2341,28 @@ namespace AlloyCompiler
 				logErrorAtCurrentPosition(typeIdentifier.pNameToken,
 					"Invalid structure member type for structure '{0}'!", structName);
 				goto failed;
+			}
+
+			switch (modifier) {
+			case TypeModifier::None:
+				break;
+
+			case TypeModifier::Pointer:
+			case TypeModifier::Reference:
+			{
+				// allocating a pointer to this type
+				identifierType.containedType = identifierType.type;
+				identifierType.type = llvm::PointerType::get(identifierType.containedType, 0);	// the contained type is not stored by llvm as all pointers are treated as "opaque"
+				break;
+			}
+
+			default:
+			{
+				ASSERT(false, "Invalid type modifier!");
+				identifierType = { nullptr, nullptr };
+				goto failed;
+				break;
+			}
 			}
 
 			memberTypes.push_back(identifierType.type);
