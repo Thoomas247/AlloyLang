@@ -120,12 +120,12 @@ namespace unittests
 
 		TEST_METHOD(MultipleFiles)
 		{
-			RunTest("../../AlloyLang/test/MultipleFiles/main.alloy", 32 * 43);
+			RunTest("../../AlloyLang/test/MultipleFiles/main.alloy", 32 * 45);
 		}
 
-		TEST_METHOD(MultipleFile2)
+		TEST_METHOD(MultipleFiles2)
 		{
-			RunTest("../../AlloyLang/test/MultipleFile2/main.alloy", 32 * 43);
+			RunTest("../../AlloyLang/test/MultipleFiles2/main.alloy", 3);
 		}
 	};
 }

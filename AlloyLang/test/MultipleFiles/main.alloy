@@ -4,12 +4,12 @@ extern printf (const str: String, ...) -> i64;
 
 fn main() -> i64
 {
-	var list: List(i32) = List(i32):create();
+	var list: List(i32) = List(i32):create(0, 10);
 
 	list:add(32);
 	list:add(45);
 
-	printf("list.arr[1] = %d", list.arr[1]);
+	printf("list.arr[0] = %d, list.arr[1] = %d, result = %d", list.arr[0], list.arr[1], list.arr[0] * list.arr[1]);
 
-	return list.arr[1];
+	return list.arr[0] * list.arr[1];
 }
