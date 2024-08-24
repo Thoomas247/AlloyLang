@@ -12,7 +12,7 @@ namespace AlloyCompiler
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, llvm::Type* parentType, const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName,
 		const std::vector<EXPRESSION*>& functionArguments, std::unordered_map<std::string, std::string>& typeMap);
 	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::string& moduleName,
-		const std::vector<TYPE*>& genericArguments, const std::vector<GENERIC_PARAMETER*>& genericParameters);
+		const std::vector<TYPE*>& genericArguments);
 	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& externDefinition, const std::string& moduleName);
 
 #pragma region Util
@@ -239,7 +239,6 @@ namespace AlloyCompiler
 
 	llvm::Type* getTypeFromTypeName(ModuleTable& moduleTable, LLVMState& state, Token* pNameToken,
 		const std::vector<TYPE*>& genericArguments,
-		const std::vector<GENERIC_PARAMETER*>& genericParameters,
 		const std::unordered_map<std::string, std::string>& genericTypeMap)
 	{
 		//
@@ -251,9 +250,6 @@ namespace AlloyCompiler
 
 		llvm::Type* type = nullptr;
 		std::string mangledName(pNameToken->Value);
-
-		// For generic types, the generic parameters can be either simple tokens (GENERIC_PARAMETER) or a TYPE, but not both
-		ASSERT(genericArguments.size() == 0 || genericParameters.size() == 0, "Only a vector of TYPEs or a vector of GENERIC_PARAMETERs is allowed, not both");
 
 		// if we have a type map that contains the requested type, retrieve the actual type, e.g. T might be an i32
 		if (genericTypeMap.contains(mangledName))
@@ -278,15 +274,12 @@ namespace AlloyCompiler
 			}
 			else
 			{
-				if (genericArguments.size() + genericParameters.size() != result.pDefiniton->pTypeIdentifier->GenericParameters.size()) {
+				if (genericArguments.size() != result.pDefiniton->pTypeIdentifier->GenericParameters.size()) {
 					logErrorAtCurrentPosition(pNameToken, "Invalid number of parameters for generic type {0}!", mangledName);
 					goto failed;
 				}
 
-				if (genericArguments.size() == 0)
-					mangledName = NodeBuffer::GetMangledName("", result.MangledName, genericParameters, genericTypeMap);
-				else
-					mangledName = NodeBuffer::GetMangledName("", result.MangledName, genericArguments, genericTypeMap);
+				mangledName = NodeBuffer::GetMangledName("", result.MangledName, genericArguments, genericTypeMap);
 
 				// now check if this type has already been defined
 				type = state.NamedValues.GetType(mangledName);
@@ -294,7 +287,7 @@ namespace AlloyCompiler
 				// if not already defined, try to define it now
 				if (nullptr == type) {
 					// if not already defined, try to define it now
-					type = generateTypeDefinition(moduleTable, state, *result.pDefiniton, result.ModuleName, genericArguments, genericParameters);
+					type = generateTypeDefinition(moduleTable, state, *result.pDefiniton, result.ModuleName, genericArguments);
 					ASSERT(type == state.NamedValues.GetType(mangledName), "Type has been defined with a mangled name different from expected one!");
 				}
 			}
@@ -600,7 +593,7 @@ namespace AlloyCompiler
 				pNameToken = pParentTypeNameToken;
 			}
 
-			identifierType.type = getTypeFromTypeName(moduleTable, state, pNameToken, typeName.GenericArguments, {}, genericTypeMap);
+			identifierType.type = getTypeFromTypeName(moduleTable, state, pNameToken, typeName.GenericArguments, genericTypeMap);
 
 			if (!identifierType.type)
 			{
@@ -914,7 +907,7 @@ namespace AlloyCompiler
 		// search for the struct definition in the module table
 		std::string structName;
 		std::unordered_map<std::string, std::string> genericTypeMap = state.NamedValues.GetGenericTypeMap();
-		llvm::Type* type = getTypeFromTypeName(moduleTable, state, constructorExpression.pType->pNameToken, constructorExpression.pType->GenericArguments, {}, genericTypeMap);
+		llvm::Type* type = getTypeFromTypeName(moduleTable, state, constructorExpression.pType->pNameToken, constructorExpression.pType->GenericArguments, genericTypeMap);
 
 		if (!type || type->getTypeID() != llvm::Type::StructTyID)
 		{
@@ -941,7 +934,7 @@ namespace AlloyCompiler
 			// get the name of the member to initialize
 			const std::string_view memberName = constructorExpression.Arguments[i].first->Value;
 
-			NamedValues::StructMemberInfo memberInfo = state.NamedValues.GetMemberIndex(structName, memberName);
+			NamedValues::TypeMemberInfo memberInfo = state.NamedValues.GetMemberIndex(structName, memberName);
 
 			if (memberInfo.memberIndex == -1)
 			{
@@ -1325,7 +1318,7 @@ namespace AlloyCompiler
 		const std::string_view structName = structType->getName();
 
 		// get the index of the member
-		NamedValues::StructMemberInfo memberInfo = state.NamedValues.GetMemberIndex(structName, memberName);
+		NamedValues::TypeMemberInfo memberInfo = state.NamedValues.GetMemberIndex(structName, memberName);
 
 		if (memberInfo.memberIndex == -1)
 		{
@@ -1364,6 +1357,21 @@ namespace AlloyCompiler
 		expectedType.containedType = memberInfo.containedType;
 
 		return left;
+	}
+
+	PtrValuePair generateEnumValue(ModuleTable& moduleTable, LLVMState& state, const ENUM_VALUE& enumValueExpression,
+		TypeSubtypePair& expectedType)
+	{
+		const std::string_view memberName = enumValueExpression.pEnumValueNameToken->Value;
+		const std::string_view enumName = enumValueExpression.pEnumName->pNameToken->Value;
+
+		llvm::Type* type = getTypeFromTypeName(moduleTable, state, enumValueExpression.pEnumName->pNameToken, enumValueExpression.pEnumName->GenericArguments, {});
+
+		// return the type and subtype of the structure element to the caller
+		// expectedType.type = memberType;
+		// expectedType.containedType = memberInfo.containedType;
+
+		return {};
 	}
 
 	llvm::Value* generateFunctionCallExpression(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
@@ -1414,7 +1422,7 @@ namespace AlloyCompiler
 			}
 			else {
 				type = getTypeFromTypeName(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->pNameToken,
-					functionCallExpressionNode.pTypeOrVariableName->GenericArguments, {}, typeMap);
+					functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap);
 				if (type != nullptr) {
 					// static member function call
 					mangledName = NodeBuffer::GetMangledName("", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value, functionName);
@@ -1829,6 +1837,9 @@ namespace AlloyCompiler
 		}
 		else if (primary.Is<ENCLOSED_EXPRESSION>()) {
 			result = generateEnclosedExpression(moduleTable, state, *primary.Get<ENCLOSED_EXPRESSION>(), expectedType);
+		}
+		else if (primary.Is<ENUM_VALUE>()) {
+			result = generateEnumValue(moduleTable, state, *primary.Get<ENUM_VALUE>(), expectedType).Value;
 		}
 		else {
 			ASSERT(false, "Unknown primary expression node kind!");
@@ -2332,18 +2343,14 @@ namespace AlloyCompiler
 	}
 
 	llvm::Type* generateStructDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
-		const STRUCT_TYPE& structDefinition, const std::vector<TYPE*>& genericArguments,
-		const std::vector<GENERIC_PARAMETER*>& genericParameters
+		const STRUCT_TYPE& structDefinition, const std::vector<TYPE*>& genericArguments
 	)
 	{
 		llvm::StructType* structType = nullptr;
 		int memberIndex, arg;
 		std::vector<llvm::Type*> memberTypes;
-		std::unordered_map<std::string_view, NamedValues::StructMemberInfo> memberNames;
+		std::unordered_map<std::string_view, NamedValues::TypeMemberInfo> memberNames;
 		std::unordered_map<std::string, std::string> genericTypeMap;
-
-		// For generic types, the generic parameters can be either simple tokens (GENERIC_PARAMETER) or a TYPE, but not both
-		ASSERT(genericArguments.size() == 0 || genericParameters.size() == 0, "Only a vector of TYPEs or a vector of GENERIC_PARAMETERs is allowed, not both");
 
 		// create the map from the structure's generic types to the actual types requested by the caller
 		arg = 0;
@@ -2357,12 +2364,9 @@ namespace AlloyCompiler
 
 		// create mangled structure name (if needed)
 		std::string structName;
-		if (genericArguments.size() > 0)
-			structName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeIdentifier.pNameToken->Value, genericArguments, genericTypeMap);
-		else
-			structName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeIdentifier.pNameToken->Value, genericParameters, genericTypeMap);
+		structName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeIdentifier.pNameToken->Value, genericArguments, genericTypeMap);
 
-		if ((genericArguments.size() + genericParameters.size()) != typeIdentifier.GenericParameters.size())
+		if (genericArguments.size() != typeIdentifier.GenericParameters.size())
 		{
 			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
 				"Invalid number of arguments for generic type '{0}'!", structName);
@@ -2424,11 +2428,109 @@ namespace AlloyCompiler
 			goto failed;
 		}
 
-		state.NamedValues.InsertType(structName, structType, true, // isStruct
+		state.NamedValues.InsertType(structName, structType, NamedValues::UserDefinedType::structure,
 			memberNames, genericTypeMap);
 
 	failed:
 		return structType;
+	}
+
+	llvm::Type* generateEnumDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
+		const ENUM_TYPE& enumDefinition, const std::vector<TYPE*>& genericArguments
+	)
+	{
+		//
+		// In order to support payloads and generics in enumerations, we are processing and storing them in a way very similar to structures
+		//
+		llvm::StructType* enumType = nullptr;
+		int memberIndex, arg;
+		std::vector<llvm::Type*> memberTypes;
+		std::unordered_map<std::string_view, NamedValues::TypeMemberInfo> memberNames;
+		std::unordered_map<std::string, std::string> genericTypeMap;
+
+		// create the map from the enum's generic types to the actual types requested by the caller
+		arg = 0;
+		if (genericArguments.size())
+			for (auto& type : typeIdentifier.GenericParameters) {
+				if (genericArguments[arg]->Type.Is<TYPE_NAME>()) {
+					genericTypeMap[std::string(type->pIdentifierToken->Value)] = genericArguments[arg]->Type.Get<TYPE_NAME>()->pNameToken->Value;
+				}
+				arg++;
+			}
+
+		// create mangled enum name (if needed)
+		std::string enumName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeIdentifier.pNameToken->Value, genericArguments, genericTypeMap);
+
+		if (genericArguments.size() != typeIdentifier.GenericParameters.size())
+		{
+			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+				"Invalid number of arguments for generic type '{0}'!", enumName);
+			goto failed;
+		}
+
+		// get a vector of member types
+		memberIndex = 0;
+		for (auto id : enumDefinition.Members)
+		{
+			TypeModifier modifier = TypeModifier::None;
+			TypeSubtypePair identifierType = { nullptr, nullptr };
+			if (id.second != nullptr) {
+				identifierType = generateTypeIdentifier(moduleTable, state, *id.second, nullptr, modifier, genericTypeMap);
+
+				if (!identifierType.type)
+				{
+					logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+						"Invalid enum member type for enum '{0}'!", enumName);
+					goto failed;
+				}
+
+				switch (modifier) {
+				case TypeModifier::None:
+					break;
+
+				case TypeModifier::Pointer:
+				case TypeModifier::Reference:
+				{
+					// allocating a pointer to this type, unless it is already a pointer
+					if (!llvm::isa<llvm::PointerType>(identifierType.type)) {
+						identifierType.containedType = identifierType.type;
+						identifierType.type = llvm::PointerType::get(identifierType.containedType, 0);	// the contained type is not stored by llvm as all pointers are treated as "opaque"
+					}
+					break;
+				}
+
+				default:
+				{
+					ASSERT(false, "Invalid type modifier!");
+					identifierType = { nullptr, nullptr };
+					goto failed;
+					break;
+				}
+				}
+
+				memberTypes.push_back(identifierType.type);
+			}
+
+			// retrieve member name and add it to memberNames map
+			const std::string_view memberName = id.first->Value;
+
+			memberNames[memberName] = { memberIndex++, identifierType.containedType };
+		}
+
+		enumType = llvm::StructType::create(*state.Context, memberTypes, enumName);
+
+		if (!enumType)
+		{
+			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+				"Invalid enum type for enum '{0}'!", enumName);
+			goto failed;
+		}
+
+		state.NamedValues.InsertType(enumName, enumType, NamedValues::UserDefinedType::enumeration,
+			memberNames, genericTypeMap);
+
+	failed:
+		return enumType;
 	}
 
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state,
@@ -2591,25 +2693,21 @@ namespace AlloyCompiler
 
 	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state,
 		const TYPE_DEFINITION& typeDefinition, const std::string& moduleName,
-		const std::vector<TYPE*>& genericArguments,
-		const std::vector<GENERIC_PARAMETER*>& genericParameters
+		const std::vector<TYPE*>& genericArguments
 	)
 	{
 		moduleTable.PushContext(moduleName);
-
-		// For generic types, the generic parameters can be either simple tokens (GENERIC_PARAMETER) or a TYPE, but not both
-		ASSERT(genericArguments.size() == 0 || genericParameters.size() == 0, "Only a vector of TYPEs or a vector of GENERIC_PARAMETERs is allowed, not both");
 
 		llvm::Type* result = nullptr;
 
 		if (typeDefinition.pType->Type.Is<STRUCT_TYPE>()) {
 			const STRUCT_TYPE& structType = *typeDefinition.pType->Type.Get<STRUCT_TYPE>();
-			result = generateStructDefinition(moduleTable, state, *typeDefinition.pTypeIdentifier, structType, genericArguments, genericParameters);
+			result = generateStructDefinition(moduleTable, state, *typeDefinition.pTypeIdentifier, structType, genericArguments);
 		}
 		else if (typeDefinition.pType->Type.Is<TYPE_NAME>()) {
 			const TYPE_NAME* typeName = typeDefinition.pType->Type.Get<TYPE_NAME>();
 
-			result = getTypeFromTypeName(moduleTable, state, typeName->pNameToken, typeName->GenericArguments, {}, {});
+			result = getTypeFromTypeName(moduleTable, state, typeName->pNameToken, typeName->GenericArguments, {});
 
 			// insert the new type (which is a copy of the type it refers to) into the namedValues of the current scope
 			if (result != nullptr) {
@@ -2617,14 +2715,21 @@ namespace AlloyCompiler
 				SearchResult<TYPE_DEFINITION> secondTypeDefinition = moduleTable.GetTypeDefinition(typeDefinition.pTypeIdentifier->pNameToken->Value);
 				bool isStruct = result->isStructTy();
 				if (isStruct) {
-					std::unordered_map<std::string_view, NamedValues::StructMemberInfo> structMembers;
+					std::unordered_map<std::string_view, NamedValues::TypeMemberInfo> structMembers;
 					state.NamedValues.GetStructMembers(state.NamedValues.GetTypeName(result), structMembers);
-					state.NamedValues.InsertType(secondTypeDefinition.MangledName, result, true, structMembers);
+					state.NamedValues.InsertType(secondTypeDefinition.MangledName, result, NamedValues::UserDefinedType::structure, structMembers);
+				}
+				else if (secondTypeDefinition.pDefiniton->pType->Type.Is<ENUM_TYPE>()) {
+					state.NamedValues.InsertType(secondTypeDefinition.MangledName, result, NamedValues::UserDefinedType::enumeration);
 				}
 				else {
-					state.NamedValues.InsertType(secondTypeDefinition.MangledName, result, false);
+					state.NamedValues.InsertType(secondTypeDefinition.MangledName, result, NamedValues::UserDefinedType::basic);
 				}
 			}
+		}
+		else if (typeDefinition.pType->Type.Is<ENUM_TYPE>()) {
+			const ENUM_TYPE& enumType = *typeDefinition.pType->Type.Get<ENUM_TYPE>();
+			result = generateEnumDefinition(moduleTable, state, *typeDefinition.pTypeIdentifier, enumType, genericArguments);
 		}
 		else {
 			ASSERT(false, "Type definition not implemented!");

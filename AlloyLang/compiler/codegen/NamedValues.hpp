@@ -45,22 +45,30 @@ namespace AlloyCompiler
 		void InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit);
 		bool RemoveValue(const std::string& name);
 
-		struct StructMemberInfo
+		//
+		// this structure contains additional member information for structure and enum types
+		//
+		struct TypeMemberInfo
 		{
 			int memberIndex;
-			llvm::Type* containedType;	// for pointer types only
+			llvm::Type* containedType;	// for structures : contains the underlying type for pointer types which are are store by llvm
+										// for enums : contains the type of the optional payload associated to the element
 		};
 
 		llvm::Type* GetType(const std::string_view& name);
 		/// <summary>
 		/// Returns -1 if the struct does not exist, -2 if the member does not exist.
 		/// </summary>
-		NamedValues::StructMemberInfo GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
+		NamedValues::TypeMemberInfo GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
 		std::string_view GetTypeName(const llvm::Type* type);
 
-		void InsertType(const std::string& name, llvm::Type* type, bool isStruct, const std::unordered_map<std::string_view, StructMemberInfo>& structMembers = {},
-			const std::unordered_map<std::string, std::string>& genericTypeMap = {});
-		bool GetStructMembers(const std::string_view& structName, std::unordered_map<std::string_view, StructMemberInfo>& structMembers);
+		typedef enum { basic = 0, structure = 1, enumeration = 2 } UserDefinedType;
+		void InsertType(const std::string& name, llvm::Type* type, UserDefinedType userDefinedType, 
+			const std::unordered_map<std::string_view, TypeMemberInfo>& memberInfo = {},
+			const std::unordered_map<std::string, std::string>& genericTypeMap = {}
+			);
+		bool GetStructMembers(const std::string_view& structName, std::unordered_map<std::string_view, TypeMemberInfo>& structMembers);
+		bool GetEnumMembers(const std::string_view& enumName, std::unordered_map<std::string_view, TypeMemberInfo>& enumMembers);
 
 		// support for generic function parameters
 		std::string GetGenericType(const std::string& typeName);
@@ -79,8 +87,8 @@ namespace AlloyCompiler
 		{
 			llvm::Type* Type;
 			std::string_view Name;
-			bool IsStruct;
-			std::unordered_map<std::string_view, StructMemberInfo> StructMembers;
+			UserDefinedType userDefinedType;
+			std::unordered_map<std::string_view, TypeMemberInfo> memberInfo;
 			std::unordered_map<std::string, std::string> genericTypeMap;
 		};
 

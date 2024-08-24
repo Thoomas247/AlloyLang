@@ -21,23 +21,23 @@ namespace AlloyCompiler
 	void NamedValues::RegisterDefaultTypes(llvm::LLVMContext& llvmContext)
 	{
 		// TODO: remove
-		InsertType("String", llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0), false); // convert string to u8*
+		InsertType("String", llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0), UserDefinedType::basic); // convert string to u8*
 
 		// insert the default types
-		InsertType("bool", llvm::Type::getInt1Ty(llvmContext), false);
+		InsertType("bool", llvm::Type::getInt1Ty(llvmContext), UserDefinedType::basic);
 
-		InsertType("i8", llvm::Type::getInt8Ty(llvmContext), false);
-		InsertType("i16", llvm::Type::getInt16Ty(llvmContext), false);
-		InsertType("i32", llvm::Type::getInt32Ty(llvmContext), false);
-		InsertType("i64", llvm::Type::getInt64Ty(llvmContext), false);
+		InsertType("i8", llvm::Type::getInt8Ty(llvmContext), UserDefinedType::basic);
+		InsertType("i16", llvm::Type::getInt16Ty(llvmContext), UserDefinedType::basic);
+		InsertType("i32", llvm::Type::getInt32Ty(llvmContext), UserDefinedType::basic);
+		InsertType("i64", llvm::Type::getInt64Ty(llvmContext), UserDefinedType::basic);
 
-		InsertType("u8", llvm::Type::getInt8Ty(llvmContext), false);
-		InsertType("u16", llvm::Type::getInt16Ty(llvmContext), false);
-		InsertType("u32", llvm::Type::getInt32Ty(llvmContext), false);
-		InsertType("u64", llvm::Type::getInt64Ty(llvmContext), false);
+		InsertType("u8", llvm::Type::getInt8Ty(llvmContext), UserDefinedType::basic);
+		InsertType("u16", llvm::Type::getInt16Ty(llvmContext), UserDefinedType::basic);
+		InsertType("u32", llvm::Type::getInt32Ty(llvmContext), UserDefinedType::basic);
+		InsertType("u64", llvm::Type::getInt64Ty(llvmContext), UserDefinedType::basic);
 
-		InsertType("f32", llvm::Type::getFloatTy(llvmContext), false);
-		InsertType("f64", llvm::Type::getDoubleTy(llvmContext), false);
+		InsertType("f32", llvm::Type::getFloatTy(llvmContext), UserDefinedType::basic);
+		InsertType("f64", llvm::Type::getDoubleTy(llvmContext), UserDefinedType::basic);
 	}
 
 	void NamedValues::PushScope(const std::string_view& name)
@@ -137,13 +137,28 @@ namespace AlloyCompiler
 		return nullptr;
 	}
 
-	bool NamedValues::GetStructMembers(const std::string_view& structName, std::unordered_map<std::string_view, NamedValues::StructMemberInfo>& structMembers)
+	bool NamedValues::GetStructMembers(const std::string_view& structName, std::unordered_map<std::string_view, NamedValues::TypeMemberInfo>& structMembers)
 	{
 		TypeInfo* typeInfo = findType(structName);
 
-		if (typeInfo && typeInfo->IsStruct)
+		if (typeInfo && typeInfo->userDefinedType == structure)
 		{
-			structMembers = typeInfo->StructMembers;
+			structMembers = typeInfo->memberInfo;
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	bool NamedValues::GetEnumMembers(const std::string_view& enumName, std::unordered_map<std::string_view, NamedValues::TypeMemberInfo>& enumPayloadMap)
+	{
+		TypeInfo* typeInfo = findType(enumName);
+
+		if (typeInfo && typeInfo->userDefinedType == enumeration)
+		{
+			enumPayloadMap = typeInfo->memberInfo;
 			return true;
 		}
 		else
@@ -167,18 +182,18 @@ namespace AlloyCompiler
 		}
 	}
 
-	NamedValues::StructMemberInfo NamedValues::GetMemberIndex(const std::string_view& structName, const std::string_view& memberName)
+	NamedValues::TypeMemberInfo NamedValues::GetMemberIndex(const std::string_view& structName, const std::string_view& memberName)
 	{
 		TypeInfo* typeInfo = findType(structName);
 
-		if (!typeInfo || !typeInfo->IsStruct)
+		if (!typeInfo || !typeInfo->userDefinedType == UserDefinedType::structure)
 		{
 			return { -1, nullptr };
 		}
 
-		auto it = typeInfo->StructMembers.find(memberName);
+		auto it = typeInfo->memberInfo.find(memberName);
 
-		if (it == typeInfo->StructMembers.end())
+		if (it == typeInfo->memberInfo.end())
 		{
 			return { -2, nullptr };
 		}
@@ -203,17 +218,19 @@ namespace AlloyCompiler
 		return "";
 	}
 
-	void NamedValues::InsertType(const std::string& name, llvm::Type* type, bool isStruct, const std::unordered_map<std::string_view, StructMemberInfo>& structMembers,
-		const std::unordered_map<std::string, std::string>& genericTypeMap)
+	void NamedValues::InsertType(const std::string& name, llvm::Type* type, UserDefinedType userDefinedType,
+		const std::unordered_map<std::string_view, TypeMemberInfo>& memberInfo,
+		const std::unordered_map<std::string, std::string>& genericTypeMap
+		)
 	{
 		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
-		ASSERT(structMembers.empty() || isStruct, "Struct members can only be added to a struct type.");
+		ASSERT(memberInfo.empty() || userDefinedType == UserDefinedType::structure || userDefinedType == UserDefinedType::enumeration, "Struct and enum members can only be added to a struct or enum type.");
 
 		TypeInfo typeInfo;
 		typeInfo.Type = type;
 		typeInfo.Name = name;
-		typeInfo.IsStruct = isStruct;
-		typeInfo.StructMembers = structMembers;
+		typeInfo.userDefinedType = userDefinedType;
+		typeInfo.memberInfo = memberInfo;
 		typeInfo.genericTypeMap = genericTypeMap;
 
 		m_ScopeStack.back().Types[name] = typeInfo;
