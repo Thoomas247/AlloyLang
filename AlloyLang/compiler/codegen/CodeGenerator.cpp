@@ -1,4 +1,5 @@
 #include "CodeGenerator.hpp"
+#include "LibraryFunctions.hpp"
 
 namespace AlloyCompiler
 {
@@ -934,18 +935,18 @@ namespace AlloyCompiler
 			// get the name of the member to initialize
 			const std::string_view memberName = constructorExpression.Arguments[i].first->Value;
 
-			NamedValues::TypeMemberInfo memberInfo = state.NamedValues.GetMemberIndex(structName, memberName);
+			NamedValues::TypeMemberInfo memberInfo = state.NamedValues.GetStructMemberIndex(structName, memberName);
 
 			if (memberInfo.memberIndex == -1)
 			{
-				logErrorAtCurrentPosition(nullptr, // constructorExpressionNode.MemberIdentifierIDs[i]
+				logErrorAtCurrentPosition(constructorExpression.pType->pNameToken,
 					"Type '{0}' is not a struct!", structName);
 				return nullptr;
 			}
 
 			if (memberInfo.memberIndex == -2)
 			{
-				logErrorAtCurrentPosition(nullptr, // constructorExpressionNode.MemberIdentifierIDs[i]
+				logErrorAtCurrentPosition(constructorExpression.pType->pNameToken,
 					"Struct '{0}' does not have a member '{1}'!", structName, memberName);
 				return nullptr;
 			}
@@ -1318,7 +1319,7 @@ namespace AlloyCompiler
 		const std::string_view structName = structType->getName();
 
 		// get the index of the member
-		NamedValues::TypeMemberInfo memberInfo = state.NamedValues.GetMemberIndex(structName, memberName);
+		NamedValues::TypeMemberInfo memberInfo = state.NamedValues.GetStructMemberIndex(structName, memberName);
 
 		if (memberInfo.memberIndex == -1)
 		{
@@ -1362,16 +1363,88 @@ namespace AlloyCompiler
 	PtrValuePair generateEnumValue(ModuleTable& moduleTable, LLVMState& state, const ENUM_VALUE& enumValueExpression,
 		TypeSubtypePair& expectedType)
 	{
+		//
+		// Given an expression such as EnumType|ValueA(43), this function will return:
+		//		- The type of the enum in expectedType
+		//		- The index of the enum value and the payload in the Value member of PtrValuePair as a structure with 2 values
+		//		- The type of the payload in containedType
+		//
 		const std::string_view memberName = enumValueExpression.pEnumValueNameToken->Value;
-		const std::string_view enumName = enumValueExpression.pEnumName->pNameToken->Value;
+		std::string_view enumName = enumValueExpression.pEnumName->pNameToken->Value;
+		NamedValues::TypeMemberInfo memberInfo;
+		int memberIndex = -1;
+		PtrValuePair result = {};
+		llvm::Value* memberPtr = nullptr;
+		std::vector<llvm::Value*> indices = getGEPIndex(state, 0);
 
 		llvm::Type* type = getTypeFromTypeName(moduleTable, state, enumValueExpression.pEnumName->pNameToken, enumValueExpression.pEnumName->GenericArguments, {});
 
-		// return the type and subtype of the structure element to the caller
-		// expectedType.type = memberType;
-		// expectedType.containedType = memberInfo.containedType;
+		if (nullptr == type) {
+			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken, "Type {0} not found!", enumValueExpression.pEnumName->pNameToken->Value);
+			goto failed;
+		}
 
-		return {};
+		// get the mangled name
+		enumName = state.NamedValues.GetTypeName(type);
+
+		memberInfo = state.NamedValues.GetEnumMemberIndex(enumName, memberName);
+		if (memberInfo.memberIndex == -1)
+		{
+			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+				"Type '{0}' is not an enum!", enumName);
+			goto failed;
+		}
+
+		if (memberInfo.memberIndex == -2)
+		{
+			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+				"Enum '{0}' does not have a member '{1}'!", enumName, memberName);
+			goto failed;
+		}
+
+		if (nullptr == memberInfo.containedType && enumValueExpression.pPayloadValue != nullptr) {
+			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+				"Payload specified for enum member '{0}' when member cannot have a payload!", memberName);
+			goto failed;
+		}
+
+		// set the type that we are expecting in return
+		expectedType.type = type;
+		expectedType.containedType = memberInfo.containedType;	// this is the type of payload, can be null
+		
+		// create an alloca to a structure of type EnumPayloadStruct
+		// and fill the structure with the enum index and payload value if any
+		result.Ptr = createEntryBlockAlloca(
+			state.Builder->GetInsertBlock()->getParent(),
+			"",
+			state.NamedValues.EnumPayloadStruct
+		);
+		// convert our index to the format required by llvm
+		indices = getGEPIndex(state, 0);
+		memberPtr = state.Builder->CreateGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, indices);
+		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberIndex, false)), memberPtr, "savepayload");
+
+		if (enumValueExpression.pPayloadValue != nullptr) {
+			// compute the value of the payload
+			TypeSubtypePair expressionType = { expectedType.containedType, nullptr };
+			llvm::Value* expressionVal = generateExpression(moduleTable, state, *enumValueExpression.pPayloadValue, expressionType);
+
+			if (!expressionVal)
+			{
+				logErrorAtCurrentPosition(enumValueExpression.pEnumValueNameToken,
+					"Error evaluating '{0}.{1}'!", enumName, memberName);
+				goto failed;
+			}
+
+			indices = getGEPIndex(state, 1);
+			memberPtr = state.Builder->CreateGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, indices);
+			state.Builder->CreateStore(expressionVal, memberPtr, "savepayload");
+		}
+
+	result.Value = state.Builder->CreateLoad(state.NamedValues.EnumPayloadStruct, result.Ptr, "loadpayload");
+
+failed:
+		return result;
 	}
 
 	llvm::Value* generateFunctionCallExpression(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
@@ -1645,9 +1718,48 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
+		std::string_view operatorStr = binaryExpressionNode.pOpToken->Value;
 		bool isFloatingPoint = leftType->isFloatingPointTy();
 
-		std::string_view operatorStr = binaryExpressionNode.pOpToken->Value;
+		// for structures or enums, llvm does not support comparing their values. Use our own procedure for comparison
+		// and only equal and not equal operators are supported
+		if (leftType->isStructTy()) {
+			if (operatorStr != "==" && operatorStr != "!=") {
+				logErrorAtCurrentPosition(nullptr, // TBD: nodeID
+					"Binary operator cannot be applied to structure or enum types! Current type is '{0}'.",
+					state.NamedValues.GetTypeName(leftType));
+				return nullptr;
+
+			}
+			else {
+				// retrieve the StructCompare library function
+				llvm::Function* structCompare = generateStructureComparisonFunction(moduleTable, state);
+				if (structCompare != nullptr) {
+					std::vector<llvm::Value*> args;
+					llvm::AllocaInst* p1 = state.Builder->CreateAlloca(leftType);
+					state.Builder->CreateStore(rightVal, p1);
+					llvm::AllocaInst* p2 = state.Builder->CreateAlloca(rightType);
+					state.Builder->CreateStore(rightVal, p2);
+					args.push_back(p1);
+					// a very convulated way of getting the size of the structure
+					args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, (size_t)state.Module->getDataLayout().getTypeAllocSize(leftType))));
+					args.push_back(p2);
+					args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, (size_t)state.Module->getDataLayout().getTypeAllocSize(rightType))));
+					llvm::Value* result = state.Builder->CreateCall(structCompare, args);
+
+					// for the not equal operator, invert the result
+					if (operatorStr == "!=") {
+						result = state.Builder->CreateNot(result);
+					}
+
+					return result;
+				}
+				else {
+					ASSERT(false, "Something is wrong in the library function " StructCompareFunctionName "!");
+					return nullptr;
+				}
+			}
+		}
 
 		// logical operators
 
@@ -2117,12 +2229,8 @@ namespace AlloyCompiler
 		// emit then value
 		state.Builder->SetInsertPoint(thenBlock);
 
-		llvm::Value* thenVal = generateStatement(moduleTable, state, *ifStatement.pStatement);
-
-		if (thenVal == nullptr)
-		{
-			return nullptr;
-		}
+		// the then block can be empty of return a null value, we don't really care
+		generateStatement(moduleTable, state, *ifStatement.pStatement);
 
 		// insert the branch into the end of the if block
 		branchIfNotDuplicate(state, mergeBlock);
@@ -2163,7 +2271,7 @@ namespace AlloyCompiler
 
 			if (statementVal == nullptr)
 			{
-				return nullptr;
+				break;
 			}
 		}
 
@@ -2514,7 +2622,7 @@ namespace AlloyCompiler
 			// retrieve member name and add it to memberNames map
 			const std::string_view memberName = id.first->Value;
 
-			memberNames[memberName] = { memberIndex++, identifierType.containedType };
+			memberNames[memberName] = { memberIndex++, identifierType.type };
 		}
 
 		enumType = llvm::StructType::create(*state.Context, memberTypes, enumName);
@@ -2593,13 +2701,13 @@ namespace AlloyCompiler
 		// create allocations for function arguments
 		for (size_t index = 0; index < func->arg_size(); index++)
 		{
-			llvm::Argument& arg = *func->getArg(index);
+			llvm::Argument* arg = func->getArg(index);
 
 			// check that we do not have a named value with the same name
-			if (state.NamedValues.GetValue(arg.getName().str(), false /*searchInParents*/))
+			if (state.NamedValues.GetValue(arg->getName().str(), false /*searchInParents*/))
 			{
 				logErrorAtCurrentPosition(nullptr, // TBD: nodeID
-					"Variable '{0}' already defined!", arg.getName().str());
+					"Variable '{0}' already defined!", arg->getName().str());
 
 				func->eraseFromParent();
 				state.NamedValues.FreeHeapPointers(*state.Builder);
@@ -2610,20 +2718,20 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			llvm::Attribute attr = arg.getAttribute(llvm::Attribute::AttrKind::ByRef);
+			llvm::Attribute attr = arg->getAttribute(llvm::Attribute::AttrKind::ByRef);
 			llvm::Type* subType = nullptr;
 			llvm::AllocaInst* allocaInst = nullptr;
 			if (attr.hasAttribute(llvm::Attribute::AttrKind::ByRef)) {
-				subType = arg.getParamByRefType();
+				subType = arg->getParamByRefType();
 			}
 			// create an alloca for this variable
-			allocaInst = createEntryBlockAlloca(func, arg.getName().str(), arg.getType());
+			allocaInst = createEntryBlockAlloca(func, arg->getName().str(), arg->getType());
 
 			// store the initial value into the alloca
-			state.Builder->CreateStore(&arg, allocaInst);
+			state.Builder->CreateStore(arg, allocaInst);
 
 			// add arguments to named values
-			state.NamedValues.InsertValue(std::string(arg.getName()), allocaInst, subType, isFunctionParameterConst(*functionDefinition.pFunctionType, index), false);
+			state.NamedValues.InsertValue(std::string(arg->getName()), allocaInst, subType, isFunctionParameterConst(*functionDefinition.pFunctionType, index), false);
 		}
 
 		// every function has an exit block for cleanup and setting the return value

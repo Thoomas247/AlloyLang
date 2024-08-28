@@ -9,7 +9,7 @@ namespace AlloyCompiler
 
 	/* -- PUBLIC -- */
 
-	NamedValues::NamedValues()
+	NamedValues::NamedValues() : EnumPayloadStruct(nullptr)
 	{
 		m_ScopeStack.emplace_back("");
 	}
@@ -38,6 +38,14 @@ namespace AlloyCompiler
 
 		InsertType("f32", llvm::Type::getFloatTy(llvmContext), UserDefinedType::basic);
 		InsertType("f64", llvm::Type::getDoubleTy(llvmContext), UserDefinedType::basic);
+
+		// this is a internal structure that holds the index and payload values of an enum
+		if (nullptr == EnumPayloadStruct) {
+			std::vector<llvm::Type*> memberTypes;
+			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));
+			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));
+			EnumPayloadStruct = llvm::StructType::create(llvmContext, memberTypes);
+		}
 	}
 
 	void NamedValues::PushScope(const std::string_view& name)
@@ -182,11 +190,30 @@ namespace AlloyCompiler
 		}
 	}
 
-	NamedValues::TypeMemberInfo NamedValues::GetMemberIndex(const std::string_view& structName, const std::string_view& memberName)
+	NamedValues::TypeMemberInfo NamedValues::GetStructMemberIndex(const std::string_view& structName, const std::string_view& memberName)
 	{
 		TypeInfo* typeInfo = findType(structName);
 
-		if (!typeInfo || !typeInfo->userDefinedType == UserDefinedType::structure)
+		if (!typeInfo || typeInfo->userDefinedType != UserDefinedType::structure)
+		{
+			return { -1, nullptr };
+		}
+
+		auto it = typeInfo->memberInfo.find(memberName);
+
+		if (it == typeInfo->memberInfo.end())
+		{
+			return { -2, nullptr };
+		}
+
+		return it->second;
+	}
+
+	NamedValues::TypeMemberInfo NamedValues::GetEnumMemberIndex(const std::string_view& enumName, const std::string_view& memberName)
+	{
+		TypeInfo* typeInfo = findType(enumName);
+
+		if (!typeInfo || typeInfo->userDefinedType != UserDefinedType::enumeration)
 		{
 			return { -1, nullptr };
 		}

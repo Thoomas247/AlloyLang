@@ -56,10 +56,13 @@ namespace AlloyCompiler
 		};
 
 		llvm::Type* GetType(const std::string_view& name);
+		
 		/// <summary>
-		/// Returns -1 if the struct does not exist, -2 if the member does not exist.
+		/// Returns -1 if the struct or enum does not exist, -2 if the member does not exist.
 		/// </summary>
-		NamedValues::TypeMemberInfo GetMemberIndex(const std::string_view& structName, const std::string_view& memberName);
+		NamedValues::TypeMemberInfo GetStructMemberIndex(const std::string_view& structName, const std::string_view& memberName);
+		NamedValues::TypeMemberInfo GetEnumMemberIndex(const std::string_view& structName, const std::string_view& memberName);
+
 		std::string_view GetTypeName(const llvm::Type* type);
 
 		typedef enum { basic = 0, structure = 1, enumeration = 2 } UserDefinedType;
@@ -81,6 +84,9 @@ namespace AlloyCompiler
 
 		// should be called before PopScope in order to free memory allocated on the heap
 		void FreeHeapPointers(llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>& builder);
+
+		// this is a internal structure that holds the index and payload values of an enum
+		llvm::StructType* EnumPayloadStruct;
 
 	private:
 		struct TypeInfo
