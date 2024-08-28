@@ -318,20 +318,22 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
+			TYPE* pPayloadType = nullptr;
+
 			// check for a payload
 			if (token()->Kind == TokenKind::colon)
 			{
 				(void)eat();
 
-				TYPE* pType = parse<TYPE>();
+				pPayloadType = parse<TYPE>();
 
-				if (pType == nullptr)
+				if (pPayloadType == nullptr)
 				{
 					return nullptr;
 				}
-
-				members.push_back({ pMemberNameToken, pType });
 			}
+
+			members.push_back({ pMemberNameToken, pPayloadType });
 
 			if (token()->Kind == TokenKind::comma)
 			{

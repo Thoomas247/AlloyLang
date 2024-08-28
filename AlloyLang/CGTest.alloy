@@ -1,5 +1,13 @@
 extern printf (const str : String, ...) -> i32;
 
+type EnumType = enum
+{
+	ValueA: i32,
+	ValueB: f64,
+	ValueC,
+	ValueD: i32
+};
+
 type Vector3Of(type T1) = struct
 {
 	x: T1,
