@@ -230,12 +230,14 @@ namespace AlloyCompiler
 		// For function definitions, allocate memory for function parameters in the entry block of the function
 		// numElements is the number of elements in an array, not used otherwise
 		//
+		llvm::AllocaInst* result;
 		llvm::IRBuilder<> tempBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
 		llvm::Value* elements = nullptr;
 		if (numElements > 0) {
 			elements = llvm::ConstantInt::get(function->getContext(), llvm::APInt(64, numElements));
 		}
-		return tempBuilder.CreateAlloca(type, elements, varName);
+		result = tempBuilder.CreateAlloca(type, elements, varName);
+		return result;
 	}
 
 	llvm::Type* getTypeFromTypeName(ModuleTable& moduleTable, LLVMState& state, Token* pNameToken,
@@ -928,6 +930,13 @@ namespace AlloyCompiler
 		// create a mutable variable at the end of the insertion block
 		llvm::IRBuilder<> tempBuilder(state.Builder->GetInsertBlock(), state.Builder->GetInsertBlock()->end());
 		llvm::AllocaInst* structPtr = tempBuilder.CreateAlloca(structType, nullptr, constructorExpression.pType->pNameToken->Value);
+		// reset memory to 0
+		state.Builder->CreateMemSetInline(
+			structPtr,
+			llvm::MaybeAlign(1),
+			llvm::ConstantInt::get(*state.Context, llvm::APInt(8, 0)),
+			llvm::ConstantInt::get(*state.Context, llvm::APInt(32, state.Module->getDataLayout().getTypeAllocSize(type)))
+		);
 
 		// go through the list of initializers and initialize all members
 		for (int i = 0; i < constructorExpression.Arguments.size(); i++)
@@ -1375,7 +1384,7 @@ namespace AlloyCompiler
 		int memberIndex = -1;
 		PtrValuePair result = {};
 		llvm::Value* memberPtr = nullptr;
-		std::vector<llvm::Value*> indices = getGEPIndex(state, 0);
+		std::vector<llvm::Value*> indices;
 
 		llvm::Type* type = getTypeFromTypeName(moduleTable, state, enumValueExpression.pEnumName->pNameToken, enumValueExpression.pEnumName->GenericArguments, {});
 
@@ -1419,10 +1428,18 @@ namespace AlloyCompiler
 			"",
 			state.NamedValues.EnumPayloadStruct
 		);
+		// reset memory to 0
+		state.Builder->CreateMemSetInline(
+			result.Ptr,
+			llvm::MaybeAlign(1),
+			llvm::ConstantInt::get(*state.Context, llvm::APInt(8, 0)),
+			llvm::ConstantInt::get(*state.Context, llvm::APInt(32, state.Module->getDataLayout().getTypeAllocSize(type)))
+		);
+
 		// convert our index to the format required by llvm
 		indices = getGEPIndex(state, 0);
 		memberPtr = state.Builder->CreateGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, indices);
-		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberIndex, false)), memberPtr, "savepayload");
+		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberInfo.memberIndex, false)), memberPtr, "savepayload");
 
 		if (enumValueExpression.pPayloadValue != nullptr) {
 			// compute the value of the payload
@@ -1735,16 +1752,17 @@ failed:
 				// retrieve the StructCompare library function
 				llvm::Function* structCompare = generateStructureComparisonFunction(moduleTable, state);
 				if (structCompare != nullptr) {
+					// and call it with the pointers and sizes of the two structures
 					std::vector<llvm::Value*> args;
-					llvm::AllocaInst* p1 = state.Builder->CreateAlloca(leftType);
-					state.Builder->CreateStore(rightVal, p1);
-					llvm::AllocaInst* p2 = state.Builder->CreateAlloca(rightType);
-					state.Builder->CreateStore(rightVal, p2);
+					llvm::AllocaInst* p1 = state.Builder->CreateAlloca(leftType, 0, nullptr, "p1");
+					state.Builder->CreateStore(leftVal, p1);
 					args.push_back(p1);
 					// a very convulated way of getting the size of the structure
-					args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, (size_t)state.Module->getDataLayout().getTypeAllocSize(leftType))));
+					args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, (size_t)state.Module->getDataLayout().getTypeAllocSize(leftType))));
+					llvm::AllocaInst* p2 = state.Builder->CreateAlloca(rightType, 0, nullptr, "p2");
+					state.Builder->CreateStore(rightVal, p2);
 					args.push_back(p2);
-					args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, (size_t)state.Module->getDataLayout().getTypeAllocSize(rightType))));
+					args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, (size_t)state.Module->getDataLayout().getTypeAllocSize(rightType))));
 					llvm::Value* result = state.Builder->CreateCall(structCompare, args);
 
 					// for the not equal operator, invert the result
@@ -2205,6 +2223,11 @@ failed:
 
 	llvm::Value* generateIfStatement(ModuleTable& moduleTable, LLVMState& state, const IF_STATEMENT& ifStatement)
 	{
+		// TODO:
+		// set the state's captured value to null
+		// store captured value in state
+		// assign captured value to pCaptureNameToken if provided
+
 		TypeSubtypePair tempType = { nullptr, nullptr };
 		llvm::Value* conditionVal = generateExpression(moduleTable, state, *ifStatement.pCondition, tempType);
 
@@ -2263,7 +2286,7 @@ failed:
 
 	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock)
 	{
-		llvm::Value* statementVal = nullptr;
+		llvm::Value* statementVal = llvm::ConstantInt::getTrue(*state.Context);		// set a default value for empty blocks
 
 		for (const STATEMENT* statement : statementBlock.Statements)
 		{
@@ -2527,7 +2550,7 @@ failed:
 			memberNames[memberName] = { memberIndex++, identifierType.containedType };
 		}
 
-		structType = llvm::StructType::create(*state.Context, memberTypes, structName);
+		structType = llvm::StructType::create(*state.Context, memberTypes, structName, true);
 
 		if (!structType)
 		{
@@ -2625,7 +2648,7 @@ failed:
 			memberNames[memberName] = { memberIndex++, identifierType.type };
 		}
 
-		enumType = llvm::StructType::create(*state.Context, memberTypes, enumName);
+		enumType = llvm::StructType::create(*state.Context, memberTypes, enumName, true);
 
 		if (!enumType)
 		{
@@ -2790,7 +2813,7 @@ failed:
 		if (state.Optimizations)
 		{
 			// run the optimizer on the function.
-			state.FPM->run(*func, *state.FAM);
+			// state.FPM->run(*func, *state.FAM);
 		}
 
 		state.Builder.reset(PreviousBuilder);

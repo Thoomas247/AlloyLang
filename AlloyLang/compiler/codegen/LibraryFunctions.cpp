@@ -9,10 +9,43 @@ namespace AlloyCompiler
 {
 	extern llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, llvm::Type* type, int numElements = 0);
 
+	llvm::Function* generateMemCmpFunctionDeclaration(ModuleTable& moduleTable, LLVMState& state) {
+		//
+		// Generate a the declaration for a function named memcmp to call the standard memcmp function
+		// Function signature : Value* memcmp(Value* Left, int64 LeftSize, Value* Right, int64 RightSize)
+		//
+
+		llvm::Type* returnType = nullptr;
+		std::vector<llvm::Type*> paramTypes;
+		llvm::FunctionType* functionType = nullptr;
+
+		// check if function already exists and return it
+		llvm::Function* function = state.Module->getFunction(MemCmpFunctionName);
+		if (function) {
+			goto exit;
+		}
+
+		// generate the function declaration
+
+		// set the return type
+		returnType = llvm::IntegerType::get(*state.Context, 32);
+
+		// function takes two pointers and one size as parameters
+		paramTypes.push_back(llvm::PointerType::get(*state.Context, 0));
+		paramTypes.push_back(llvm::PointerType::get(*state.Context, 0));
+		paramTypes.push_back(llvm::IntegerType::get(*state.Context, 32));
+
+		functionType = llvm::FunctionType::get(returnType, paramTypes, false);
+		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, MemCmpFunctionName, *state.Module);
+
+	exit:
+		return function;
+	}
+		
 	llvm::Function* generateStructureComparisonFunction(ModuleTable& moduleTable, LLVMState& state) {
 		//
 		// Generate a function named _CreateStructCompare_ to compare two structures or enumerations
-		// Function signature : Value* _CreateStructCompare_(Value* Left, Value* Right)
+		// Function signature : Value* _CreateStructCompare_(Value* Left, int64 LeftSize, Value* Right, int64 RightSize)
 		//
 		
 		llvm::Type* returnType = nullptr;
@@ -30,25 +63,16 @@ namespace AlloyCompiler
 		// set the return type
 		returnType = llvm::IntegerType::get(*state.Context, 1);
 
-		// function takes two pointers and twp pointer sizes as parameters
+		// function takes two pointers and two pointer sizes as parameters
 		paramTypes.push_back(llvm::PointerType::get(*state.Context, 0));
-		paramTypes.push_back(llvm::IntegerType::get(*state.Context, 64));
+		paramTypes.push_back(llvm::IntegerType::get(*state.Context, 32));
 		paramTypes.push_back(llvm::PointerType::get(*state.Context, 0));
-		paramTypes.push_back(llvm::IntegerType::get(*state.Context, 64));
+		paramTypes.push_back(llvm::IntegerType::get(*state.Context, 32));
 
-		functionType = llvm::FunctionType::get(returnType, paramTypes, true);
+		functionType = llvm::FunctionType::get(returnType, paramTypes, false);
 		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, StructCompareFunctionName, *state.Module);
 
 		if (function != nullptr) {
-			// push a new scope for the function
-			state.NamedValues.PushScope(StructCompareFunctionName);
-
-			// give names to the parameters
-			function->getArg(0)->setName("Left");
-			function->getArg(1)->setName("LeftSize");
-			function->getArg(2)->setName("Right");
-			function->getArg(3)->setName("RighSize");
-
 			// create a new builder for this function, this will allow us to generate multiple functions in parallel
 			llvm::IRBuilder<>* FuncBuilder = new llvm::IRBuilder<>(*state.Context);
 
@@ -61,45 +85,48 @@ namespace AlloyCompiler
 			// default return value is false
 			FuncBuilder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(1, 0)), retInst);
 
-			/* create allocations for function arguments
-			for (size_t index = 0; index < function->arg_size(); index++)
-			{
-				llvm::Argument* arg = function->getArg(index);
-				llvm::Type* subType = nullptr;
-				llvm::AllocaInst* allocaInst = nullptr;
-
-				// create an alloca for this variable
-				allocaInst = createEntryBlockAlloca(function, arg->getName().str(), arg->getType());
-
-				// store the initial value into the alloca
-				FuncBuilder->CreateStore(arg, allocaInst);
-
-				// add arguments to named values
-				state.NamedValues.InsertValue(std::string(arg->getName()), allocaInst, subType, false, false);
-			}
-			*/
-
 			llvm::BasicBlock* MemCmpBlock = llvm::BasicBlock::Create(*state.Context, "exit", function);
+			llvm::BasicBlock* RevertResultBlock = llvm::BasicBlock::Create(*state.Context, "inverse", function);
 
 			// every function has an exit block for cleanup and setting the return value
 			llvm::BasicBlock* FuncExitBlock = llvm::BasicBlock::Create(*state.Context, "exit", function);
 
 			// first make sure the struct sizes are equal
-			llvm::Value* cmp = FuncBuilder->CreateICmpEQ(function->getArg(1), function->getArg(3));
+			llvm::Value* cmp = FuncBuilder->CreateICmpNE(function->getArg(1), function->getArg(3));
 			// set the return value
-			FuncBuilder->CreateStore(cmp, retInst);
 			FuncBuilder->CreateCondBr(cmp, FuncExitBlock, MemCmpBlock);
 			
 			FuncBuilder->SetInsertPoint(MemCmpBlock);
 
 			// size is the same, continue by comparing memory
-			// ...
+			// retrieve the memcmp library function
+			llvm::Function* memcmpfn = generateMemCmpFunctionDeclaration(moduleTable, state);
+			if (memcmp != nullptr) {
+				// and call it with the pointers and sizes of the two structures
+				std::vector<llvm::Value*> args;
+				args.push_back(function->getArg(0));	// first pointer
+				args.push_back(function->getArg(2));	// second pointer
+				args.push_back(function->getArg(1));	// size
+				llvm::Value* result = FuncBuilder->CreateCall(memcmpfn, args);
+
+				// memcmp returns 0 if the memory content is equal, so we need to revert the result by comparing the value to 0
+				FuncBuilder->CreateCondBr(FuncBuilder->CreateICmpEQ(result, llvm::ConstantInt::get(*state.Context, llvm::APInt(result->getType()->getIntegerBitWidth(), 0))),
+					RevertResultBlock, FuncExitBlock);
+
+				// memcmp return a value different from 0, which means the structures are not equal
+				FuncBuilder->SetInsertPoint(RevertResultBlock);
+				FuncBuilder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(1, 1)), retInst);
+			}
+			else {
+				ASSERT(false, "Something is wrong in the library function " MemCmpFunctionName "!");
+				return nullptr;
+			}
+
 			FuncBuilder->CreateBr(FuncExitBlock);
 
 			FuncBuilder->SetInsertPoint(FuncExitBlock);
 			FuncBuilder->CreateRet(FuncBuilder->CreateLoad(returnType, retInst));
 			
-			state.NamedValues.PopScope();
 			delete FuncBuilder;
 		}
 		else {

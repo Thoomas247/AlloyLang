@@ -45,5 +45,8 @@
     <ClCompile Include="..\AlloyLang\compiler\codegen\llvm\llvm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\AlloyLang\compiler\codegen\LibraryFunctions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
