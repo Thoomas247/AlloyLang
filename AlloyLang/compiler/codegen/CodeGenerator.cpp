@@ -972,14 +972,11 @@ namespace AlloyCompiler
 				return nullptr;
 			}
 
-			// convert our index to the format required by llvm
-			std::vector<llvm::Value*> indices = getGEPIndex(state, memberInfo.memberIndex);
-
 			if (llvm::isa<llvm::PointerType>(structType->getElementType(memberInfo.memberIndex))) {
 				// TBD: check if special processing is needed in case of pointers (e.g. strings?)
 			}
 
-			llvm::Value* memberPtr = state.Builder->CreateGEP(structType, structPtr, indices, memberName);
+			llvm::Value* memberPtr = state.Builder->CreateStructGEP(structType, structPtr, memberInfo.memberIndex, memberName);
 
 			convertValueToType(state, expressionVal, structType->getElementType(memberInfo.memberIndex));
 
@@ -1354,10 +1351,7 @@ namespace AlloyCompiler
 			left = PtrValuePair{ .Ptr = nullptr, .Value = memberValue, .isConst = left.isConst };
 		}
 		else {
-			// get the member index in the format required by llvm
-			std::vector<llvm::Value*> indices = getGEPIndex(state, memberInfo.memberIndex);
-
-			llvm::Value* memberPtr = state.Builder->CreateGEP(structType, left.Ptr, indices, memberName);
+			llvm::Value* memberPtr = state.Builder->CreateStructGEP(structType, left.Ptr, memberInfo.memberIndex, memberName);
 			llvm::Value* memberValue = state.Builder->CreateLoad(memberType, memberPtr, "loadtmp");
 			left = PtrValuePair{ .Ptr = memberPtr, .Value = memberValue, .isConst = left.isConst };
 		}
@@ -1384,7 +1378,6 @@ namespace AlloyCompiler
 		int memberIndex = -1;
 		PtrValuePair result = {};
 		llvm::Value* memberPtr = nullptr;
-		std::vector<llvm::Value*> indices;
 
 		llvm::Type* type = getTypeFromTypeName(moduleTable, state, enumValueExpression.pEnumName->pNameToken, enumValueExpression.pEnumName->GenericArguments, {});
 
@@ -1436,9 +1429,8 @@ namespace AlloyCompiler
 			llvm::ConstantInt::get(*state.Context, llvm::APInt(32, state.Module->getDataLayout().getTypeAllocSize(type)))
 		);
 
-		// convert our index to the format required by llvm
-		indices = getGEPIndex(state, 0);
-		memberPtr = state.Builder->CreateGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, indices);
+		// store the index of the enum value in the first element of EnumPayloadStruct
+		memberPtr = state.Builder->CreateStructGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, 0);
 		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberInfo.memberIndex, false)), memberPtr, "savepayload");
 
 		if (enumValueExpression.pPayloadValue != nullptr) {
@@ -1453,12 +1445,16 @@ namespace AlloyCompiler
 				goto failed;
 			}
 
-			indices = getGEPIndex(state, 1);
-			memberPtr = state.Builder->CreateGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, indices);
+			// store the payload in the second element of EnumPayloadStruct
+			memberPtr = state.Builder->CreateStructGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, 1);
 			state.Builder->CreateStore(expressionVal, memberPtr, "savepayload");
 		}
 
-	result.Value = state.Builder->CreateLoad(state.NamedValues.EnumPayloadStruct, result.Ptr, "loadpayload");
+		// store the structure type in the third element of EnumPayloadStruct
+		memberPtr = state.Builder->CreateStructGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, 2);
+		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, state.NamedValues.GetID(expectedType.type))), memberPtr, "savepayload");
+		
+		result.Value = state.Builder->CreateLoad(state.NamedValues.EnumPayloadStruct, result.Ptr, "loadpayload");
 
 failed:
 		return result;
@@ -1709,6 +1705,77 @@ failed:
 		return generateExpression(moduleTable, state, *enclosedExpressionNode.pExpression, expectedType);
 	}
 
+	llvm::Value* compareEnumValues(ModuleTable& moduleTable, LLVMState& state, 
+									llvm::StructType* leftType, llvm::Value* leftVal, llvm::StructType* rightType, llvm::Value* rightVal, 
+									bool capture
+									)
+	{
+		//
+		// for enums, we compare the types and the first element of the structure which the ID of the enum element
+		//
+		llvm::Value* result = nullptr;
+		llvm::Value* result1 = nullptr;
+		llvm::Value* result2 = nullptr;
+
+		if (leftType == rightType)
+		{
+			{
+				llvm::Value* indexLeft = state.Builder->CreateExtractValue(leftVal, 0);
+				llvm::Value* indexRight = state.Builder->CreateExtractValue(rightVal, 0);
+				result1 = state.Builder->CreateICmpEQ(indexLeft, indexRight);
+			}
+
+			// in the case of enums with payloads, this is where we capture the payload value
+			llvm::Value* payload = state.Builder->CreateExtractValue(leftVal, 1);
+			if (payload
+				&& capture
+				) {
+				state.NamedValues.GetEnumCapturedValue() = payload;
+			}
+
+			{
+				// now compare the enum type's unique ID
+				llvm::Value* idLeft = state.Builder->CreateExtractValue(leftVal, 2);
+				llvm::Value* idRight = state.Builder->CreateExtractValue(rightVal, 2);
+				result2 = state.Builder->CreateICmpEQ(idLeft, idRight);
+			}
+
+			// both the index and enum structure ID should be equal
+			result = state.Builder->CreateAnd(result1, result2);
+		}
+
+		return result;
+	}
+
+	llvm::Value* compareStructValues(ModuleTable& moduleTable, LLVMState& state, 
+									llvm::StructType* leftType, llvm::Value* leftVal, llvm::StructType* rightType, llvm::Value* rightVal
+									)
+	{
+		llvm::Value* result = nullptr;
+
+		// retrieve the StructCompare library function
+		llvm::Function* structCompare = generateStructureComparisonFunction(moduleTable, state);
+		if (structCompare != nullptr) {
+			// and call it with the pointers and sizes of the two structures
+			std::vector<llvm::Value*> args;
+			llvm::AllocaInst* p1 = state.Builder->CreateAlloca(leftType, 0, nullptr, "p1");
+			state.Builder->CreateStore(leftVal, p1);
+			args.push_back(p1);
+			// a very convulated way of getting the size of the structure
+			args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, (size_t)state.Module->getDataLayout().getTypeAllocSize(leftType))));
+			llvm::AllocaInst* p2 = state.Builder->CreateAlloca(rightType, 0, nullptr, "p2");
+			state.Builder->CreateStore(rightVal, p2);
+			args.push_back(p2);
+			args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, (size_t)state.Module->getDataLayout().getTypeAllocSize(rightType))));
+			result = state.Builder->CreateCall(structCompare, args);
+		}
+		else {
+			ASSERT(false, "Something is wrong in the library function " StructCompareFunctionName "!");
+		}
+
+		return result;
+	}
+	
 	llvm::Value* generateBinaryExpression(ModuleTable& moduleTable, LLVMState& state, const BINARY& binaryExpressionNode)
 	{
 		TypeSubtypePair leftExpressionType = { nullptr, nullptr };
@@ -1739,44 +1806,30 @@ failed:
 		bool isFloatingPoint = leftType->isFloatingPointTy();
 
 		// for structures or enums, llvm does not support comparing their values. Use our own procedure for comparison
-		// and only equal and not equal operators are supported
-		if (leftType->isStructTy()) {
+		// only equal and not equal operators are supported
+		if (leftType->isStructTy() || rightType->isStructTy()) {
+			llvm::Value* result = nullptr;
+			ASSERT((static_cast<llvm::StructType*>(leftType))->isPacked(), "Structures should be created with the packed flag ON othersize we cannot compare them");
 			if (operatorStr != "==" && operatorStr != "!=") {
 				logErrorAtCurrentPosition(nullptr, // TBD: nodeID
 					"Binary operator cannot be applied to structure or enum types! Current type is '{0}'.",
 					state.NamedValues.GetTypeName(leftType));
-				return nullptr;
-
+			}
+			else if (state.NamedValues.EnumPayloadStruct == leftType) {
+				// according to the unwritten specs, we only capture when the right hand side is an enum value and not an identifier (or anything else)
+				bool capturePayload = binaryExpressionNode.pRight->Is<PRIMARY>() && binaryExpressionNode.pRight->Get<PRIMARY>()->Is<ENUM_VALUE>();
+				result = compareEnumValues(moduleTable, state, static_cast<llvm::StructType*>(leftType), leftVal, static_cast<llvm::StructType*>(rightType), rightVal, capturePayload);
 			}
 			else {
-				// retrieve the StructCompare library function
-				llvm::Function* structCompare = generateStructureComparisonFunction(moduleTable, state);
-				if (structCompare != nullptr) {
-					// and call it with the pointers and sizes of the two structures
-					std::vector<llvm::Value*> args;
-					llvm::AllocaInst* p1 = state.Builder->CreateAlloca(leftType, 0, nullptr, "p1");
-					state.Builder->CreateStore(leftVal, p1);
-					args.push_back(p1);
-					// a very convulated way of getting the size of the structure
-					args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, (size_t)state.Module->getDataLayout().getTypeAllocSize(leftType))));
-					llvm::AllocaInst* p2 = state.Builder->CreateAlloca(rightType, 0, nullptr, "p2");
-					state.Builder->CreateStore(rightVal, p2);
-					args.push_back(p2);
-					args.push_back(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, (size_t)state.Module->getDataLayout().getTypeAllocSize(rightType))));
-					llvm::Value* result = state.Builder->CreateCall(structCompare, args);
-
-					// for the not equal operator, invert the result
-					if (operatorStr == "!=") {
-						result = state.Builder->CreateNot(result);
-					}
-
-					return result;
-				}
-				else {
-					ASSERT(false, "Something is wrong in the library function " StructCompareFunctionName "!");
-					return nullptr;
-				}
+				result = compareStructValues(moduleTable, state, static_cast<llvm::StructType*>(leftType), leftVal, static_cast<llvm::StructType*>(rightType), rightVal);
 			}
+
+			// for the not equal operator, invert the result
+			if (operatorStr == "!=") {
+				result = state.Builder->CreateNot(result);
+			}
+
+			return result;
 		}
 
 		// logical operators
@@ -2223,12 +2276,8 @@ failed:
 
 	llvm::Value* generateIfStatement(ModuleTable& moduleTable, LLVMState& state, const IF_STATEMENT& ifStatement)
 	{
-		// TODO:
-		// set the state's captured value to null
-		// store captured value in state
-		// assign captured value to pCaptureNameToken if provided
-
 		TypeSubtypePair tempType = { nullptr, nullptr };
+		state.NamedValues.GetEnumCapturedValue() = nullptr;	// reset the captured payload value in case it is used in the condition statement
 		llvm::Value* conditionVal = generateExpression(moduleTable, state, *ifStatement.pCondition, tempType);
 
 		if (conditionVal == nullptr)
@@ -2251,6 +2300,32 @@ failed:
 
 		// emit then value
 		state.Builder->SetInsertPoint(thenBlock);
+
+		// if provided, create a variable with name ifStatement.pCaptureNameToken and set the value to the captured value
+		// the captured value is set in the binary comparison expression
+		// TODO: extract this code into a separate function
+		if (ifStatement.pCaptureNameToken)
+		{
+			const std::string_view name = ifStatement.pCaptureNameToken->Value;
+			llvm::Value* payload = state.NamedValues.GetEnumCapturedValue();
+			if (payload == nullptr) {
+				logErrorAtCurrentPosition(
+					ifStatement.pCaptureNameToken,
+					"Payload capture variable '{0}' is given but enum value does not a payload!",
+					ifStatement.pCaptureNameToken->Value
+					);
+			}
+			else
+			{
+				// create the alloca
+				llvm::IRBuilder<> tempBuilder(thenBlock, thenBlock->begin());
+				llvm::AllocaInst* allocaInst = tempBuilder.CreateAlloca(payload->getType(), nullptr, ifStatement.pCaptureNameToken->Value);
+				tempBuilder.CreateStore(payload, allocaInst);
+				// add the variable to the named values
+				state.NamedValues.InsertValue(std::string(name), allocaInst, payload->getType(),
+												false, false);
+			}
+		}
 
 		// the then block can be empty of return a null value, we don't really care
 		generateStatement(moduleTable, state, *ifStatement.pStatement);
@@ -2288,6 +2363,9 @@ failed:
 	{
 		llvm::Value* statementVal = llvm::ConstantInt::getTrue(*state.Context);		// set a default value for empty blocks
 
+		// statement blocks have their own identifier scope
+		state.NamedValues.PushScope("StmtBlock");
+
 		for (const STATEMENT* statement : statementBlock.Statements)
 		{
 			statementVal = generateStatement(moduleTable, state, *statement);
@@ -2297,6 +2375,7 @@ failed:
 				break;
 			}
 		}
+		state.NamedValues.PopScope();
 
 		return statementVal;
 	}

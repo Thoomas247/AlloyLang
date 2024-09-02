@@ -83,6 +83,11 @@ namespace unittests
 			RunTest("../../AlloyLang/test/Structs/main.alloy", 1);
 		}
 
+		TEST_METHOD(Enums)
+		{
+			RunTest("../../AlloyLang/test/Enums/main.alloy", 43);
+		}
+
 		TEST_METHOD(Arrays)
 		{
 			RunTest("../../AlloyLang/test/Arrays/main.alloy", 1);
@@ -127,6 +132,7 @@ namespace unittests
 		{
 			RunTest("../../AlloyLang/test/MultipleFiles2/main.alloy", 3);
 		}
+
 	};
 }
 

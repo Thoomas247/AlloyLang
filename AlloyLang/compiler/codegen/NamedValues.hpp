@@ -82,11 +82,19 @@ namespace AlloyCompiler
 		// returns the generic type map for a specific type
 		bool GetGenericTypeMap(const std::string_view& structName, std::unordered_map<std::string, std::string>& genericTypeMap);
 
+		llvm::Value*& GetEnumCapturedValue() { return m_ScopeStack.back().EnumCapturedValue; }
+
 		// should be called before PopScope in order to free memory allocated on the heap
 		void FreeHeapPointers(llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>& builder);
 
-		// this is a internal structure that holds the index and payload values of an enum
+		// this is an internal structure that holds the index and payload values of an enum
 		llvm::StructType* EnumPayloadStruct;
+
+		// check if specific type is an enumeration
+		bool IsEnumType(llvm::Type* type);
+
+		// return the unique ID for that type
+		unsigned int GetID(llvm::Type* type);
 
 	private:
 		struct TypeInfo
@@ -96,6 +104,7 @@ namespace AlloyCompiler
 			UserDefinedType userDefinedType;
 			std::unordered_map<std::string_view, TypeMemberInfo> memberInfo;
 			std::unordered_map<std::string, std::string> genericTypeMap;
+			unsigned int ID;		// a unique internal ID that identifies each type
 		};
 
 		struct Scope
@@ -105,6 +114,7 @@ namespace AlloyCompiler
 			std::unordered_map<std::string, TypeInfo> Types;
 			std::unordered_map<const llvm::Type*, std::string> TypeNames; // used for error messages
 			std::unordered_map<std::string, std::string> GenericTypeMap;	// this is a map from the generic types to the actual function parameter types
+			llvm::Value* EnumCapturedValue;									// captured payload value in if or switch statements
 
 			Scope(const std::string_view& name)
 				: Name(name)
@@ -116,6 +126,9 @@ namespace AlloyCompiler
 
 	private:
 		std::deque<Scope> m_ScopeStack;
+
+		// this is incremented each time a new type is added and allows us to give each type a unique ID
+		unsigned int NextTypeID;
 	};
 
 }

@@ -9,7 +9,8 @@ namespace AlloyCompiler
 
 	/* -- PUBLIC -- */
 
-	NamedValues::NamedValues() : EnumPayloadStruct(nullptr)
+	NamedValues::NamedValues() :
+		EnumPayloadStruct(nullptr), NextTypeID(0)
 	{
 		m_ScopeStack.emplace_back("");
 	}
@@ -42,9 +43,10 @@ namespace AlloyCompiler
 		// this is a internal structure that holds the index and payload values of an enum
 		if (nullptr == EnumPayloadStruct) {
 			std::vector<llvm::Type*> memberTypes;
-			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));
-			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));
-			EnumPayloadStruct = llvm::StructType::create(llvmContext, memberTypes);
+			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// index into the enum
+			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// payload. TODO: should be able to handle all types
+			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// the actual enum ID, needed to compare enum values
+			EnumPayloadStruct = llvm::StructType::create(llvmContext, memberTypes, "_EnumPayloadStruct_", true);
 		}
 	}
 
@@ -175,6 +177,38 @@ namespace AlloyCompiler
 		}
 	}
 
+	// check if specific type is an enumeration
+	bool NamedValues::IsEnumType(llvm::Type* type)
+	{
+		// check if specific type is an enumeration
+		TypeInfo* typeInfo = findType(GetTypeName(type));
+
+		if (typeInfo && typeInfo->userDefinedType == enumeration)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	// check if specific type is an enumeration
+	unsigned int NamedValues::GetID(llvm::Type* type)
+	{
+		// check if specific type is an enumeration
+		TypeInfo* typeInfo = findType(GetTypeName(type));
+
+		if (typeInfo)
+		{
+			return typeInfo->ID;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+
 	bool NamedValues::GetGenericTypeMap(const std::string_view& typeName, std::unordered_map<std::string, std::string>& genericTypeMap)
 	{
 		TypeInfo* typeInfo = findType(typeName);
@@ -259,6 +293,7 @@ namespace AlloyCompiler
 		typeInfo.userDefinedType = userDefinedType;
 		typeInfo.memberInfo = memberInfo;
 		typeInfo.genericTypeMap = genericTypeMap;
+		typeInfo.ID = ++NextTypeID;		// unique ID for this type
 
 		m_ScopeStack.back().Types[name] = typeInfo;
 		m_ScopeStack.back().TypeNames[type] = name;
