@@ -18,8 +18,6 @@ namespace llvm
 
 namespace AlloyCompiler
 {
-	#define _EnumPayloadStruct_	"_EnumPayloadStruct_"
-
 	// for pointer and reference types, llvm does not store the type pointed to by the pointer
 	// we have to keep track of it ourselves
 	// type is null if this is not a pointer nor a reference
@@ -30,6 +28,11 @@ namespace AlloyCompiler
 		bool isConst = false;					// whether we are pointing to a constant value
 		bool freeOnExit = false;				// whether we should free the pointer
 	};
+
+#define _EnumPayloadStruct_	"_EnumPayloadStruct_"
+#define EnumPayloadIndex	0
+#define EnumPayloadValue	1
+#define EnumPayloadEnumID	2
 
 	class NamedValues
 	{
@@ -118,7 +121,7 @@ namespace AlloyCompiler
 			llvm::Value* EnumCapturedValue;									// captured payload value in if or switch statements
 
 			Scope(const std::string_view& name)
-				: Name(name)
+				: Name(name), EnumCapturedValue(nullptr)
 			{}
 		};
 

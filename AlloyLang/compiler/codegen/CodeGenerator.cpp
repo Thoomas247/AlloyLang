@@ -1433,8 +1433,8 @@ namespace AlloyCompiler
 		);
 
 		// store the index of the enum value in the first element of EnumPayloadStruct
-		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, 0);
-		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberInfo.memberIndex, false)), memberPtr, "savepayload");
+		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, EnumPayloadIndex);
+		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberInfo.memberIndex)), memberPtr, "savepayload");
 
 		if (enumValueExpression.pPayloadValue != nullptr) {
 			// compute the value of the payload
@@ -1449,12 +1449,12 @@ namespace AlloyCompiler
 			}
 
 			// store the payload in the second element of EnumPayloadStruct
-			memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, 1);
+			memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, EnumPayloadValue);
 			state.Builder->CreateStore(expressionVal, memberPtr, "savepayload");
 		}
 
 		// store the structure type in the third element of EnumPayloadStruct
-		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, 2);
+		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, EnumPayloadEnumID);
 		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, state.NamedValues.GetID(expectedType.type))), memberPtr, "savepayload");
 		
 		result.Value = state.Builder->CreateLoad(EnumPayloadStruct, result.Ptr, "loadpayload");
@@ -1723,13 +1723,13 @@ failed:
 		if (leftType == rightType)
 		{
 			{
-				llvm::Value* indexLeft = state.Builder->CreateExtractValue(leftVal, 0);
-				llvm::Value* indexRight = state.Builder->CreateExtractValue(rightVal, 0);
+				llvm::Value* indexLeft = state.Builder->CreateExtractValue(leftVal, EnumPayloadIndex);
+				llvm::Value* indexRight = state.Builder->CreateExtractValue(rightVal, EnumPayloadIndex);
 				result1 = state.Builder->CreateICmpEQ(indexLeft, indexRight);
 			}
 
 			// in the case of enums with payloads, this is where we capture the payload value
-			llvm::Value* payload = state.Builder->CreateExtractValue(leftVal, 1);
+			llvm::Value* payload = state.Builder->CreateExtractValue(leftVal, EnumPayloadValue);
 			if (payload
 				&& capture
 				) {
@@ -1738,8 +1738,8 @@ failed:
 
 			{
 				// now compare the enum type's unique ID
-				llvm::Value* idLeft = state.Builder->CreateExtractValue(leftVal, 2);
-				llvm::Value* idRight = state.Builder->CreateExtractValue(rightVal, 2);
+				llvm::Value* idLeft = state.Builder->CreateExtractValue(leftVal, EnumPayloadEnumID);
+				llvm::Value* idRight = state.Builder->CreateExtractValue(rightVal, EnumPayloadEnumID);
 				result2 = state.Builder->CreateICmpEQ(idLeft, idRight);
 			}
 
@@ -2278,6 +2278,39 @@ failed:
 		return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
 	}
 
+	void captureEnumPayload(LLVMState& state, const Token* varNameToken, llvm::Value* payload, llvm::BasicBlock* insertionBlock)
+	{
+		//
+		// Create a variable with the enum payload value
+		//
+		if (varNameToken != nullptr) {
+			const std::string name(varNameToken->Value);
+			if (payload == nullptr) {
+				logErrorAtCurrentPosition(
+					varNameToken,
+					"Payload capture variable '{0}' is given but enum value does not a payload!",
+					name
+				);
+			}
+			else {
+				llvm::IRBuilder<> tempBuilder(insertionBlock, insertionBlock->begin());
+				// if the variable already exists, update it. Otherwise create a new variable
+				ValueTypePair* value = state.NamedValues.GetValue(name);
+				if (value) {
+					tempBuilder.CreateStore(payload, value->value);
+				}
+				else {
+					// create the alloca
+					llvm::AllocaInst* allocaInst = tempBuilder.CreateAlloca(payload->getType(), nullptr, name);
+					tempBuilder.CreateStore(payload, allocaInst);
+					// add the variable to the named values
+					state.NamedValues.InsertValue(std::string(name), allocaInst, payload->getType(),
+						false, false);
+				}
+			}
+		}
+	}
+
 	llvm::Value* generateIfStatement(ModuleTable& moduleTable, LLVMState& state, const IF_STATEMENT& ifStatement)
 	{
 		TypeSubtypePair tempType = { nullptr, nullptr };
@@ -2307,29 +2340,9 @@ failed:
 
 		// if provided, create a variable with name ifStatement.pCaptureNameToken and set the value to the captured value
 		// the captured value is set in the binary comparison expression
-		// TODO: extract this code into a separate function
-		if (ifStatement.pCaptureNameToken)
-		{
-			const std::string_view name = ifStatement.pCaptureNameToken->Value;
-			llvm::Value* payload = state.NamedValues.GetEnumCapturedValue();
-			if (payload == nullptr) {
-				logErrorAtCurrentPosition(
-					ifStatement.pCaptureNameToken,
-					"Payload capture variable '{0}' is given but enum value does not a payload!",
-					ifStatement.pCaptureNameToken->Value
-					);
-			}
-			else
-			{
-				// create the alloca
-				llvm::IRBuilder<> tempBuilder(thenBlock, thenBlock->begin());
-				llvm::AllocaInst* allocaInst = tempBuilder.CreateAlloca(payload->getType(), nullptr, ifStatement.pCaptureNameToken->Value);
-				tempBuilder.CreateStore(payload, allocaInst);
-				// add the variable to the named values
-				state.NamedValues.InsertValue(std::string(name), allocaInst, payload->getType(),
-												false, false);
-			}
-		}
+		captureEnumPayload(state, ifStatement.pCaptureNameToken, state.NamedValues.GetEnumCapturedValue(), thenBlock);
+		// reset the captured value for the next call
+		state.NamedValues.GetEnumCapturedValue() = nullptr;
 
 		// the then block can be empty of return a null value, we don't really care
 		generateStatement(moduleTable, state, *ifStatement.pStatement);
@@ -2435,6 +2448,7 @@ failed:
 		llvm::SwitchInst* switchInst = nullptr;
 		llvm::BasicBlock* afterBlock = nullptr;
 		llvm::BasicBlock* switchBlock = nullptr;
+		llvm::Type* EnumType = nullptr;
 
 		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
 		ASSERT(func != nullptr, "No function to insert into!");
@@ -2445,6 +2459,13 @@ failed:
 		if (conditionVal == nullptr)
 		{
 			goto failed;
+		}
+
+		// switch/case statements using enumerations, we need to retrieve the index of enum value
+		if (state.NamedValues.IsEnumType(conditionVal->getType()))
+		{
+			EnumType = conditionVal->getType();
+			conditionVal = state.Builder->CreateExtractValue(conditionVal, EnumPayloadIndex);
 		}
 
 		// create a new basic block to start insertion into
@@ -2464,9 +2485,21 @@ failed:
 		switchInst = state.Builder->CreateSwitch(conditionVal, afterBlock, statement.Cases.size());
 
 		for (auto& caseStmt : statement.Cases) {
+			llvm::Value* payload = nullptr;
 			EXPRESSION* expr = std::get<0>(caseStmt);
-			TypeSubtypePair tempType = { nullptr, nullptr };
+			tempType = { nullptr, nullptr };
 			llvm::Value* cond = generateExpression(moduleTable, state, *expr, tempType);
+			if (EnumType != nullptr) {
+				/* switch / case statements using enumerations, the enumerations should be of the same type and we need to retrieve the index of enum value
+				if (EnumType != tempType.type) {
+					logErrorAtCurrentPosition(std::get<1>(caseStmt), "Case condition is not of the same enum type as switch value!");
+					goto failed;
+				}
+				*/
+				payload = state.Builder->CreateExtractValue(cond, EnumPayloadValue);
+				cond = state.Builder->CreateExtractValue(cond, EnumPayloadIndex);
+			}
+			
 			if (!llvm::isa<llvm::ConstantInt>(cond)) {
 				logErrorAtCurrentPosition(std::get<1>(caseStmt), "Switch/Case condition is not a constant integer!");
 				goto failed;
@@ -2474,6 +2507,14 @@ failed:
 
 			// create a new basic block to start insertion into
 			llvm::BasicBlock* caseBlock = llvm::BasicBlock::Create(*state.Context, "case", func);
+
+			if (payload != nullptr) {
+				// if provided, create a variable and set the value to the captured value
+				// TODO: using a hard-coded value while we figure out how to get the variable name
+				Location loc(0, 0, 0);
+				Token tok = { "num", loc, TokenKind::string_literal };
+				captureEnumPayload(state, &tok, payload, caseBlock);
+			}
 
 			// start insertion into the caseBlock
 			state.Builder->SetInsertPoint(caseBlock);

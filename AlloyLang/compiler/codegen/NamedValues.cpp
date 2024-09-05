@@ -60,7 +60,7 @@ namespace AlloyCompiler
 			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// the actual enum ID, needed to compare enum values
 			EnumPayloadStruct = llvm::StructType::create(llvmContext, memberTypes, payloadStructName, true);
 
-			InsertType(payloadStructName, EnumPayloadStruct, UserDefinedType::structure);
+			InsertType(payloadStructName, EnumPayloadStruct, UserDefinedType::enumeration);
 		}
 
 		return EnumPayloadStruct;
