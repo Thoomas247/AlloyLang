@@ -10,7 +10,7 @@ namespace AlloyCompiler
 	/* -- PUBLIC -- */
 
 	NamedValues::NamedValues() :
-		EnumPayloadStruct(nullptr), NextTypeID(0)
+		NextTypeID(0)
 	{
 		m_ScopeStack.emplace_back("");
 	}
@@ -39,15 +39,31 @@ namespace AlloyCompiler
 
 		InsertType("f32", llvm::Type::getFloatTy(llvmContext), UserDefinedType::basic);
 		InsertType("f64", llvm::Type::getDoubleTy(llvmContext), UserDefinedType::basic);
+	}
 
-		// this is a internal structure that holds the index and payload values of an enum
+	llvm::Type* NamedValues::GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, llvm::Type* PayloadType)
+	{
+		// 
+		// EnumPayloadStruct is a structure that contains the index, payload and enum ID for an enum value
+		// Because the payload can be of any type, each time a new type is requested we check if we already have such a structure defined, if not define and return the structure
+		// The structures are stored in the NamedValues::Types map the same way all other types are stored. The name of the structure type is _EnumPayloadStruct_[PayloadType]
+		// 
+		std::string_view payloadTypeName = (PayloadType == nullptr ? "" : GetTypeName(PayloadType));
+		std::string payloadStructName = _EnumPayloadStruct_ + std::string(payloadTypeName);
+		
+		// check if the same structure has already been defined, otherwise define it
+		llvm::Type* EnumPayloadStruct = GetType(payloadStructName);
 		if (nullptr == EnumPayloadStruct) {
 			std::vector<llvm::Type*> memberTypes;
 			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// index into the enum
-			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// payload. TODO: should be able to handle all types
+			memberTypes.push_back(PayloadType != nullptr ? PayloadType : llvm::Type::getInt8Ty(llvmContext));			// payload
 			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// the actual enum ID, needed to compare enum values
-			EnumPayloadStruct = llvm::StructType::create(llvmContext, memberTypes, "_EnumPayloadStruct_", true);
+			EnumPayloadStruct = llvm::StructType::create(llvmContext, memberTypes, payloadStructName, true);
+
+			InsertType(payloadStructName, EnumPayloadStruct, UserDefinedType::structure);
 		}
+
+		return EnumPayloadStruct;
 	}
 
 	void NamedValues::PushScope(const std::string_view& name)

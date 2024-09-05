@@ -1,21 +1,31 @@
 extern printf (const str : String, ...) -> i64;
 
-type EnumType = enum
+type EnumType(type T) = enum
 	{
-		ValueA: i32,
+		ValueA: T,
 		ValueB: f64,
 		ValueC,	// no payload
-		ValueD: i32,	// same payload as ValueA
+		ValueD: T,	// same payload as ValueA
 	};
 
 fn main() -> i32
 {
-	var enumVar = EnumType|ValueA(43);
+	var enumVar = EnumType(i32)|ValueA(43);
+	var enum2Var = EnumType(i64)|ValueB(2.54);
+	var enum3Var = EnumType(i32)|ValueC;
 
-	if (enumVar == EnumType|ValueA) -> num
+	if (enumVar == EnumType(i32)|ValueA) -> num
 	{
-		printf("enums are equal, payload is %d", num);
-		return num;
+		if (enum2Var == EnumType(i64)|ValueB) -> fnum
+		{
+			printf("enums are equal, payload A is %d, payload B is %f", num, fnum);
+			return num;
+		}
+		else
+		{
+			printf("Only enumA of type i32 was equal!");
+			return 0;
+		}
 	}
 	else
 	{

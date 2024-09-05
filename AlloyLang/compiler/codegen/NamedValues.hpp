@@ -18,6 +18,7 @@ namespace llvm
 
 namespace AlloyCompiler
 {
+	#define _EnumPayloadStruct_	"_EnumPayloadStruct_"
 
 	// for pointer and reference types, llvm does not store the type pointed to by the pointer
 	// we have to keep track of it ourselves
@@ -87,14 +88,14 @@ namespace AlloyCompiler
 		// should be called before PopScope in order to free memory allocated on the heap
 		void FreeHeapPointers(llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>& builder);
 
-		// this is an internal structure that holds the index and payload values of an enum
-		llvm::StructType* EnumPayloadStruct;
-
 		// check if specific type is an enumeration
 		bool IsEnumType(llvm::Type* type);
 
 		// return the unique ID for that type
 		unsigned int GetID(llvm::Type* type);
+
+		// return the structure type associated with a specific payload type
+		llvm::Type* GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, llvm::Type* PayloadType);
 
 	private:
 		struct TypeInfo

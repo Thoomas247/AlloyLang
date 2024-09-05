@@ -1378,7 +1378,9 @@ namespace AlloyCompiler
 		int memberIndex = -1;
 		PtrValuePair result = {};
 		llvm::Value* memberPtr = nullptr;
+		llvm::Type* EnumPayloadStruct = nullptr;
 
+		// generate or retrieve the llvm type for this enumeration
 		llvm::Type* type = getTypeFromTypeName(moduleTable, state, enumValueExpression.pEnumName->pNameToken, enumValueExpression.pEnumName->GenericArguments, {});
 
 		if (nullptr == type) {
@@ -1416,10 +1418,11 @@ namespace AlloyCompiler
 		
 		// create an alloca to a structure of type EnumPayloadStruct
 		// and fill the structure with the enum index and payload value if any
+		EnumPayloadStruct = state.NamedValues.GetEnumPayloadStruct(*state.Context, memberInfo.containedType);
 		result.Ptr = createEntryBlockAlloca(
 			state.Builder->GetInsertBlock()->getParent(),
 			"",
-			state.NamedValues.EnumPayloadStruct
+			EnumPayloadStruct
 		);
 		// reset memory to 0
 		state.Builder->CreateMemSetInline(
@@ -1430,7 +1433,7 @@ namespace AlloyCompiler
 		);
 
 		// store the index of the enum value in the first element of EnumPayloadStruct
-		memberPtr = state.Builder->CreateStructGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, 0);
+		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, 0);
 		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberInfo.memberIndex, false)), memberPtr, "savepayload");
 
 		if (enumValueExpression.pPayloadValue != nullptr) {
@@ -1446,15 +1449,15 @@ namespace AlloyCompiler
 			}
 
 			// store the payload in the second element of EnumPayloadStruct
-			memberPtr = state.Builder->CreateStructGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, 1);
+			memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, 1);
 			state.Builder->CreateStore(expressionVal, memberPtr, "savepayload");
 		}
 
 		// store the structure type in the third element of EnumPayloadStruct
-		memberPtr = state.Builder->CreateStructGEP(state.NamedValues.EnumPayloadStruct, result.Ptr, 2);
+		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, 2);
 		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, state.NamedValues.GetID(expectedType.type))), memberPtr, "savepayload");
 		
-		result.Value = state.Builder->CreateLoad(state.NamedValues.EnumPayloadStruct, result.Ptr, "loadpayload");
+		result.Value = state.Builder->CreateLoad(EnumPayloadStruct, result.Ptr, "loadpayload");
 
 failed:
 		return result;
@@ -1809,13 +1812,14 @@ failed:
 		// only equal and not equal operators are supported
 		if (leftType->isStructTy() || rightType->isStructTy()) {
 			llvm::Value* result = nullptr;
-			ASSERT((static_cast<llvm::StructType*>(leftType))->isPacked(), "Structures should be created with the packed flag ON othersize we cannot compare them");
+			std::string_view leftTypeName = state.NamedValues.GetTypeName(leftType);
+			ASSERT((static_cast<llvm::StructType*>(leftType))->isPacked(), "Structures should be created with the packed flag ON otherwise we cannot compare them");
 			if (operatorStr != "==" && operatorStr != "!=") {
 				logErrorAtCurrentPosition(nullptr, // TBD: nodeID
 					"Binary operator cannot be applied to structure or enum types! Current type is '{0}'.",
-					state.NamedValues.GetTypeName(leftType));
+					leftTypeName);
 			}
-			else if (state.NamedValues.EnumPayloadStruct == leftType) {
+			else if (leftTypeName.starts_with(_EnumPayloadStruct_)) {
 				// according to the unwritten specs, we only capture when the right hand side is an enum value and not an identifier (or anything else)
 				bool capturePayload = binaryExpressionNode.pRight->Is<PRIMARY>() && binaryExpressionNode.pRight->Get<PRIMARY>()->Is<ENUM_VALUE>();
 				result = compareEnumValues(moduleTable, state, static_cast<llvm::StructType*>(leftType), leftVal, static_cast<llvm::StructType*>(rightType), rightVal, capturePayload);

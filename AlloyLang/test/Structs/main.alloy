@@ -30,6 +30,7 @@ fn main () -> i64
 	var a : f32 = 32.0;
 	var expected : f32 = 20480.0;
 	var result : i64 = 0;
+
 	var test : Vector3 = 
 		Vector3 
 		{ 
@@ -38,21 +39,24 @@ fn main () -> i64
 			z = 0.0 
 		};
 
-	var test2 : Transform = 
-		Transform
+	// variables of type structure can also be declared without repeating the structure name
+	var test2 = Transform
 		{
 			position = Vector3 { x = 10.0, y = 5.0, z = 7.0 },
 			rotation = Vector3 { x = 0.0, y = 45.0, z = 0.0 },
 			scale = test
 		};
 
-	const translation : Vector3 = Vector3 { x = 0, y = 0, z = 10 };
+	const translation = Vector3 { x = 0, y = 0, z = 10 };
 
 	test.z = translate(test, translation).z;
 	test2.rotation.y = 20.0;
 
 	printf("result = %f", test.x * test2.scale.y * test.z);
-	if (test.x * test2.scale.y * test.z == expected)
+	if (test.x * test2.scale.y * test.z == expected
+		&& translation == Vector3 { x = 0, y = 0, z = 10 }	// testing for the equality operator on structures
+		&& translation != Vector3 { x = 0, y = 1, z = 10 }  // testing for the inequality operator on structures
+		)
 		return 1;
 	else
 		return 0;
