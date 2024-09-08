@@ -20,11 +20,12 @@ namespace AlloyCompiler
 {
 	// for pointer and reference types, llvm does not store the type pointed to by the pointer
 	// we have to keep track of it ourselves
-	// type is null if this is not a pointer nor a reference
+	// containedType is null if this is not a pointer nor a reference
 	struct ValueTypePair
 	{
 		llvm::AllocaInst* value = nullptr;
 		llvm::Type* containedType = nullptr;
+		llvm::Type* parentType = nullptr;		// for enums and structs, this holds the type of the structure that contains the variable, needed for accurately comparing values
 		bool isConst = false;					// whether we are pointing to a constant value
 		bool freeOnExit = false;				// whether we should free the pointer
 	};
@@ -46,7 +47,7 @@ namespace AlloyCompiler
 		void PopScope();
 
 		ValueTypePair* GetValue(const std::string& name, bool searchInParents = true);
-		void InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit);
+		void InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, llvm::Type* parentType, bool isConst, bool freeOnExit);
 		bool RemoveValue(const std::string& name);
 
 		//

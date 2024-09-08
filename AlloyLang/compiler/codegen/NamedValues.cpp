@@ -60,7 +60,7 @@ namespace AlloyCompiler
 			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// the actual enum ID, needed to compare enum values
 			EnumPayloadStruct = llvm::StructType::create(llvmContext, memberTypes, payloadStructName, true);
 
-			InsertType(payloadStructName, EnumPayloadStruct, UserDefinedType::enumeration);
+			InsertType(payloadStructName, EnumPayloadStruct, UserDefinedType::structure);
 		}
 
 		return EnumPayloadStruct;
@@ -144,10 +144,10 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	void NamedValues::InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, bool isConst, bool freeOnExit)
+	void NamedValues::InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, llvm::Type* parentType, bool isConst, bool freeOnExit)
 	{
 		ASSERT(!m_ScopeStack.back().Values.contains(name), "Named value already exists! Should check if it exists first with NamedValues::GetValue(const std::string& name).");
-		ValueTypePair valueTypePair = { value, type, isConst, freeOnExit };
+		ValueTypePair valueTypePair = { value, type, parentType, isConst, freeOnExit };
 		m_ScopeStack.back().Values[name] = valueTypePair;
 	}
 
