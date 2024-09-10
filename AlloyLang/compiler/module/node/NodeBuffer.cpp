@@ -242,7 +242,8 @@ namespace AlloyCompiler
 	template<>
 	STRUCT_TYPE* NodeBuffer::parse()
 	{
-		if (expectKind<TokenKind::struct_keyword>() != SUCCESS)
+		Token* pErrorToken = nullptr;
+		if (expectKind<TokenKind::struct_keyword>(&pErrorToken) != SUCCESS)
 		{
 			return nullptr;
 		}
@@ -291,6 +292,7 @@ namespace AlloyCompiler
 		return createNode(
 			STRUCT_TYPE
 			{
+				.pErrorToken = pErrorToken,
 				.Members = std::move(members)
 			}
 		);
@@ -299,7 +301,8 @@ namespace AlloyCompiler
 	template<>
 	ENUM_TYPE* NodeBuffer::parse()
 	{
-		if (expectKind<TokenKind::enum_keyword>() != SUCCESS)
+		Token* pErrorToken = nullptr;
+		if (expectKind<TokenKind::enum_keyword>(&pErrorToken) != SUCCESS)
 		{
 			return nullptr;
 		}
@@ -351,6 +354,7 @@ namespace AlloyCompiler
 		return createNode(
 			ENUM_TYPE
 			{
+				.pErrorToken = pErrorToken,
 				.Members = std::move(members)
 			}
 		);

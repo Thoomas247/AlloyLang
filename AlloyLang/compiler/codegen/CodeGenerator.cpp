@@ -29,16 +29,21 @@ namespace AlloyCompiler
 	};
 
 	template<typename ...Args>
-	constexpr void logErrorAtCurrentPosition(const Token* token, const std::string& format, Args && ...args)
+	constexpr void logErrorAtCurrentPosition(const Token* pToken, const std::string& format, Args && ...args)
 	{
-		if (token != nullptr) {
-			const Location& location = token->Location;
-			Log::Error("Error at location ({0} : {1}):", location.Line, location.Column);
-			/// TBD		Log::Error("\t{0}", tokenBuffers.GetLine(location.LineStart));
-			Log::Error("\t{0}^", std::string(location.Column - 1, ' '));
+		if (pToken != nullptr)
+		{
+			const Location& location = pToken->Location;
+			const size_t tokenSize = pToken->Value.size();
+			//const std::string_view line = m_Source.GetLine(location.LineStart);
+
+			Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
+			//Log::Error("\t{0}", line);
+			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
 			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 		}
-		else {
+		else 
+		{
 			Log::Error("\t{0}", std::vformat(format, std::make_format_args(args...)));
 		}
 
@@ -623,8 +628,7 @@ namespace AlloyCompiler
 
 				if (arraySize == 0)
 				{
-					logErrorAtCurrentPosition(nullptr, // typeIdentifierNode.ArraySizeID
-						"Array size must be greater than 0!");
+					logErrorAtCurrentPosition(type.pSizeLiteral->pValueToken, "Array size must be greater than 0!");
 					identifierType = { nullptr, nullptr };
 					goto exit;
 				}
@@ -636,8 +640,7 @@ namespace AlloyCompiler
 
 			if (identifierType.type == nullptr)
 			{
-				logErrorAtCurrentPosition(nullptr, // elementTypeIdentifierNode
-					"Unknown array element type!");
+				logErrorAtCurrentPosition(type.pElementType->GetErrorToken(), "Unknown array element type!");
 				identifierType = { nullptr, nullptr };
 				goto exit;
 			}
