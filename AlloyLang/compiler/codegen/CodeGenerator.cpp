@@ -4,18 +4,6 @@
 namespace AlloyCompiler
 {
 
-	// forward declarations
-	llvm::Value* generateExpression(ModuleTable& moduleTable, LLVMState& state, const EXPRESSION& expressionNode,
-		TypeSubtypePair& expectedType);
-	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
-	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
-	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
-	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, llvm::Type* parentType, const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName,
-		const std::vector<EXPRESSION*>& functionArguments, std::unordered_map<std::string, std::string>& typeMap);
-	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::string& moduleName,
-		const std::vector<TYPE*>& genericArguments);
-	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& externDefinition, const std::string& moduleName);
-
 #pragma region Util
 
 	struct PtrValuePair
@@ -27,6 +15,18 @@ namespace AlloyCompiler
 		llvm::Value* Value = nullptr;
 		bool isConst = false;	// indicates that we are pointing to constant variables
 	};
+
+	// forward declarations
+	PtrValuePair generateExpression(ModuleTable& moduleTable, LLVMState& state, const EXPRESSION& expressionNode,
+		TypeSubtypePair& expectedType);
+	llvm::Value* generateVariableDefinition(ModuleTable& moduleTable, LLVMState& state, const VARIABLE_DEFINITION& variableDefinition);
+	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
+	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
+	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, llvm::Type* parentType, const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName,
+		const std::vector<EXPRESSION*>& functionArguments, std::unordered_map<std::string, std::string>& typeMap);
+	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::string& moduleName,
+		const std::vector<TYPE*>& genericArguments);
+	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& externDefinition, const std::string& moduleName);
 
 	template<typename ...Args>
 	constexpr void logErrorAtCurrentPosition(const Token* pToken, const std::string& format, Args && ...args)
@@ -42,7 +42,7 @@ namespace AlloyCompiler
 			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
 			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 		}
-		else 
+		else
 		{
 			Log::Error("\t{0}", std::vformat(format, std::make_format_args(args...)));
 		}
@@ -100,18 +100,18 @@ namespace AlloyCompiler
 		case llvm::Type::IntegerTyID:
 		{
 			switch (newType->getTypeID()) {
-			//
-			// int to float or double
-			//
+				//
+				// int to float or double
+				//
 			case llvm::Type::FloatTyID:
 			case llvm::Type::DoubleTyID:
 				value = state.Builder->CreateSIToFP(value, newType);
 				result = true;
 				break;
 
-			//
-			// int to int of another bitsize
-			//
+				//
+				// int to int of another bitsize
+				//
 			case llvm::Type::IntegerTyID:
 				value = state.Builder->CreateIntCast(value, newType, true);
 				result = true;
@@ -127,9 +127,9 @@ namespace AlloyCompiler
 		case llvm::Type::FloatTyID:
 		{
 			switch (newType->getTypeID()) {
-			//
-			// float to double
-			// 
+				//
+				// float to double
+				// 
 			case llvm::Type::DoubleTyID:
 				value = state.Builder->CreateFPCast(value, newType);
 				result = true;
@@ -144,9 +144,9 @@ namespace AlloyCompiler
 		case llvm::Type::DoubleTyID:
 		{
 			switch (newType->getTypeID()) {
-			//
-			// double to float
-			//
+				//
+				// double to float
+				//
 			case llvm::Type::FloatTyID:
 				value = state.Builder->CreateFPCast(value, newType);
 				result = true;
@@ -672,9 +672,9 @@ namespace AlloyCompiler
 				identifierType.containedType = elementType;
 			}
 			else {
-				identifierType.type = llvm::VectorType::get(elementType, arraySize, 
+				identifierType.type = llvm::VectorType::get(elementType, arraySize,
 					false //not scalable
-				);		
+				);
 			}
 		}
 
@@ -968,7 +968,7 @@ namespace AlloyCompiler
 			// set the type that we are expecting for each structure element
 			TypeSubtypePair identifierType = { structType->getElementType(memberInfo.memberIndex), memberInfo.containedType };
 
-			llvm::Value* expressionVal = generateExpression(moduleTable, state, *constructorExpression.Arguments[i].second, identifierType);
+			llvm::Value* expressionVal = generateExpression(moduleTable, state, *constructorExpression.Arguments[i].second, identifierType).Value;
 
 			if (!expressionVal)
 			{
@@ -1019,7 +1019,7 @@ namespace AlloyCompiler
 
 		// get the value to set for each element
 		TypeSubtypePair temp = { elementType, nullptr };
-		llvm::Value* defaultValue = generateExpression(moduleTable, state, *pointerInitializerNode.pValue, temp);
+		llvm::Value* defaultValue = generateExpression(moduleTable, state, *pointerInitializerNode.pValue, temp).Value;
 		// try to convert the value to the expected type	
 		convertValueToType(state, defaultValue, subElementType);
 
@@ -1031,7 +1031,7 @@ namespace AlloyCompiler
 		}
 		else {
 			TypeSubtypePair temp = { llvm::IntegerType::getInt64Ty(*state.Context), nullptr };
-			count = generateExpression(moduleTable, state, *pointerInitializerNode.pSize, temp);
+			count = generateExpression(moduleTable, state, *pointerInitializerNode.pSize, temp).Value;
 		}
 
 		// create a mutable variable on the heap
@@ -1130,7 +1130,7 @@ namespace AlloyCompiler
 			// set the type that we are expecting for each array element
 			TypeSubtypePair identifierType = { vectorType->getElementType(), expectedType.containedType };
 
-			llvm::Value* expressionVal = generateExpression(moduleTable, state, *initListExpressionNode.Values[i], identifierType);
+			llvm::Value* expressionVal = generateExpression(moduleTable, state, *initListExpressionNode.Values[i], identifierType).Value;
 
 			if (!expressionVal)
 			{
@@ -1164,7 +1164,7 @@ namespace AlloyCompiler
 			// case where the type is not given but has to be inferred from the type of the expression
 
 			// create the value expression
-			value = generateExpression(moduleTable, state, *variableDefinition.pValue, identifierType);
+			value = generateExpression(moduleTable, state, *variableDefinition.pValue, identifierType).Value;
 
 			if (value)
 			{
@@ -1183,7 +1183,7 @@ namespace AlloyCompiler
 			if (declarationVal)
 			{
 				// create the value expression
-				value = generateExpression(moduleTable, state, *variableDefinition.pValue, identifierType);
+				value = generateExpression(moduleTable, state, *variableDefinition.pValue, identifierType).Value;
 
 				if (value)
 				{
@@ -1213,7 +1213,7 @@ namespace AlloyCompiler
 		TypeSubtypePair& identifierType)
 	{
 		TypeSubtypePair i64Type = { llvm::IntegerType::getInt64Ty(*state.Context), nullptr };
-		llvm::Value* memberIndex = generateExpression(moduleTable, state, *arrayAccessExpression.pIndex, i64Type);
+		llvm::Value* memberIndex = generateExpression(moduleTable, state, *arrayAccessExpression.pIndex, i64Type).Value;
 		PtrValuePair left = { nullptr, nullptr, false };
 		llvm::Value* memberPtr = nullptr;
 		llvm::Value* memberValue = nullptr;
@@ -1230,7 +1230,7 @@ namespace AlloyCompiler
 		else
 			// not a variable, must be an expression that returns an array
 		{
-			left.Value = generateExpression(moduleTable, state, *arrayAccessExpression.pArray, identifierType);
+			left.Value = generateExpression(moduleTable, state, *arrayAccessExpression.pArray, identifierType).Value;
 		}
 
 		// get the type of the left
@@ -1260,7 +1260,7 @@ namespace AlloyCompiler
 			memberValue = state.Builder->CreateLoad(identifierType.type, memberPtr);
 		}
 		else if (leftType->getTypeID() == llvm::Type::PointerTyID
-				&& identifierType.containedType != nullptr) {
+			&& identifierType.containedType != nullptr) {
 			// case where the value contains a pointer			
 			memberPtr = state.Builder->CreateGEP(identifierType.containedType, left.Value, memberIndex, "memberptr");
 			memberValue = state.Builder->CreateLoad(identifierType.containedType, memberPtr);
@@ -1310,8 +1310,7 @@ namespace AlloyCompiler
 		else
 			// neither an identifier nor a nested member access, must be an expression that returns a structure
 		{
-			left.Value = generateExpression(moduleTable, state, *memberAccessExpression.pObject, expectedType);
-			left.Ptr = nullptr;		// we don't have a pointer to a variable, so set this to null
+			left = generateExpression(moduleTable, state, *memberAccessExpression.pObject, expectedType);
 		}
 
 		// get the type of the left
@@ -1374,8 +1373,9 @@ namespace AlloyCompiler
 		//
 		// Given an expression such as EnumType|ValueA(43), this function will return:
 		//		- The type of the enum structure in expectedType.parentType
-		//		- The type of the enum value in expectedType.type
-		//		- The index of the enum value and the payload in the Value member of PtrValuePair as a structure with 2 values
+		//		- The type of the enum value in expectedType.type (structure of type EnumPayloadStruct)
+		//		- The index of the enum value in the Value member of PtrValuePair as a constant int
+		//		- A pointer to the EnumPayloadStruct in the Ptr member of PtrValuePair
 		//		- The type of the payload in containedType
 		//
 		const std::string_view memberName = enumValueExpression.pEnumValueNameToken->Value;
@@ -1418,11 +1418,6 @@ namespace AlloyCompiler
 			goto failed;
 		}
 
-		// set the type that we are expecting in return
-		expectedType.type = type;
-		expectedType.containedType = memberInfo.containedType;	// this is the type of payload, can be null
-		expectedType.parentType = type;
-		
 		// create an alloca to a structure of type EnumPayloadStruct
 		// and fill the structure with the enum index and payload value if any
 		EnumPayloadStruct = state.NamedValues.GetEnumPayloadStruct(*state.Context, memberInfo.containedType);
@@ -1439,6 +1434,11 @@ namespace AlloyCompiler
 			llvm::ConstantInt::get(*state.Context, llvm::APInt(32, state.Module->getDataLayout().getTypeAllocSize(type)))
 		);
 
+		// set the types that we are expecting in return
+		expectedType.type = EnumPayloadStruct;
+		expectedType.containedType = memberInfo.containedType;	// this is the type of payload, can be null
+		expectedType.parentType = type;
+
 		// store the index of the enum value in the first element of EnumPayloadStruct
 		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, EnumPayloadIndex);
 		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberInfo.memberIndex)), memberPtr, "savepayload");
@@ -1446,7 +1446,7 @@ namespace AlloyCompiler
 		if (enumValueExpression.pPayloadValue != nullptr) {
 			// compute the value of the payload
 			TypeSubtypePair expressionType = { expectedType.containedType, nullptr, nullptr };
-			llvm::Value* expressionVal = generateExpression(moduleTable, state, *enumValueExpression.pPayloadValue, expressionType);
+			llvm::Value* expressionVal = generateExpression(moduleTable, state, *enumValueExpression.pPayloadValue, expressionType).Value;
 
 			if (!expressionVal)
 			{
@@ -1460,13 +1460,63 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(expressionVal, memberPtr, "savepayload");
 		}
 
-		// store the structure type in the third element of EnumPayloadStruct
+		// store the structure type ID in the third element of EnumPayloadStruct
 		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, EnumPayloadEnumID);
 		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, state.NamedValues.GetID(expectedType.type))), memberPtr, "savepayload");
-		
+
 		result.Value = state.Builder->CreateLoad(EnumPayloadStruct, result.Ptr, "loadpayload");
 
-failed:
+	failed:
+		return result;
+	}
+
+	PtrValuePair generateEnumValueIndex(ModuleTable& moduleTable, LLVMState& state, const ENUM_VALUE& enumValueExpression,
+		TypeSubtypePair& expectedType)
+	{
+		//
+		// This function is equivalent to generateEnumValue except that it returns the index of the enum value and not the payload structure
+		//
+		const std::string_view memberName = enumValueExpression.pEnumValueNameToken->Value;
+		std::string_view enumName = enumValueExpression.pEnumName->pNameToken->Value;
+		NamedValues::TypeMemberInfo memberInfo;
+		int memberIndex = -1;
+		PtrValuePair result = {};
+		llvm::Value* memberPtr = nullptr;
+
+		// generate or retrieve the llvm type for this enumeration
+		llvm::Type* type = getTypeFromTypeName(moduleTable, state, enumValueExpression.pEnumName->pNameToken, enumValueExpression.pEnumName->GenericArguments, {});
+
+		if (nullptr == type) {
+			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken, "Type {0} not found!", enumValueExpression.pEnumName->pNameToken->Value);
+			goto failed;
+		}
+
+		// get the mangled name
+		enumName = state.NamedValues.GetTypeName(type);
+
+		memberInfo = state.NamedValues.GetEnumMemberIndex(enumName, memberName);
+		if (memberInfo.memberIndex == -1)
+		{
+			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+				"Type '{0}' is not an enum!", enumName);
+			goto failed;
+		}
+
+		if (memberInfo.memberIndex == -2)
+		{
+			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+				"Enum '{0}' does not have a member '{1}'!", enumName, memberName);
+			goto failed;
+		}
+
+		// set the types that we are expecting in return
+		expectedType.type = llvm::Type::getInt64Ty(*state.Context);		// the index is return in 64-bit int format
+		expectedType.containedType = memberInfo.containedType;	// this is the type of payload, can be null
+		expectedType.parentType = type;
+
+		result.Value = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, memberInfo.memberIndex));
+
+	failed:
 		return result;
 	}
 
@@ -1628,7 +1678,7 @@ failed:
 
 				// retrieve the actual type for ByRef arguments
 				argType.containedType = calleeFunc->getArg(argi)->getParamByRefType();
-				
+
 				if (argument.Is<UNARY>()) {
 					const UNARY& unary = *argument.Get<UNARY>();
 					std::string_view operatorStr = unary.pOpToken->Value;
@@ -1663,7 +1713,7 @@ failed:
 						goto error;
 					}
 
-					argVal = generateExpression(moduleTable, state, argument, argType);
+					argVal = generateExpression(moduleTable, state, argument, argType).Value;
 					// create a pointer to the evaluated expression and pass the pointer as argument
 					llvm::AllocaInst* ptr = state.Builder->CreateAlloca(argVal->getType());
 					state.Builder->CreateStore(argVal, ptr);
@@ -1671,7 +1721,7 @@ failed:
 				}
 			}
 			else {
-				argVal = generateExpression(moduleTable, state, argument, argType);
+				argVal = generateExpression(moduleTable, state, argument, argType).Value;
 
 				if (argVal == nullptr)
 				{
@@ -1709,16 +1759,16 @@ failed:
 		return result;
 	}
 
-	llvm::Value* generateEnclosedExpression(ModuleTable& moduleTable, LLVMState& state, const ENCLOSED_EXPRESSION& enclosedExpressionNode,
+	PtrValuePair generateEnclosedExpression(ModuleTable& moduleTable, LLVMState& state, const ENCLOSED_EXPRESSION& enclosedExpressionNode,
 		TypeSubtypePair& expectedType)
 	{
 		return generateExpression(moduleTable, state, *enclosedExpressionNode.pExpression, expectedType);
 	}
 
-	llvm::Value* compareEnumValues(ModuleTable& moduleTable, LLVMState& state, 
-									llvm::StructType* leftType, llvm::Value* leftVal, llvm::StructType* rightType, llvm::Value* rightVal, 
-									bool capture
-									)
+	llvm::Value* compareEnumValues(ModuleTable& moduleTable, LLVMState& state,
+		llvm::StructType* leftType, const PtrValuePair* leftVal, llvm::StructType* rightType, const PtrValuePair* rightVal,
+		bool capture
+	)
 	{
 		//
 		// for enums, we compare the types and the first element of the structure which the ID of the enum element
@@ -1729,14 +1779,16 @@ failed:
 
 		if (leftType == rightType)
 		{
+			llvm::Value* left = state.Builder->CreateLoad(leftType, leftVal->Ptr);
+			llvm::Value* right = state.Builder->CreateLoad(rightType, rightVal->Ptr);
 			{
-				llvm::Value* indexLeft = state.Builder->CreateExtractValue(leftVal, EnumPayloadIndex);
-				llvm::Value* indexRight = state.Builder->CreateExtractValue(rightVal, EnumPayloadIndex);
+				llvm::Value* indexLeft = state.Builder->CreateExtractValue(left, EnumPayloadIndex);
+				llvm::Value* indexRight = state.Builder->CreateExtractValue(right, EnumPayloadIndex);
 				result1 = state.Builder->CreateICmpEQ(indexLeft, indexRight);
 			}
 
 			// in the case of enums with payloads, this is where we capture the payload value
-			llvm::Value* payload = state.Builder->CreateExtractValue(leftVal, EnumPayloadValue);
+			llvm::Value* payload = state.Builder->CreateExtractValue(left, EnumPayloadValue);
 			if (payload
 				&& capture
 				) {
@@ -1745,8 +1797,8 @@ failed:
 
 			{
 				// now compare the enum type's unique ID
-				llvm::Value* idLeft = state.Builder->CreateExtractValue(leftVal, EnumPayloadEnumID);
-				llvm::Value* idRight = state.Builder->CreateExtractValue(rightVal, EnumPayloadEnumID);
+				llvm::Value* idLeft = state.Builder->CreateExtractValue(left, EnumPayloadEnumID);
+				llvm::Value* idRight = state.Builder->CreateExtractValue(right, EnumPayloadEnumID);
 				result2 = state.Builder->CreateICmpEQ(idLeft, idRight);
 			}
 
@@ -1757,9 +1809,9 @@ failed:
 		return result;
 	}
 
-	llvm::Value* compareStructValues(ModuleTable& moduleTable, LLVMState& state, 
-									llvm::StructType* leftType, llvm::Value* leftVal, llvm::StructType* rightType, llvm::Value* rightVal
-									)
+	llvm::Value* compareStructValues(ModuleTable& moduleTable, LLVMState& state,
+		llvm::StructType* leftType, llvm::Value* leftVal, llvm::StructType* rightType, llvm::Value* rightVal
+	)
 	{
 		llvm::Value* result = nullptr;
 
@@ -1785,13 +1837,15 @@ failed:
 
 		return result;
 	}
-	
+
 	llvm::Value* generateBinaryExpression(ModuleTable& moduleTable, LLVMState& state, const BINARY& binaryExpressionNode)
 	{
 		TypeSubtypePair leftExpressionType = { nullptr, nullptr };
-		llvm::Value* leftVal = generateExpression(moduleTable, state, *binaryExpressionNode.pLeft, leftExpressionType);
+		PtrValuePair left = generateExpression(moduleTable, state, *binaryExpressionNode.pLeft, leftExpressionType);
+		llvm::Value* leftVal = left.Value;
 		TypeSubtypePair rightExpressionType = { leftVal->getType(), nullptr };	// when computing rightVal, try to obtain a value of same type as leftVal
-		llvm::Value* rightVal = generateExpression(moduleTable, state, *binaryExpressionNode.pRight, rightExpressionType);
+		PtrValuePair right = generateExpression(moduleTable, state, *binaryExpressionNode.pRight, rightExpressionType);
+		llvm::Value* rightVal = right.Value;
 
 		if (!leftVal || !rightVal)
 		{
@@ -1800,8 +1854,9 @@ failed:
 			return nullptr;
 		}
 
-		llvm::Type* leftType = leftVal->getType();
-		llvm::Type* rightType = rightVal->getType();
+		// the parent type is set in case of enumerations and allows us to check if the enumerations are of the same type
+		llvm::Type* leftType = (leftExpressionType.parentType == nullptr ? leftVal->getType() : leftExpressionType.parentType);
+		llvm::Type* rightType = (rightExpressionType.parentType == nullptr ? rightVal->getType() : rightExpressionType.parentType);
 
 		// check that types match
 		if (leftType != rightType)
@@ -1826,10 +1881,10 @@ failed:
 					"Binary operator cannot be applied to structure or enum types! Current type is '{0}'.",
 					leftTypeName);
 			}
-			else if (leftTypeName.starts_with(_EnumPayloadStruct_)) {
+			else if (state.NamedValues.IsEnumType(leftType)) {
 				// according to the unwritten specs, we only capture when the right hand side is an enum value and not an identifier (or anything else)
 				bool capturePayload = binaryExpressionNode.pRight->Is<PRIMARY>() && binaryExpressionNode.pRight->Get<PRIMARY>()->Is<ENUM_VALUE>();
-				result = compareEnumValues(moduleTable, state, static_cast<llvm::StructType*>(leftType), leftVal, static_cast<llvm::StructType*>(rightType), rightVal, capturePayload);
+				result = compareEnumValues(moduleTable, state, static_cast<llvm::StructType*>(leftExpressionType.type), &left, static_cast<llvm::StructType*>(rightExpressionType.type), &right, capturePayload);
 			}
 			else {
 				result = compareStructValues(moduleTable, state, static_cast<llvm::StructType*>(leftType), leftVal, static_cast<llvm::StructType*>(rightType), rightVal);
@@ -1950,7 +2005,7 @@ failed:
 
 		if (operatorStr == "-")
 		{
-			llvm::Value* expressionVal = generateExpression(moduleTable, state, *unaryExpressionNode.pExpression, expectedType);
+			llvm::Value* expressionVal = generateExpression(moduleTable, state, *unaryExpressionNode.pExpression, expectedType).Value;
 
 			if (expressionVal)
 			{
@@ -1964,7 +2019,7 @@ failed:
 		else
 			if (operatorStr == "!")
 			{
-				llvm::Value* expressionVal = generateExpression(moduleTable, state, *unaryExpressionNode.pExpression, expectedType);
+				llvm::Value* expressionVal = generateExpression(moduleTable, state, *unaryExpressionNode.pExpression, expectedType).Value;
 
 				if (expressionVal)
 				{
@@ -1990,50 +2045,50 @@ failed:
 		return result;
 	}
 
-	llvm::Value* generatePrimaryExpression(ModuleTable& moduleTable, LLVMState& state, const PRIMARY& primary,
+	PtrValuePair generatePrimaryExpression(ModuleTable& moduleTable, LLVMState& state, const PRIMARY& primary,
 		TypeSubtypePair& expectedType)
 	{
 		//
 		// using PRIMARY = VariantNode<LITERAL, VARIABLE, VARIABLE_DEFINITION, FUNCTION_CALL, CONSTRUCTOR,
 		//  	POINTER_INIT, POINTER_MOVE, INITIALIZER_LIST, ENCLOSED_EXPRESSION>;
-		///
-		llvm::Value* result = nullptr;
+		//
+		PtrValuePair result;
 
 		if (primary.Is<LITERAL>()) {
-			result = generateLiteral(moduleTable, state, *primary.Get<LITERAL>(), expectedType);
+			result.Value = generateLiteral(moduleTable, state, *primary.Get<LITERAL>(), expectedType);
 		}
 		else if (primary.Is<VARIABLE>()) {
-			result = generateIdentifier(moduleTable, state, *primary.Get<VARIABLE>(), expectedType).Value;
+			result = generateIdentifier(moduleTable, state, *primary.Get<VARIABLE>(), expectedType);
 		}
 		else if (primary.Is<CONSTRUCTOR>()) {
-			result = generateConstructorExpression(moduleTable, state, *primary.Get<CONSTRUCTOR>());
+			result.Value = generateConstructorExpression(moduleTable, state, *primary.Get<CONSTRUCTOR>());
 		}
 		else if (primary.Is<POINTER_INIT>()) {
-			result = generatePointerInitializerExpression(moduleTable, state, *primary.Get<POINTER_INIT>(), expectedType);
+			result.Value = generatePointerInitializerExpression(moduleTable, state, *primary.Get<POINTER_INIT>(), expectedType);
 		}
 		else if (primary.Is<POINTER_MOVE>()) {
-			result = generatePointerMoveExpression(moduleTable, state, *primary.Get<POINTER_MOVE>(), expectedType);
+			result.Value = generatePointerMoveExpression(moduleTable, state, *primary.Get<POINTER_MOVE>(), expectedType);
 		}
 		else if (primary.Is<INITIALIZER_LIST>()) {
-			result = generateInitializerListExpression(moduleTable, state, *primary.Get<INITIALIZER_LIST>(), expectedType);
+			result.Value = generateInitializerListExpression(moduleTable, state, *primary.Get<INITIALIZER_LIST>(), expectedType);
 		}
 		else if (primary.Is<VARIABLE_DEFINITION>()) {
-			result = generateVariableDefinitionExpression(moduleTable, state, *primary.Get<VARIABLE_DEFINITION>());
+			result.Value = generateVariableDefinitionExpression(moduleTable, state, *primary.Get<VARIABLE_DEFINITION>());
 		}
 		else if (primary.Is<ARRAY_ACCESS>()) {
-			result = generateArrayAccessExpression(moduleTable, state, *primary.Get<ARRAY_ACCESS>(), expectedType).Value;
+			result = generateArrayAccessExpression(moduleTable, state, *primary.Get<ARRAY_ACCESS>(), expectedType);
 		}
 		else if (primary.Is<MEMBER_ACCESS>()) {
-			result = generateMemberAccessExpression(moduleTable, state, *primary.Get<MEMBER_ACCESS>(), expectedType).Value;
+			result = generateMemberAccessExpression(moduleTable, state, *primary.Get<MEMBER_ACCESS>(), expectedType);
 		}
 		else if (primary.Is<FUNCTION_CALL>()) {
-			result = generateFunctionCallExpression(moduleTable, state, *primary.Get<FUNCTION_CALL>());
+			result.Value = generateFunctionCallExpression(moduleTable, state, *primary.Get<FUNCTION_CALL>());
 		}
 		else if (primary.Is<ENCLOSED_EXPRESSION>()) {
 			result = generateEnclosedExpression(moduleTable, state, *primary.Get<ENCLOSED_EXPRESSION>(), expectedType);
 		}
 		else if (primary.Is<ENUM_VALUE>()) {
-			result = generateEnumValue(moduleTable, state, *primary.Get<ENUM_VALUE>(), expectedType).Value;
+			result = generateEnumValue(moduleTable, state, *primary.Get<ENUM_VALUE>(), expectedType);
 		}
 		else {
 			ASSERT(false, "Unknown primary expression node kind!");
@@ -2080,7 +2135,7 @@ failed:
 			return nullptr;
 		}
 
-		llvm::Value* expressionVal = generateExpression(moduleTable, state, *assignment.pValue, expectedType);
+		llvm::Value* expressionVal = generateExpression(moduleTable, state, *assignment.pValue, expectedType).Value;
 
 		if (!expressionVal)
 		{
@@ -2099,30 +2154,30 @@ failed:
 		return state.Builder->CreateStore(expressionVal, ptr);
 	}
 
-	llvm::Value* generateExpression(ModuleTable& moduleTable, LLVMState& state, const EXPRESSION& expressionNode,
+	PtrValuePair generateExpression(ModuleTable& moduleTable, LLVMState& state, const EXPRESSION& expressionNode,
 		TypeSubtypePair& expectedType)
 	{
-		llvm::Value* result = nullptr;
+		PtrValuePair result;
 
 		if (expressionNode.Is<BINARY>()) {
-			result = generateBinaryExpression(moduleTable, state, *expressionNode.Get<BINARY>());
+			result.Value = generateBinaryExpression(moduleTable, state, *expressionNode.Get<BINARY>());
 		}
 		else if (expressionNode.Is<UNARY>()) {
-			result = generateUnaryExpression(moduleTable, state, *expressionNode.Get<UNARY>(), expectedType);
+			result.Value = generateUnaryExpression(moduleTable, state, *expressionNode.Get<UNARY>(), expectedType);
 		}
 		else if (expressionNode.Is<PRIMARY>()) {
 			result = generatePrimaryExpression(moduleTable, state, *expressionNode.Get<PRIMARY>(), expectedType);
 		}
 		else if (expressionNode.Is<ASSIGNMENT>()) {
-			result = generateAssignmentExpression(moduleTable, state, *expressionNode.Get<ASSIGNMENT>(), expectedType);
+			result.Value = generateAssignmentExpression(moduleTable, state, *expressionNode.Get<ASSIGNMENT>(), expectedType);
 		}
 		else if (expressionNode.Is<POSTFIX>()) {
 			const POSTFIX& postfix = *expressionNode.Get<POSTFIX>();
 			if (postfix.Is<ARRAY_ACCESS>()) {
-				result = generateArrayAccessExpression(moduleTable, state, *postfix.Get<ARRAY_ACCESS>(), expectedType).Value;
+				result = generateArrayAccessExpression(moduleTable, state, *postfix.Get<ARRAY_ACCESS>(), expectedType);
 			}
 			else if (postfix.Is<MEMBER_ACCESS>()) {
-				result = generateMemberAccessExpression(moduleTable, state, *postfix.Get<MEMBER_ACCESS>(), expectedType).Value;
+				result = generateMemberAccessExpression(moduleTable, state, *postfix.Get<MEMBER_ACCESS>(), expectedType);
 			}
 			else {
 				ASSERT(false, "Unknown postfix expression node kind!");
@@ -2165,7 +2220,7 @@ failed:
 		if (forLoop.pInitialization != nullptr)
 		{
 			TypeSubtypePair tempType = { nullptr, nullptr };
-			llvm::Value* initVal = generateExpression(moduleTable, state, *forLoop.pInitialization, tempType);
+			llvm::Value* initVal = generateExpression(moduleTable, state, *forLoop.pInitialization, tempType).Value;
 
 			if (initVal == nullptr)
 			{
@@ -2199,7 +2254,7 @@ failed:
 		// emit step value
 		if (forLoop.pIncrement != nullptr) {
 			TypeSubtypePair tempType = { nullptr, nullptr };
-			llvm::Value* stepVal = generateExpression(moduleTable, state, *forLoop.pIncrement, tempType);
+			llvm::Value* stepVal = generateExpression(moduleTable, state, *forLoop.pIncrement, tempType).Value;
 
 			if (stepVal == nullptr)
 			{
@@ -2213,7 +2268,7 @@ failed:
 		llvm::Value* conditionVal = nullptr;
 		if (forLoop.pCondition != nullptr) {
 			TypeSubtypePair tempType = { nullptr, nullptr };
-			conditionVal = generateExpression(moduleTable, state, *forLoop.pCondition, tempType);
+			conditionVal = generateExpression(moduleTable, state, *forLoop.pCondition, tempType).Value;
 
 			if (conditionVal == nullptr)
 			{
@@ -2263,7 +2318,7 @@ failed:
 
 		// emit the condition
 		TypeSubtypePair tempType = { nullptr, nullptr };
-		llvm::Value* conditionVal = generateExpression(moduleTable, state, *whileLoop.pCondition, tempType);
+		llvm::Value* conditionVal = generateExpression(moduleTable, state, *whileLoop.pCondition, tempType).Value;
 
 		if (conditionVal == nullptr)
 		{
@@ -2300,20 +2355,18 @@ failed:
 				);
 			}
 			else {
-				llvm::IRBuilder<> tempBuilder(insertionBlock, insertionBlock->begin());
-				// if the variable already exists, update it. Otherwise create a new variable
-				ValueTypePair* value = state.NamedValues.GetValue(name);
-				if (value) {
-					tempBuilder.CreateStore(payload, value->value);
-				}
-				else {
-					// create the alloca
-					llvm::AllocaInst* allocaInst = tempBuilder.CreateAlloca(payload->getType(), nullptr, name);
-					tempBuilder.CreateStore(payload, allocaInst);
-					// add the variable to the named values
-					state.NamedValues.InsertValue(std::string(name), allocaInst, payload->getType(),
-						nullptr, false, false);
-				}
+				// llvm::IRBuilder<> tempBuilder(insertionBlock, insertionBlock->begin());
+				// llvm::AllocaInst* allocaInst = tempBuilder.CreateAlloca(payload->getType(), nullptr, name);
+				// create the alloca
+				llvm::AllocaInst* allocaInst = createEntryBlockAlloca(
+					state.Builder->GetInsertBlock()->getParent(),
+					name,
+					payload->getType()
+				);
+				state.Builder->CreateStore(payload, allocaInst);
+				// add the variable to the named values
+				state.NamedValues.InsertValue(name, allocaInst, payload->getType(),
+					nullptr, false, false);
 			}
 		}
 	}
@@ -2324,7 +2377,7 @@ failed:
 		llvm::Value* payload = nullptr;
 
 		state.NamedValues.GetEnumCapturedValue() = nullptr;	// reset the captured payload value in case it is used in the condition statement
-		llvm::Value* conditionVal = generateExpression(moduleTable, state, *ifStatement.pCondition, tempType);
+		llvm::Value* conditionVal = generateExpression(moduleTable, state, *ifStatement.pCondition, tempType).Value;
 
 		if (conditionVal == nullptr)
 		{
@@ -2355,7 +2408,7 @@ failed:
 
 		// if provided, create a variable with name ifStatement.pCaptureNameToken and set the value to the captured value
 		// the captured value is set in the binary comparison expression
-		captureEnumPayload(state, ifStatement.pCaptureNameToken, payload, thenBlock);
+		captureEnumPayload(state, ifStatement.pCaptureNameToken, payload, &func->getEntryBlock());
 
 		// the then block can be empty and return a null value, we don't really care
 		generateStatement(moduleTable, state, *ifStatement.pStatement);
@@ -2430,7 +2483,7 @@ failed:
 		}
 
 		TypeSubtypePair tempType = { nullptr, nullptr };
-		llvm::Value* expressionValue = generateExpression(moduleTable, state, *returnStatement.pValue, tempType);
+		llvm::Value* expressionValue = generateExpression(moduleTable, state, *returnStatement.pValue, tempType).Value;
 
 		if (expressionValue == nullptr)
 		{
@@ -2465,13 +2518,14 @@ failed:
 		llvm::BasicBlock* afterBlock = nullptr;
 		llvm::BasicBlock* switchBlock = nullptr;
 		llvm::Type* EnumType = nullptr;
+		llvm::Value* payload = nullptr;
 
 		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
 		ASSERT(func != nullptr, "No function to insert into!");
 
 		// generate and check the condition expression for the switch statement
 		TypeSubtypePair tempType = { nullptr, nullptr };
-		llvm::Value* conditionVal = generateExpression(moduleTable, state, *statement.pSwitchValue, tempType);
+		llvm::Value* conditionVal = generateExpression(moduleTable, state, *statement.pSwitchValue, tempType).Value;
 		if (conditionVal == nullptr)
 		{
 			goto failed;
@@ -2481,6 +2535,9 @@ failed:
 		if (state.NamedValues.GetTypeName(conditionVal->getType()).starts_with(_EnumPayloadStruct_))
 		{
 			EnumType = tempType.parentType;
+			// check if there is a payload and load it
+			payload = state.Builder->CreateExtractValue(conditionVal, EnumPayloadValue);
+			// now extract the index of the enum value
 			conditionVal = state.Builder->CreateExtractValue(conditionVal, EnumPayloadIndex);
 		}
 
@@ -2501,45 +2558,48 @@ failed:
 		switchInst = state.Builder->CreateSwitch(conditionVal, afterBlock, statement.Cases.size());
 
 		for (auto& caseStmt : statement.Cases) {
-			llvm::Value* payload = nullptr;
 			EXPRESSION* expr = std::get<0>(caseStmt);
 			tempType = { nullptr, nullptr };
 
 			// in order to accomodate enum payload capture, we need to create a new identifier scope before entering the case's statement block
 			state.NamedValues.PushScope("");
 
-			llvm::Value* cond = generateExpression(moduleTable, state, *expr, tempType);
-			if (EnumType != nullptr) {
-				// switch/case statements using enumerations, the enumerations should be of the same type
-				if (EnumType != tempType.type) {
-					logErrorAtCurrentPosition(nullptr, "Case condition type {0} is not of the same enum type as switch value {1}!", 
-						state.NamedValues.GetTypeName(tempType.type), state.NamedValues.GetTypeName(EnumType));
-					goto failed;
-				}
-				
-				// for enums, we compare the index of enum value
-				payload = state.Builder->CreateExtractValue(cond, EnumPayloadValue);
-				cond = state.Builder->CreateExtractValue(cond, EnumPayloadIndex);
-			}
-			
-			if (!llvm::isa<llvm::ConstantInt>(cond)) {
-				logErrorAtCurrentPosition(nullptr, "Switch/Case condition is not a constant integer!");
-				goto failed;
-			}
-
 			// create a new basic block to start insertion into
 			llvm::BasicBlock* caseBlock = llvm::BasicBlock::Create(*state.Context, "case", func);
 
-			if (payload != nullptr) {
-				// if provided, create a variable and set the value to the captured value
-				Token* tok = std::get<1>(caseStmt);
-				if (tok != nullptr && !tok->Value.empty()) {
-					captureEnumPayload(state, tok, payload, caseBlock);
-				}
-			}
-
 			// start insertion into the caseBlock
 			state.Builder->SetInsertPoint(caseBlock);
+
+			PtrValuePair cond = generateExpression(moduleTable, state, *expr, tempType);
+			if (EnumType != nullptr) {
+				// switch/case statements using enumerations, the enumerations should be of the same type
+				if (EnumType != tempType.parentType) {
+					logErrorAtCurrentPosition(nullptr, "Case condition type {0} is not of the same enum type as switch value {1}!",
+						state.NamedValues.GetTypeName(tempType.parentType), state.NamedValues.GetTypeName(EnumType));
+					goto failed;
+				}
+
+				if (payload != nullptr) {
+					// if provided, create a variable and set the value to the captured value
+					Token* tok = std::get<1>(caseStmt);
+					if (tok != nullptr && !tok->Value.empty()) {
+						captureEnumPayload(state, tok, payload, caseBlock);
+					}
+				}
+
+				// retrieve the index of the enum value which should be a constant int
+				if (!expr->Is<PRIMARY>() || !expr->Get<PRIMARY>()->Is<ENUM_VALUE>()) {
+					logErrorAtCurrentPosition(nullptr, "Case condition is not part of the enumeration!");
+					goto failed;
+				}
+				ENUM_VALUE* ev = expr->Get<PRIMARY>()->Get<ENUM_VALUE>();
+				cond.Value = generateEnumValueIndex(moduleTable, state, *ev, tempType).Value;
+				if (!llvm::isa<llvm::ConstantInt>(cond.Value)) {
+					logErrorAtCurrentPosition(nullptr, "Switch/Case condition is not a constant value!");
+					goto failed;
+				}
+
+			}
 
 			// generate the body of the case statement (can be empty)
 			if (std::get<2>(caseStmt) != nullptr) {
@@ -2553,7 +2613,10 @@ failed:
 				}
 			}
 
-			switchInst->addCase(static_cast<llvm::ConstantInt*>(cond), caseBlock);
+			// jump to after the switch statement
+			state.Builder->CreateBr(afterBlock);
+
+			switchInst->addCase(static_cast<llvm::ConstantInt*>(cond.Value), caseBlock);
 
 			// end of scope for this case condition
 			state.NamedValues.PopScope();
@@ -2564,7 +2627,7 @@ failed:
 
 		// switch expr always returns 0.0
 		result = llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
-			
+
 	failed:
 		return result;
 	}
@@ -2717,7 +2780,7 @@ failed:
 
 	llvm::Type* generateEnumDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
 		const ENUM_TYPE& enumDefinition, const std::vector<TYPE*>& genericArguments
-		)
+	)
 	{
 		//
 		// In order to support payloads and generics in enumerations, we are processing and storing them in a way very similar to structures
@@ -2849,6 +2912,7 @@ failed:
 			|| functionDefinition.pBody == nullptr		// this is the case for external function definitions
 			)
 		{
+			state.NamedValues.PopScope();
 			moduleTable.PopContext();
 			return func;
 		}
@@ -2962,7 +3026,7 @@ failed:
 		if (state.Optimizations)
 		{
 			// run the optimizer on the function.
-			// state.FPM->run(*func, *state.FAM);
+// 			state.FPM->run(*func, *state.FAM);
 		}
 
 		state.Builder.reset(PreviousBuilder);

@@ -10,37 +10,37 @@ type EnumType(type T) = enum
 
 fn main() -> i32
 {
-	var enumVar = EnumType(i32)|ValueA(43);
-	var enum2Var = EnumType(i64)|ValueB(2.54);
-	var enum3Var = EnumType(i32)|ValueC;
+	var enumVar = EnumType(i64)|ValueA(43);
+	var enum2Var = EnumType(i32)|ValueB(2.54);
+	var enum3Var = EnumType(i64)|ValueC;
 
-	if (enumVar == EnumType(i32)|ValueA) -> num
+	if (enumVar == EnumType(i64)|ValueA) -> num
 	{
-		if (enum2Var == EnumType(i64)|ValueB) -> fnum
+		if (enum2Var == EnumType(i32)|ValueB) -> fnum
 		{
 
 			switch (enumVar)
 			{
-				case (EnumType(i32)|ValueA) -> num	// capture is optional, and can be omitted even when there is a payload, in which case the payload is inaccessible
+				case (EnumType(i64)|ValueA) -> num	// capture is optional, and can be omitted even when there is a payload, in which case the payload is inaccessible
 				{
 					// use num
 					printf("payload A is %d", num);
 				}
 
 				// no fallthrough between cases!
-				case (EnumType(i32)|ValueB) -> num
+				case (EnumType(i64)|ValueB) -> num2
 				{
 					// use num2
-					printf("payload B is %d", num);
+					printf("payload B is %d", num2);
 				}
 
-				case (EnumType(i32)|ValueC)	// ValueC has no payload, cannot capture
+				case (EnumType(i64)|ValueC)	// ValueC has no payload, cannot capture
 				{
 			
 				}
 			}
 			printf("enums are equal, payload A is %d, payload B is %f", num, fnum);
-					return num;
+			return num;
 		}
 		else
 		{
