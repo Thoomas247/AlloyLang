@@ -23,7 +23,7 @@ namespace AlloyCompiler
 	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
 	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, llvm::Type* parentType, const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName,
-		const std::vector<EXPRESSION*>& functionArguments, std::unordered_map<std::string, std::string>& typeMap);
+		const std::vector<EXPRESSION*>& functionArguments);
 	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::string& moduleName,
 		const std::vector<TYPE*>& genericArguments);
 	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& externDefinition, const std::string& moduleName);
@@ -1041,7 +1041,7 @@ namespace AlloyCompiler
 		llvm::CallInst* Ptr = state.Builder->CreateMalloc(PointerType, subElementType, AllocSize, count);
 
 		// create code to go through the list of members and initialize them to the given value
-		// we need to create the loop within the llvm code because we don' t know before hand how many objects we are creating
+		// we need to create the loop within the llvm code because we don't know beforehand how many objects we are creating
 		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
 		ASSERT(func != nullptr, "No function to insert into!");
 
@@ -1065,7 +1065,7 @@ namespace AlloyCompiler
 
 		// create the instructions to store the value for each element
 		llvm::Value* current = tempBuilder.CreateLoad(start->getAllocatedType(), start);
-		llvm::Value* memberPtr = tempBuilder.CreateGEP(pointerType, Ptr, current, "pointerinit");
+		llvm::Value* memberPtr = tempBuilder.CreateGEP(subElementType, Ptr, current, "pointerinit");
 		tempBuilder.CreateStore(defaultValue, memberPtr);
 
 		// increment loop variable (start) by step value
@@ -1612,7 +1612,7 @@ namespace AlloyCompiler
 		// check if function is already in the parser and process it
 		if (!calleeFunc)
 		{
-			calleeFunc = generateFunctionDefinition(moduleTable, state, type, *funcResult.pDefiniton, funcResult.ModuleName, Arguments, typeMap);
+			calleeFunc = generateFunctionDefinition(moduleTable, state, type, *funcResult.pDefiniton, funcResult.ModuleName, Arguments);
 
 			ASSERT(Arguments.size() > 0 || calleeFunc == state.Module->getFunction(funcResult.MangledName), "Function was not generated with the right name!");
 		}
@@ -2879,8 +2879,7 @@ namespace AlloyCompiler
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state,
 		llvm::Type* parentType,
 		const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName,
-		const std::vector<EXPRESSION*>& functionArguments,
-		std::unordered_map<std::string, std::string>& typeMap_)
+		const std::vector<EXPRESSION*>& functionArguments)
 	{
 		//
 		// Generate either a global function definition or a member function definition
@@ -3121,7 +3120,7 @@ namespace AlloyCompiler
 			}*/
 
 		std::unordered_map<std::string, std::string> typeMap;
-		llvm::Function* result = generateFunctionDefinition(moduleTable, state, nullptr, *pMainFunction, moduleTable.GetCurrentContext(), {}, typeMap);
+		llvm::Function* result = generateFunctionDefinition(moduleTable, state, nullptr, *pMainFunction, moduleTable.GetCurrentContext(), {});
 		state.MainFunctionName = moduleTable.GetCurrentContext() + "::main";
 
 		std::error_code errorCode;

@@ -68,7 +68,19 @@ namespace AlloyCompiler
 
 	void NamedValues::PushScope(const std::string_view& name)
 	{
+		//
+		// for the generic type maps, we copy the previous map into the current one, new types will then either overwrite or be added to the map
+		// e.g. we can start with:
+		// T -> i32 
+		// and end up with :
+		// T -> i64
+		// T1 ->f32
+		//
+		const std::unordered_map<std::string, std::string>& previousTypeMap = m_ScopeStack.back().GenericTypeMap;
+
 		m_ScopeStack.emplace_back(name);
+
+		m_ScopeStack.back().GenericTypeMap.insert(previousTypeMap.begin(), previousTypeMap.end());
 	}
 
 	void NamedValues::PopScope()
@@ -340,7 +352,7 @@ namespace AlloyCompiler
 	{
 		auto found = m_ScopeStack.back().GenericTypeMap.find(typeName);
 		if (found == m_ScopeStack.back().GenericTypeMap.end()) {
-			return "";
+			return typeName;
 		}
 		else {
 			return found->second;
