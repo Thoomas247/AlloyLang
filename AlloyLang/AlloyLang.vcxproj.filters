@@ -131,6 +131,9 @@
     <ClInclude Include="compiler\codegen\LibraryFunctions.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="compiler\codegen\Inlines.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.alloy" />

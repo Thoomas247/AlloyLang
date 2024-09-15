@@ -1,0 +1,65 @@
+extern printf(const fmt: String, ...);
+
+type Vector3Of(type T) = struct
+{
+	x: T,
+	y: T,
+	z: T,
+};
+
+type IVec3 = Vector3Of(i32);
+type UVec3 = Vector3Of(u32);
+type FVec3 = Vector3Of(f32);
+
+
+type Vector4Of(type T) = struct
+{
+	x: T,
+	y: T,
+	z: T,
+	w: T,
+};
+
+type Quat = Vector4Of(f32);
+type FVec4 = Vector4Of(f32);
+
+
+type Mat4 = struct
+{
+	row_1: FVec4,
+	row_2: FVec4,
+	row_3: FVec4,
+	row_4: FVec4,
+};
+
+fn Mat4:create_identity() -> Mat4
+{
+	return Mat4
+	{
+		row_1 = FVec4 { 1.0, 0.0, 0.0, 0.0 },
+		row_2 = FVec4 { 0.0, 1.0, 0.0, 0.0 },
+		row_3 = FVec4 { 0.0, 0.0, 1.0, 0.0 },
+		row_4 = FVec4 { 0.0, 0.0, 0.0, 1.0 },
+	};
+}
+
+
+type Transform = struct
+{
+	position:	FVec3,
+	rotation:	Quat,
+	scale:		FVec3,
+};
+
+fn Transform:get_transform_matrix(const self: &Self) -> Mat4
+{
+	return Mat4:create_identity();
+};
+
+
+fn main() -> i32
+{
+	printf("Hello World!");
+
+	return 0;
+}

@@ -143,6 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\codegen\CodeGenerator.hpp" />
+    <ClInclude Include="compiler\codegen\Inlines.hpp" />
     <ClInclude Include="compiler\codegen\LibraryFunctions.hpp" />
     <ClInclude Include="compiler\codegen\NamedValues.hpp" />
     <ClInclude Include="compiler\Compiler.hpp" />
