@@ -51,6 +51,9 @@
     <ClCompile Include="compiler\codegen\LibraryFunctions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="compiler\codegen\Inlines.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\module\token\Token.hpp">

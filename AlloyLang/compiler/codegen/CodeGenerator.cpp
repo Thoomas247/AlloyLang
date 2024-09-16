@@ -1,5 +1,6 @@
 #include "CodeGenerator.hpp"
 #include "LibraryFunctions.hpp"
+#include "Inlines.hpp"
 
 namespace AlloyCompiler
 {
@@ -3096,6 +3097,9 @@ namespace AlloyCompiler
 			logErrorAtCurrentPosition(nullptr, "Cannot find main entry point!");
 			return false;
 		}
+
+		// generate all the casting functions for the built-in types
+		generateAllCastFunctions(state);
 
 		/* pre-process all types definitions as these might be used throughout the code
 		* for this to work properly we need to process the types in the order they appear in the file because one type can reference a previous type

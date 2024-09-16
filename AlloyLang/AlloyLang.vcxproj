@@ -132,6 +132,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="compiler\codegen\CodeGenerator.cpp" />
+    <ClCompile Include="compiler\codegen\Inlines.cpp" />
     <ClCompile Include="compiler\codegen\LibraryFunctions.cpp" />
     <ClCompile Include="compiler\codegen\NamedValues.cpp" />
     <ClCompile Include="compiler\Compiler.cpp" />
