@@ -201,7 +201,82 @@ namespace AlloyCompiler
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
 		state.Builder->SetInsertPoint(entryBlock);
 
-		llvm::Value* castValue = state.Builder->CreateTruncOrBitCast(function->getArg(0), toType);
+		llvm::Value* fromValue = function->getArg(0);
+		llvm::Value* castValue = nullptr;
+
+		TypeSizePair fromInfo = getTypeSizePair(fromName);
+		TypeSizePair toInfo = getTypeSizePair(toName);
+
+		if (fromInfo.Type == TypeSizePair::Float)
+		{
+			// float to float
+			if (toInfo.Type == TypeSizePair::Float)
+			{
+				castValue = state.Builder->CreateFPCast(fromValue, toType);
+			}
+
+			// float to int
+			else
+			{
+				// convert float to int of same size
+
+				if (toInfo.Type == TypeSizePair::Signed)
+				{
+					if (fromInfo.Size == 64)
+					{
+						fromValue = state.Builder->CreateFPToSI(fromValue, llvm::IntegerType::getInt64Ty(*state.Context));
+					}
+
+					else if (fromInfo.Size == 32)
+					{
+						fromValue = state.Builder->CreateFPToSI(fromValue, llvm::IntegerType::getInt32Ty(*state.Context));
+					}
+				}
+
+				else if (toInfo.Type == TypeSizePair::Unsigned)
+				{
+					if (fromInfo.Size == 64)
+					{
+						fromValue = state.Builder->CreateFPToUI(fromValue, llvm::IntegerType::getInt64Ty(*state.Context));
+					}
+
+					else if (fromInfo.Size == 32)
+					{
+						fromValue = state.Builder->CreateFPToUI(fromValue, llvm::IntegerType::getInt32Ty(*state.Context));
+					}
+				}
+
+				// castValue is now an integer
+				// from big int to small int, just truncate; from small int to big int, zero-extend
+				castValue = state.Builder->CreateZExtOrTrunc(fromValue, toType);
+			}
+		}
+
+		else
+		{
+			// int to float
+			if (toInfo.Type == TypeSizePair::Float)
+			{
+				
+				if (fromInfo.Type == TypeSizePair::Signed)
+				{
+					castValue = state.Builder->CreateSIToFP(fromValue, toType);
+				}
+
+				else if (fromInfo.Type == TypeSizePair::Unsigned)
+				{
+					castValue = state.Builder->CreateUIToFP(fromValue, toType);
+				}
+				
+			}
+
+			// int to int
+			else
+			{
+				castValue = state.Builder->CreateZExtOrTrunc(fromValue, toType);
+			}
+		}
+		
 
 		ASSERT(castValue != nullptr, "Invalid cast operation!");
 
@@ -223,7 +298,7 @@ namespace AlloyCompiler
 			for (auto& from : numericTypeNames)
 			{
 				generateCastFunction(state, from, to);
-				//generateBitCastFunction(state, from, to);
+				generateBitCastFunction(state, from, to);
 			}
 		}
 	}
