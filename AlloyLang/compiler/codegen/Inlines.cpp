@@ -49,7 +49,7 @@ namespace AlloyCompiler
 
 	llvm::Function* generateCastFunction(LLVMState& state, const std::string_view& fromName, const std::string_view& toName)
 	{
-		const std::string functionName = std::string(fromName) + ":" + CAST_FUNCTION_NAME + "@" + std::string(toName);
+		const std::string functionName = std::string(fromName) + "@" + CAST_FUNCTION_NAME + "@" + std::string(toName);
 
 		llvm::Function* function = state.Module->getFunction(functionName);
 		if (function != nullptr)
@@ -69,6 +69,9 @@ namespace AlloyCompiler
 		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, functionName, *state.Module);
 
 		ASSERT(function != nullptr, "Failed to generate cast function!");
+
+		// force inlining of Cast functions
+		function->addFnAttr(llvm::Attribute::AlwaysInline);
 
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
 		state.Builder->SetInsertPoint(entryBlock);
@@ -177,7 +180,7 @@ namespace AlloyCompiler
 
 	llvm::Function* generateBitCastFunction(LLVMState& state, const std::string_view& fromName, const std::string_view& toName)
 	{
-		const std::string functionName = std::string(fromName) + ":" + BIT_CAST_FUNCTION_NAME + "@" + std::string(toName);
+		const std::string functionName = std::string(fromName) + "@" + BIT_CAST_FUNCTION_NAME + "@" + std::string(toName);
 
 		llvm::Function* function = state.Module->getFunction(functionName);
 		if (function != nullptr)
@@ -197,6 +200,9 @@ namespace AlloyCompiler
 		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, functionName, *state.Module);
 
 		ASSERT(function != nullptr, "Failed to generate bit cast function!");
+
+		// force inlining of BitCast functions
+		function->addFnAttr(llvm::Attribute::AlwaysInline);
 
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
 		state.Builder->SetInsertPoint(entryBlock);
