@@ -70,6 +70,9 @@ namespace AlloyCompiler
 
 		ASSERT(function != nullptr, "Failed to generate cast function!");
 
+		// force inlining of Cast functions
+		function->addFnAttr(llvm::Attribute::AlwaysInline);
+
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
 		state.Builder->SetInsertPoint(entryBlock);
 
@@ -197,6 +200,9 @@ namespace AlloyCompiler
 		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, functionName, *state.Module);
 
 		ASSERT(function != nullptr, "Failed to generate bit cast function!");
+
+		// force inlining of BitCast functions
+		function->addFnAttr(llvm::Attribute::AlwaysInline);
 
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
 		state.Builder->SetInsertPoint(entryBlock);
