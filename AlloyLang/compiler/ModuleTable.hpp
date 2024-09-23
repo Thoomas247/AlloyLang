@@ -5,9 +5,16 @@
 
 namespace AlloyCompiler
 {
+	const std::array<std::string, 10> NUMERIC_TYPE_NAMES = {
+			"i8", "i16", "i32", "i64",
+			"u8", "u16", "u32", "u64",
+			"f32", "f64"
+	};
+
 	enum class SearchResultCode : uint8_t
 	{
 		Found,
+		BuiltIn,
 		NotFound,
 		Inaccessible
 	};
@@ -15,8 +22,8 @@ namespace AlloyCompiler
 	template <typename T>
 	struct SearchResult
 	{
-		SearchResultCode Code;
-		T* pDefiniton;
+		SearchResultCode Code = SearchResultCode::Inaccessible;
+		T* pDefiniton = nullptr;
 		std::string MangledName;
 		std::string ModuleName;
 	};
@@ -42,7 +49,7 @@ namespace AlloyCompiler
 
 	private:
 		template <typename T>
-		using GetDefinitionFn = Definition<T>(*)(Module&, const std::string_view&);
+		using GetDefinitionFn = Definition<T>(*)(const Module&, const std::string_view&);
 
 		struct ModuleAndSymbolName
 		{
@@ -68,6 +75,7 @@ namespace AlloyCompiler
 		SearchResult<T> getDefinition(GetDefinitionFn<T> getDefinitionFn, const std::string_view& name) const;
 
 	private:
+		Module m_GlobalModule;
 		std::unordered_map<std::string, Module>& m_Modules;
 		std::deque<std::string> m_ContextStack;
 	};
@@ -77,7 +85,7 @@ namespace AlloyCompiler
 	{
 		std::string realModuleName = std::string(moduleName);
 
-		if (realModuleName.empty())
+		if (moduleName.empty())
 		{
 			realModuleName = m_ContextStack.back();
 		}
@@ -90,6 +98,13 @@ namespace AlloyCompiler
 
 			result.Definition = getDefinitionFn(givenModule, symbolName);
 			result.ModuleName = realModuleName;
+		}
+
+		// if not found in this module, but no module name was given, check the built-in functions
+		if (result.Definition.IsNull() && moduleName.empty())
+		{
+			result.Definition = getDefinitionFn(m_GlobalModule, symbolName);
+			result.ModuleName = "";
 		}
 
 		return result;
@@ -108,7 +123,7 @@ namespace AlloyCompiler
 			symbolName = moduleAndSymbolName.SymbolName;
 		}
 
-		// check whatever the given module is for the symbol
+		// check the given module for the symbol, also check the global module
 		ModuleDefinitionPair<T> moduleAndDefinition = getDefinitionInModule(getDefinitionFn, moduleName, symbolName);
 
 		// if not found in given module, check if any alias matches the given module name, and check in those aliased modules
@@ -156,8 +171,15 @@ namespace AlloyCompiler
 			result.pDefiniton = nullptr;
 		}
 
+		else if (moduleAndDefinition.ModuleName.empty())
+		{
+			result.Code = SearchResultCode::BuiltIn;
+			result.MangledName = symbolName;
+			result.ModuleName = "";
+			result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
+		}
+
 		else if (moduleAndDefinition.Definition.Access == Visibility::Private
-			&& !moduleAndDefinition.ModuleName.empty()
 			&& moduleAndDefinition.ModuleName != m_ContextStack.back())
 		{
 			result.Code = SearchResultCode::Inaccessible;

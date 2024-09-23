@@ -11,16 +11,17 @@ namespace AlloyCompiler
 		Module(const fs::path& filePath);
 
 		bool Generate();
-		const NodeBuffer& GetNodeBuffer() const;
+		bool GenerateFromString(const std::string& sourceString);
+		NodeBuffer& GetNodeBuffer();
 
-		Definition<MACRO_DEFINITION> GetMacroDefinition(const std::string_view& name);
-		Definition<TYPE_DEFINITION> GetTypeDefinition(const std::string_view& name);
-		Definition<FUNCTION_DEFINITION> GetFunctionDefinition(const std::string_view& name);
-		Definition<VARIABLE_DEFINITION> GetGlobalVariableDefinition(const std::string_view& name);
+		Definition<MACRO_DEFINITION> GetMacroDefinition(const std::string_view& name) const;
+		Definition<TYPE_DEFINITION> GetTypeDefinition(const std::string_view& name) const;
+		Definition<FUNCTION_DEFINITION> GetFunctionDefinition(const std::string_view& name) const;
+		Definition<VARIABLE_DEFINITION> GetGlobalVariableDefinition(const std::string_view& name) const;
 
 	private:
 		template <typename T>
-		Definition<T> getDefinition(const NodeBuffer::NodeMap<T>& nodeMap, const std::string_view& name);
+		Definition<T> getDefinition(const NodeBuffer::NodeMap<T>& nodeMap, const std::string_view& name) const;
 
 	private:
 		Source m_Source;
@@ -29,7 +30,7 @@ namespace AlloyCompiler
 	};
 
 	template<typename T>
-	inline Definition<T> Module::getDefinition(const NodeBuffer::NodeMap<T>& nodeMap, const std::string_view& name)
+	inline Definition<T> Module::getDefinition(const NodeBuffer::NodeMap<T>& nodeMap, const std::string_view& name) const
 	{
 		auto it = nodeMap.find(std::string(name));
 		if (it == nodeMap.end())

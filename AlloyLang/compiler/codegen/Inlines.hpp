@@ -22,5 +22,5 @@ namespace AlloyCompiler
 	/// <summary>
 	/// Generates all combinations of casts for the built-in numeric types.
 	/// </summary>
-	void generateAllCastFunctions(LLVMState& state);
+	void generateAllCastFunctions(ModuleTable& moduleTable, LLVMState& state);
 }

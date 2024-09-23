@@ -2,9 +2,23 @@
 
 namespace AlloyCompiler
 {
-	ModuleTable::ModuleTable(std::unordered_map<std::string, Module>& modules, const std::string& mainModuleName)
-		: m_Modules(modules), m_ContextStack({ mainModuleName })
+	std::string getCastFunctionDefinitionString(const std::string& type, const std::string& functionName)
 	{
+		return std::format("exp fn {0}:{1}(const num: &Self, type T) -> T {2}\n", type, functionName, "{}");
+	}
+
+	ModuleTable::ModuleTable(std::unordered_map<std::string, Module>& modules, const std::string& mainModuleName)
+		: m_GlobalModule(""), m_Modules(modules), m_ContextStack({mainModuleName})
+	{
+		std::string builtInModule;
+
+		for (auto& typeName : NUMERIC_TYPE_NAMES)
+		{
+			builtInModule.append(getCastFunctionDefinitionString(typeName, "cast"));
+			builtInModule.append(getCastFunctionDefinitionString(typeName, "bit_cast"));
+		}
+
+		m_GlobalModule.GenerateFromString(builtInModule);
 	}
 
 	const std::string& ModuleTable::GetCurrentContext() const
@@ -26,15 +40,13 @@ namespace AlloyCompiler
 
 	SearchResult<MACRO_DEFINITION> ModuleTable::GetMacroDefinition(const std::string_view& name) const
 	{
-		GetDefinitionFn<MACRO_DEFINITION> fn = [](Module& module, const std::string_view& name) -> Definition<MACRO_DEFINITION>
+		GetDefinitionFn<MACRO_DEFINITION> fn = [](const Module& module, const std::string_view& name) -> Definition<MACRO_DEFINITION>
 			{
 				return module.GetMacroDefinition(name);
 			};
 
 		return getDefinition(fn, name);
 	}
-
-	
 
 	SearchResult<TYPE_DEFINITION> ModuleTable::GetTypeDefinition(const std::string_view& name) const
 	{
@@ -62,7 +74,7 @@ namespace AlloyCompiler
 			return result;
 		}
 
-		GetDefinitionFn<TYPE_DEFINITION> fn = [](Module& module, const std::string_view& name) -> Definition<TYPE_DEFINITION>
+		GetDefinitionFn<TYPE_DEFINITION> fn = [](const Module& module, const std::string_view& name) -> Definition<TYPE_DEFINITION>
 			{
 				return module.GetTypeDefinition(name);
 			};
@@ -72,7 +84,7 @@ namespace AlloyCompiler
 
 	SearchResult<FUNCTION_DEFINITION> ModuleTable::GetFunctionDefinition(const std::string_view& name) const
 	{
-		GetDefinitionFn<FUNCTION_DEFINITION> fn = [](Module& module, const std::string_view& name) -> Definition<FUNCTION_DEFINITION>
+		GetDefinitionFn<FUNCTION_DEFINITION> fn = [](const Module& module, const std::string_view& name) -> Definition<FUNCTION_DEFINITION>
 			{
 				return module.GetFunctionDefinition(name);
 			};
@@ -80,7 +92,7 @@ namespace AlloyCompiler
 		auto result = getDefinition(fn, name);
 
 		// do not include module name if extern
-		if (result.pDefiniton && result.pDefiniton->pBody == nullptr)
+		if (result.pDefiniton != nullptr && result.pDefiniton->pBody == nullptr)
 		{
 			result.MangledName = result.pDefiniton->pFunctionNameToken->Value;
 			result.ModuleName = "";
@@ -91,7 +103,7 @@ namespace AlloyCompiler
 
 	SearchResult<VARIABLE_DEFINITION> ModuleTable::GetGlobalVariableDefinition(const std::string_view& name) const
 	{
-		GetDefinitionFn<VARIABLE_DEFINITION> fn = [](Module& module, const std::string_view& name) -> Definition<VARIABLE_DEFINITION>
+		GetDefinitionFn<VARIABLE_DEFINITION> fn = [](const Module& module, const std::string_view& name) -> Definition<VARIABLE_DEFINITION>
 			{
 				return module.GetGlobalVariableDefinition(name);
 			};

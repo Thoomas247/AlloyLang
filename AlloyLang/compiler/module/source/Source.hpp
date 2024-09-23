@@ -27,6 +27,7 @@ namespace AlloyCompiler
 	{
 	public:
 		Source(const fs::path& filePath);
+		Source(const std::string& sourceString);
 
 		/// <summary>
 		/// Opens and reads the file at the given filepath.

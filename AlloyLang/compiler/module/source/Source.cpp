@@ -6,6 +6,10 @@ namespace AlloyCompiler
 		: m_SourceFilePath(fs::absolute(filePath)), m_SourceString("")
 	{}
 
+	Source::Source(const std::string& sourceString)
+		: m_SourceFilePath(""), m_SourceString(sourceString)
+	{}
+
 	bool Source::ReadFile()
 	{
 		if (!fs::exists(m_SourceFilePath))

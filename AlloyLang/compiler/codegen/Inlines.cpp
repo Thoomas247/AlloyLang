@@ -49,7 +49,7 @@ namespace AlloyCompiler
 
 	llvm::Function* generateCastFunction(LLVMState& state, const std::string_view& fromName, const std::string_view& toName)
 	{
-		const std::string functionName = std::string(fromName) + ":" + CAST_FUNCTION_NAME + "@" + std::string(toName);
+		const std::string functionName = std::string(fromName) + "@" + CAST_FUNCTION_NAME + "@" + std::string(toName);
 
 		llvm::Function* function = state.Module->getFunction(functionName);
 		if (function != nullptr)
@@ -177,7 +177,7 @@ namespace AlloyCompiler
 
 	llvm::Function* generateBitCastFunction(LLVMState& state, const std::string_view& fromName, const std::string_view& toName)
 	{
-		const std::string functionName = std::string(fromName) + ":" + BIT_CAST_FUNCTION_NAME + "@" + std::string(toName);
+		const std::string functionName = std::string(fromName) + "@" + BIT_CAST_FUNCTION_NAME + "@" + std::string(toName);
 
 		llvm::Function* function = state.Module->getFunction(functionName);
 		if (function != nullptr)
@@ -285,7 +285,7 @@ namespace AlloyCompiler
 		return function;
 	}
 
-	void generateAllCastFunctions(LLVMState& state)
+	void generateAllCastFunctions(ModuleTable& moduleTable, LLVMState& state)
 	{
 		const std::array<std::string, 10> numericTypeNames = {
 			"i8", "i16", "i32", "i64",
@@ -293,9 +293,9 @@ namespace AlloyCompiler
 			"f32", "f64"
 		};
 
-		for (auto& to : numericTypeNames)
+		for (auto& from : numericTypeNames)
 		{
-			for (auto& from : numericTypeNames)
+			for (auto& to : numericTypeNames)
 			{
 				generateCastFunction(state, from, to);
 				generateBitCastFunction(state, from, to);
