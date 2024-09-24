@@ -146,6 +146,7 @@
     <None Include="test\MultipleFiles2\lib\math.alloy" />
     <None Include="test\MultipleFiles2\lib\log.alloy" />
     <None Include="test\Enums\main.alloy" />
+    <None Include="test\CallbackFunctions\main.alloy" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="docs\Parser Issues.txt" />

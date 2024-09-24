@@ -118,6 +118,14 @@ namespace AlloyCompiler
 				result = true;
 				break;
 
+				//
+				// int to pointer (e.g. null pointer)
+				//
+			case llvm::Type::PointerTyID:
+				value = state.Builder->CreateIntToPtr(value, newType);
+				result = true;
+				break;
+
 			default:
 				ASSERT(false, "Conversion to type is not implemented");
 				break;
@@ -566,6 +574,23 @@ namespace AlloyCompiler
 			return PtrValuePair{ .Ptr = globalVar, .Value = value };
 		}
 
+		// check if the identifier is a function and return a pointer to that function
+		SearchResult<FUNCTION_DEFINITION> funcResult = moduleTable.GetFunctionDefinition(name);
+
+		if (funcResult.Code == SearchResultCode::Found)
+		{
+			// look up the function in the global module table
+			llvm::Function* calleeFunc = state.Module->getFunction(funcResult.MangledName);
+			if (calleeFunc == nullptr) {
+				calleeFunc = generateFunctionDefinition(moduleTable, state, nullptr, *funcResult.pDefiniton, funcResult.ModuleName, {});
+			}
+
+			if (calleeFunc != nullptr) {
+				identifierType = { llvm::PointerType::get(*state.Context, 0), nullptr };
+				return PtrValuePair{ .Ptr = nullptr, .Value = calleeFunc, .isConst = false };
+			}
+		}
+
 		logErrorAtCurrentPosition(variable.pNameToken, "Unknown variable name '{0}'!", name);
 		return {};
 	}
@@ -833,7 +858,7 @@ namespace AlloyCompiler
 				}
 
 				// References should be passed as pointers
-				if (modifier == TypeModifier::Reference) {
+				if (modifier == TypeModifier::Reference || modifier == TypeModifier::Pointer) {
 					paramTypes.push_back(llvm::PointerType::get(identifierType.type, 0));
 					paramSubTypes.push_back(identifierType.type);
 				}
@@ -936,13 +961,17 @@ namespace AlloyCompiler
 		// create a mutable variable at the end of the insertion block
 		llvm::IRBuilder<> tempBuilder(state.Builder->GetInsertBlock(), state.Builder->GetInsertBlock()->end());
 		llvm::AllocaInst* structPtr = tempBuilder.CreateAlloca(structType, nullptr, constructorExpression.pType->pNameToken->Value);
-		// reset memory to 0
+
+		/* reset memory to 0
+		* this call crashes the JIT compiler but only after optimizations are applied
+		* the call can be removed as structures are made packed (byte aligned)
 		state.Builder->CreateMemSetInline(
 			structPtr,
 			llvm::MaybeAlign(1),
 			llvm::ConstantInt::get(*state.Context, llvm::APInt(8, 0)),
-			llvm::ConstantInt::get(*state.Context, llvm::APInt(32, state.Module->getDataLayout().getTypeAllocSize(type)))
+			llvm::ConstantInt::get(*state.Context, llvm::APInt(64, state.Module->getDataLayout().getTypeAllocSize(type)))
 		);
+		*/
 
 		// go through the list of initializers and initialize all members
 		for (int i = 0; i < constructorExpression.Arguments.size(); i++)
@@ -1427,13 +1456,16 @@ namespace AlloyCompiler
 			"",
 			EnumPayloadStruct
 		);
-		// reset memory to 0
+		/* reset memory to 0
+		* this call crashes the JIT compiler but only after optimizations are applied
+		* the call can be removed as structures are made packed (byte aligned)
 		state.Builder->CreateMemSetInline(
 			result.Ptr,
 			llvm::MaybeAlign(1),
 			llvm::ConstantInt::get(*state.Context, llvm::APInt(8, 0)),
-			llvm::ConstantInt::get(*state.Context, llvm::APInt(32, state.Module->getDataLayout().getTypeAllocSize(type)))
+			llvm::ConstantInt::get(*state.Context, llvm::APInt(64, state.Module->getDataLayout().getTypeAllocSize(type)))
 		);
+		*/
 
 		// set the types that we are expecting in return
 		expectedType.type = EnumPayloadStruct;
@@ -1442,7 +1474,7 @@ namespace AlloyCompiler
 
 		// store the index of the enum value in the first element of EnumPayloadStruct
 		memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, EnumPayloadIndex);
-		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(32, memberInfo.memberIndex)), memberPtr, "savepayload");
+		state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, memberInfo.memberIndex)), memberPtr, "savepayload");
 
 		if (enumValueExpression.pPayloadValue != nullptr) {
 			// compute the value of the payload
@@ -1459,6 +1491,11 @@ namespace AlloyCompiler
 			// store the payload in the second element of EnumPayloadStruct
 			memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, EnumPayloadValue);
 			state.Builder->CreateStore(expressionVal, memberPtr, "savepayload");
+		}
+		else {
+			// store a null value for the payload in the second element of EnumPayloadStruct
+			memberPtr = state.Builder->CreateStructGEP(EnumPayloadStruct, result.Ptr, EnumPayloadValue);
+			state.Builder->CreateStore(llvm::Constant::getNullValue(llvm::Type::getInt64Ty(*state.Context)), memberPtr, "savepayload");
 		}
 
 		// store the structure type ID in the third element of EnumPayloadStruct
@@ -1641,7 +1678,7 @@ namespace AlloyCompiler
 			argi = 1;
 		}
 
-		/* if the function was found, check for argument count mismatch(not counting the additional arguments that we added
+		/* if the function was found, check for argument count mismatch (not counting the additional arguments that we added)
 		* this test does not work with generic functions as the type parameters are not actual parameters
 		* a more accurate test in done in the loop below
 		if (!calleeFunc->isVarArg() && calleeFunc->arg_size() != Arguments.size() + argi)
@@ -1754,7 +1791,9 @@ namespace AlloyCompiler
 			goto error;
 		}
 
-		result = state.Builder->CreateCall(calleeFunc, args);
+		result = state.Builder->CreateCall(calleeFunc, args,
+			(calleeFunc->getReturnType()->getTypeID() != llvm::Type::VoidTyID ? functionName : "")	// giving the return value a name solves a bug internal to llvm, e.g. the switch/case unit test
+		);
 
 	error:
 		return result;
@@ -3026,7 +3065,7 @@ namespace AlloyCompiler
 		if (state.Optimizations)
 		{
 			// run the optimizer on the function.
-// 			state.FPM->run(*func, *state.FAM);
+			state.FPM->run(*func, *state.FAM);
 		}
 
 		state.Builder.reset(PreviousBuilder);
@@ -3099,7 +3138,7 @@ namespace AlloyCompiler
 		}
 
 		// generate all the casting functions for the built-in types
-		//generateAllCastFunctions(state);
+		// generateAllCastFunctions(state);
 
 		/* pre-process all types definitions as these might be used throughout the code
 		* for this to work properly we need to process the types in the order they appear in the file because one type can reference a previous type

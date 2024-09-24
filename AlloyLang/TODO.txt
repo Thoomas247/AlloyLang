@@ -1,6 +1,6 @@
 TODO for version 0.1 release:
 	[] working generics for functions, types and generic member functions on generic types
-	[] working enums with payloads, including value-capturing in switch and if statements
+	[x] working enums with payloads, including value-capturing in switch and if statements
 	[] built-in cast functions for built-in types (f32:to_u32(), u64:to_u8(), ...)
 	[] global variables
 	[] array sizes as part of arrays
