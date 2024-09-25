@@ -133,6 +133,10 @@ namespace unittests
 			RunTest("../../AlloyLang/test/MultipleFiles2/main.alloy", 3);
 		}
 
+		TEST_METHOD(CallbackFunctions)
+		{
+			RunTest("../../AlloyLang/test/CallbackFunctions/main.alloy", 1);
+		}
 		TEST_METHOD(LargeTest)
 		{
 			RunTest("../../AlloyLang/test/LargeTest/main.alloy", 0);

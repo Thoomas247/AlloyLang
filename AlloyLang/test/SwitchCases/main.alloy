@@ -2,22 +2,22 @@ extern printf (const str : String, ...) -> i64;
 
 fn main () -> i64
 {
-	var res : i64 = 1;
+	var res : i64 = 0;
+	var test : i64 = 1;
 
-	switch (res)
+	switch (test)
 	{
 		case (2)
 		{
-			printf("Error %d!", res);
-			return res;
+			printf("Error %d!", test);
+			res = 2;
 		}
 		case (1)
 		{
-			printf("Success %d!", res);
-			return res;
+			printf("Success %d!", test);
+			res = 1;
 		}
 	}
 
-	res = 0;
 	return res;
 }

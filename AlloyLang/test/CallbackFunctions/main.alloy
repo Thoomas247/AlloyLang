@@ -1,0 +1,30 @@
+extern printf (const str : String, ...) -> i64;
+extern CreateThread(var lpThreadAttributes : *i8, 
+					var dwStackSize : i64, 
+					var lpStartAddress : *i8, 
+					var lpParameter : *i64, 
+					var dwCreationFlags : i32, 
+					var lpThreadId : *i32) -> i64;
+extern WaitForSingleObject(
+					  var hHandle : i64,
+					  var dwMilliseconds : i32
+					) -> i32;
+
+fn ThreadFunc(var Param : &i64) -> i32
+{
+	Param = 1;
+	printf("In ThreadFunc");
+}
+
+fn main () -> i64
+{
+	var res : i64 = 0;
+	var threadId : i32 = 0;
+	var hThread : i64 = 0;
+
+	hThread = CreateThread(0, 0, ThreadFunc, &res, 0, &threadId);
+	WaitForSingleObject(hThread, 5000);
+
+	return res;
+}
+
