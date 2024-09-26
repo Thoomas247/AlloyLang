@@ -47,16 +47,8 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	llvm::Function* generateCastFunction(LLVMState& state, const std::string_view& fromName, const std::string_view& toName)
+	llvm::Function* generateCastFunction(LLVMState& state, const std::string_view& mangledName, const std::string_view& fromName, const std::string_view& toName)
 	{
-		const std::string functionName = std::string(fromName) + "@" + CAST_FUNCTION_NAME + "@" + std::string(toName);
-
-		llvm::Function* function = state.Module->getFunction(functionName);
-		if (function != nullptr)
-		{
-			return function;
-		}
-
 		llvm::Type* fromType = state.NamedValues.GetType(fromName);
 		llvm::Type* toType = state.NamedValues.GetType(toName);
 
@@ -66,7 +58,7 @@ namespace AlloyCompiler
 		std::vector<llvm::Type*> paramTypes = { fromType };
 		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, false);
 
-		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, functionName, *state.Module);
+		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, mangledName, *state.Module);
 
 		ASSERT(function != nullptr, "Failed to generate cast function!");
 
@@ -178,16 +170,8 @@ namespace AlloyCompiler
 		return function;
 	}
 
-	llvm::Function* generateBitCastFunction(LLVMState& state, const std::string_view& fromName, const std::string_view& toName)
+	llvm::Function* generateBitCastFunction(LLVMState& state, const std::string_view& mangledName, const std::string_view& fromName, const std::string_view& toName)
 	{
-		const std::string functionName = std::string(fromName) + "@" + BIT_CAST_FUNCTION_NAME + "@" + std::string(toName);
-
-		llvm::Function* function = state.Module->getFunction(functionName);
-		if (function != nullptr)
-		{
-			return function;
-		}
-
 		llvm::Type* fromType = state.NamedValues.GetType(fromName);
 		llvm::Type* toType = state.NamedValues.GetType(toName);
 
@@ -197,7 +181,7 @@ namespace AlloyCompiler
 		std::vector<llvm::Type*> paramTypes = { fromType };
 		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, false);
 
-		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, functionName, *state.Module);
+		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, mangledName, *state.Module);
 
 		ASSERT(function != nullptr, "Failed to generate bit cast function!");
 
@@ -291,21 +275,36 @@ namespace AlloyCompiler
 		return function;
 	}
 
-	void generateAllCastFunctions(ModuleTable& moduleTable, LLVMState& state)
+	llvm::Function* generateBuiltInFunction(LLVMState& state, const std::string_view& mangledName)
 	{
-		const std::array<std::string, 10> numericTypeNames = {
-			"i8", "i16", "i32", "i64",
-			"u8", "u16", "u32", "u64",
-			"f32", "f64"
-		};
-
-		for (auto& from : numericTypeNames)
+		llvm::Function* function = state.Module->getFunction(mangledName);
+		if (function != nullptr)
 		{
-			for (auto& to : numericTypeNames)
-			{
-				generateCastFunction(state, from, to);
-				generateBitCastFunction(state, from, to);
-			}
+			return function;
 		}
+
+		// currently, all built-in functions are casts, which must be member functions and have one generic parameter
+		// therefore, we assume the mangled name matches the format "type@function@param"
+		const size_t firstSeparator = mangledName.find('@');
+		const size_t secondSeparator = mangledName.find('@', firstSeparator + 1);
+
+		ASSERT(firstSeparator != std::string_view::npos && secondSeparator != std::string_view::npos, "Invalid built-in function name!");
+
+		const std::string_view& fromName = mangledName.substr(0, firstSeparator);
+		const std::string_view& funcName = mangledName.substr(firstSeparator + 1, secondSeparator - firstSeparator);
+		const std::string_view& toName = mangledName.substr(secondSeparator + 1, mangledName.size() - secondSeparator);
+
+		llvm::Function* result = nullptr;
+
+		if (funcName == CAST_FUNCTION_NAME)
+		{
+			result = generateCastFunction(state, mangledName, fromName, toName);
+		}
+		else if (funcName == BIT_CAST_FUNCTION_NAME)
+		{
+			result = generateBitCastFunction(state, mangledName, fromName, toName);
+		}
+
+		return result;
 	}
 }

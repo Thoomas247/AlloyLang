@@ -11,16 +11,17 @@ namespace AlloyCompiler
 	/// Creates or returns the function needed to cast from one built-in number type to another.
 	/// Allows casting from and to the same type.
 	/// </summary>
-	llvm::Function* generateCastFunction(LLVMState& state, const std::string_view& fromName, const std::string_view& toName);
+	llvm::Function* generateCastFunction(LLVMState& state, const std::string_view& mangledName, const std::string_view& fromName, const std::string_view& toName);
 
 	/// <summary>
 	/// Creates or returns the function needed to bit cast from one built-in number type to another.
 	/// Allows casting from and to the same type.
 	/// </summary>
-	llvm::Function* generateBitCastFunction(LLVMState& state, const std::string_view& fromName, const std::string_view& toName);
+	llvm::Function* generateBitCastFunction(LLVMState& state, const std::string_view& mangledName, const std::string_view& fromName, const std::string_view& toName);
 
 	/// <summary>
-	/// Generates all combinations of casts for the built-in numeric types.
+	/// Generates or returns the built-in function which corresponds to the given mangled name.
+	/// The mangled name must include generic parameters.
 	/// </summary>
-	void generateAllCastFunctions(ModuleTable& moduleTable, LLVMState& state);
+	llvm::Function* generateBuiltInFunction(LLVMState& state, const std::string_view& mangledName);
 }
