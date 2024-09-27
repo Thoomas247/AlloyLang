@@ -1563,12 +1563,12 @@ namespace AlloyCompiler
 		std::string functionName(functionCallExpressionNode.pFunctionNameToken->Value);
 		std::string mangledName(functionName);
 		std::vector<llvm::Value*> args;
-		int argi = 0;	// argument index currently processed
 		llvm::Value* result = nullptr;
 		llvm::Function* calleeFunc = nullptr;
 		FUNCTION_TYPE* pCalleeFunctionType = nullptr;	// in addition to the LLVM function definition, we need the original function definition in order to properly handle generic and const parameters
-		bool insertSelfAsFirstParam = false;		// indicates whether the first parameter should be the variable value in the case of member function calls
+		enum { None, Reference, Value } insertSelfAsFirstParam = None;		// indicates whether the first parameter should be the variable value in the case of member function calls
 		std::vector<EXPRESSION*> Arguments(functionCallExpressionNode.Arguments);	// creating a copy of the arguments as we might need to insert new elements
+		EXPRESSION self;	// this is a fake expression used as a placeholder for Self as first parameter
 		SearchResult<FUNCTION_DEFINITION> funcResult;
 		llvm::Type* type = nullptr;
 		std::unordered_map<std::string, std::string> typeMap;
@@ -1602,7 +1602,9 @@ namespace AlloyCompiler
 					typeName = typeName.substr(0, pos);
 				}
 				mangledName = NodeBuffer::GetMangledName("", typeName, functionName);
-				insertSelfAsFirstParam = true;
+				// insert Self as a first argument
+				insertSelfAsFirstParam = Reference;
+				Arguments.insert(Arguments.begin(), &self);
 			}
 			else {
 				type = getTypeFromTypeName(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->pNameToken,
@@ -1643,6 +1645,15 @@ namespace AlloyCompiler
 				type == nullptr ? "" : std::string(state.NamedValues.GetTypeName(type)),
 				type == nullptr ? funcResult.MangledName : functionName,
 				funcResult.pDefiniton->pFunctionType->Parameters, Arguments, typeMap);
+
+			// make sure the built-in function has already been generated
+			if (funcResult.Code == SearchResultCode::BuiltIn) {
+#ifndef FIRST_PARAMETER_BYREF
+				insertSelfAsFirstParam = Value;
+#endif
+				generateBuiltInFunction(state, extendedName);
+			}
+
 			calleeFunc = state.Module->getFunction(extendedName);
 		}
 
@@ -1662,22 +1673,6 @@ namespace AlloyCompiler
 			goto error;
 		}
 
-		// first parameter is &Self
-		if (insertSelfAsFirstParam)
-		{
-			VARIABLE var{ functionCallExpressionNode.pTypeOrVariableName->pNameToken };
-			TypeSubtypePair identifierType = {};
-			PtrValuePair ptrValue = generateIdentifier(moduleTable, state, var, identifierType);
-			if (ptrValue.Ptr == nullptr)
-			{
-				logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
-				goto error;
-			}
-
-			args.push_back(ptrValue.Ptr);
-			argi = 1;
-		}
-
 		/* if the function was found, check for argument count mismatch (not counting the additional arguments that we added)
 		* this test does not work with generic functions as the type parameters are not actual parameters
 		* a more accurate test in done in the loop below
@@ -1689,13 +1684,29 @@ namespace AlloyCompiler
 		*/
 
 		// evaluate all the arguments
-		for (size_t i = 0; i < Arguments.size(); i++, argi++)
+		for (size_t argi = 0; argi < Arguments.size(); argi++)
 		{
-			const EXPRESSION& argument = *Arguments[i];
+			// first parameter is &Self
+			if (argi == 0 && insertSelfAsFirstParam != None)
+			{
+				VARIABLE var{ functionCallExpressionNode.pTypeOrVariableName->pNameToken };
+				TypeSubtypePair identifierType = {};
+				PtrValuePair ptrValue = generateIdentifier(moduleTable, state, var, identifierType);
+				if (ptrValue.Ptr == nullptr)
+				{
+					logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
+					goto error;
+				}
+
+				args.push_back(insertSelfAsFirstParam == Reference ? ptrValue.Ptr : ptrValue.Value);
+				continue;
+			}
+
+			const EXPRESSION& argument = *Arguments[argi];
 
 			// for functions with a variable number of arguments, check the argument types till the first optional argument
 			// e.g. if the function has 2 mandatory arguments and a number of optional arguments, check for only the first 2 types 
-			TypeSubtypePair argType = { (i < calleeFunc->arg_size() ? calleeFunc->getArg(argi)->getType() : nullptr), nullptr };
+			TypeSubtypePair argType = { (argi < calleeFunc->arg_size() ? calleeFunc->getArg(argi)->getType() : nullptr), nullptr };
 
 			llvm::Value* argVal = nullptr;
 
@@ -1709,7 +1720,7 @@ namespace AlloyCompiler
 			bool isConst = isFunctionParameterConst(*pCalleeFunctionType, argi);
 
 			// check if the parameter is passed byref, in which case it should be a variable and we will pass the address of the identifier
-			auto attr = calleeFunc->getAttributeAtIndex(i + 1, llvm::Attribute::AttrKind::ByRef);
+			auto attr = calleeFunc->getAttributeAtIndex(argi + 1, llvm::Attribute::AttrKind::ByRef);
 			bool isByRef = attr.hasAttribute(llvm::Attribute::AttrKind::ByRef);
 			if (isByRef) {
 				bool foundVariable = false;
@@ -1729,13 +1740,13 @@ namespace AlloyCompiler
 							tempType);
 						if (left.Ptr == nullptr) {
 							logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-								"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
+								"Function argument {0} expects a reference to a variable preceded by the & symbol!", argi + 1);
 							goto error;
 						}
 						// check that we are passing a reference to a variable of the right type
 						if (tempType.type != argType.containedType) {
 							logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-								"Function argument {0} expects a reference to a variable of type!", i + 1, state.NamedValues.GetTypeName(argType.containedType));
+								"Function argument {0} expects a reference to a variable of type!", argi + 1, state.NamedValues.GetTypeName(argType.containedType));
 							goto error;
 						}
 						argVal = left.Ptr;
@@ -1747,7 +1758,7 @@ namespace AlloyCompiler
 				if (!foundVariable) {
 					if (!isConst) {
 						logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-							"Function argument {0} expects a reference to a variable preceded by the & symbol!", i + 1);
+							"Function argument {0} expects a reference to a variable preceded by the & symbol!", argi + 1);
 						goto error;
 					}
 
@@ -1768,13 +1779,13 @@ namespace AlloyCompiler
 					goto error;
 				}
 
-				if (i < calleeFunc->arg_size()) {
+				if (argi < calleeFunc->arg_size()) {
 					convertValueToType(state, argVal, calleeFunc->getArg(argi)->getType());
 
 					if (argVal->getType() != calleeFunc->getArg(argi)->getType())
 					{
 						logErrorAtCurrentPosition(nullptr, // TBD: argumentID
-							"Function argument {0} expects value of type '{1}' but given type is '{2}'!", i + 1,
+							"Function argument {0} expects value of type '{1}' but given type is '{2}'!", argi + 1,
 							state.NamedValues.GetTypeName(calleeFunc->getArg(argi)->getType()),
 							state.NamedValues.GetTypeName(argVal->getType()));
 						goto error;
@@ -3168,6 +3179,12 @@ namespace AlloyCompiler
 
 		std::error_code errorCode;
 		llvm::raw_fd_ostream out("c:\\temp\\out.ll", errorCode);
+
+		if (state.Optimizations)
+		{
+			// run the optimizer on the module
+			state.MPM.run(*state.Module, *state.MAM);
+		}
 		state.Module->print(out, nullptr);
 
 		return true;
