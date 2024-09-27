@@ -66,7 +66,10 @@ namespace AlloyCompiler
 		function->addFnAttr(llvm::Attribute::AlwaysInline);
 
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
-		state.Builder->SetInsertPoint(entryBlock);
+
+		// create a new builder for this function, this will allow us to generate multiple functions in parallel
+		llvm::IRBuilder<> builder(*state.Context);
+		builder.SetInsertPoint(entryBlock);
 
 		llvm::Value* fromValue = function->getArg(0);
 		llvm::Value* castValue = nullptr;
@@ -83,12 +86,12 @@ namespace AlloyCompiler
 
 			else if (toInfo.Type == TypeSizePair::Signed || toInfo.Type == TypeSizePair::Unsigned)
 			{
-				castValue = state.Builder->CreateZExt(fromValue, toType);
+				castValue = builder.CreateZExt(fromValue, toType);
 			}
 
 			else if (toInfo.Type == TypeSizePair::Float)
 			{
-				castValue = state.Builder->CreateUIToFP(fromValue, toType);
+				castValue = builder.CreateUIToFP(fromValue, toType);
 			}
 		}
 
@@ -96,22 +99,22 @@ namespace AlloyCompiler
 		{
 			if (toInfo.Type == TypeSizePair::Bool)
 			{
-				castValue = state.Builder->CreateICmpNE(fromValue, state.Builder->getInt(llvm::APInt(fromInfo.Size, 0, /*isSigned*/true)));
+				castValue = builder.CreateICmpNE(fromValue, builder.getInt(llvm::APInt(fromInfo.Size, 0, /*isSigned*/true)));
 			}
 
 			else if (toInfo.Type == TypeSizePair::Signed)
 			{
-				castValue = state.Builder->CreateSExtOrTrunc(fromValue, toType);
+				castValue = builder.CreateSExtOrTrunc(fromValue, toType);
 			}
 
 			else if (toInfo.Type == TypeSizePair::Unsigned)
 			{
-				castValue = state.Builder->CreateZExtOrTrunc(fromValue, toType);
+				castValue = builder.CreateZExtOrTrunc(fromValue, toType);
 			}
 
 			else if (toInfo.Type == TypeSizePair::Float)
 			{
-				castValue = state.Builder->CreateSIToFP(fromValue, toType);
+				castValue = builder.CreateSIToFP(fromValue, toType);
 			}
 		}
 
@@ -119,24 +122,24 @@ namespace AlloyCompiler
 		{
 			if (toInfo.Type == TypeSizePair::Bool)
 			{
-				castValue = state.Builder->CreateICmpNE(fromValue, state.Builder->getInt(llvm::APInt(fromInfo.Size, 0, /*isSigned*/false)));
+				castValue = builder.CreateICmpNE(fromValue, builder.getInt(llvm::APInt(fromInfo.Size, 0, /*isSigned*/false)));
 			}
 
 			else if (toInfo.Type == TypeSizePair::Signed)
 			{
 				// TODO: check this
-				castValue = state.Builder->CreateZExtOrTrunc(fromValue, toType);
+				castValue = builder.CreateZExtOrTrunc(fromValue, toType);
 			}
 
 			else if (toInfo.Type == TypeSizePair::Unsigned)
 			{
 				// TODO: check this
-				castValue = state.Builder->CreateZExtOrTrunc(fromValue, toType);
+				castValue = builder.CreateZExtOrTrunc(fromValue, toType);
 			}
 
 			else if (toInfo.Type == TypeSizePair::Float)
 			{
-				castValue = state.Builder->CreateUIToFP(fromValue, toType);
+				castValue = builder.CreateUIToFP(fromValue, toType);
 			}
 		}
 
@@ -144,28 +147,28 @@ namespace AlloyCompiler
 		{
 			if (toInfo.Type == TypeSizePair::Bool)
 			{
-				castValue = state.Builder->CreateFCmpONE(fromValue, llvm::ConstantFP::get(*state.Context, llvm::APFloat(0.0)));
+				castValue = builder.CreateFCmpONE(fromValue, llvm::ConstantFP::get(*state.Context, llvm::APFloat(0.0)));
 			}
 
 			else if (toInfo.Type == TypeSizePair::Signed)
 			{
-				castValue = state.Builder->CreateFPToSI(fromValue, toType);
+				castValue = builder.CreateFPToSI(fromValue, toType);
 			}
 
 			else if (toInfo.Type == TypeSizePair::Unsigned)
 			{
-				castValue = state.Builder->CreateFPToUI(fromValue, toType);
+				castValue = builder.CreateFPToUI(fromValue, toType);
 			}
 
 			else if (toInfo.Type == TypeSizePair::Float)
 			{
-				castValue = state.Builder->CreateFPCast(fromValue, toType);
+				castValue = builder.CreateFPCast(fromValue, toType);
 			}
 		}
 
 		ASSERT(castValue != nullptr, "Invalid cast operation!");
 
-		state.Builder->CreateRet(castValue);
+		builder.CreateRet(castValue);
 
 		return function;
 	}
@@ -189,7 +192,10 @@ namespace AlloyCompiler
 		function->addFnAttr(llvm::Attribute::AlwaysInline);
 
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
-		state.Builder->SetInsertPoint(entryBlock);
+
+		// create a new builder for this function, this will allow us to generate multiple functions in parallel
+		llvm::IRBuilder<> builder(*state.Context);
+		builder.SetInsertPoint(entryBlock);
 
 		llvm::Value* fromValue = function->getArg(0);
 		llvm::Value* castValue = nullptr;
@@ -202,7 +208,7 @@ namespace AlloyCompiler
 			// float to float
 			if (toInfo.Type == TypeSizePair::Float)
 			{
-				castValue = state.Builder->CreateFPCast(fromValue, toType);
+				castValue = builder.CreateFPCast(fromValue, toType);
 			}
 
 			// float to int
@@ -214,12 +220,12 @@ namespace AlloyCompiler
 				{
 					if (fromInfo.Size == 64)
 					{
-						fromValue = state.Builder->CreateFPToSI(fromValue, llvm::IntegerType::getInt64Ty(*state.Context));
+						fromValue = builder.CreateFPToSI(fromValue, llvm::IntegerType::getInt64Ty(*state.Context));
 					}
 
 					else if (fromInfo.Size == 32)
 					{
-						fromValue = state.Builder->CreateFPToSI(fromValue, llvm::IntegerType::getInt32Ty(*state.Context));
+						fromValue = builder.CreateFPToSI(fromValue, llvm::IntegerType::getInt32Ty(*state.Context));
 					}
 				}
 
@@ -227,18 +233,18 @@ namespace AlloyCompiler
 				{
 					if (fromInfo.Size == 64)
 					{
-						fromValue = state.Builder->CreateFPToUI(fromValue, llvm::IntegerType::getInt64Ty(*state.Context));
+						fromValue = builder.CreateFPToUI(fromValue, llvm::IntegerType::getInt64Ty(*state.Context));
 					}
 
 					else if (fromInfo.Size == 32)
 					{
-						fromValue = state.Builder->CreateFPToUI(fromValue, llvm::IntegerType::getInt32Ty(*state.Context));
+						fromValue = builder.CreateFPToUI(fromValue, llvm::IntegerType::getInt32Ty(*state.Context));
 					}
 				}
 
 				// castValue is now an integer
 				// from big int to small int, just truncate; from small int to big int, zero-extend
-				castValue = state.Builder->CreateZExtOrTrunc(fromValue, toType);
+				castValue = builder.CreateZExtOrTrunc(fromValue, toType);
 			}
 		}
 
@@ -250,12 +256,12 @@ namespace AlloyCompiler
 				
 				if (fromInfo.Type == TypeSizePair::Signed)
 				{
-					castValue = state.Builder->CreateSIToFP(fromValue, toType);
+					castValue = builder.CreateSIToFP(fromValue, toType);
 				}
 
 				else if (fromInfo.Type == TypeSizePair::Unsigned)
 				{
-					castValue = state.Builder->CreateUIToFP(fromValue, toType);
+					castValue = builder.CreateUIToFP(fromValue, toType);
 				}
 				
 			}
@@ -263,14 +269,14 @@ namespace AlloyCompiler
 			// int to int
 			else
 			{
-				castValue = state.Builder->CreateZExtOrTrunc(fromValue, toType);
+				castValue = builder.CreateZExtOrTrunc(fromValue, toType);
 			}
 		}
 		
 
 		ASSERT(castValue != nullptr, "Invalid cast operation!");
 
-		state.Builder->CreateRet(castValue);
+		builder.CreateRet(castValue);
 
 		return function;
 	}
@@ -291,7 +297,7 @@ namespace AlloyCompiler
 		ASSERT(firstSeparator != std::string_view::npos && secondSeparator != std::string_view::npos, "Invalid built-in function name!");
 
 		const std::string_view& fromName = mangledName.substr(0, firstSeparator);
-		const std::string_view& funcName = mangledName.substr(firstSeparator + 1, secondSeparator - firstSeparator);
+		const std::string_view& funcName = mangledName.substr(firstSeparator + 1, secondSeparator - firstSeparator - 1);
 		const std::string_view& toName = mangledName.substr(secondSeparator + 1, mangledName.size() - secondSeparator);
 
 		llvm::Function* result = nullptr;
