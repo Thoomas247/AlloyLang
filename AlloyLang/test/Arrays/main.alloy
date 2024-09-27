@@ -1,8 +1,10 @@
 extern printf (const str : String, const param : i64) -> i64;
 
+type Array(type T) = [T; 10];
+
 fn main () -> i64
 {
-	var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+	var array : Array(i64) = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 	var expected : i64 = 1*2*3*4*5*6*7*8*9*10;
 	var result : i64 = 1;
 

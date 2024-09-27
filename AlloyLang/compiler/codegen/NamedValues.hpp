@@ -70,7 +70,7 @@ namespace AlloyCompiler
 
 		std::string_view GetTypeName(const llvm::Type* type);
 
-		typedef enum { basic = 0, structure = 1, enumeration = 2 } UserDefinedType;
+		typedef enum { basic = 0, structure = 1, enumeration = 2, array = 3 } UserDefinedType;
 		void InsertType(const std::string& name, llvm::Type* type, UserDefinedType userDefinedType, 
 			const std::unordered_map<std::string_view, TypeMemberInfo>& memberInfo = {},
 			const std::unordered_map<std::string, std::string>& genericTypeMap = {}

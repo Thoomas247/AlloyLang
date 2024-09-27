@@ -27,6 +27,13 @@ namespace AlloyCompiler
 		const std::vector<EXPRESSION*>& functionArguments);
 	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::string& moduleName,
 		const std::vector<TYPE*>& genericArguments);
+	llvm::Type* generateStructDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
+		const STRUCT_TYPE& structDefinition, const std::vector<TYPE*>& genericArguments);
+	llvm::Type* generateEnumDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
+		const ENUM_TYPE& enumDefinition, const std::vector<TYPE*>& genericArguments);
+	TypeSubtypePair generateArrayDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
+		const ARRAY_TYPE& arrayDefinition, const std::vector<TYPE*>& genericArguments,
+		const std::unordered_map<std::string, std::string>& parentTypeMap);
 	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& externDefinition, const std::string& moduleName);
 
 	template<typename ...Args>
@@ -607,7 +614,7 @@ namespace AlloyCompiler
 		// let the caller know if this is a pointer, a reference or none
 		modifier = typeIdentifier.Modifier;
 
-		// handle non-array types
+		// handle simple types
 		if (typeIdentifier.Type.Is<TYPE_NAME>())
 		{
 			const TYPE_NAME& typeName = *typeIdentifier.Type.Get<TYPE_NAME>();
@@ -639,74 +646,30 @@ namespace AlloyCompiler
 			}
 		}
 		// handle array types
-		else
+		else if (typeIdentifier.Type.Is<ARRAY_TYPE>())
 		{
-			ASSERT(typeIdentifier.Type.Is<ARRAY_TYPE>(), "Expected array type!");
-
-			uint64_t arraySize = 0;
 			const ARRAY_TYPE& type = *typeIdentifier.Type.Get<ARRAY_TYPE>();
-
-			// get size if given
-			if (type.pSizeLiteral != nullptr)
-			{
-				std::string_view sizeStr = type.pSizeLiteral->pValueToken->Value;
-				std::from_chars(sizeStr.data(), sizeStr.data() + sizeStr.size(), arraySize);
-
-				if (arraySize == 0)
-				{
-					logErrorAtCurrentPosition(type.pSizeLiteral->pValueToken, "Array size must be greater than 0!");
-					identifierType = { nullptr, nullptr };
-					goto exit;
-				}
-			}
-
-			TypeModifier modifier = TypeModifier::None;
-			identifierType = generateTypeIdentifier(moduleTable, state, *type.pElementType, pParentTypeNameToken, modifier, genericTypeMap);
-			llvm::Type* elementType = identifierType.type;
-
-			if (identifierType.type == nullptr)
-			{
-				logErrorAtCurrentPosition(type.pElementType->GetErrorToken(), "Unknown array element type!");
-				identifierType = { nullptr, nullptr };
-				goto exit;
-			}
-
-			switch (modifier) {
-			case TypeModifier::None:
-				break;
-
-			case TypeModifier::Pointer:
-			case TypeModifier::Reference:
-			{
-				// allocating a pointer to this type
-				identifierType.containedType = identifierType.type;
-				elementType = llvm::PointerType::get(identifierType.containedType, 0);	// the contained type is not stored by llvm as all pointers are treated as "opaque"
-				break;
-			}
-
-			default:
-			{
-				ASSERT(false, "Invalid type modifier!");
-				identifierType = { nullptr, nullptr };
-				goto exit;
-				break;
-			}
-			}
-
-			if (arraySize == 0) {
-				identifierType.type = llvm::PointerType::get(elementType, 0);	// when size is unknown, just create a pointer. elementType is not used by llvm
-				identifierType.containedType = elementType;
-			}
-			else {
-				identifierType.type = llvm::VectorType::get(elementType, arraySize,
-					false //not scalable
-				);
-			}
+			TYPE_IDENTIFIER ti = { nullptr, {} };
+			identifierType = generateArrayDefinition(moduleTable, state, ti, type, {}, genericTypeMap);
+		}
+		// handle struct types
+		else if (typeIdentifier.Type.Is<STRUCT_TYPE>())
+		{
+			const STRUCT_TYPE& type = *typeIdentifier.Type.Get<STRUCT_TYPE>();
+			TYPE_IDENTIFIER ti = { nullptr, {} };
+			identifierType.type = generateStructDefinition(moduleTable, state, ti, type, {});
+		}
+		// handle ènum types
+		else if (typeIdentifier.Type.Is<ENUM_TYPE>())
+		{
+			const ENUM_TYPE& type = *typeIdentifier.Type.Get<ENUM_TYPE>();
+			TYPE_IDENTIFIER ti = { nullptr, {} };
+			identifierType.type = generateEnumDefinition(moduleTable, state, ti, type, {});
+		}
+		else {
+			ASSERT(false, "Unknown type definition!");
 		}
 
-		// return the identifier type and subtype
-		// e.g. var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }; when we encounter var array : [i64; 10] we know that we are
-		// initializing an i64 array of 10 elements
 	exit:
 		return identifierType;
 	}
@@ -2736,6 +2699,110 @@ namespace AlloyCompiler
 		return generateVariableDefinitionExpression(moduleTable, state, variableDefinition);
 	}
 
+	TypeSubtypePair generateArrayDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
+		const ARRAY_TYPE& arrayDefinition, const std::vector<TYPE*>& genericArguments,
+		const std::unordered_map<std::string, std::string>& parentTypeMap)
+	{
+		//
+		// return the type and subtype
+		// e.g. var array : [i64; 10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }; when we encounter var array : [i64; 10] we know that we are
+		// initializing an i64 array of 10 elements
+		//
+
+		TypeSubtypePair identifierType = { nullptr, nullptr };
+		uint64_t arraySize = 0;
+		TypeModifier modifier = TypeModifier::None;
+		llvm::Type* elementType = nullptr;
+		std::string arrayName;
+		std::unordered_map<std::string, std::string> genericTypeMap(parentTypeMap);
+
+		if (typeIdentifier.pNameToken) {
+			// create the map from the array's generic types to the actual types requested by the caller
+			int arg = 0;
+			if (genericArguments.size())
+				for (auto& type : typeIdentifier.GenericParameters) {
+					if (genericArguments[arg]->Type.Is<TYPE_NAME>()) {
+						genericTypeMap[std::string(type->pIdentifierToken->Value)] = genericArguments[arg]->Type.Get<TYPE_NAME>()->pNameToken->Value;
+					}
+					arg++;
+				}
+
+			// create mangled array name (if needed)
+			arrayName = NodeBuffer::GetMangledName(moduleTable.GetCurrentContext(), typeIdentifier.pNameToken->Value, genericArguments, genericTypeMap);
+
+			if (genericArguments.size() != typeIdentifier.GenericParameters.size())
+			{
+				logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+					"Invalid number of arguments for generic type '{0}'!", arrayName);
+				goto exit;
+			}
+		}
+
+		// get size if given
+		if (arrayDefinition.pSizeLiteral != nullptr)
+		{
+			std::string_view sizeStr = arrayDefinition.pSizeLiteral->pValueToken->Value;
+			std::from_chars(sizeStr.data(), sizeStr.data() + sizeStr.size(), arraySize);
+
+			if (arraySize == 0)
+			{
+				logErrorAtCurrentPosition(arrayDefinition.pSizeLiteral->pValueToken, "Array size must be greater than 0!");
+				identifierType = { nullptr, nullptr };
+				goto exit;
+			}
+		}
+
+		identifierType = generateTypeIdentifier(moduleTable, state, *arrayDefinition.pElementType, nullptr, modifier, genericTypeMap);
+		elementType = identifierType.type;
+
+		if (identifierType.type == nullptr)
+		{
+			logErrorAtCurrentPosition(arrayDefinition.pElementType->GetErrorToken(), "Unknown array element type!");
+			identifierType = { nullptr, nullptr };
+			goto exit;
+		}
+
+		switch (modifier) {
+		case TypeModifier::None:
+			break;
+
+		case TypeModifier::Pointer:
+		case TypeModifier::Reference:
+		{
+			// allocating a pointer to this type
+			identifierType.containedType = identifierType.type;
+			elementType = llvm::PointerType::get(identifierType.containedType, 0);	// the contained type is not stored by llvm as all pointers are treated as "opaque"
+			break;
+		}
+
+		default:
+		{
+			ASSERT(false, "Invalid type modifier!");
+			identifierType = { nullptr, nullptr };
+			goto exit;
+			break;
+		}
+		}
+
+		if (arraySize == 0) {
+			identifierType.type = llvm::PointerType::get(elementType, 0);	// when size is unknown, just create a pointer. elementType is not used by llvm
+			identifierType.containedType = elementType;
+		}
+		else {
+			identifierType.type = llvm::VectorType::get(elementType, arraySize,
+				false //not scalable
+			);
+		}
+
+		// if we have a name token, add the newly created array type to NamedValues
+		if (!arrayName.empty()) {
+			state.NamedValues.InsertType(arrayName, identifierType.type, NamedValues::UserDefinedType::array);
+		}
+
+	exit:
+		return identifierType;
+	}
+
 	llvm::Type* generateStructDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
 		const STRUCT_TYPE& structDefinition, const std::vector<TYPE*>& genericArguments
 	)
@@ -3125,6 +3192,10 @@ namespace AlloyCompiler
 			const ENUM_TYPE& enumType = *typeDefinition.pType->Type.Get<ENUM_TYPE>();
 			result = generateEnumDefinition(moduleTable, state, *typeDefinition.pTypeIdentifier, enumType, genericArguments);
 		}
+		else if (typeDefinition.pType->Type.Is<ARRAY_TYPE>()) {
+			const ARRAY_TYPE& arrayType = *typeDefinition.pType->Type.Get<ARRAY_TYPE>();
+			result = generateArrayDefinition(moduleTable, state, *typeDefinition.pTypeIdentifier, arrayType, genericArguments, {}).type;
+		}
 		else {
 			ASSERT(false, "Type definition not implemented!");
 		}
@@ -3183,7 +3254,7 @@ namespace AlloyCompiler
 		if (state.Optimizations)
 		{
 			// run the optimizer on the module
-			state.MPM.run(*state.Module, *state.MAM);
+			// state.MPM.run(*state.Module, *state.MAM);
 		}
 		state.Module->print(out, nullptr);
 
