@@ -51,15 +51,27 @@ type Transform = struct
 	scale:		FVec3,
 };
 
+fn Transform:create() -> Transform
+{
+	return Transform { position = FVec3:create(), rotation = Quat:create(), scale = FVec3:create() };
+}
+
 fn Transform:get_transform_matrix(const self: &Self) -> Mat4
 {
 	return Mat4:create_identity();
 }
 
 
+type TransformArray = [Transform; 256];
+
+
 fn main() -> i32
 {
 	printf("Hello World!");
+
+	var transformArray: *TransformArray = new [Transform:create(); 256];
+
+
 
 	return 0;
 }
