@@ -169,6 +169,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\AlloyLang\compiler\codegen\CodeGenerator.cpp" />
+    <ClCompile Include="..\AlloyLang\compiler\codegen\Inlines.cpp" />
     <ClCompile Include="..\AlloyLang\compiler\codegen\LibraryFunctions.cpp" />
     <ClCompile Include="..\AlloyLang\compiler\codegen\llvm\llvm.cpp" />
     <ClCompile Include="..\AlloyLang\compiler\codegen\NamedValues.cpp" />

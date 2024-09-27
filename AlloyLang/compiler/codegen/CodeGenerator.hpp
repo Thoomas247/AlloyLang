@@ -41,6 +41,8 @@ namespace AlloyCompiler
 		std::unique_ptr<llvm::PassInstrumentationCallbacks> PIC;
 		std::unique_ptr<llvm::StandardInstrumentations> SI;
 
+		llvm::ModulePassManager MPM;
+
 		bool Optimizations;
 
 		virtual ~LLVMState()
@@ -89,7 +91,11 @@ namespace AlloyCompiler
 				llvm::PassBuilder PB;
 				PB.registerModuleAnalyses(*MAM);
 				PB.registerFunctionAnalyses(*FAM);
+				PB.registerLoopAnalyses(*LAM);
+				PB.registerCGSCCAnalyses(*CGAM);
 				PB.crossRegisterProxies(*LAM, *FAM, *CGAM, *MAM);
+
+				MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O3);
 			}
 		}
 	};

@@ -55,7 +55,11 @@ namespace AlloyCompiler
 		ASSERT(fromType != nullptr && toType != nullptr, "Invalid type names!");
 
 		llvm::Type* returnType = toType;
+#ifdef FIRST_PARAMETER_BYREF
+		std::vector<llvm::Type*> paramTypes = { llvm::PointerType::get(fromType, 0) };
+#else
 		std::vector<llvm::Type*> paramTypes = { fromType };
+#endif
 		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, false);
 
 		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, mangledName, *state.Module);
@@ -64,14 +68,25 @@ namespace AlloyCompiler
 
 		// force inlining of Cast functions
 		function->addFnAttr(llvm::Attribute::AlwaysInline);
-
+#ifdef FIRST_PARAMETER_BYREF
+		// the first parameter is a reference to a variable and not a value
+		function->addAttributeAtIndex(1, llvm::Attribute::getWithByRefType(*state.Context, fromType));
+#endif
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
 
 		// create a new builder for this function, this will allow us to generate multiple functions in parallel
 		llvm::IRBuilder<> builder(*state.Context);
 		builder.SetInsertPoint(entryBlock);
 
+#ifdef FIRST_PARAMETER_BYREF
+		//
+		// TBD: The first (and only) parameter to the cast functions is supposed to be &Self, but this creates and extra call to load the value from the pointer
+		// We need to evaluate the impact on performance and on hte inline optimizer of the extra call to "load"
+		//
+		llvm::Value* fromValue = builder.CreateLoad(fromType, function->getArg(0));
+#else
 		llvm::Value* fromValue = function->getArg(0);
+#endif
 		llvm::Value* castValue = nullptr;
 
 		TypeSizePair fromInfo = getTypeSizePair(fromName);
@@ -181,7 +196,11 @@ namespace AlloyCompiler
 		ASSERT(fromType != nullptr && toType != nullptr, "Invalid type names!");
 
 		llvm::Type* returnType = toType;
+#ifdef FIRST_PARAMETER_BYREF
+		std::vector<llvm::Type*> paramTypes = { llvm::PointerType::get(fromType, 0) };
+#else
 		std::vector<llvm::Type*> paramTypes = { fromType };
+#endif
 		llvm::FunctionType* functionType = llvm::FunctionType::get(returnType, paramTypes, false);
 
 		llvm::Function* function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, mangledName, *state.Module);
@@ -190,6 +209,10 @@ namespace AlloyCompiler
 
 		// force inlining of BitCast functions
 		function->addFnAttr(llvm::Attribute::AlwaysInline);
+#ifdef FIRST_PARAMETER_BYREF
+		// the first parameter is a reference to a variable and not a value
+		function->addAttributeAtIndex(1, llvm::Attribute::getWithByRefType(*state.Context, fromType));
+#endif
 
 		llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*state.Context, "entry", function);
 
@@ -197,7 +220,11 @@ namespace AlloyCompiler
 		llvm::IRBuilder<> builder(*state.Context);
 		builder.SetInsertPoint(entryBlock);
 
+#ifdef FIRST_PARAMETER_BYREF
+		llvm::Value* fromValue = builder.CreateLoad(fromType, function->getArg(0));
+#else
 		llvm::Value* fromValue = function->getArg(0);
+#endif
 		llvm::Value* castValue = nullptr;
 
 		TypeSizePair fromInfo = getTypeSizePair(fromName);

@@ -3,7 +3,9 @@ extern printf (const str : String, ...) -> i64;
 fn main () -> i64
 {
 	var res : i64 = 0;
-	var test : i64 = 1;
+	var test32 : i32 = 1;
+
+	var test = test32:cast(i64);	// small extra test for the cast functions
 
 	switch (test)
 	{
