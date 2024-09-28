@@ -26,6 +26,11 @@ namespace AlloyCompiler
 		return m_ContextStack.back();
 	}
 
+	const Module& ModuleTable::GetCurrentModule() const
+	{
+		return m_Modules.at(m_ContextStack.back());
+	}
+
 	void ModuleTable::PushContext(const std::string& moduleName)
 	{
 		m_ContextStack.push_back(moduleName);

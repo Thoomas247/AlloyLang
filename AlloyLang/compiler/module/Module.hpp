@@ -14,6 +14,8 @@ namespace AlloyCompiler
 		bool GenerateFromString(const std::string& sourceString);
 		NodeBuffer& GetNodeBuffer();
 
+		const Source& GetSource() const;
+
 		Definition<MACRO_DEFINITION> GetMacroDefinition(const std::string_view& name) const;
 		Definition<TYPE_DEFINITION> GetTypeDefinition(const std::string_view& name) const;
 		Definition<FUNCTION_DEFINITION> GetFunctionDefinition(const std::string_view& name) const;

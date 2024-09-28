@@ -62,14 +62,14 @@ fn Transform:get_transform_matrix(const self: &Self) -> Mat4
 }
 
 
-type TransformArray = [Transform; 256];
+type TransformArray = [*Transform; 256];
 
 
 fn main() -> i32
 {
 	printf("Hello World!");
 
-	var transformArray: *TransformArray = new [Transform:create(); 256];
+	var transformArray: *TransformArray = new [new Transform:create(); 256];
 
 
 

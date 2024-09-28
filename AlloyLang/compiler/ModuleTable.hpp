@@ -34,6 +34,7 @@ namespace AlloyCompiler
 		ModuleTable(std::unordered_map<std::string, Module>& modules, const std::string& mainModuleName);
 
 		const std::string& GetCurrentContext() const;
+		const Module& GetCurrentModule() const;
 
 		void PushContext(const std::string& moduleName);
 		void PopContext();

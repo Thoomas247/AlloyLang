@@ -50,6 +50,11 @@ namespace AlloyCompiler
 		return m_NodeBuffer;
 	}
 
+	const Source& Module::GetSource() const
+	{
+		return m_Source;
+	}
+
 	Definition<MACRO_DEFINITION> Module::GetMacroDefinition(const std::string_view& name) const
 	{
 		return getDefinition(m_NodeBuffer.GetMacroDefinitions(), name);

@@ -37,16 +37,18 @@ namespace AlloyCompiler
 	llvm::Function* generateExternDefinition(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_DEFINITION& externDefinition, const std::string& moduleName);
 
 	template<typename ...Args>
-	constexpr void logErrorAtCurrentPosition(const Token* pToken, const std::string& format, Args && ...args)
+	constexpr void logErrorAtCurrentPosition(const ModuleTable& moduleTable, const Token* pToken, const std::string& format, Args && ...args)
 	{
 		if (pToken != nullptr)
 		{
+			const Module& currentModule = moduleTable.GetCurrentModule();
+
 			const Location& location = pToken->Location;
 			const size_t tokenSize = pToken->Value.size();
-			//const std::string_view line = m_Source.GetLine(location.LineStart);
+			const std::string_view line = currentModule.GetSource().GetLine(location.LineStart);
 
 			Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
-			//Log::Error("\t{0}", line);
+			Log::Error("\t{0}", line);
 			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
 			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 		}
@@ -290,16 +292,16 @@ namespace AlloyCompiler
 
 			if (result.Code == SearchResultCode::NotFound)
 			{
-				logErrorAtCurrentPosition(pNameToken, "Type '{0}' does not exist.", pNameToken->Value);
+				logErrorAtCurrentPosition(moduleTable, pNameToken, "Type '{0}' does not exist.", pNameToken->Value);
 			}
 			else if (result.Code == SearchResultCode::Inaccessible)
 			{
-				logErrorAtCurrentPosition(pNameToken, "Type '{0}' is private and cannot be accessed here.", pNameToken->Value);
+				logErrorAtCurrentPosition(moduleTable, pNameToken, "Type '{0}' is private and cannot be accessed here.", pNameToken->Value);
 			}
 			else
 			{
 				if (genericArguments.size() != result.pDefiniton->pTypeIdentifier->GenericParameters.size()) {
-					logErrorAtCurrentPosition(pNameToken, "Invalid number of parameters for generic type {0}!", mangledName);
+					logErrorAtCurrentPosition(moduleTable, pNameToken, "Invalid number of parameters for generic type {0}!", mangledName);
 					goto failed;
 				}
 
@@ -321,7 +323,7 @@ namespace AlloyCompiler
 		return type;
 	}
 
-	std::string getExtendedFunctionName(const std::string_view& moduleName, const std::string_view& typeName, const std::string_view& functionName,
+	std::string getExtendedFunctionName(ModuleTable& moduleTable, const std::string_view& moduleName, const std::string_view& typeName, const std::string_view& functionName,
 		const std::vector<FUNCTION_PARAMETER*>& functionParameters,
 		const std::vector<EXPRESSION*>& functionArguments,
 		std::unordered_map<std::string, std::string>& typeMap
@@ -357,7 +359,8 @@ namespace AlloyCompiler
 					)
 				{
 					// we are expecting a literal expression representing a type, nothing else
-					logErrorAtCurrentPosition(type->pIdentifierToken, "Expected a literal expression representing a type!");
+					logErrorAtCurrentPosition(moduleTable, type->pIdentifierToken, "Expected a type name.");
+
 					mangled = "";
 					goto failed;
 				}
@@ -366,7 +369,7 @@ namespace AlloyCompiler
 
 				// check that the generic parameter has not been encountered already
 				if (typeMap.contains(std::string(var->pNameToken->Value))) {
-					logErrorAtCurrentPosition(type->pIdentifierToken, "Type {0} cannot be defined more than once!", type->pIdentifierToken->Value);
+					logErrorAtCurrentPosition(moduleTable, type->pIdentifierToken, "Type {0} cannot be defined more than once.", type->pIdentifierToken->Value);
 					mangled = "";
 					goto failed;
 				}
@@ -383,13 +386,13 @@ namespace AlloyCompiler
 		return mangled;
 	}
 
-	std::string getExtendedFunctionName(const std::string_view& moduleName, Token* pTypeNameToken, Token* pFunctionNameToken,
+	std::string getExtendedFunctionName(ModuleTable& moduleTable, const std::string_view& moduleName, Token* pTypeNameToken, Token* pFunctionNameToken,
 		const std::vector<FUNCTION_PARAMETER*>& functionParameters,
 		const std::vector<EXPRESSION*>& functionArguments,
 		std::unordered_map<std::string, std::string>& typeMap
 	)
 	{
-		return getExtendedFunctionName(moduleName,
+		return getExtendedFunctionName(moduleTable, moduleName,
 			pTypeNameToken ? pTypeNameToken->Value : "",
 			pFunctionNameToken->Value,
 			functionParameters,
@@ -598,7 +601,7 @@ namespace AlloyCompiler
 			}
 		}
 
-		logErrorAtCurrentPosition(variable.pNameToken, "Unknown variable name '{0}'!", name);
+		logErrorAtCurrentPosition(moduleTable, variable.pNameToken, "Unknown variable name '{0}'!", name);
 		return {};
 	}
 
@@ -627,7 +630,7 @@ namespace AlloyCompiler
 			{
 				if (pParentTypeNameToken == nullptr)
 				{
-					logErrorAtCurrentPosition(typeName.pNameToken,
+					logErrorAtCurrentPosition(moduleTable, typeName.pNameToken,
 						"Self used with non member function!");
 					identifierType = { nullptr, nullptr };
 					goto exit;
@@ -639,7 +642,7 @@ namespace AlloyCompiler
 
 			if (!identifierType.type)
 			{
-				logErrorAtCurrentPosition(typeName.pNameToken,
+				logErrorAtCurrentPosition(moduleTable, typeName.pNameToken,
 					"Unknown type name '{0}'!", pNameToken->Value);
 				identifierType = { nullptr, nullptr };
 				goto exit;
@@ -704,7 +707,7 @@ namespace AlloyCompiler
 
 			if (!identifierType.type)
 			{
-				logErrorAtCurrentPosition(variableDeclarationNode.pNameToken, "Variable '{0}' type error!", name);
+				logErrorAtCurrentPosition(moduleTable, variableDeclarationNode.pNameToken, "Variable '{0}' type error!", name);
 				return nullptr;
 			}
 
@@ -763,6 +766,7 @@ namespace AlloyCompiler
 		// If the parameter list contains types (generic functions), also add the type names and function arguments to the mangled name
 		//
 		std::string name = getExtendedFunctionName(
+			moduleTable,
 			((parentType != nullptr) ? "" : moduleName),	// when parentType is provided, GetTypeName will already include the module name so don't repeat it here
 			((parentType != nullptr) ? state.NamedValues.GetTypeName(parentType) : ""),
 			functionDeclarationNode.pFunctionNameToken->Value,
@@ -772,7 +776,7 @@ namespace AlloyCompiler
 		);
 
 		if (name.empty()) {
-			logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' invalid declaration!", name);
+			logErrorAtCurrentPosition(moduleTable, functionDeclarationNode.pFunctionNameToken, "Function '{0}' invalid declaration!", name);
 			return nullptr;
 		}
 
@@ -782,7 +786,7 @@ namespace AlloyCompiler
 			// Replace '@' in mangled name by ':' for error messages
 			std::string ename = name;
 			std::replace(ename.begin(), ename.end(), '@', ':');
-			logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' already defined!", ename);
+			logErrorAtCurrentPosition(moduleTable, functionDeclarationNode.pFunctionNameToken, "Function '{0}' already defined!", ename);
 			return nullptr;
 		}
 
@@ -816,7 +820,7 @@ namespace AlloyCompiler
 
 				if (!identifierType.type)
 				{
-					logErrorAtCurrentPosition(pParameterVariableDeclaration->pNameToken, "Function '{0}' parameter type error!", name);
+					logErrorAtCurrentPosition(moduleTable, pParameterVariableDeclaration->pNameToken, "Function '{0}' parameter type error!", name);
 					return nullptr;
 				}
 
@@ -845,7 +849,7 @@ namespace AlloyCompiler
 
 		if (!returnType)
 		{
-			logErrorAtCurrentPosition(functionDeclarationNode.pFunctionNameToken, "Function '{0}' return type error!", name);
+			logErrorAtCurrentPosition(moduleTable, functionDeclarationNode.pFunctionNameToken, "Function '{0}' return type error!", name);
 			return nullptr;
 		}
 
@@ -913,7 +917,7 @@ namespace AlloyCompiler
 			// create mangled structure name (if needed)
 			structName = NodeBuffer::GetMangledName("", result.MangledName, constructorExpression.pType->GenericArguments, genericTypeMap);
 
-			logErrorAtCurrentPosition(constructorExpression.pType->pNameToken,
+			logErrorAtCurrentPosition(moduleTable, constructorExpression.pType->pNameToken,
 				"Unknown struct type '{0}'!", structName);
 			return nullptr;
 		}
@@ -946,14 +950,14 @@ namespace AlloyCompiler
 
 			if (memberInfo.memberIndex == -1)
 			{
-				logErrorAtCurrentPosition(constructorExpression.pType->pNameToken,
+				logErrorAtCurrentPosition(moduleTable, constructorExpression.pType->pNameToken,
 					"Type '{0}' is not a struct!", structName);
 				return nullptr;
 			}
 
 			if (memberInfo.memberIndex == -2)
 			{
-				logErrorAtCurrentPosition(constructorExpression.pType->pNameToken,
+				logErrorAtCurrentPosition(moduleTable, constructorExpression.pType->pNameToken,
 					"Struct '{0}' does not have a member '{1}'!", structName, memberName);
 				return nullptr;
 			}
@@ -965,7 +969,7 @@ namespace AlloyCompiler
 
 			if (!expressionVal)
 			{
-				logErrorAtCurrentPosition(nullptr, // nodeID
+				logErrorAtCurrentPosition(moduleTable, nullptr, // nodeID
 					"Error evaluating '{0}.{1}'!", structName, memberName);
 				return nullptr;
 			}
@@ -999,7 +1003,7 @@ namespace AlloyCompiler
 		}
 
 		if (elementType == nullptr) {
-			logErrorAtCurrentPosition(nullptr, // TBD *pointerInitializerNode... 
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD *pointerInitializerNode... 
 				"Unknown element type!");
 			return nullptr;
 		}
@@ -1106,7 +1110,7 @@ namespace AlloyCompiler
 
 		if (!expectedType.type || (expectedType.type->getTypeID() != llvm::Type::FixedVectorTyID && expectedType.type->getTypeID() != llvm::Type::ScalableVectorTyID))
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: initListExpressionNode...
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: initListExpressionNode...
 				"Unknown vector type!");
 			return nullptr;
 		}
@@ -1127,7 +1131,7 @@ namespace AlloyCompiler
 
 			if (!expressionVal)
 			{
-				logErrorAtCurrentPosition(nullptr, // TBD: initListExpressionNode.Values[i]...
+				logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: initListExpressionNode.Values[i]...
 					"Error evaluating expression!");
 				return nullptr;
 			}
@@ -1191,7 +1195,7 @@ namespace AlloyCompiler
 
 		if (nullptr == value || nullptr == declarationVal)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD 
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD 
 				"Error evaluating expression!");
 			return nullptr;
 		}
@@ -1259,7 +1263,7 @@ namespace AlloyCompiler
 			memberValue = state.Builder->CreateLoad(identifierType.containedType, memberPtr);
 		}
 		else {
-			logErrorAtCurrentPosition(nullptr, // TBD: arrayAccessExpression.ArrayExpressionID
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: arrayAccessExpression.ArrayExpressionID
 				"Expected vector type!");
 			return {};
 		}
@@ -1267,7 +1271,7 @@ namespace AlloyCompiler
 		// array of pointers, we need to load the underlying value
 		if (llvm::isa<llvm::PointerType>(memberValue->getType())) {
 			if (identifierType.containedType == nullptr) {
-				logErrorAtCurrentPosition(nullptr, // TBD: moduleTable.GetErrorInfo(arrayAccessExpression.ArrayExpressionID)
+				logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: moduleTable.GetErrorInfo(arrayAccessExpression.ArrayExpressionID)
 					"Array contains pointers of unknown type!");
 				return {};
 			}
@@ -1311,7 +1315,7 @@ namespace AlloyCompiler
 
 		if (leftType->getTypeID() != llvm::Type::StructTyID)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: moduleTable.GetErrorInfo(memberAccessExpressionNode.LeftID)
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: moduleTable.GetErrorInfo(memberAccessExpressionNode.LeftID)
 				"Expected struct type!");
 			return {};
 		}
@@ -1326,14 +1330,14 @@ namespace AlloyCompiler
 
 		if (memberInfo.memberIndex == -1)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: memberAccessExpressionNode.RightID
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: memberAccessExpressionNode.RightID
 				"Type '{0}' is not a struct type!", structName);
 			return {};
 		}
 
 		if (memberInfo.memberIndex == -2)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: memberAccessExpressionNode.RightID
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: memberAccessExpressionNode.RightID
 				"Struct '{0}' does not have a member '{1}'!", structName, memberName);
 			return {};
 		}
@@ -1383,7 +1387,7 @@ namespace AlloyCompiler
 		llvm::Type* type = getTypeFromTypeName(moduleTable, state, enumValueExpression.pEnumName->pNameToken, enumValueExpression.pEnumName->GenericArguments, {});
 
 		if (nullptr == type) {
-			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken, "Type {0} not found!", enumValueExpression.pEnumName->pNameToken->Value);
+			logErrorAtCurrentPosition(moduleTable, enumValueExpression.pEnumName->pNameToken, "Type {0} not found!", enumValueExpression.pEnumName->pNameToken->Value);
 			goto failed;
 		}
 
@@ -1393,20 +1397,20 @@ namespace AlloyCompiler
 		memberInfo = state.NamedValues.GetEnumMemberIndex(enumName, memberName);
 		if (memberInfo.memberIndex == -1)
 		{
-			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+			logErrorAtCurrentPosition(moduleTable, enumValueExpression.pEnumName->pNameToken,
 				"Type '{0}' is not an enum!", enumName);
 			goto failed;
 		}
 
 		if (memberInfo.memberIndex == -2)
 		{
-			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+			logErrorAtCurrentPosition(moduleTable, enumValueExpression.pEnumName->pNameToken,
 				"Enum '{0}' does not have a member '{1}'!", enumName, memberName);
 			goto failed;
 		}
 
 		if (nullptr == memberInfo.containedType && enumValueExpression.pPayloadValue != nullptr) {
-			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+			logErrorAtCurrentPosition(moduleTable, enumValueExpression.pEnumName->pNameToken,
 				"Payload specified for enum member '{0}' when member cannot have a payload!", memberName);
 			goto failed;
 		}
@@ -1446,7 +1450,7 @@ namespace AlloyCompiler
 
 			if (!expressionVal)
 			{
-				logErrorAtCurrentPosition(enumValueExpression.pEnumValueNameToken,
+				logErrorAtCurrentPosition(moduleTable, enumValueExpression.pEnumValueNameToken,
 					"Error evaluating '{0}.{1}'!", enumName, memberName);
 				goto failed;
 			}
@@ -1488,7 +1492,7 @@ namespace AlloyCompiler
 		llvm::Type* type = getTypeFromTypeName(moduleTable, state, enumValueExpression.pEnumName->pNameToken, enumValueExpression.pEnumName->GenericArguments, {});
 
 		if (nullptr == type) {
-			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken, "Type {0} not found!", enumValueExpression.pEnumName->pNameToken->Value);
+			logErrorAtCurrentPosition(moduleTable, enumValueExpression.pEnumName->pNameToken, "Type {0} not found!", enumValueExpression.pEnumName->pNameToken->Value);
 			goto failed;
 		}
 
@@ -1498,14 +1502,14 @@ namespace AlloyCompiler
 		memberInfo = state.NamedValues.GetEnumMemberIndex(enumName, memberName);
 		if (memberInfo.memberIndex == -1)
 		{
-			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+			logErrorAtCurrentPosition(moduleTable, enumValueExpression.pEnumName->pNameToken,
 				"Type '{0}' is not an enum!", enumName);
 			goto failed;
 		}
 
 		if (memberInfo.memberIndex == -2)
 		{
-			logErrorAtCurrentPosition(enumValueExpression.pEnumName->pNameToken,
+			logErrorAtCurrentPosition(moduleTable, enumValueExpression.pEnumName->pNameToken,
 				"Enum '{0}' does not have a member '{1}'!", enumName, memberName);
 			goto failed;
 		}
@@ -1577,7 +1581,7 @@ namespace AlloyCompiler
 					mangledName = NodeBuffer::GetMangledName("", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value, functionName);
 				}
 				else {
-					logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Not a variable or type name '{0}'!", varOrTypeName);
+					logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pTypeOrVariableName->pNameToken, "'{0}' is not a variable or type name.", varOrTypeName);
 					goto error;
 				}
 			}
@@ -1588,14 +1592,12 @@ namespace AlloyCompiler
 
 		if (funcResult.Code == SearchResultCode::NotFound)
 		{
-			// TODO: error not found
-			ASSERT(false, "Could not find function!");
+			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Could not find function '{0}'.", functionCallExpressionNode.pFunctionNameToken->Value);
 			goto error;
 		}
 		else if (funcResult.Code == SearchResultCode::Inaccessible)
 		{
-			// TODO: error inaccessible
-			ASSERT(false, "Function is inaccessible!");
+			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Function '{0}' is private and cannot be accessed here.", functionCallExpressionNode.pFunctionNameToken->Value);
 			goto error;
 		}
 		else
@@ -1604,7 +1606,7 @@ namespace AlloyCompiler
 
 			// look up the function in the global module table
 			// for generic functions, we need the full function name including any generic parameters
-			std::string extendedName = getExtendedFunctionName("",
+			std::string extendedName = getExtendedFunctionName(moduleTable, "",
 				type == nullptr ? "" : std::string(state.NamedValues.GetTypeName(type)),
 				type == nullptr ? funcResult.MangledName : functionName,
 				funcResult.pDefiniton->pFunctionType->Parameters, Arguments, typeMap);
@@ -1632,7 +1634,7 @@ namespace AlloyCompiler
 		if (!calleeFunc
 			|| !pCalleeFunctionType)
 		{
-			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Cannot find function '{0}'!", functionName);
+			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Cannot find function '{0}'!", functionName);
 			goto error;
 		}
 
@@ -1641,7 +1643,7 @@ namespace AlloyCompiler
 		* a more accurate test in done in the loop below
 		if (!calleeFunc->isVarArg() && calleeFunc->arg_size() != Arguments.size() + argi)
 		{
-			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
+			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
 			goto error;
 		}
 		*/
@@ -1657,7 +1659,7 @@ namespace AlloyCompiler
 				PtrValuePair ptrValue = generateIdentifier(moduleTable, state, var, identifierType);
 				if (ptrValue.Ptr == nullptr)
 				{
-					logErrorAtCurrentPosition(functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
+					logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
 					goto error;
 				}
 
@@ -1702,13 +1704,13 @@ namespace AlloyCompiler
 						PtrValuePair left = generateIdentifier(moduleTable, state, *unary.pExpression->Get<PRIMARY>()->Get<VARIABLE>(),
 							tempType);
 						if (left.Ptr == nullptr) {
-							logErrorAtCurrentPosition(nullptr, // TBD: argumentID
+							logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: argumentID
 								"Function argument {0} expects a reference to a variable preceded by the & symbol!", argi + 1);
 							goto error;
 						}
 						// check that we are passing a reference to a variable of the right type
 						if (tempType.type != argType.containedType) {
-							logErrorAtCurrentPosition(nullptr, // TBD: argumentID
+							logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: argumentID
 								"Function argument {0} expects a reference to a variable of type!", argi + 1, state.NamedValues.GetTypeName(argType.containedType));
 							goto error;
 						}
@@ -1720,7 +1722,7 @@ namespace AlloyCompiler
 				// argument is not in the form of &variable, if we are expecting a constant, continue evaluating the expression
 				if (!foundVariable) {
 					if (!isConst) {
-						logErrorAtCurrentPosition(nullptr, // TBD: argumentID
+						logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: argumentID
 							"Function argument {0} expects a reference to a variable preceded by the & symbol!", argi + 1);
 						goto error;
 					}
@@ -1737,7 +1739,7 @@ namespace AlloyCompiler
 
 				if (argVal == nullptr)
 				{
-					logErrorAtCurrentPosition(nullptr, // nodeID
+					logErrorAtCurrentPosition(moduleTable, nullptr, // nodeID
 						"Error evaluating expression!");
 					goto error;
 				}
@@ -1747,7 +1749,7 @@ namespace AlloyCompiler
 
 					if (argVal->getType() != calleeFunc->getArg(argi)->getType())
 					{
-						logErrorAtCurrentPosition(nullptr, // TBD: argumentID
+						logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: argumentID
 							"Function argument {0} expects value of type '{1}' but given type is '{2}'!", argi + 1,
 							state.NamedValues.GetTypeName(calleeFunc->getArg(argi)->getType()),
 							state.NamedValues.GetTypeName(argVal->getType()));
@@ -1761,7 +1763,7 @@ namespace AlloyCompiler
 
 		if (!calleeFunc->isVarArg() && calleeFunc->arg_size() != args.size())
 		{
-			logErrorAtCurrentPosition(functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
+			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
 			goto error;
 		}
 
@@ -1863,7 +1865,7 @@ namespace AlloyCompiler
 
 		if (!leftVal || !rightVal)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: nodeID, 
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID, 
 				"Error evaluating expression!");
 			return nullptr;
 		}
@@ -1875,7 +1877,7 @@ namespace AlloyCompiler
 		// check that types match
 		if (leftType != rightType)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: nodeID
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID
 				"Binary operator must be applied to matching types! Current types are '{0}' and '{1}'.",
 				state.NamedValues.GetTypeName(leftType), state.NamedValues.GetTypeName(rightType));
 			return nullptr;
@@ -1891,7 +1893,7 @@ namespace AlloyCompiler
 			std::string_view leftTypeName = state.NamedValues.GetTypeName(leftType);
 			ASSERT((static_cast<llvm::StructType*>(leftType))->isPacked(), "Structures should be created with the packed flag ON otherwise we cannot compare them");
 			if (operatorStr != "==" && operatorStr != "!=") {
-				logErrorAtCurrentPosition(nullptr, // TBD: nodeID
+				logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID
 					"Binary operator cannot be applied to structure or enum types! Current type is '{0}'.",
 					leftTypeName);
 			}
@@ -2138,13 +2140,13 @@ namespace AlloyCompiler
 
 		if (!ptr)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: nodeID 
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID 
 				"Error evaluating identifier!");
 			return nullptr;
 		}
 
 		if (ptrValue.isConst) {
-			logErrorAtCurrentPosition(nullptr, // TBD: nodeID 
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID 
 				"Assigning a value to a constant!");
 			return nullptr;
 		}
@@ -2153,7 +2155,7 @@ namespace AlloyCompiler
 
 		if (!expressionVal)
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: nodeID
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID
 				"Error evaluating expression!");
 			return nullptr;
 		}
@@ -2238,7 +2240,7 @@ namespace AlloyCompiler
 
 			if (initVal == nullptr)
 			{
-				logErrorAtCurrentPosition(nullptr, // TBD: forLoop...
+				logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: forLoop...
 					"Error evaluating expression!");
 				return nullptr;
 			}
@@ -2259,7 +2261,7 @@ namespace AlloyCompiler
 
 			if (bodyVal == nullptr)
 			{
-				logErrorAtCurrentPosition(nullptr,	// TBD: forLoop... 
+				logErrorAtCurrentPosition(moduleTable, nullptr,	// TBD: forLoop... 
 					"Error evaluating expression!");
 				return nullptr;
 			}
@@ -2272,7 +2274,7 @@ namespace AlloyCompiler
 
 			if (stepVal == nullptr)
 			{
-				logErrorAtCurrentPosition(nullptr,	// TBD: forLoop... 
+				logErrorAtCurrentPosition(moduleTable, nullptr,	// TBD: forLoop... 
 					"Error evaluating expression!");
 				return nullptr;
 			}
@@ -2286,7 +2288,7 @@ namespace AlloyCompiler
 
 			if (conditionVal == nullptr)
 			{
-				logErrorAtCurrentPosition(nullptr,	// TBD: forLoop... 
+				logErrorAtCurrentPosition(moduleTable, nullptr,	// TBD: forLoop... 
 					"Error evaluating expression!");
 				return nullptr;
 			}
@@ -2354,7 +2356,7 @@ namespace AlloyCompiler
 		return llvm::Constant::getNullValue(llvm::Type::getDoubleTy(*state.Context));
 	}
 
-	void captureEnumPayload(LLVMState& state, const Token* varNameToken, llvm::Value* payload, llvm::BasicBlock* insertionBlock)
+	void captureEnumPayload(ModuleTable& moduleTable, LLVMState& state, const Token* varNameToken, llvm::Value* payload, llvm::BasicBlock* insertionBlock)
 	{
 		//
 		// Create a variable with the enum payload value
@@ -2362,7 +2364,7 @@ namespace AlloyCompiler
 		if (varNameToken != nullptr) {
 			const std::string name(varNameToken->Value);
 			if (payload == nullptr) {
-				logErrorAtCurrentPosition(
+				logErrorAtCurrentPosition(moduleTable, 
 					varNameToken,
 					"Payload capture variable '{0}' is given but enum value does not a payload!",
 					name
@@ -2422,7 +2424,7 @@ namespace AlloyCompiler
 
 		// if provided, create a variable with name ifStatement.pCaptureNameToken and set the value to the captured value
 		// the captured value is set in the binary comparison expression
-		captureEnumPayload(state, ifStatement.pCaptureNameToken, payload, &func->getEntryBlock());
+		captureEnumPayload(moduleTable, state, ifStatement.pCaptureNameToken, payload, &func->getEntryBlock());
 
 		// the then block can be empty and return a null value, we don't really care
 		generateStatement(moduleTable, state, *ifStatement.pStatement);
@@ -2487,7 +2489,7 @@ namespace AlloyCompiler
 		{
 			if (state.CurrentReturnValue != nullptr)
 			{
-				logErrorAtCurrentPosition(nullptr, // TBD: nodeID
+				logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID
 					"Function expects a return value of type '{0}'!", state.NamedValues.GetTypeName(state.CurrentReturnValue->getType()));
 
 				return nullptr;
@@ -2513,7 +2515,7 @@ namespace AlloyCompiler
 		if (state.CurrentReturnValue == nullptr
 			|| expressionValue->getType() != state.CurrentReturnValue->getAllocatedType())
 		{
-			logErrorAtCurrentPosition(nullptr, // TBD: nodeID,
+			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID,
 				"Function has return type '{0}' but provided return value is of type '{1}'!",
 				state.CurrentReturnValue == nullptr ? "void" : state.NamedValues.GetTypeName(state.CurrentReturnValue->getAllocatedType()),
 				state.NamedValues.GetTypeName(expressionValue->getType()));
@@ -2588,7 +2590,7 @@ namespace AlloyCompiler
 			if (EnumType != nullptr) {
 				// switch/case statements using enumerations, the enumerations should be of the same type
 				if (EnumType != tempType.parentType) {
-					logErrorAtCurrentPosition(nullptr, "Case condition type {0} is not of the same enum type as switch value {1}!",
+					logErrorAtCurrentPosition(moduleTable, nullptr, "Case condition type {0} is not of the same enum type as switch value {1}!",
 						state.NamedValues.GetTypeName(tempType.parentType), state.NamedValues.GetTypeName(EnumType));
 					goto failed;
 				}
@@ -2597,19 +2599,19 @@ namespace AlloyCompiler
 					// if provided, create a variable and set the value to the captured value
 					Token* tok = std::get<1>(caseStmt);
 					if (tok != nullptr && !tok->Value.empty()) {
-						captureEnumPayload(state, tok, payload, caseBlock);
+						captureEnumPayload(moduleTable, state, tok, payload, caseBlock);
 					}
 				}
 
 				// retrieve the index of the enum value which should be a constant int
 				if (!expr->Is<PRIMARY>() || !expr->Get<PRIMARY>()->Is<ENUM_VALUE>()) {
-					logErrorAtCurrentPosition(nullptr, "Case condition is not part of the enumeration!");
+					logErrorAtCurrentPosition(moduleTable, nullptr, "Case condition is not part of the enumeration!");
 					goto failed;
 				}
 				ENUM_VALUE* ev = expr->Get<PRIMARY>()->Get<ENUM_VALUE>();
 				cond.Value = generateEnumValueIndex(moduleTable, state, *ev, tempType).Value;
 				if (!llvm::isa<llvm::ConstantInt>(cond.Value)) {
-					logErrorAtCurrentPosition(nullptr, "Switch/Case condition is not a constant value!");
+					logErrorAtCurrentPosition(moduleTable, nullptr, "Switch/Case condition is not a constant value!");
 					goto failed;
 				}
 
@@ -2621,7 +2623,7 @@ namespace AlloyCompiler
 
 				if (bodyVal == nullptr)
 				{
-					logErrorAtCurrentPosition(nullptr,
+					logErrorAtCurrentPosition(moduleTable, nullptr,
 						"Error generating case statement!");
 					goto failed;
 				}
@@ -2732,7 +2734,7 @@ namespace AlloyCompiler
 
 			if (genericArguments.size() != typeIdentifier.GenericParameters.size())
 			{
-				logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+				logErrorAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
 					"Invalid number of arguments for generic type '{0}'!", arrayName);
 				goto exit;
 			}
@@ -2746,7 +2748,7 @@ namespace AlloyCompiler
 
 			if (arraySize == 0)
 			{
-				logErrorAtCurrentPosition(arrayDefinition.pSizeLiteral->pValueToken, "Array size must be greater than 0!");
+				logErrorAtCurrentPosition(moduleTable, arrayDefinition.pSizeLiteral->pValueToken, "Array size must be greater than 0!");
 				identifierType = { nullptr, nullptr };
 				goto exit;
 			}
@@ -2757,7 +2759,7 @@ namespace AlloyCompiler
 
 		if (identifierType.type == nullptr)
 		{
-			logErrorAtCurrentPosition(arrayDefinition.pElementType->GetErrorToken(), "Unknown array element type!");
+			logErrorAtCurrentPosition(moduleTable, arrayDefinition.pElementType->GetErrorToken(), "Unknown array element type!");
 			identifierType = { nullptr, nullptr };
 			goto exit;
 		}
@@ -2829,7 +2831,7 @@ namespace AlloyCompiler
 
 		if (genericArguments.size() != typeIdentifier.GenericParameters.size())
 		{
-			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+			logErrorAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
 				"Invalid number of arguments for generic type '{0}'!", structName);
 			goto failed;
 		}
@@ -2843,7 +2845,7 @@ namespace AlloyCompiler
 
 			if (!identifierType.type)
 			{
-				logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+				logErrorAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
 					"Invalid structure member type for structure '{0}'!", structName);
 				goto failed;
 			}
@@ -2884,7 +2886,7 @@ namespace AlloyCompiler
 
 		if (!structType)
 		{
-			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+			logErrorAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
 				"Invalid structure type for structure '{0}'!", structName);
 			goto failed;
 		}
@@ -2924,7 +2926,7 @@ namespace AlloyCompiler
 
 		if (genericArguments.size() != typeIdentifier.GenericParameters.size())
 		{
-			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+			logErrorAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
 				"Invalid number of arguments for generic type '{0}'!", enumName);
 			goto failed;
 		}
@@ -2940,7 +2942,7 @@ namespace AlloyCompiler
 
 				if (!identifierType.type)
 				{
-					logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+					logErrorAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
 						"Invalid enum member type for enum '{0}'!", enumName);
 					goto failed;
 				}
@@ -2982,7 +2984,7 @@ namespace AlloyCompiler
 
 		if (!enumType)
 		{
-			logErrorAtCurrentPosition(typeIdentifier.pNameToken,
+			logErrorAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
 				"Invalid enum type for enum '{0}'!", enumName);
 			goto failed;
 		}
@@ -3059,7 +3061,7 @@ namespace AlloyCompiler
 			// check that we do not have a named value with the same name
 			if (state.NamedValues.GetValue(arg->getName().str(), false /*searchInParents*/))
 			{
-				logErrorAtCurrentPosition(nullptr, // TBD: nodeID
+				logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID
 					"Variable '{0}' already defined!", arg->getName().str());
 
 				func->eraseFromParent();
@@ -3215,7 +3217,7 @@ namespace AlloyCompiler
 		FUNCTION_DEFINITION* pMainFunction = moduleTable.GetMainFunction();
 		if (pMainFunction == nullptr)
 		{
-			logErrorAtCurrentPosition(nullptr, "Cannot find main entry point!");
+			logErrorAtCurrentPosition(moduleTable, nullptr, "Cannot find main entry point!");
 			return false;
 		}
 
