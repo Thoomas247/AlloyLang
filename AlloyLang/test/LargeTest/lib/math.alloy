@@ -1,0 +1,72 @@
+pub type Vector3Of(type T) = struct
+{
+	x: T,
+	y: T,
+	z: T,
+};
+
+
+pub type IVec3 = Vector3Of(i32);
+
+pub fn IVec3:create() -> IVec3
+{
+	return IVec3 { x = 0, y = 0, z = 0 };
+}
+
+
+pub type UVec3 = Vector3Of(u32);
+
+pub fn UVec3:create() -> UVec3
+{
+	return UVec3 { x = 0, y = 0, z = 0 };
+}
+
+
+pub type FVec3 = Vector3Of(f32);
+
+pub fn FVec3:create() -> FVec3
+{
+	return FVec3 { x = 0, y = 0, z = 0 };
+}
+
+
+pub type Vector4Of(type T) = struct
+{
+	x: T,
+	y: T,
+	z: T,
+	w: T,
+};
+
+pub type Quat = Vector4Of(f32);
+
+pub fn Quat:create() -> Quat
+{
+	return Quat { x = 0, y = 0, z = 0, z = 0 };
+}
+
+pub type FVec4 = Vector4Of(f32);
+
+pub fn FVec4:create() -> FVec4
+{
+	return FVec4 { x = 0, y = 0, z = 0, z = 0 };
+}
+
+pub type Mat4 = struct
+{
+	row_1: FVec4,
+	row_2: FVec4,
+	row_3: FVec4,
+	row_4: FVec4,
+};
+
+pub fn Mat4:create_identity() -> Mat4
+{
+	return Mat4
+	{
+		row_1 = FVec4 { x = 1.0, y = 0.0, z = 0.0, w = 0.0 },
+		row_2 = FVec4 { x = 0.0, y = 1.0, z = 0.0, w = 0.0 },
+		row_3 = FVec4 { x = 0.0, y = 0.0, z = 1.0, w = 0.0 },
+		row_4 = FVec4 { x = 0.0, y = 0.0, z = 0.0, w = 1.0 },
+	};
+}

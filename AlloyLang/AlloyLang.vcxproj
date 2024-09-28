@@ -177,6 +177,9 @@
     <None Include="test\CallbackFunctions\main.alloy" />
     <None Include="test\Enums\main.alloy" />
     <None Include="test\GenericFunctions\main.alloy" />
+    <None Include="test\LargeTest\lib\array.alloy" />
+    <None Include="test\LargeTest\lib\ecs.alloy" />
+    <None Include="test\LargeTest\lib\math.alloy" />
     <None Include="test\MultipleFiles2\lib\log.alloy" />
     <None Include="test\MultipleFiles2\lib\math.alloy" />
     <None Include="test\MultipleFiles2\main.alloy" />

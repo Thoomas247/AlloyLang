@@ -1,0 +1,33 @@
+pub type Array(type T) = struct
+{
+	capacity:	u64,
+	size:		u64,
+	data:		*[T],
+};
+
+pub fn Array(type T):create() -> Array(T)
+{
+	return Array(T) { size = 0, data = new {} };
+}
+
+pub fn Array(type T):add(var self: &Self, const new_obj: &T)
+{
+	// check if we reached max capacity
+	if (self.size == self.capacity)
+	{
+		self.capacity = self.capacity * 2;
+
+		var new_data: *[T] = new [T:create(); self.capacity];
+
+		// copy over to new array
+		for (var i: u64 = 0; i < size; i = i + 1)
+		{
+			new_data[i] = self.data[i];
+		}
+
+		self.data = move new_data;
+	}
+
+	self.data[self.size] = new_obj;
+	self.size = self.size + 1;
+}
