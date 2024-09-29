@@ -292,11 +292,11 @@ namespace AlloyCompiler
 
 			if (result.Code == SearchResultCode::NotFound)
 			{
-				logErrorAtCurrentPosition(moduleTable, pNameToken, "Type '{0}' does not exist.", pNameToken->Value);
+				logErrorAtCurrentPosition(moduleTable, pNameToken, "Type '{0}' does not exist.", mangledName != pNameToken->Value ? std::string(pNameToken->Value) + " (" + mangledName + ")" : mangledName);
 			}
 			else if (result.Code == SearchResultCode::Inaccessible)
 			{
-				logErrorAtCurrentPosition(moduleTable, pNameToken, "Type '{0}' is private and cannot be accessed here.", pNameToken->Value);
+				logErrorAtCurrentPosition(moduleTable, pNameToken, "Type '{0}' is private and cannot be accessed here.", mangledName != pNameToken->Value ? std::string(pNameToken->Value) + " (" + mangledName + ")" : mangledName);
 			}
 			else
 			{
