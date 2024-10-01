@@ -17,3 +17,4 @@ TODO for version 0.2 release:
 	[] restrictions on generic parameters using traits
 	[] traits as interfaces, see traits examples in AlloyLang.txt
 	[] macros, see macros examples in AlloyLang.txt
+	[] operator overloading (including destructor)

@@ -137,6 +137,8 @@ namespace AlloyCompiler
 		bool isEOF() const;
 		bool hasNext() const;
 
+		void getNextNonComment();
+
 		Token* token();
 		Token* peekToken(size_t offset = 0);
 
@@ -216,9 +218,9 @@ namespace AlloyCompiler
 		const std::string_view line = m_Source.GetLine(location.LineStart);
 
 		Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
-		Log::Error("\t{0}", line);
-		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
-		Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+		Log::Error("    {0}", line);
+		Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::string(tokenSize, '~'));
+		Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::vformat(format, std::make_format_args(args...)));
 	}
 
 	template<typename T>
@@ -244,7 +246,8 @@ namespace AlloyCompiler
 			*ppToken = m_TokenBuffer.GetToken(m_CurrentTokenIndex);
 		}
 
-		++m_CurrentTokenIndex;
+		getNextNonComment();
+
 		return SUCCESS;
 	}
 }

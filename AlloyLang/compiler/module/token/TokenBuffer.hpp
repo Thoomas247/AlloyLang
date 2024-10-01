@@ -32,7 +32,7 @@ namespace AlloyCompiler
 		std::string_view createStringView(size_t start, size_t end) const;
 
 		bool trySkipWhitespace();
-		bool trySkipComment();
+		bool tryGetComment();
 		bool tryGetOperator();
 		bool tryGetDelimiter();
 		bool tryGetKeyword();

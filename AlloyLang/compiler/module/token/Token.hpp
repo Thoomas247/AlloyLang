@@ -14,6 +14,8 @@ namespace AlloyCompiler
 
 		end_of_file,
 
+		comment,
+
 		identifier,
 		long_identifier,
 
@@ -93,6 +95,8 @@ namespace AlloyCompiler
 	const std::unordered_map<TokenKind, std::string> TOKEN_KIND_VALUES =
 	{
 		{ TokenKind::none,					"none" },
+
+		{ TokenKind::comment,				"comment" },
 
 		{ TokenKind::identifier,			"identifier" },
 		{ TokenKind::long_identifier,		"identifier" },

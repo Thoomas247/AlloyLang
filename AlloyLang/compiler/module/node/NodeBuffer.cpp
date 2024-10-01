@@ -70,6 +70,17 @@ namespace AlloyCompiler
 		return !isEOF();
 	}
 
+	void NodeBuffer::getNextNonComment()
+	{
+		++m_CurrentTokenIndex;
+
+		// skip comment tokens, if any
+		while (token()->Kind == TokenKind::comment)
+		{
+			++m_CurrentTokenIndex;
+		}
+	}
+
 	Token* NodeBuffer::token()
 	{
 		return m_TokenBuffer.GetToken(m_CurrentTokenIndex);
@@ -77,18 +88,35 @@ namespace AlloyCompiler
 
 	Token* NodeBuffer::peekToken(size_t offset)
 	{
-		return m_TokenBuffer.GetToken(m_CurrentTokenIndex + offset + 1);
+		size_t realOffset = 0; // offset taking into account comment tokens
+		Token* pToken = m_TokenBuffer.GetToken(m_CurrentTokenIndex + realOffset + 1);
+		
+		// move forward 'offset' more times, skipping any comments
+		for (size_t i = 0; i < offset; i++)
+		{
+			while (pToken->Kind == TokenKind::comment)
+			{
+				realOffset++;
+				pToken = m_TokenBuffer.GetToken(m_CurrentTokenIndex + realOffset + 1);
+			}
+
+			realOffset++;
+		}
+
+		return m_TokenBuffer.GetToken(m_CurrentTokenIndex + realOffset + 1);
 	}
 
 	NodeBuffer::Result NodeBuffer::eat()
 	{
+		// check if we are already at the end of the file
 		if (isEOF())
 		{
 			logErrorAtCurrentPosition("Unexpected end of file.");
 			return EOF_REACHED;
 		}
 
-		++m_CurrentTokenIndex;
+		getNextNonComment();
+
 		return SUCCESS;
 	}
 
@@ -115,7 +143,8 @@ namespace AlloyCompiler
 			*ppToken = m_TokenBuffer.GetToken(m_CurrentTokenIndex);
 		}
 
-		++m_CurrentTokenIndex;
+		getNextNonComment();
+
 		return SUCCESS;
 	}
 

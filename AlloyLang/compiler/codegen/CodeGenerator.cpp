@@ -48,13 +48,13 @@ namespace AlloyCompiler
 			const std::string_view line = currentModule.GetSource().GetLine(location.LineStart);
 
 			Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
-			Log::Error("\t{0}", line);
-			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
-			Log::Error("\t{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+			Log::Error("    {0}", line);
+			Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::string(tokenSize, '~'));
+			Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::vformat(format, std::make_format_args(args...)));
 		}
 		else
 		{
-			Log::Error("\t{0}", std::vformat(format, std::make_format_args(args...)));
+			Log::Error("    {0}", std::vformat(format, std::make_format_args(args...)));
 		}
 
 		ASSERT(false, "Check log file for errors!");	// all errors should assert in debug mode

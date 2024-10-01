@@ -22,15 +22,41 @@ fn Transform:get_transform_matrix(const self: &Self) -> Mat4
 
 
 //type TransformArray = [Transform; 256];
+type ScoreArray = Array(u32);
 
 
 fn main() -> i32
 {
-	printf("Hello World!");
+	//printf("Hello World!");
 
-	//var transformArray: *TransformArray = new [Transform:create(); 256];
+	//var transformArray: TransformArray = [Transform:create(); 256];
 
 	var transform_array = Array(Transform):create();
 
+	//var score_array = ScoreArray:create();
+	//var run = true;
+
+	//while (run)
+	//{
+	//	increment_scores(&score_array);
+	//}
+
+	//a.b:c();
+
 	return 0;
+}
+
+fn increment_scores(const score_array: &ScoreArray)
+{
+	for (var i: u64 = 0; i < score_array.size; i = i + 1)
+	{
+		var current_score = score_array:get(i);
+
+		current_score = current_score + 5;
+
+		if (current_score % 7 == 0)
+		{
+			current_score = current_score - 3;
+		}
+	}
 }

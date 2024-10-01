@@ -4,16 +4,12 @@
 
 namespace AlloyCompiler
 {
-	constexpr auto NUM_SPACES_PER_TAB = 2;
-
 	namespace Log
 	{
 		inline static std::string convertTabsToSpaces(const std::string& s)
 		{
 			const std::regex tab(R"(\t)");
-			const std::string spaces(NUM_SPACES_PER_TAB, ' ');
-
-			return std::regex_replace(s, tab, spaces);
+			return std::regex_replace(s, tab, " ");
 		}
 
 		template <typename... Args>

@@ -20,7 +20,7 @@ namespace AlloyCompiler
 				continue;
 
 			// skip comments
-			if (trySkipComment())
+			if (tryGetComment())
 				continue;
 
 			// check for any operators
@@ -88,16 +88,7 @@ namespace AlloyCompiler
 			m_Column = 1;
 		}
 
-		// check if we have a tab
-		else if (current() == '\t')
-		{
-			m_Column += NUM_SPACES_PER_TAB;
-		}
-		else
-		{
-			++m_Column;
-		}
-
+		++m_Column;
 		++m_CharIndex;
 
 		// check that we haven't reached the end of the file
@@ -151,12 +142,16 @@ namespace AlloyCompiler
 		return true;
 	}
 
-	bool TokenBuffer::trySkipComment()
+	bool TokenBuffer::tryGetComment()
 	{
 		if (current() != '/' || !hasNext())
 		{
 			return false;
 		}
+
+		// store the starting index and position
+		size_t start = index();
+		const Location& loc = location();
 
 		// check if we have a single line comment
 		if (peek() == '/')
@@ -170,8 +165,6 @@ namespace AlloyCompiler
 			{
 				eat();
 			}
-
-			return true;
 		}
 
 		// check if we have a multi line comment
@@ -202,13 +195,20 @@ namespace AlloyCompiler
 			{
 				logErrorAtCurrentPosition("Unexpected end of file! Missing '*/'.");
 			}
-
-			return true;
 		}
+
+		// otherwise, this isn't a comment
 		else
 		{
 			return false;
 		}
+
+		// get the comment string
+		auto tokenString = createStringView(start, index());
+
+		addToken(TokenKind::comment, tokenString, loc);
+
+		return true;
 	}
 
 	bool TokenBuffer::tryGetOperator()
