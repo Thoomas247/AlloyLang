@@ -1,7 +1,45 @@
 #include "TokenBuffer.hpp"
 
+#ifdef CLR
+#include <msclr\marshal_cppstd.h>
+#endif
+
+
 namespace AlloyCompiler
 {
+#ifdef CLR
+	//
+	// split a string into multiple tokens and return the token list to the calling .Net object
+	//
+	/* static*/
+	System::Collections::Generic::List<GlobalFunctions::CSharpToken^>^ GlobalFunctions::Tokenize(System::String^ managedStr)
+	{
+		System::Collections::Generic::List<GlobalFunctions::CSharpToken^>^ list;
+		if (!System::String::IsNullOrEmpty(managedStr))
+		{
+			msclr::interop::marshal_context context;
+			AlloyCompiler::Source src(context.marshal_as<std::string>(managedStr));
+			AlloyCompiler::TokenBuffer tok(src);
+			tok.Tokenize();
+			int count = (int)tok.NumTokens();
+			list = gcnew System::Collections::Generic::List<GlobalFunctions::CSharpToken^>(count);
+			for (int n = 0; n < count; n++)
+			{
+				// convert our C++ tokens into C# token and add it to the list
+				Token* token = tok.GetToken(n);
+				GlobalFunctions::CSharpToken^ cstoken = gcnew GlobalFunctions::CSharpToken();
+				cstoken->Value = gcnew System::String(std::string(token->Value).data());
+				cstoken->LineStart = token->Location.LineStart;
+				cstoken->Line = token->Location.Line;
+				cstoken->Column = token->Location.Column;
+				cstoken->Kind = (int)token->Kind;
+				list->Add(cstoken);
+			}
+		}
+		return list;
+	}
+#endif
+
 	TokenBuffer::TokenBuffer(const Source& source)
 		: m_Source(source)
 		, m_CharIndex(0)

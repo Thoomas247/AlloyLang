@@ -59,4 +59,22 @@ namespace AlloyCompiler
 
 		eat();
 	}
+
+#ifdef CLR
+	public ref class GlobalFunctions
+	{
+	public:
+		ref struct CSharpToken
+		{
+			System::String^ Value;
+			int LineStart;
+			int Line;
+			int Column;
+			int Kind;
+		};
+		static System::Collections::Generic::List<CSharpToken^>^ Tokenize(System::String^ managedStr);
+	};
+#endif
+
+
 }
