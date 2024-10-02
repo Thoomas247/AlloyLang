@@ -78,7 +78,9 @@ namespace AlloySyntaxHighliting
 
 		    AlloyTokenTypes.none,       // end_of_file,
 
-		    AlloyTokenTypes.none,    // identifier,
+            AlloyTokenTypes.comment,     // comment
+
+            AlloyTokenTypes.none,    // identifier,
 		    AlloyTokenTypes.none,    // long_identifier,
 
             AlloyTokenTypes.keyword,    // extern_keyword,
@@ -141,8 +143,6 @@ namespace AlloySyntaxHighliting
 		    AlloyTokenTypes.basictype,    // boolean_literal,
 		    AlloyTokenTypes.stringliteral,   // string_literal,
 		    AlloyTokenTypes.stringliteral,    // character_literal
-
-            AlloyTokenTypes.comment        // comment
         };
 
         public IEnumerable<ITagSpan<AlloyTokenTag>> GetTags(NormalizedSnapshotSpanCollection spans)
@@ -160,7 +160,9 @@ namespace AlloySyntaxHighliting
                         if (token.Kind != 0
                             && curLoc+ token.Value.Length < curSpan.Snapshot.Length)
                         {
-                            var tokenSpan = new SnapshotSpan(curSpan.Snapshot, new Span(curLoc, token.Value.Length));
+                            int len = token.Value.Length;
+                            if (token.Kind == 49 /*string_literal*/ || token.Kind == 50 /*character_literal*/) len += 2;  // for strings and single chars we want to cover the quotes
+                            var tokenSpan = new SnapshotSpan(curSpan.Snapshot, new Span(curLoc, len));
                             if (tokenSpan.IntersectsWith(curSpan))
                                 yield return new TagSpan<AlloyTokenTag>(tokenSpan,
                                                                       new AlloyTokenTag(TokenKinds[token.Kind]));

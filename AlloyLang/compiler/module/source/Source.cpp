@@ -39,8 +39,7 @@ namespace AlloyCompiler
 	char Source::GetChar(size_t index) const
 	{
 		ASSERT(!m_SourceString.empty(), "File has not been read! Call ReadFile() first.");
-
-		return m_SourceString[index];
+		return (index < m_SourceString.length() ? m_SourceString [index] : 0);
 	}
 
 	size_t Source::GetSize() const
@@ -68,6 +67,9 @@ namespace AlloyCompiler
 	{
 		ASSERT(!m_SourceString.empty(), "File has not been read! Call ReadFile() first.");
 
-		return std::string_view(m_SourceString).substr(start, end - start);
+		// Error encountered in the syntax highlighter: we need to make sure we are not past the end of the string
+		if (end > m_SourceString.length()) end = m_SourceString.length();
+		if (start > end) start = end;
+		return  std::string_view(m_SourceString).substr(start, end - start);
 	}
 }
