@@ -9,7 +9,7 @@ namespace AlloyCompiler
 {
 	extern llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, llvm::Type* type, int numElements = 0);
 
-	llvm::Function* generateMemCmpFunctionDeclaration(ModuleTable& moduleTable, LLVMState& state) {
+	llvm::Function* generateMemCmpFunctionDeclaration(const ModuleTable& moduleTable, LLVMState& state) {
 		//
 		// Generate a the declaration for a function named memcmp to call the standard memcmp function
 		// Function signature : Value* memcmp(Value* Left, int64 LeftSize, Value* Right, int64 RightSize)
@@ -42,7 +42,7 @@ namespace AlloyCompiler
 		return function;
 	}
 		
-	llvm::Function* generateStructureComparisonFunction(ModuleTable& moduleTable, LLVMState& state) {
+	llvm::Function* generateStructureComparisonFunction(const ModuleTable& moduleTable, LLVMState& state) {
 		//
 		// Generate a function named _CreateStructCompare_ to compare two structures or enumerations
 		// Function signature : Value* _CreateStructCompare_(Value* Left, int64 LeftSize, Value* Right, int64 RightSize)

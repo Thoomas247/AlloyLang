@@ -42,31 +42,6 @@ namespace AlloyCompiler
 								pFunctionNameToken->Value);
 		}
 
-		//
-		// return the mangled name for a type with generic arguments
-		//
-		static std::string GetMangledName(const std::string_view& moduleName, const std::string_view& typeName, const std::vector<TYPE*>& genericArguments,
-			const std::unordered_map<std::string, std::string>& genericTypeMap)
-		{
-			std::string mangledName(moduleName);
-			if (!mangledName.empty())
-				mangledName += "::";
-			mangledName += std::string(typeName);
-
-			if (!genericArguments.empty()) {
-				for (auto& t : genericArguments) {
-					if (t->Type.Is<TYPE_NAME>()) {
-						if (genericTypeMap.contains(std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value)))
-							mangledName = mangledName + "@" + genericTypeMap.at(std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value));
-						else
-							mangledName = mangledName + "@" + std::string(t->Type.Get<TYPE_NAME>()->pNameToken->Value);
-					}
-				}
-			}
-
-			return mangledName;
-		}
-
 		NodeBuffer(const Source& source, TokenBuffer& tokenBuffer);
 		bool Parse();
 

@@ -30,6 +30,9 @@ namespace AlloyCompiler
 		bool freeOnExit = false;				// whether we should free the pointer
 	};
 
+	typedef std::unordered_map<std::string, llvm::Type*>	GenericTypeMap;
+	typedef std::vector<std::tuple<std::string, llvm::Type*>> GenericArgumentTypes;
+
 #define _EnumPayloadStruct_	"_EnumPayloadStruct_"
 #define EnumPayloadIndex	0
 #define EnumPayloadValue	1
@@ -73,19 +76,19 @@ namespace AlloyCompiler
 		typedef enum { basic = 0, structure = 1, enumeration = 2, array = 3 } UserDefinedType;
 		void InsertType(const std::string& name, llvm::Type* type, UserDefinedType userDefinedType, 
 			const std::unordered_map<std::string_view, TypeMemberInfo>& memberInfo = {},
-			const std::unordered_map<std::string, std::string>& genericTypeMap = {}
+			const GenericTypeMap& genericTypeMap = {}
 			);
 		bool GetStructMembers(const std::string_view& structName, std::unordered_map<std::string_view, TypeMemberInfo>& structMembers);
 		bool GetEnumMembers(const std::string_view& enumName, std::unordered_map<std::string_view, TypeMemberInfo>& enumMembers);
 
 		// support for generic function parameters
-		std::string GetGenericType(const std::string& typeName);
-		void SetGenericType(const std::string& typeName, const std::string& realType);
+		llvm::Type* GetGenericType(const std::string& typeName);
+		void SetGenericType(const std::string& typeName, llvm::Type* realType);
 
 		// returns the current function's generic type map
-		std::unordered_map<std::string, std::string> GetGenericTypeMap();
+		GenericTypeMap GetGenericTypeMap();
 		// returns the generic type map for a specific type
-		bool GetGenericTypeMap(const std::string_view& structName, std::unordered_map<std::string, std::string>& genericTypeMap);
+		bool GetGenericTypeMap(const std::string_view& structName, GenericTypeMap& genericTypeMap);
 
 		llvm::Value*& GetEnumCapturedValue() { return m_ScopeStack.back().EnumCapturedValue; }
 
@@ -108,7 +111,7 @@ namespace AlloyCompiler
 			std::string_view Name;
 			UserDefinedType userDefinedType;
 			std::unordered_map<std::string_view, TypeMemberInfo> memberInfo;
-			std::unordered_map<std::string, std::string> genericTypeMap;
+			GenericTypeMap genericTypeMap;
 			unsigned int ID;		// a unique internal ID that identifies each type
 		};
 
@@ -118,7 +121,7 @@ namespace AlloyCompiler
 			std::unordered_map<std::string, ValueTypePair> Values;
 			std::unordered_map<std::string, TypeInfo> Types;
 			std::unordered_map<const llvm::Type*, std::string> TypeNames; // used for error messages
-			std::unordered_map<std::string, std::string> GenericTypeMap;	// this is a map from the generic types to the actual function parameter types
+			GenericTypeMap GenericTypeMap;	// this is a map from the generic types to the actual function parameter types
 			llvm::Value* EnumCapturedValue;									// captured payload value in if or switch statements
 
 			Scope(const std::string_view& name)

@@ -7,5 +7,5 @@ namespace AlloyCompiler
 	llvm::Function* generateMemCmpFunctionDeclaration(ModuleTable& moduleTable, LLVMState& state);
 
 	// generate code to compare two structures given pointers to these structures
-	llvm::Function* generateStructureComparisonFunction(ModuleTable& moduleTable, LLVMState& state);
+	llvm::Function* generateStructureComparisonFunction(const ModuleTable& moduleTable, LLVMState& state);
 }

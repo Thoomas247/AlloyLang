@@ -76,7 +76,7 @@ namespace AlloyCompiler
 		// T -> i64
 		// T1 ->f32
 		//
-		const std::unordered_map<std::string, std::string>& previousTypeMap = m_ScopeStack.back().GenericTypeMap;
+		const GenericTypeMap& previousTypeMap = m_ScopeStack.back().GenericTypeMap;
 
 		m_ScopeStack.emplace_back(name);
 
@@ -237,7 +237,7 @@ namespace AlloyCompiler
 		}
 	}
 
-	bool NamedValues::GetGenericTypeMap(const std::string_view& typeName, std::unordered_map<std::string, std::string>& genericTypeMap)
+	bool NamedValues::GetGenericTypeMap(const std::string_view& typeName, GenericTypeMap& genericTypeMap)
 	{
 		TypeInfo* typeInfo = findType(typeName);
 
@@ -309,7 +309,7 @@ namespace AlloyCompiler
 
 	void NamedValues::InsertType(const std::string& name, llvm::Type* type, UserDefinedType userDefinedType,
 		const std::unordered_map<std::string_view, TypeMemberInfo>& memberInfo,
-		const std::unordered_map<std::string, std::string>& genericTypeMap
+		const GenericTypeMap& genericTypeMap
 		)
 	{
 		ASSERT(!m_ScopeStack.back().Types.contains(name), "Named type already exists! Should check if it exists first with NamedValues::GetType(const std::string& name).");
@@ -348,23 +348,23 @@ namespace AlloyCompiler
 	}
 
 	// support for generic function parameters
-	std::string NamedValues::GetGenericType(const std::string& typeName)
+	llvm::Type* NamedValues::GetGenericType(const std::string& typeName)
 	{
 		auto found = m_ScopeStack.back().GenericTypeMap.find(typeName);
 		if (found == m_ScopeStack.back().GenericTypeMap.end()) {
-			return typeName;
+			return nullptr;
 		}
 		else {
 			return found->second;
 		}
 	}
 
-	void NamedValues::SetGenericType(const std::string& typeName, const std::string& Type)
+	void NamedValues::SetGenericType(const std::string& typeName, llvm::Type* Type)
 	{
 		m_ScopeStack.back().GenericTypeMap[typeName] = Type;
 	}
 
-	std::unordered_map<std::string, std::string> NamedValues::GetGenericTypeMap()
+	GenericTypeMap NamedValues::GetGenericTypeMap()
 	{
 		return m_ScopeStack.back().GenericTypeMap;
 	}
