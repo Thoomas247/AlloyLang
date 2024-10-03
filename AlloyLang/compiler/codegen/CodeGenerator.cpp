@@ -64,6 +64,28 @@ namespace AlloyCompiler
 	}
 
 	template<typename ...Args>
+	constexpr void logInfoAtCurrentPosition(const ModuleTable& moduleTable, const Token* pToken, const std::string& format, Args && ...args)
+	{
+		if (pToken != nullptr)
+		{
+			const Module& currentModule = moduleTable.GetCurrentModule();
+
+			const Location& location = pToken->Location;
+			const size_t tokenSize = pToken->Value.size();
+			const std::string_view line = currentModule.GetSource().GetLine(location.LineStart);
+
+			Log::Print("({0}:{1}) INFO:", location.Line, location.Column);
+			Log::Print("    {0}", line);
+			Log::Print("    {0}{1}", std::string(location.Column - 2, ' '), std::string(tokenSize, '~'));
+			Log::Print("    {0}{1}", std::string(location.Column - 2, ' '), std::vformat(format, std::make_format_args(args...)));
+		}
+		else
+		{
+			Log::Print("    {0}", std::vformat(format, std::make_format_args(args...)));
+		}
+	}
+
+	template<typename ...Args>
 	constexpr void logErrorAtCurrentPosition(const ModuleTable& moduleTable, const Token* pToken, const std::string& format, Args && ...args)
 	{
 		if (pToken != nullptr)
@@ -861,6 +883,11 @@ namespace AlloyCompiler
 			typeMap
 		);
 
+#ifdef TRACE_CODE_GENERATOR
+		logInfoAtCurrentPosition(moduleTable, functionDeclarationNode.pFunctionNameToken,
+							"Processing function {0}\n", name);
+#endif
+
 		if (name.empty()) {
 			logErrorAtCurrentPosition(moduleTable, functionDeclarationNode.pFunctionNameToken, "Function '{0}' invalid declaration!", name);
 			return nullptr;
@@ -995,10 +1022,16 @@ namespace AlloyCompiler
 		std::string structName;
 		GenericTypeMap genericTypeMap = state.NamedValues.GetGenericTypeMap();
 		GenericArgumentTypes genericArgumentTypes = ProcessGenericArguments(moduleTable, state, constructorExpression.pType->GenericArguments, genericTypeMap);
-		llvm::Type* type = getTypeFromTypeName(moduleTable, state, constructorExpression.pType->pNameToken, 
+		llvm::Type* type = getTypeFromTypeName(moduleTable, state, constructorExpression.pType->pNameToken,
 						genericArgumentTypes,
 						genericTypeMap);
 
+#ifdef TRACE_CODE_GENERATOR
+		logInfoAtCurrentPosition(moduleTable, constructorExpression.pType->pNameToken,
+				"Processing constructor {0}\n", GetMangledName(state, moduleTable.GetCurrentContext(), constructorExpression.pType->pNameToken->Value,
+				genericArgumentTypes,
+				genericTypeMap));
+#endif
 		if (!type || type->getTypeID() != llvm::Type::StructTyID)
 		{
 			SearchResult<TYPE_DEFINITION> result = moduleTable.GetTypeDefinition(constructorExpression.pType->pNameToken->Value);
@@ -2918,6 +2951,11 @@ namespace AlloyCompiler
 		// create mangled structure name (if needed)
 		std::string structName;
 		structName = GetMangledName(state, moduleTable.GetCurrentContext(), typeIdentifier.pNameToken->Value, genericArguments, genericTypeMap);
+
+#ifdef TRACE_CODE_GENERATOR
+		logInfoAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
+			"Processing structure {0}\n", structName);
+#endif
 
 		if (genericArguments.size() != typeIdentifier.GenericParameters.size())
 		{
