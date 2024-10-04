@@ -1024,10 +1024,10 @@ namespace AlloyCompiler
 	template<>
 	FUNCTION_CALL* NodeBuffer::parse(EXPRESSION* pLeft)
 	{
-		/*
+		
 		TYPE_NAME* pTypeName = nullptr;
-		if (peekToken()->Kind == TokenKind::colon
-			|| peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon)
+		if (pLeft == nullptr && 
+			(peekToken()->Kind == TokenKind::colon|| peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon))
 		{
 			pTypeName = parse<TYPE_NAME>();
 
@@ -1038,11 +1038,9 @@ namespace AlloyCompiler
 
 			(void)eat();	// eat colon
 		}
-		*/
 
 		Token* pFunctionNameToken = nullptr;
-		//if (pTypeName == nullptr)
-		if (pLeft == nullptr)
+		if (pLeft == nullptr && pTypeName == nullptr)
 		{
 			// long_identifier here is only valid if this is not a member function
 			if (expectKind<TokenKind::identifier, TokenKind::long_identifier>(&pFunctionNameToken) != SUCCESS)

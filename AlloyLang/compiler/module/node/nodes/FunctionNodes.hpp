@@ -37,8 +37,8 @@ namespace AlloyCompiler
 
 	struct FUNCTION_CALL
 	{
-		//TYPE_NAME* pTypeOrVariableName;	// optional, can contain name of variable OR name of type, TYPE_NAME is used because it can handle both cases
-		EXPRESSION* pObject;	// for member functions only, for static functions this is the type name, otherwise it is any expression (variable name, member access, ...)
+		TYPE_NAME* pTypeOrVariableName;	// optional, can contain name of variable OR name of type, TYPE_NAME is used because it can handle both cases
+		EXPRESSION* pObject;	// for member functions only (can be variable name, member access, ...)
 		Token* pFunctionNameToken;
 		std::vector<EXPRESSION*> Arguments;
 	};
