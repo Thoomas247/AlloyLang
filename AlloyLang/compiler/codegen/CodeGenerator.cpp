@@ -1646,6 +1646,7 @@ namespace AlloyCompiler
 				- find the function type_name@func_name
 				- call it like you would a normal function
 		*/
+#if 0
 		if (functionCallExpressionNode.pTypeOrVariableName != nullptr)
 		{
 			bool isGenericType = (functionCallExpressionNode.pTypeOrVariableName->GenericArguments.size() > 0);
@@ -1668,7 +1669,7 @@ namespace AlloyCompiler
 			}
 			else {
 				type = getTypeFromTypeName(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->pNameToken,
-					ProcessGenericArguments(moduleTable, state,functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap), 
+					ProcessGenericArguments(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap),
 					typeMap);
 				if (type != nullptr) {
 					// static member function call
@@ -1864,6 +1865,9 @@ namespace AlloyCompiler
 		result = state.Builder->CreateCall(calleeFunc, args,
 			(calleeFunc->getReturnType()->getTypeID() != llvm::Type::VoidTyID ? functionName : "")	// giving the return value a name solves a bug internal to llvm, e.g. the switch/case unit test
 		);
+
+
+#endif
 
 	error:
 		return result;

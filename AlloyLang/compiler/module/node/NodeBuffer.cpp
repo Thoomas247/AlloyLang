@@ -1022,8 +1022,9 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	FUNCTION_CALL* NodeBuffer::parse()
+	FUNCTION_CALL* NodeBuffer::parse(EXPRESSION* pLeft)
 	{
+		/*
 		TYPE_NAME* pTypeName = nullptr;
 		if (peekToken()->Kind == TokenKind::colon
 			|| peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon)
@@ -1037,9 +1038,11 @@ namespace AlloyCompiler
 
 			(void)eat();	// eat colon
 		}
+		*/
 
 		Token* pFunctionNameToken = nullptr;
-		if (pTypeName == nullptr)
+		//if (pTypeName == nullptr)
+		if (pLeft == nullptr)
 		{
 			// long_identifier here is only valid if this is not a member function
 			if (expectKind<TokenKind::identifier, TokenKind::long_identifier>(&pFunctionNameToken) != SUCCESS)
@@ -1083,7 +1086,8 @@ namespace AlloyCompiler
 		return createNode(
 			FUNCTION_CALL
 			{
-				.pTypeOrVariableName = pTypeName,
+				//.pTypeOrVariableName = pTypeName,
+				.pObject = pLeft,
 				.pFunctionNameToken = pFunctionNameToken,
 				.Arguments = arguments
 			}
@@ -1572,6 +1576,11 @@ namespace AlloyCompiler
 			{
 				(void)eat();
 			}
+			else if (token()->Kind != TokenKind::close_brace)
+			{
+				logErrorAtCurrentPosition("Expected a ',' or '{0}'.", "}");
+				return nullptr;
+			}
 		}
 
 		// eat closing brace
@@ -1844,23 +1853,15 @@ namespace AlloyCompiler
 
 				else
 				{
-					goto parse_function_call;
+					FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>((EXPRESSION*)nullptr);
+
+					if (pFunctionCall == nullptr)
+					{
+						return nullptr;
+					}
+
+					return createNode(EXPRESSION(createNode(PRIMARY(pFunctionCall))));
 				}
-			}
-
-			// FUNCTION_CALL
-			if (peekToken()->Kind == colon)
-			{
-			parse_function_call:
-
-				FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>();
-
-				if (pFunctionCall == nullptr)
-				{
-					return nullptr;
-				}
-
-				return createNode(EXPRESSION(createNode(PRIMARY(pFunctionCall))));
 			}
 
 			// CONSTRUCTOR
@@ -1972,9 +1973,9 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		while (token()->Kind == TokenKind::open_bracket || token()->Kind == TokenKind::dot)
+		while (token()->Kind == TokenKind::open_bracket || token()->Kind == TokenKind::dot || token()->Kind == TokenKind::colon)
 		{
-			// POSTFIX node to insert either ARRAY_ACCESS or MEMBER_ACCESS into
+			// POSTFIX node to insert either ARRAY_ACCESS, MEMBER_ACCESS or FUNCTION_CALL into
 			POSTFIX* pPostfix = createNode(POSTFIX());
 
 			if (token()->Kind == TokenKind::open_bracket)
@@ -2026,9 +2027,24 @@ namespace AlloyCompiler
 				);
 			}
 
+			else if (token()->Kind == TokenKind::colon)
+			{
+				(void)eat();
+
+				FUNCTION_CALL* pFunctionCall = parse<FUNCTION_CALL>(pLeft);
+
+				if (pFunctionCall == nullptr)
+				{
+					return nullptr;
+				}
+
+				// set the POSTFIX expression to a FUNCTION_CALL
+				pPostfix->Set(pFunctionCall);
+			}
+
 			else
 			{
-				(void)expectKind<TokenKind::open_bracket, TokenKind::dot>();
+				(void)expectKind<TokenKind::open_bracket, TokenKind::dot, TokenKind::colon>();
 				return nullptr;
 			}
 
@@ -2610,7 +2626,39 @@ namespace AlloyCompiler
 		case TokenKind::long_identifier:
 		{
 			STATEMENT* pStatement = nullptr;
+			EXPRESSION* pExpression = parse<EXPRESSION>();
 
+			if (pExpression->IsEmpty())
+			{
+				return nullptr;
+			}
+
+			if (pExpression->Is<FUNCTION_CALL>())
+			{
+				pStatement = createNode(STATEMENT(pExpression->Get<FUNCTION_CALL>()));
+			}
+			else if (pExpression->Is<POSTFIX>() && pExpression->Get<POSTFIX>()->Is<FUNCTION_CALL>())
+			{
+				pStatement = createNode(STATEMENT(pExpression->Get<POSTFIX>()->Get<FUNCTION_CALL>()));
+			}
+			else if (pExpression->Is<ASSIGNMENT>())
+			{
+				pStatement = createNode(STATEMENT(pExpression->Get<ASSIGNMENT>()));
+			}
+			else
+			{
+				logErrorAtPreviousPosition("Not a statement.");
+				return nullptr;
+			}
+
+			if (expectKind<TokenKind::semicolon>() != SUCCESS)
+			{
+				return nullptr;
+			}
+
+			return pStatement;
+
+			/*
 			// handle function call
 			if (peekToken()->Kind == TokenKind::open_paren || peekToken()->Kind == TokenKind::colon)
 			{
@@ -2634,12 +2682,8 @@ namespace AlloyCompiler
 				pStatement = createNode(STATEMENT(pAssignment));
 			}
 
-			if (expectKind<TokenKind::semicolon>() != SUCCESS)
-			{
-				return nullptr;
-			}
-
 			return pStatement;
+			*/
 		}
 
 		case TokenKind::for_keyword:
@@ -3007,7 +3051,7 @@ namespace AlloyCompiler
 					}
 
 					m_FunctionDefinitions[fullFunctionName] = Definition<FUNCTION_DEFINITION>(visibility, pFunctionDefinition);
-					// not added to AllSymbolNames since member function names cannot clash with other node names
+					m_AllSymbolNames.insert(fullFunctionName);
 				}
 
 				else
