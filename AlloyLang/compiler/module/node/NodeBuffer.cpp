@@ -2635,14 +2635,6 @@ namespace AlloyCompiler
 			{
 				pStatement = createNode(STATEMENT(pExpression->Get<FUNCTION_CALL>()));
 			}
-			else if (pExpression->Is<PRIMARY>() && pExpression->Get<PRIMARY>()->Is<FUNCTION_CALL>())
-			{
-				pStatement = createNode(STATEMENT(pExpression->Get<PRIMARY>()->Get<FUNCTION_CALL>()));
-			}
-			else if (pExpression->Is<POSTFIX>() && pExpression->Get<POSTFIX>()->Is<FUNCTION_CALL>())
-			{
-				pStatement = createNode(STATEMENT(pExpression->Get<POSTFIX>()->Get<FUNCTION_CALL>()));
-			}
 			else if (pExpression->Is<ASSIGNMENT>())
 			{
 				pStatement = createNode(STATEMENT(pExpression->Get<ASSIGNMENT>()));
