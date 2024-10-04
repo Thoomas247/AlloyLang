@@ -884,8 +884,10 @@ namespace AlloyCompiler
 		);
 
 #ifdef TRACE_CODE_GENERATOR
-		logInfoAtCurrentPosition(moduleTable, functionDeclarationNode.pFunctionNameToken,
-							"Processing function {0}\n", name);
+		if (!moduleName.empty()) {
+			logInfoAtCurrentPosition(moduleTable, functionDeclarationNode.pFunctionNameToken,
+				"Processing function {0}\n", name);
+		}
 #endif
 
 		if (name.empty()) {
@@ -1679,38 +1681,45 @@ namespace AlloyCompiler
 				- find the function type_name@func_name
 				- call it like you would a normal function
 		*/
-#if 0
-		if (functionCallExpressionNode.pTypeOrVariableName != nullptr)
-		{
-			bool isGenericType = (functionCallExpressionNode.pTypeOrVariableName->GenericArguments.size() > 0);
-			const std::string varOrTypeName(functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
 
-			if (!isGenericType && state.NamedValues.GetValue(varOrTypeName) != nullptr)
+		if (functionCallExpressionNode.pObject != nullptr)
+		{
+			bool isGenericType = (functionCallExpressionNode.pTypeOrVariableName && functionCallExpressionNode.pTypeOrVariableName->GenericArguments.size() > 0);
+
+			if (functionCallExpressionNode.pObject && functionCallExpressionNode.pObject->Is<VARIABLE>())
 			{
 				// non-static member function call
-				type = state.NamedValues.GetValue(varOrTypeName)->value->getAllocatedType();
-				std::string typeName(state.NamedValues.GetTypeName(type));
-				// extract any generic parameters from the type name, otherwise we cannot locate the member function
-				size_t pos = typeName.find('@');
-				if (pos != std::string::npos) {
-					typeName = typeName.substr(0, pos);
-				}
-				mangledName = NodeBuffer::GetMangledName("", typeName, functionName);
-				// insert Self as a first argument
-				insertSelfAsFirstParam = Reference;
-				Arguments.insert(Arguments.begin(), &self);
-			}
-			else {
-				type = getTypeFromTypeName(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->pNameToken,
-					ProcessGenericArguments(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap),
-					typeMap);
-				if (type != nullptr) {
-					// static member function call
-					mangledName = NodeBuffer::GetMangledName("", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value, functionName);
+				VARIABLE* var = functionCallExpressionNode.pObject->Get<VARIABLE>();
+				std::string varOrTypeName(var->pNameToken->Value);
+				ValueTypePair* val = state.NamedValues.GetValue(varOrTypeName);
+				if (!isGenericType && val) {
+					// variable found
+					type = val->value->getAllocatedType();
+					std::string typeName(state.NamedValues.GetTypeName(type));
+					// extract any generic parameters from the type name, otherwise we cannot locate the member function
+					size_t pos = typeName.find('@');
+					if (pos != std::string::npos) {
+						typeName = typeName.substr(0, pos);
+					}
+					mangledName = NodeBuffer::GetMangledName("", typeName, functionName);
+					// insert Self as a first argument
+					insertSelfAsFirstParam = Reference;
+					Arguments.insert(Arguments.begin(), &self);
 				}
 				else {
-					logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pTypeOrVariableName->pNameToken, "'{0}' is not a variable or type name.", varOrTypeName);
-					goto error;
+					// not a variable, check if a valid type and make a static function call
+					GenericArgumentTypes genericArguments;
+					if (functionCallExpressionNode.pTypeOrVariableName)
+						genericArguments = ProcessGenericArguments(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap);
+					type = getTypeFromTypeName(moduleTable, state, var->pNameToken, genericArguments, typeMap);
+					if (type != nullptr) {
+						// static member function call
+						mangledName = NodeBuffer::GetMangledName("", varOrTypeName, functionName);
+					}
+					else {
+						logErrorAtCurrentPosition(moduleTable, var->pNameToken, "'{0}' is not a variable or type name.", varOrTypeName);
+						goto error;
+					}
 				}
 			}
 		}
@@ -1782,12 +1791,12 @@ namespace AlloyCompiler
 			// first parameter is &Self
 			if (argi == 0 && insertSelfAsFirstParam != None)
 			{
-				VARIABLE var{ functionCallExpressionNode.pTypeOrVariableName->pNameToken };
+				VARIABLE* var = functionCallExpressionNode.pObject->Get<VARIABLE>();
 				TypeSubtypePair identifierType = {};
-				PtrValuePair ptrValue = generateIdentifier(moduleTable, state, var, identifierType);
+				PtrValuePair ptrValue = generateIdentifier(moduleTable, state, *var, identifierType);
 				if (ptrValue.Ptr == nullptr)
 				{
-					logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pTypeOrVariableName->pNameToken, "Error evaluating variable '{0}'!", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
+					logErrorAtCurrentPosition(moduleTable, var->pNameToken, "Error evaluating variable '{0}'!", var->pNameToken->Value);
 					goto error;
 				}
 
@@ -1898,9 +1907,6 @@ namespace AlloyCompiler
 		result = state.Builder->CreateCall(calleeFunc, args,
 			(calleeFunc->getReturnType()->getTypeID() != llvm::Type::VoidTyID ? functionName : "")	// giving the return value a name solves a bug internal to llvm, e.g. the switch/case unit test
 		);
-
-
-#endif
 
 	error:
 		return result;
@@ -2325,6 +2331,9 @@ namespace AlloyCompiler
 			}
 			else if (postfix.Is<MEMBER_ACCESS>()) {
 				result = generateMemberAccessExpression(moduleTable, state, *postfix.Get<MEMBER_ACCESS>(), expectedType);
+			}
+			else if (postfix.Is<FUNCTION_CALL>()) {
+				result.Value = generateFunctionCallExpression(moduleTable, state, *postfix.Get<FUNCTION_CALL>());
 			}
 			else {
 				ASSERT(false, "Unknown postfix expression node kind!");
