@@ -21,7 +21,7 @@ namespace AlloyCompiler
 		}
 
 		template <typename T>
-		static std::string Name()
+		static const char* Name()
 		{
 			return typeid(T).name();
 		}
@@ -50,6 +50,7 @@ namespace AlloyCompiler
 	public:
 		VariantNode()
 			: m_Kind(NodeKind::None), m_pNode(nullptr)
+			, m_NextVariantKind(NodeKind::None), m_pNextVariantNode(nullptr)
 		{}
 
 		template <typename T>
@@ -66,23 +67,52 @@ namespace AlloyCompiler
 			m_Kind = NodeInfo::Kind<T>();
 			m_pNode = pNode;
 
+			m_NextVariantKind = NodeKind::None;
+			m_pNextVariantNode = nullptr;
+
 #ifdef _DEBUG
-			m_Name = NodeInfo::Name<T>();
+			m_pName = NodeInfo::Name<T>();
+#endif // _DEBUG
+		}
+
+		template <typename... Ns>
+		void Set(VariantNode<Ns...>* pVariantNode)
+		{
+			ASSERT((std::is_same_v<VariantNode<Ns...>, Ts> || ...), "Variant node cannot hold the given type!");
+
+			m_Kind = pVariantNode->_getKind();
+			m_pNode = pVariantNode->_getNode();
+
+			m_NextVariantKind = NodeInfo::Kind<VariantNode<Ns...>>();
+			m_pNextVariantNode = pVariantNode;
+
+#ifdef _DEBUG
+			m_pName = pVariantNode->GetName();
 #endif // _DEBUG
 		}
 
 		template <typename T>
 		T* Get() const
 		{
-			ASSERT(m_Kind == NodeInfo::Kind<T>(), "Variant holds a different type to the given type!");
+			if (NodeInfo::Kind<T>() == m_Kind)
+			{
+				return (T*)m_pNode;
+			}
 
-			return (T*)m_pNode;
+			else if (NodeInfo::Kind<T>() == m_NextVariantKind)
+			{
+				return (T*)m_pNextVariantNode;
+			}
+
+			ASSERT(false, "Variant holds a different type to the given type!");
+
+			return nullptr;
 		}
 
 		template <typename T>
 		bool Is() const
 		{
-			return m_Kind == NodeInfo::Kind<T>();
+			return NodeInfo::Kind<T>() == m_Kind || NodeInfo::Kind<T>() == m_NextVariantKind;
 		}
 
 		NodeKind GetKind() const
@@ -95,12 +125,42 @@ namespace AlloyCompiler
 			return m_pNode == nullptr;
 		}
 
+#ifdef _DEBUG
+		const char* GetName() const
+		{
+			return m_pName;
+		}
+#endif
+
+		NodeKind _getKind() const
+		{
+			return m_Kind;
+		}
+
+		void* _getNode() const
+		{
+			return m_pNode;
+		}
+
+		NodeKind _getNextVariantKind() const
+		{
+			return m_NextVariantKind;
+		}
+
+		void* _getNextVariantNode() const
+		{
+			return m_pNextVariantNode;
+		}
+
 	private:
-		NodeKind m_Kind;	// the kind of the variant node
-		void* m_pNode;		// points to the variant node
+		NodeKind m_Kind;
+		void* m_pNode;
+
+		NodeKind m_NextVariantKind;
+		void* m_pNextVariantNode;
 
 #ifdef _DEBUG
-		std::string m_Name;
+		const char* m_pName;
 #endif // _DEBUG
 
 	};
