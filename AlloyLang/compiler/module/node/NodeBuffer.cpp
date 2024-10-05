@@ -1027,7 +1027,7 @@ namespace AlloyCompiler
 		
 		TYPE_NAME* pTypeName = nullptr;
 		if (pLeft == nullptr && 
-			(peekToken()->Kind == TokenKind::colon|| peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon))
+			(peekToken()->Kind == TokenKind::colon || peekToken(getOffsetToClosing(TokenKind::close_paren))->Kind == TokenKind::colon))
 		{
 			pTypeName = parse<TYPE_NAME>();
 
@@ -1084,7 +1084,7 @@ namespace AlloyCompiler
 		return createNode(
 			FUNCTION_CALL
 			{
-				//.pTypeOrVariableName = pTypeName,
+				.pTypeOrVariableName = pTypeName,
 				.pObject = pLeft,
 				.pFunctionNameToken = pFunctionNameToken,
 				.Arguments = arguments
