@@ -1,6 +1,6 @@
 extern printf (const str : String, ...) -> i64;
 
-type EnumType(type T) = enum
+type EnumType<type T> = enum
 	{
 		ValueA: T,
 		ValueB: f64,
@@ -10,31 +10,31 @@ type EnumType(type T) = enum
 
 fn main() -> i32
 {
-	var enumVar = EnumType(i64)|ValueA(43);
-	var enum2Var = EnumType(i32)|ValueB(2.54);
-	var enum3Var = EnumType(i64)|ValueC;
+	var enumVar = EnumType<i64>|ValueA(43);
+	var enum2Var = EnumType<i32>|ValueB(2.54);
+	var enum3Var = EnumType<i64>|ValueC;
 
-	if (enumVar == EnumType(i64)|ValueA) -> num
+	if (enumVar == EnumType<i64>|ValueA) -> num
 	{
-		if (enum2Var == EnumType(i32)|ValueB) -> fnum
+		if (enum2Var == EnumType<i32>|ValueB) -> fnum
 		{
 
 			switch (enumVar)
 			{
-				case (EnumType(i64)|ValueA) -> num	// capture is optional, and can be omitted even when there is a payload, in which case the payload is inaccessible
+				case (EnumType<i64>|ValueA) -> num	// capture is optional, and can be omitted even when there is a payload, in which case the payload is inaccessible
 				{
 					// use num
 					printf("payload A is %d", num);
 				}
 
 				// no fallthrough between cases!
-				case (EnumType(i64)|ValueB) -> num2
+				case (EnumType<i64>|ValueB) -> num2
 				{
 					// use num2
 					printf("payload B is %d", num2);
 				}
 
-				case (EnumType(i64)|ValueC)	// ValueC has no payload, cannot capture
+				case (EnumType<i64>|ValueC)	// ValueC has no payload, cannot capture
 				{
 			
 				}

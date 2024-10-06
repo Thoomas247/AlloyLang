@@ -37,9 +37,9 @@ namespace AlloyCompiler
 
 		static std::string GetMangledName(const std::string_view& moduleName, Token* pTypeNameToken, Token* pFunctionNameToken)
 		{
-			return GetMangledName(moduleName, 
-								pTypeNameToken ? pTypeNameToken->Value : "", 
-								pFunctionNameToken->Value);
+			return GetMangledName(moduleName,
+				pTypeNameToken ? pTypeNameToken->Value : "",
+				pFunctionNameToken->Value);
 		}
 
 		NodeBuffer(const Source& source, TokenBuffer& tokenBuffer);
@@ -148,6 +148,7 @@ namespace AlloyCompiler
 		/// the first one.
 		/// </summary>
 		size_t getOffsetToClosing(TokenKind closing);
+		size_t getOffsetToClosing(char closing);
 
 	private:
 		const Source& m_Source;

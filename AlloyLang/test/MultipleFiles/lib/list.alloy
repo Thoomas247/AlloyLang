@@ -1,17 +1,17 @@
 
-exp type List(type T) = struct
+exp type List<type T> = struct
 {
 	capacity: u64,
 	size: u64,
 	arr: *[T],
 };
 
-exp fn List(type T):create(const default: &T, const capacity: u64) -> List(T)
+exp fn List<type T>:create(const default: &T, const capacity: u64) -> List<T>
 {
-	return List(T) { capacity = capacity, size = 0, arr = new [default; capacity] };
+	return List<T> { capacity = capacity, size = 0, arr = new [default; capacity] };
 }
 
-exp fn List(type T):add(var self: &Self, const value: &T)
+exp fn List<type T>:add(var self: &Self, const value: &T)
 {
 	if (self.size == self.capacity) return;
 

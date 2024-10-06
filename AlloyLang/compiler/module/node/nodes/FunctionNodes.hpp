@@ -21,9 +21,11 @@ namespace AlloyCompiler
 	struct FUNCTION_TYPE
 	{
 		bool IsVarArg;
-		bool IsGeneric;
 		bool IsMember;
-		std::vector<FUNCTION_PARAMETER*> Parameters;
+
+		std::vector<GENERIC_PARAMETER*> GenericParameters; // is empty for non-generic functions
+		std::vector<VARIABLE_DECLARATION*> Parameters;
+
 		RETURN_TYPE* pReturnType;	// optional
 	};
 
@@ -40,6 +42,7 @@ namespace AlloyCompiler
 		TYPE_NAME* pTypeOrVariableName;	// optional, can contain name of variable OR name of type, TYPE_NAME is used because it can handle both cases
 		EXPRESSION* pObject;	// for member functions only (can be variable name, member access, ...)
 		Token* pFunctionNameToken;
+		std::vector<TYPE*> GenericArguments;
 		std::vector<EXPRESSION*> Arguments;
 	};
 

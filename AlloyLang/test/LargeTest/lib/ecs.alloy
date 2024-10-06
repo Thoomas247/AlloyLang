@@ -1,15 +1,15 @@
 type Entity = u32;
 
 // container for a single component type
-pub type SparseSet(type T) = struct
+pub type SparseSet<type T> = struct
 {
-	sparse:			Array(Entity),
-	dense:			Array(Entity),
-	components:		Array(T),
+	sparse:			Array<Entity>,
+	dense:			Array<Entity>,
+	components:		Array<T>,
 };
 
 // returns whether the given entity is in this set
-pub fn SparseSet(type T):contains_entity(const self: &Self, const entity: Entity) -> bool
+pub fn SparseSet<type T>:contains_entity(const self: &Self, const entity: Entity) -> bool
 {
 	/*
 	if (entity >= self.sparse.size)
@@ -25,7 +25,7 @@ pub fn SparseSet(type T):contains_entity(const self: &Self, const entity: Entity
 
 // adds the given entity and component to the set
 // if the entity is already in the set, its component will be overridden
-pub fn SparseSet(type T):add_entity(var self: &Self, const entity: Entity, const component: &T) -> var &T
+pub fn SparseSet<type T>:add_entity(var self: &Self, const entity: Entity, const component: &T) -> var &T
 {
 	/*
 	if (!self:contains_entity(entity))

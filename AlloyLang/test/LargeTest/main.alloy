@@ -22,7 +22,7 @@ fn Transform:get_transform_matrix(const self: &Self) -> Mat4
 
 
 //type TransformArray = [Transform; 256];
-type ScoreArray = Array(u32);
+type ScoreArray = Array<u32>;
 
 
 //type Data = struct

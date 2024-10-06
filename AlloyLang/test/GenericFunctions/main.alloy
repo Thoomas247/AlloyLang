@@ -1,6 +1,6 @@
 extern printf (const str: String, ...) -> i64;
 
-fn Compare(type T1, var a : T1, var b : T1) -> i64
+fn Compare<type T1>(var a : T1, var b : T1) -> i64
 {
 	if (a == b)
 		return 0;
@@ -20,7 +20,7 @@ fn main () -> i64
 
 	var a1 : f64 = 2.5;
 	var b1 : f64 = 1.5;
-	var result : i64 = Compare(i32, a, b) + Compare(f64, a1, b1);
+	var result : i64 = Compare<i32>(a, b) + Compare<f64>(a1, b1);
 
 	printf("Result = %d", result);
 	return result;		// should be 0

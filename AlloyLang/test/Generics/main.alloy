@@ -1,19 +1,19 @@
 extern printf (const str : String) -> i32;
 
-type Vector3Of(type T1) = struct
+type Vector3Of<type T1> = struct
 {
 	x: T1,
 	y: T1,
 	z: T1,
 };
 
-type PairOf(type T1, type T2) = struct
+type PairOf<type T1, type T2> = struct
 {
 	x: T1,
 	y: T2
 };
 
-fn Compare(type T, var a : T, var b : T)
+fn Compare<type T>(var a : T, var b : T)
 {
 	if (a == b)
 		return 0;
@@ -26,16 +26,16 @@ fn Compare(type T, var a : T, var b : T)
 	}
 }
 
-type I32Vec3 = Vector3Of(i32);
-type F64Vec3 = Vector3Of(f64);
-type I32StringPair = PairOf(i32, String);
+type I32Vec3 = Vector3Of<i32>;
+type F64Vec3 = Vector3Of<f64>;
+type I32StringPair = PairOf<i32, String>;
 
 fn main () -> i64
 {
-	var temp32 : Vector3Of(i32) = Vector3Of(i32) { x=1, y=2, z=3 };
-	var temp64 : I32Vec3 = I32Vec3 { x=2, y=3, z=2 };
-	var tempF64 : F64Vec3 = F64Vec3 { x = 2.0, y = 3.0, z = 3.0 }; 
-	var pair : I32StringPair = I32StringPair { x = 1, y = "Hello" };
+	var temp32 = Vector3Of<i32> { x=1, y=2, z=3 };
+	var temp64 = I32Vec3 { x=2, y=3, z=2 };
+	var tempF64 = F64Vec3 { x = 2.0, y = 3.0, z = 3.0 }; 
+	var pair = I32StringPair { x = 1, y = "Hello" };
 
 	if (temp32.y > temp32.x)
 	{

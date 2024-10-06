@@ -1,4 +1,4 @@
-pub type Vector3Of(type T) = struct
+pub type Vector3Of<type T> = struct
 {
 	x: T,
 	y: T,
@@ -6,7 +6,7 @@ pub type Vector3Of(type T) = struct
 };
 
 
-pub type IVec3 = Vector3Of(i32);
+pub type IVec3 = Vector3Of<i32>;
 
 pub fn IVec3:create() -> IVec3
 {
@@ -14,7 +14,7 @@ pub fn IVec3:create() -> IVec3
 }
 
 
-pub type UVec3 = Vector3Of(u32);
+pub type UVec3 = Vector3Of<u32>;
 
 pub fn UVec3:create() -> UVec3
 {
@@ -22,7 +22,7 @@ pub fn UVec3:create() -> UVec3
 }
 
 
-pub type FVec3 = Vector3Of(f32);
+pub type FVec3 = Vector3Of<f32>;
 
 pub fn FVec3:create() -> FVec3
 {
@@ -30,7 +30,7 @@ pub fn FVec3:create() -> FVec3
 }
 
 
-pub type Vector4Of(type T) = struct
+pub type Vector4Of<type T> = struct
 {
 	x: T,
 	y: T,
@@ -38,14 +38,14 @@ pub type Vector4Of(type T) = struct
 	w: T,
 };
 
-pub type Quat = Vector4Of(f32);
+pub type Quat = Vector4Of<f32>;
 
 pub fn Quat:create() -> Quat
 {
 	return Quat { x = 0, y = 0, z = 0, z = 0 };
 }
 
-pub type FVec4 = Vector4Of(f32);
+pub type FVec4 = Vector4Of<f32>;
 
 pub fn FVec4:create() -> FVec4
 {

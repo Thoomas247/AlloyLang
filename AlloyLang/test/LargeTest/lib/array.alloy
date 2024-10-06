@@ -1,16 +1,16 @@
-pub type Array(type T) = struct
+pub type Array<type T> = struct
 {
 	capacity:	u64,
 	size:		u64,
 	data:		*[T],
 };
 
-pub fn Array(type T):create() -> Array(T)
+pub fn Array<type T>:create() -> Array<T>
 {
-	return Array(T) { size = 0, data = new {} };
+	return Array<T> { size = 0, data = new {} };
 }
 
-pub fn Array(type T):resize_fill(var self: &Self, const new_size: u64, const value: &T)
+pub fn Array<type T>:resize_fill(var self: &Self, const new_size: u64, const value: &T)
 {
 	if (self.size == new_size)
 	{
@@ -31,12 +31,12 @@ pub fn Array(type T):resize_fill(var self: &Self, const new_size: u64, const val
 	self.size = new_size;
 }
 
-pub fn Array(type T):get(var self: &Self, const index: u64) -> var &T
+pub fn Array<type T>:get(var self: &Self, const index: u64) -> var &T
 {
 	return &self.data[index];
 }
 
-pub fn Array(type T):add(var self: &Self, const new_obj: &T)
+pub fn Array<type T>:add(var self: &Self, const new_obj: &T)
 {
 	// check if we reached max capacity
 	if (self.size == self.capacity)
@@ -58,7 +58,7 @@ pub fn Array(type T):add(var self: &Self, const new_obj: &T)
 	self.size = self.size + 1;
 }
 
-pub fn Array(type T):remove(var self: &Self, const index: u64)
+pub fn Array<type T>:remove(var self: &Self, const index: u64)
 {
 	for (var i = index; i < self.size - 1; i = i + 1)
 	{

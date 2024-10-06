@@ -72,7 +72,7 @@
 
 	TYPE:						[ reference | pointer ] ( TYPE_NAME | STRUCT_TYPE | ENUM_TYPE | ARRAY_TYPE | MACRO_CALL ) ;
 
-		TYPE_NAME:					( identifier | long_identifier ) [ open_paren TYPE { comma TYPE } close_paren ] ;
+		TYPE_NAME:					( identifier | long_identifier ) [ '<' TYPE { comma TYPE } '>' ] ;
 		STRUCT_TYPE:				struct_keyword open_brace [ identifier colon TYPE { comma identifier colon TYPE } ] close_brace ;
 		ENUM_TYPE:					enum_keyword open_brace identifier [ colon TYPE ] { comma identifier [ colon TYPE ] } close_brace ;
 		ARRAY_TYPE:					open_bracket TYPE [ semicolon LITERAL ] close_bracket ;
@@ -91,15 +91,13 @@
 
 	(* - Functions - *)
 
-	FUNCTION_PARAMETER:			VARIABLE_DECLARATION | GENERIC_PARAMETER ;
-
 	RETURN_TYPE:				[ variable | constant ] TYPE ;
-	FUNCTION_TYPE:				open_paren [ FUNCTION_PARAMETER { comma FUNCTION_PARAMETER } ] close_paren [ arrow RETURN_TYPE ] ;
+	FUNCTION_TYPE:				[ '<' GENERIC_PARAMETER { comma GENERIC_PARAMETER } '>' ] open_paren [ VARIABLE_DECLARATION { comma VARIABLE_DECLARATION } ] close_paren [ arrow RETURN_TYPE ] ;
 
 	FUNCTION_DEFINITION:		function_keyword [ TYPE_IDENTIFIER colon ] identifier FUNCTION_TYPE STATEMENT_BLOCK ;
 	EXTERN_DEFINITION:			extern_keyword identifier FUNCTION_TYPE semicolon ;
 	
-	FUNCTION_CALL:				[ TYPE_NAME colon ] ( identifier | long_identifier ) open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ; (* TYPE_NAME can contain a variable name in this context *)
+	FUNCTION_CALL:				[ ( TYPE_NAME | EXPRESSION ) colon ] ( identifier | long_identifier ) [ '<' TYPE { comma TYPE } '>' ] open_paren [ EXPRESSION { comma EXPRESSION } ] close_paren ; (* TYPE_NAME can contain a variable name in this context *)
 
 
 	(* Macros *)

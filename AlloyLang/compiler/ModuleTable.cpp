@@ -4,11 +4,11 @@ namespace AlloyCompiler
 {
 	std::string getCastFunctionDefinitionString(const std::string& type, const std::string& functionName)
 	{
-		return std::format("exp fn {0}:{1}(const num: &Self, type T) -> T {2}\n", type, functionName, "{}");
+		return std::format("exp fn {0}:{1}<type T>(const num: &Self) -> T {2}\n", type, functionName, "{}");
 	}
 
 	ModuleTable::ModuleTable(std::unordered_map<std::string, Module>& modules, const std::string& mainModuleName)
-		: m_GlobalModule(""), m_Modules(modules), m_ContextStack({mainModuleName})
+		: m_GlobalModule(""), m_Modules(modules), m_ContextStack({ mainModuleName })
 	{
 		std::string builtInModule;
 
