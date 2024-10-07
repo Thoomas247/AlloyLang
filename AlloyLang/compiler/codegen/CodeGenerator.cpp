@@ -24,7 +24,7 @@ namespace AlloyCompiler
 	llvm::Value* generateStatement(ModuleTable& moduleTable, LLVMState& state, const STATEMENT& statement);
 	llvm::Value* generateStatementBlock(ModuleTable& moduleTable, LLVMState& state, const STATEMENT_BLOCK& statementBlock);
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state, llvm::Type* parentType, const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName,
-		const std::vector<EXPRESSION*>& functionArguments);
+		const std::vector<TYPE*>& functionArguments);
 	llvm::Type* generateTypeDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_DEFINITION& typeDefinition, const std::string& moduleName,
 		const GenericArgumentTypes& genericArguments);
 	llvm::Type* generateStructDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
@@ -428,7 +428,7 @@ namespace AlloyCompiler
 		const std::string_view& moduleName, const std::string_view& typeName,
 		const std::string_view& functionName,
 		const std::vector<GENERIC_PARAMETER*>& genericParameters,
-		const std::vector<EXPRESSION*>& genericArguments,
+		const std::vector<TYPE*>& genericArguments,
 		GenericTypeMap& typeMap
 	)
 	{
@@ -442,6 +442,9 @@ namespace AlloyCompiler
 		// On return, typeMap will contain a map from function parameter types to actual types
 		//
 		std::string mangled(moduleName);
+
+		ASSERT(genericParameters.size() == genericArguments.size(), "The number of generic parameters and arguments do not match!");
+
 		if (!mangled.empty())
 			mangled += "::";
 		if (!typeName.empty()) {
@@ -452,34 +455,28 @@ namespace AlloyCompiler
 		int argument = 0;
 		for (GENERIC_PARAMETER* genericParameter : genericParameters)
 		{
-			EXPRESSION* exp = genericArguments[argument];
-			PRIMARY* primary = nullptr;
-			if (exp->Is<PRIMARY>())
-				primary = exp->Get<PRIMARY>();
-			if (primary == nullptr
-				|| !primary->Is<VARIABLE>()
-				)
-			{
-				// we are expecting a literal expression representing a type, nothing else
-				logErrorAtCurrentPosition(moduleTable, genericParameter->pIdentifierToken, "Expected a type name.");
+			TYPE* type = genericArguments[argument];
 
+			if (!type->Type.Is<TYPE_NAME>()) {
+				// TODO: only TYPE_NAME is currently supported
+				logErrorAtCurrentPosition(moduleTable, genericParameter->pIdentifierToken, "Expected a type name.");
 				mangled = "";
 				goto failed;
 			}
 
-			VARIABLE* var = exp->Get<PRIMARY>()->Get<VARIABLE>();
+			TYPE_NAME* typeName = type->Type.Get<TYPE_NAME>();
 
 			// check that the generic parameter has not been encountered already
-			if (typeMap.contains(std::string(var->pNameToken->Value))) {
-				logErrorAtCurrentPosition(moduleTable, genericParameter->pIdentifierToken, "Type {0} cannot be defined more than once.", genericParameter->pIdentifierToken->Value);
+			if (typeMap.contains(std::string(typeName->pNameToken->Value))) {
+				logErrorAtCurrentPosition(moduleTable, genericParameter->pIdentifierToken, "Type {0} ({1}) cannot be defined more than once.", genericParameter->pIdentifierToken->Value, typeName->pNameToken->Value);
 				mangled = "";
 				goto failed;
 			}
 
 			mangled += "@";
-			mangled += var->pNameToken->Value;
+			mangled += typeName->pNameToken->Value;
 
-			typeMap[std::string(genericParameter->pIdentifierToken->Value)] = getTypeFromTypeName(moduleTable, state, var->pNameToken, {}, {});
+			typeMap[std::string(genericParameter->pIdentifierToken->Value)] = getTypeFromTypeName(moduleTable, state, typeName->pNameToken, {}, {});
 
 			argument++;
 		}
@@ -491,7 +488,7 @@ namespace AlloyCompiler
 	std::string getExtendedFunctionName(ModuleTable& moduleTable, LLVMState& state,
 		const std::string_view& moduleName, Token* pTypeNameToken, Token* pFunctionNameToken,
 		const std::vector<GENERIC_PARAMETER*>& genericParameters,
-		const std::vector<EXPRESSION*>& genericArguments,
+		const std::vector<TYPE*>& genericArguments,
 		GenericTypeMap& typeMap
 	)
 	{
@@ -506,7 +503,11 @@ namespace AlloyCompiler
 
 	bool isFunctionParameterConst(const FUNCTION_TYPE& functionType, int index)
 	{
-		return functionType.Parameters[index]->VarType == VariableType::Constant;
+		//
+		// for functions with variable number of arguments, the index can exceed the size of the parameters,
+		//		in this case consider the parameter as constant as we cannot modify it
+		//
+		return (index < functionType.Parameters.size() ? (functionType.Parameters[index]->VarType == VariableType::Constant) : true);
 	}
 #pragma endregion
 
@@ -817,7 +818,7 @@ namespace AlloyCompiler
 	llvm::Function* generateFunctionDeclaration(ModuleTable& moduleTable, LLVMState& state,
 		const llvm::Type* parentType,
 		const FUNCTION_DEFINITION& functionDeclarationNode, const std::string& moduleName,
-		const std::vector<EXPRESSION*>& functionArguments,
+		const std::vector<TYPE*>& functionArguments,	// generic arguments, if any
 		GenericTypeMap& typeMap		// map from the generic type to the actual function parameter type
 	)
 	{
@@ -1611,6 +1612,11 @@ namespace AlloyCompiler
 		llvm::Type* type = nullptr;
 		GenericTypeMap typeMap;
 
+#ifdef TRACE_CODE_GENERATOR
+		logInfoAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken,
+			"Processing function call {0}\n", mangledName);
+#endif
+
 		// handle member function calls
 		/*
 		In order to differentiate between the different ways of calling a function, the following must be done :
@@ -1689,7 +1695,8 @@ namespace AlloyCompiler
 			std::string extendedName = getExtendedFunctionName(moduleTable, state, "",
 				type == nullptr ? "" : std::string(state.NamedValues.GetTypeName(type)),
 				type == nullptr ? funcResult.MangledName : functionName,
-				funcResult.pDefiniton->pFunctionType->GenericParameters, Arguments, typeMap);
+				funcResult.pDefiniton->pFunctionType->GenericParameters, 
+				functionCallExpressionNode.GenericArguments, typeMap);
 
 			// make sure the built-in function has already been generated
 			if (funcResult.Code == SearchResultCode::BuiltIn) {
@@ -1706,7 +1713,7 @@ namespace AlloyCompiler
 		// check if function is already in the parser and process it
 		if (!calleeFunc)
 		{
-			calleeFunc = generateFunctionDefinition(moduleTable, state, type, *funcResult.pDefiniton, funcResult.ModuleName, Arguments);
+			calleeFunc = generateFunctionDefinition(moduleTable, state, type, *funcResult.pDefiniton, funcResult.ModuleName, functionCallExpressionNode.GenericArguments);
 
 			// ASSERT(Arguments.size() > 0 || calleeFunc == state.Module->getFunction(funcResult.MangledName), "Function was not generated with the right name!");
 		}
@@ -3075,7 +3082,7 @@ namespace AlloyCompiler
 	llvm::Function* generateFunctionDefinition(ModuleTable& moduleTable, LLVMState& state,
 		llvm::Type* parentType,
 		const FUNCTION_DEFINITION& functionDefinition, const std::string& moduleName,
-		const std::vector<EXPRESSION*>& functionArguments)
+		const std::vector<TYPE*>& functionArguments)	// generic arguments, if any
 	{
 		//
 		// Generate either a global function definition or a member function definition
