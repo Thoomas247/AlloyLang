@@ -124,10 +124,11 @@
 						| ASSIGNMENT
 						;
 
-		PRIMARY:			LITERAL 
+		PRIMARY:			LITERAL
 							| VARIABLE
 							| VARIABLE_DEFINITION
 							| FUNCTION_CALL 
+							| ARRAY_INIT
 							| CONSTRUCTOR
 							| POINTER_INIT
 							| POINTER_MOVE
@@ -136,14 +137,15 @@
 							| ENUM_VALUE
 							; 
 			LITERAL:				integer_literal | float_literal | boolean_literal | string_literal | character_literal ;
+			ARRAY_INIT:				open_bracket EXPRESSION semicolon EXPRESSION close_bracket ;
 			CONSTRUCTOR:			TYPE_NAME open_brace [ identifier assignment_operator EXPRESSION { comma identifier assignment_operator EXPRESSION } ] close_brace ;
-			POINTER_INIT:			new_keyword ( EXPRESSION | ( open_bracket EXPRESSION semicolon EXPRESSION close_bracket ) ) ;
-			POINTER_MOVE:			move_keyword VARIABLE ; (* TODO: this should be more than just VARIABLE *)
+			POINTER_INIT:			new_keyword EXPRESSION ;
+			POINTER_MOVE:			move_keyword EXPRESSION ;
 			INITIALIZER_LIST:		open_brace [ EXPRESSION { comma EXPRESSION } ] close_brace ;
 			ENCLOSED_EXPRESSION:	open_paren EXPRESSION close_paren ;
 			ENUM_VALUE:				TYPE_NAME pipe_operator identifier [ open_paren EXPRESSION close_paren ] ;
 
-		POSTFIX:		ARRAY_ACCESS | MEMBER_ACCESS ;
+		POSTFIX:		ARRAY_ACCESS | MEMBER_ACCESS | FUNCTION_CALL ;
 			ARRAY_ACCESS:			EXPRESSION open_bracket EXPRESSION close_bracket ;
 			MEMBER_ACCESS:			EXPRESSION dot identifier ;
 			

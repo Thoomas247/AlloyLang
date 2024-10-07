@@ -1080,13 +1080,21 @@ namespace AlloyCompiler
 
 		// now get the size of the vector to create
 		llvm::Value* count;
-		if (nullptr == pointerInitializerNode.pSize) {
+		if (pointerInitializerNode.pValue->Is<ARRAY_INIT>())
+		{
+			ARRAY_INIT* pArrayInit = pointerInitializerNode.pValue->Get<ARRAY_INIT>();
+
+			TypeSubtypePair temp = { llvm::IntegerType::getInt64Ty(*state.Context), nullptr };
+			count = generateExpression(moduleTable, state, *pArrayInit->pCount, temp).Value;
+
+			// set pValue of the POINTER_INIT node to the pValue of the ARRAY_INIT node
+			// TODO: this is a bit of a hack to avoid changing the rest of this function
+			pointerInitializerNode.pValue->Set(pArrayInit->pValue);
+		}
+		else
+		{
 			// creating a single object
 			count = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1, true));
-		}
-		else {
-			TypeSubtypePair temp = { llvm::IntegerType::getInt64Ty(*state.Context), nullptr };
-			count = generateExpression(moduleTable, state, *pointerInitializerNode.pSize, temp).Value;
 		}
 
 		// create a mutable variable on the heap
@@ -1149,10 +1157,13 @@ namespace AlloyCompiler
 		//
 		// move Identifier ;
 		//
-		PtrValuePair ptrValue = generateIdentifier(moduleTable, state, *pointerMoveNode.pVariable, expectedType);
+		ASSERT(pointerMoveNode.pVariable->Is<VARIABLE>(), "TODO: right side of pointer move ca now be any variable to support member/array accesses!");
+		VARIABLE* pVariable = pointerMoveNode.pVariable->Get<VARIABLE>();
+
+		PtrValuePair ptrValue = generateIdentifier(moduleTable, state, *pVariable, expectedType);
 
 		// retrieve the name of the identifier in the right-side node in order to remove it from the NamedValues map
-		const Token& rightNode = *pointerMoveNode.pVariable->pNameToken;
+		const Token& rightNode = *pVariable->pNameToken;
 		const std::string name(rightNode.Value);
 		state.NamedValues.RemoveValue(name);
 
@@ -2901,7 +2912,7 @@ namespace AlloyCompiler
 			logErrorAtCurrentPosition(moduleTable, typeIdentifier.pNameToken,
 				"Invalid number of arguments for generic type '{0}'!", structName);
 			goto failed;
-	}
+		}
 
 		// get a vector of member types
 		memberIndex = 0;
@@ -2963,7 +2974,7 @@ namespace AlloyCompiler
 
 	failed:
 		return structType;
-}
+	}
 
 	llvm::Type* generateEnumDefinition(ModuleTable& moduleTable, LLVMState& state, const TYPE_IDENTIFIER& typeIdentifier,
 		const ENUM_TYPE& enumDefinition, const GenericArgumentTypes& genericArguments

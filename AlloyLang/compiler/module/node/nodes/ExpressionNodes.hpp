@@ -14,7 +14,13 @@ namespace AlloyCompiler
 		Token* pValueToken;
 	};
 
-	struct CONSTRUCTOR 
+	struct ARRAY_INIT
+	{
+		EXPRESSION* pValue;
+		EXPRESSION* pCount;
+	};
+
+	struct CONSTRUCTOR
 	{
 		TYPE_NAME* pType;
 		std::vector<std::pair<Token*, EXPRESSION*>> Arguments;	// Token* contains name of member
@@ -23,12 +29,11 @@ namespace AlloyCompiler
 	struct POINTER_INIT
 	{
 		EXPRESSION* pValue;
-		EXPRESSION* pSize;	// nullptr if not an array
 	};
 
 	struct POINTER_MOVE
 	{
-		VARIABLE* pVariable;
+		EXPRESSION* pVariable;
 	};
 
 	struct INITIALIZER_LIST

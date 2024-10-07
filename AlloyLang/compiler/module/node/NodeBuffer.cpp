@@ -1594,6 +1594,47 @@ namespace AlloyCompiler
 	}
 
 	template<>
+	ARRAY_INIT* NodeBuffer::parse()
+	{
+		if (expectKind<TokenKind::open_bracket>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pValue = parse<EXPRESSION>();
+
+		if (pValue == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expectKind<TokenKind::semicolon>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		EXPRESSION* pCount = parse<EXPRESSION>();
+
+		if (pCount == nullptr)
+		{
+			return nullptr;
+		}
+
+		if (expectKind<TokenKind::close_bracket>() != SUCCESS)
+		{
+			return nullptr;
+		}
+
+		return createNode(
+			ARRAY_INIT
+			{
+				.pValue = pValue,
+				.pCount = pCount,
+			}
+		);
+	}
+
+	template<>
 	CONSTRUCTOR* NodeBuffer::parse()
 	{
 		TYPE_NAME* pNamedType = parse<TYPE_NAME>();
@@ -1662,54 +1703,17 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		EXPRESSION* pValue = nullptr;
-		EXPRESSION* pSize = nullptr;
+		EXPRESSION* pValue = parse<EXPRESSION>();
 
-		// handle array allocation
-		if (token()->Kind == TokenKind::open_bracket)
+		if (pValue == nullptr)
 		{
-			(void)eat();
-
-			pValue = parse<EXPRESSION>();
-
-			if (pValue == nullptr)
-			{
-				return nullptr;
-			}
-
-			if (expectKind<TokenKind::semicolon>() != SUCCESS)
-			{
-				return nullptr;
-			}
-
-			pSize = parse<EXPRESSION>();
-
-			if (pSize == nullptr)
-			{
-				return nullptr;
-			}
-
-			if (expectKind<TokenKind::close_bracket>() != SUCCESS)
-			{
-				return nullptr;
-			}
-		}
-
-		else
-		{
-			pValue = parse<EXPRESSION>();
-
-			if (pValue == nullptr)
-			{
-				return nullptr;
-			}
+			return nullptr;
 		}
 
 		return createNode(
 			POINTER_INIT
 			{
-				.pValue = pValue,
-				.pSize = pSize
+				.pValue = pValue
 			}
 		);
 	}
@@ -1722,10 +1726,9 @@ namespace AlloyCompiler
 			return nullptr;
 		}
 
-		// TODO: pointer could be struct member, array member, ... need to fix!
-		VARIABLE* pNamedVariable = parse<VARIABLE>();
+		EXPRESSION* pVariable = parse<EXPRESSION>();
 
-		if (pNamedVariable == nullptr)
+		if (pVariable == nullptr)
 		{
 			return nullptr;
 		}
@@ -1733,7 +1736,7 @@ namespace AlloyCompiler
 		return createNode(
 			POINTER_MOVE
 			{
-				.pVariable = pNamedVariable
+				.pVariable = pVariable
 			}
 		);
 	}
