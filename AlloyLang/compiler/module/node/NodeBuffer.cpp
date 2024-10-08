@@ -2034,6 +2034,18 @@ namespace AlloyCompiler
 			return createNode(EXPRESSION(createNode(PRIMARY(pEnclosedExpression))));
 		}
 
+		case open_bracket:
+		{
+			ARRAY_INIT* pArrayInit = parse<ARRAY_INIT>();
+
+			if (pArrayInit == nullptr)
+			{
+				return nullptr;
+			}
+
+			return createNode(EXPRESSION(createNode(PRIMARY(pArrayInit))));
+		}
+
 		default:
 		{
 			(void)expectKind<integer_literal, float_literal, boolean_literal, string_literal, character_literal,
