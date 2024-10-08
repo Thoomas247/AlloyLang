@@ -1,0 +1,124 @@
+Alloy Types
+
+Primitive Types:
+- Built-in numeric types
+- Arrays
+- Structs
+- Enums
+
+Modifiers:
+- Pointer
+- Reference
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+User-defined types are types created using the "type <name> = ...;" syntax.
+Each user-defined type must have a unique (mangled) name, and can be represented as a combination of primitive types and modifiers.
+
+	For example, given:
+		type A = [i64; 4];
+		type B = struct
+		{
+			a: &A,
+			b: f32,
+		};
+		type C = *[B; 2];
+
+	We can rewrite each user-defined type A, B and C as a combination of primitive types and modifiers:
+		type A = [i64; 4];	// already a combination of primitives
+		type B = struct
+		{
+			a: &[i64; 4],
+			b: f32,
+		};
+		type C = *[struct { a: &[i64; 4], b: f32 }; 2];	// note: this is not valid syntax, but conceptually type C is equivalent to this
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+User-defined types are always unique and non-interchangeable!
+This means that if a type T and another type P can both be represented as the same combination of primitives and modifiers, T still cannot be used where P is expected, and P cannot be used where T is expected.
+	
+	For example:
+		type T = i64;
+		type P = i64;
+
+		fn do_something_T(const t: T) { ... }
+		fn do_something_P(const p: P) { ... }
+
+		fn main()
+		{
+			const t: T = 200;
+			const p: P = 400;
+
+			do_something_T(t);	// allowed
+			do_something_P(p);	// allowed
+
+			do_something_T(p);	// not allowed
+			do_something_P(t);	// not allowed
+
+
+			// also note that (explained later):
+			const num: i64 = -200;
+
+			do_something_T(num);	// not allowed
+			do_something_P(num);	// not allowed
+		}
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+User-defined types are meant to add meaning to the underlying data.
+A type called Health and another called Stamina could both just be u32 under the hood. 
+However, in terms of semantics, using Health where Stamina is expected (e.g. as a function argument) or vice-versa, does not make sense.
+Health and Stamina may also define different member functions which add more meaning to the type.
+
+In another context, we could be expecting a raw u32. In this case, we do not care about the meaning of the u32, we just want the underlying data to be a u32.
+Using this logic, it would make sense that both Health and Stamina could be used where a u32 is expected.
+User-defined types can "decay" into a more general form, however the opposite is not possible.
+
+Going back to the first example, we can create a graph representing each type and where it came from:
+	A --> [i64; 4]
+	B --> struct { a: &A, b: f32 } --> struct { a: &[i64; 4], b: f32 }
+	C --> *[B; 2] --> *[struct { a: &A, b: f32 }; 2] --> *[struct { a: &[i64; 4], b: f32 }; 2];
+
+	The direction of the arrows represents the direction in which a type can decay.
+	Note that as we move toward the right, the types become less specialized.
+
+An example showing the concept of type decay:
+	type FixedArray<type T> = [T; 100];
+	type Health = u32;
+	type PlayerHealthArray = FixedArray<Health>;
+	type EnemyHealthArray = FixedArray<Health>;
+
+	fn add_one(var arr: &[u32; 100]) { ... }
+	fn add_two(var arr: &FixedArray<u32>) { ... }
+	fn add_health(var arr: &FixedArray<Health>, const val: Health) { ... }
+	fn apply_damage_to_players(var arr: &PlayerHealthArray, const dmg: Health) { ... }
+
+	// graph for these types:
+	// PlayerHealthArray --> FixedArray<Health> --> FixedArray<u32> --> [u32; 100]
+	// EnemyHealthArray -----^
+	// note: there is no arrow between PlayerHealthArray and EnemyHealthArray, conversion between them is not possible!
+
+	fn main()
+	{
+		var player_healths: PlayerHealthArray = [10; 100];	// note that numeric literals have a type depending on their context; in this case, the literal 10 is of type Health
+
+		apply_damage_to_players(&player_healths, 25);	// makes sense, PlayerHealthArray is exactly the type that the function expects
+		add_health(&player_healths, 25);				// PlayerHealthArray decays to FixedArray<Health>
+		add_two(&player_healths);						// PlayerHealthArray decays directly to FixedArray<u32>
+		add_one(&player_healths);						// PlayerHealthArray decays all the way down to its primitive form
+
+		var enemy_healths: EnemyHealthArray = [5; 100];
+
+		apply_damage_to_players(&enemy_healths);		// invalid! the function was created specifically with players in mind, not enemies
+		add_health(&enemy_healths);						// valid, add_health was created for any FixedArray<Health>
+	}
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+For generic functions, we have to create a new function for every different set of generic arguments, even if the underlying primitive types are the same:
+	fn do_something<type T>();
+	// do_something<u32>() != do_something<Health>() != do_something<Stamina>()
+
+This will be important when we add more compile-time functionality like macros and such, where the user will be able to perform static reflection on the types and change the function behavior based on this.
+However, as to not duplicate code everywhere, optimizations will be added once the macro part is figured out.
