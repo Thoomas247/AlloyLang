@@ -1051,7 +1051,7 @@ namespace AlloyCompiler
 		const TypeSubtypePair& identifierType)
 	{
 		//
-		// new ( EXPRESSION | ( [ EXPRESSION; EXPRESSION ] ) ) ;
+		// new ( EXPRESSION ) ;
 		//
 		llvm::Type* elementType = identifierType.type;
 		llvm::Type* subElementType = identifierType.containedType;
@@ -1071,7 +1071,6 @@ namespace AlloyCompiler
 		if (llvm::isa<llvm::VectorType>(elementType)) {
 			subElementType = static_cast<llvm::VectorType*>(elementType)->getElementType();
 		}
-		llvm::PointerType* pointerType = llvm::PointerType::get(elementType, 0);	// note that elementType is not actually stored by llvm
 
 		// get the value to set for each element
 		TypeSubtypePair temp = { elementType, nullptr };
@@ -1079,24 +1078,8 @@ namespace AlloyCompiler
 		// try to convert the value to the expected type	
 		convertValueToType(state, defaultValue, subElementType);
 
-		// now get the size of the vector to create
-		llvm::Value* count;
-		if (pointerInitializerNode.pValue->Is<ARRAY_INIT>())
-		{
-			ARRAY_INIT* pArrayInit = pointerInitializerNode.pValue->Get<ARRAY_INIT>();
-
-			TypeSubtypePair temp = { llvm::IntegerType::getInt64Ty(*state.Context), nullptr };
-			count = generateExpression(moduleTable, state, *pArrayInit->pCount, temp).Value;
-
-			// set pValue of the POINTER_INIT node to the pValue of the ARRAY_INIT node
-			// TODO: this is a bit of a hack to avoid changing the rest of this function
-			pointerInitializerNode.pValue->Set(pArrayInit->pValue);
-		}
-		else
-		{
-			// creating a single object
-			count = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1, true));
-		}
+		// creating a single object
+		llvm::Value* count = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1, true));
 
 		// create a mutable variable on the heap
 		llvm::Type* PointerType = llvm::Type::getInt64Ty(*state.Context);	// pointers are 64-bit values
@@ -1130,6 +1113,79 @@ namespace AlloyCompiler
 		// create the instructions to store the value for each element
 		llvm::Value* current = tempBuilder.CreateLoad(start->getAllocatedType(), start);
 		llvm::Value* memberPtr = tempBuilder.CreateGEP(subElementType, Ptr, current, "pointerinit");
+		tempBuilder.CreateStore(defaultValue, memberPtr);
+
+		// increment loop variable (start) by step value
+		current = tempBuilder.CreateAdd(current, step);
+		tempBuilder.CreateStore(current, start);
+
+		// emit the condition
+		llvm::Value* conditionVal = tempBuilder.CreateICmpUGE(current, count);
+		conditionVal = convertToBool(state, conditionVal);
+
+		// create the "after loop" block and insert it
+		llvm::BasicBlock* afterBlock = llvm::BasicBlock::Create(*state.Context, "afterloop", func);
+
+		// insert the conditional branch into the end of afterBlock
+		tempBuilder.CreateCondBr(conditionVal, afterBlock, loopBlock);
+
+		// any new code will be inserted in afterBlock
+		tempBuilder.SetInsertPoint(afterBlock);
+
+		return Ptr;	// return the initialized pointer
+	}
+
+	llvm::Value* generateArrayInitializerExpression(ModuleTable& moduleTable, LLVMState& state, const ARRAY_INIT& arrayInitializerNode,
+		const TypeSubtypePair& identifierType)
+	{
+		//
+		// ( [ EXPRESSION; EXPRESSION ] ) ;
+		//
+		llvm::Type* elementType = identifierType.type;
+
+		// get the value to set for each element
+		TypeSubtypePair temp = { elementType, nullptr };
+		llvm::Value* defaultValue = generateExpression(moduleTable, state, *arrayInitializerNode.pValue, temp).Value;
+		// try to convert the value to the expected type	
+		convertValueToType(state, defaultValue, elementType);
+
+		// now get the size of the vector to create
+		llvm::Value* count;
+		temp = { llvm::IntegerType::getInt64Ty(*state.Context), nullptr };
+		count = generateExpression(moduleTable, state, arrayInitializerNode.pCount, temp).Value;
+
+		// create a mutable variable on the heap
+		llvm::Type* PointerType = llvm::Type::getInt64Ty(*state.Context);	// pointers are 64-bit values
+		llvm::Constant* AllocSize = llvm::ConstantExpr::getSizeOf(elementType);
+		AllocSize = llvm::ConstantExpr::getTruncOrBitCast(AllocSize, PointerType);
+		llvm::CallInst* Ptr = state.Builder->CreateMalloc(PointerType, elementType, AllocSize, count);
+
+		// create code to go through the list of members and initialize them to the given value
+		// we need to create the loop within the llvm code because we don't know beforehand how many objects we are creating
+		llvm::Function* func = state.Builder->GetInsertBlock()->getParent();
+		ASSERT(func != nullptr, "No function to insert into!");
+
+		llvm::IRBuilder<>& tempBuilder = *state.Builder;
+
+		// emit init code before the loop
+		// start is the loop variable, initialize it to 0
+		llvm::AllocaInst* start = tempBuilder.CreateAlloca(llvm::IntegerType::getInt64Ty(*state.Context), nullptr);
+		tempBuilder.CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 0)), start);
+		llvm::Value* step = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1));
+
+		// create a new basic block to start insertion into
+		llvm::BasicBlock* loopBlock = llvm::BasicBlock::Create(*state.Context, "loop", func);
+		// insert an explicit fall through from the current block to the loopBlock
+		tempBuilder.CreateBr(loopBlock);
+
+		// start insertion into the loopBlock
+		tempBuilder.SetInsertPoint(loopBlock);
+
+		// generate the body of the loop
+
+		// create the instructions to store the value for each element
+		llvm::Value* current = tempBuilder.CreateLoad(start->getAllocatedType(), start);
+		llvm::Value* memberPtr = tempBuilder.CreateGEP(elementType, Ptr, current, "arrayinit");
 		tempBuilder.CreateStore(defaultValue, memberPtr);
 
 		// increment loop variable (start) by step value
@@ -1226,6 +1282,10 @@ namespace AlloyCompiler
 		llvm::Value* declarationVal = nullptr;
 		llvm::Value* value = nullptr;
 
+#ifdef TRACE_CODE_GENERATOR
+		logInfoAtCurrentPosition(moduleTable, variableDefinition.pDeclaration->pNameToken,
+			"Processing variable definition for {0}\n", variableDefinition.pDeclaration->pNameToken->Value);
+#endif
 		if (nullptr == variableDefinition.pDeclaration->pType)
 		{
 			// case where the type is not given but has to be inferred from the type of the expression
@@ -2162,6 +2222,9 @@ namespace AlloyCompiler
 		}
 		else if (primary.Is<POINTER_INIT>()) {
 			result.Value = generatePointerInitializerExpression(moduleTable, state, *primary.Get<POINTER_INIT>(), expectedType);
+		}
+		else if (primary.Is<ARRAY_INIT>()) {
+			result.Value = generateArrayInitializerExpression(moduleTable, state, *primary.Get<ARRAY_INIT>(), expectedType);
 		}
 		else if (primary.Is<POINTER_MOVE>()) {
 			result.Value = generatePointerMoveExpression(moduleTable, state, *primary.Get<POINTER_MOVE>(), expectedType);
