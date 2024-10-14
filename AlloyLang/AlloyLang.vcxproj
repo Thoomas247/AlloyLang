@@ -1,10 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Profile|x64">
-      <Configuration>Profile</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -37,13 +33,6 @@
     <CharacterSet>Unicode</CharacterSet>
     <CLRSupport>false</CLRSupport>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
@@ -55,15 +44,12 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_SILENCE_CXX23_ALIGNED_STORAGE_DEPRECATION_WARNING;_SILENCE_ALL_CXX23_DEPRECATION_WARNINGS;NO_CODE_EXECUTION</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TRACE_CODE_GENERATOR;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_SILENCE_CXX23_ALIGNED_STORAGE_DEPRECATION_WARNING;_SILENCE_ALL_CXX23_DEPRECATION_WARNINGS;NO_CODE_EXECUTION</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalIncludeDirectories>C:\llvm\include;X:\llvm\include</AdditionalIncludeDirectories>
@@ -100,38 +86,12 @@
       <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_SILENCE_CXX23_ALIGNED_STORAGE_DEPRECATION_WARNING;_SILENCE_ALL_CXX23_DEPRECATION_WARNINGS;NO_CODE_EXECUTION</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\llvm\include;X:\llvm\include</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <DisableSpecificWarnings>4141;4146;4244;4267;4291;4351;4456;4457;4458;4459;4503;4624;4722;4100;4127;4512;4505;4610;4510;4702;4245;4706;4310;4701;4703;4389;4611;4805;4204;4577;4091;4592;4319;4709;5105;4324</DisableSpecificWarnings>
-    </ClCompile>
-    <Link>
-      <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <Profile>true</Profile>
-      <AdditionalLibraryDirectories>C:\llvm\lib;X:\llvm\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib";"LLVMPasses.lib";"LLVMInstCombine.lib";"LLVMipo.lib";"LLVMAggressiveInstCombine.lib";"LLVMCoroutines.lib";"LLVMMC.lib";"LLVMBitWriter.lib";"LLVMInstrumentation.lib";"LLVMVectorize.lib";"LLVMIRPrinter.lib";"LLVMCFGuard.lib";"LLVMHipStdPar.lib";"LLVMObjCARCOpts.lib";"LLVMFrontendOpenMP.lib";"LLVMProfileData.lib";"LLVMObject.lib";"LLVMCodeGenTypes.lib";"LLVMDebugInfoDWARF.lib";"LLVMLinker.lib";"LLVMFrontendOffloading.lib";"LLVMIRReader.lib";"LLVMMCParser.lib";"LLVMTextAPI.lib"</AdditionalDependencies>
-      <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
-    </Link>
-  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AlloyLang.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="compiler\codegen\CodeGenerator.cpp" />
     <ClCompile Include="compiler\codegen\Inlines.cpp" />

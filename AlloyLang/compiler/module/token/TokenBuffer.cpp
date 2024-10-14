@@ -38,6 +38,91 @@ namespace AlloyCompiler
 		}
 		return list;
 	}
+
+	/*static*/
+	GlobalFunctions::AlloyTokenTypes GlobalFunctions::GetTokenType(int TokenKind)
+	{
+		//
+		// given a token kind returned by the parser, convert to to token type for syntax highlighting
+		//
+		static const AlloyTokenTypes TokenKinds[] =
+		{
+			AlloyTokenTypes::none,       // none
+
+			AlloyTokenTypes::none,       // end_of_file,
+
+			AlloyTokenTypes::comment,     // comment
+
+			AlloyTokenTypes::none,    // identifier,
+			AlloyTokenTypes::none,    // long_identifier,
+
+			AlloyTokenTypes::keyword,    // extern_keyword,
+			AlloyTokenTypes::structure,  // struct_keyword,
+			AlloyTokenTypes::enumeration,// enum_keyword,
+			AlloyTokenTypes::keyword,    // function_keyword,
+			AlloyTokenTypes::keyword,    // macro_keyword,
+
+			AlloyTokenTypes::keyword,    // import_keyword,
+			AlloyTokenTypes::keyword,    // as_keyword,
+
+			AlloyTokenTypes::varorconst,    // public_keyword,
+			AlloyTokenTypes::varorconst,    // export_keyword,
+
+			AlloyTokenTypes::keyword,    // type_keyword,
+
+			AlloyTokenTypes::varorconst,    // variable_keyword,
+			AlloyTokenTypes::varorconst,    // constant_keyword,
+
+			AlloyTokenTypes::keyword,    // for_keyword,
+			AlloyTokenTypes::keyword,    // while_keyword,
+			AlloyTokenTypes::keyword,    // if_keyword,
+			AlloyTokenTypes::keyword,    // else_keyword,
+			AlloyTokenTypes::keyword,    // switch_keyword,
+			AlloyTokenTypes::keyword,    // case_keyword,
+			AlloyTokenTypes::keyword,    // return_keyword,
+
+			AlloyTokenTypes::keyword,    // new_keyword,
+			AlloyTokenTypes::keyword,    // move_keyword,
+
+			AlloyTokenTypes::none,       // pound,
+			AlloyTokenTypes::none,       // at_symbol,
+
+			AlloyTokenTypes::none,       // reference,
+
+			AlloyTokenTypes::none,       // comma,
+			AlloyTokenTypes::none,       // colon,
+			AlloyTokenTypes::none,       // semicolon,
+			AlloyTokenTypes::none,       // double_colon,
+			AlloyTokenTypes::none,       // dot,
+			AlloyTokenTypes::none,       // arrow,
+			AlloyTokenTypes::none,       // ellipsis,
+
+			AlloyTokenTypes::none,       // open_paren,
+			AlloyTokenTypes::none,       // close_paren,
+			AlloyTokenTypes::none,       // open_brace,
+			AlloyTokenTypes::none,       // close_brace,
+			AlloyTokenTypes::none,       // open_bracket,
+			AlloyTokenTypes::none,       // close_bracket,
+
+			AlloyTokenTypes::none,       // pipe_operator,
+
+			AlloyTokenTypes::none,       // assignment_operator,
+
+			AlloyTokenTypes::none,       // unary_operator,
+			AlloyTokenTypes::none,       // binary_operator,
+
+			AlloyTokenTypes::basictype,    // integer_literal,
+			AlloyTokenTypes::basictype,    // float_literal,
+			AlloyTokenTypes::basictype,    // boolean_literal,
+			AlloyTokenTypes::stringliteral,   // string_literal,
+			AlloyTokenTypes::stringliteral,    // character_literal
+		};
+
+		if (TokenKind < sizeof(TokenKinds) / sizeof(TokenKinds[0]))
+			return TokenKinds[TokenKind];
+		else
+			return AlloyTokenTypes::none;
+	}
 #endif
 
 	TokenBuffer::TokenBuffer(const Source& source)

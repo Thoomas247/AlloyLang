@@ -30,8 +30,12 @@ namespace AlloyCompiler
 		bool freeOnExit = false;				// whether we should free the pointer
 	};
 
-	typedef std::unordered_map<std::string, llvm::Type*>	GenericTypeMap;
-	typedef std::vector<std::tuple<std::string, llvm::Type*>> GenericArgumentTypes;
+	// GenericTypeMap is a map from a generic type T to the actual type name (e.g. i32) and the generated llvm::Type
+	// Note that llvm can generate a type that is different from the one requested, e.g. generate u32 when we request i32
+	// this is why we cannot rely on NamedValues::GetTypeName to retrieve the real type name
+	typedef std::tuple<std::string, llvm::Type*> LLVMNameType;
+	typedef std::unordered_map<std::string, LLVMNameType> GenericTypeMap;
+	typedef std::vector<LLVMNameType> GenericArgumentTypes;
 
 #define _EnumPayloadStruct_	"_EnumPayloadStruct_"
 #define EnumPayloadIndex	0
@@ -71,6 +75,8 @@ namespace AlloyCompiler
 		NamedValues::TypeMemberInfo GetStructMemberIndex(const std::string_view& structName, const std::string_view& memberName);
 		NamedValues::TypeMemberInfo GetEnumMemberIndex(const std::string_view& structName, const std::string_view& memberName);
 
+		// Note that llvm can generate a type that is different from the one requested, e.g. generate u32 when we request i32
+		// this is why we cannot rely on NamedValues::GetTypeName to retrieve the real type name
 		std::string_view GetTypeName(const llvm::Type* type);
 
 		typedef enum { basic = 0, structure = 1, enumeration = 2, array = 3 } UserDefinedType;
@@ -82,8 +88,8 @@ namespace AlloyCompiler
 		bool GetEnumMembers(const std::string_view& enumName, std::unordered_map<std::string_view, TypeMemberInfo>& enumMembers);
 
 		// support for generic function parameters
-		llvm::Type* GetGenericType(const std::string& typeName);
-		void SetGenericType(const std::string& typeName, llvm::Type* realType);
+		LLVMNameType GetGenericType(const std::string& typeName);
+		void SetGenericType(const std::string& typeName, LLVMNameType realType);
 
 		// returns the current function's generic type map
 		GenericTypeMap GetGenericTypeMap();
@@ -103,6 +109,9 @@ namespace AlloyCompiler
 
 		// return the structure type associated with a specific payload type
 		llvm::Type* GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, llvm::Type* PayloadType);
+
+		// dump all registered type names for debugging purposes
+		void DumpTypeNames();
 
 	private:
 		struct TypeInfo

@@ -303,6 +303,11 @@ namespace AlloyCompiler
 			}
 		}
 
+#ifdef _DEBUG
+		std::cout << "llvm Type not found: ";
+		type->dump();
+		DumpTypeNames();
+#endif
 		ASSERT(false, "Type name not found! This only happens if type wasn't added to NamedValues when it should.");
 		return "";
 	}
@@ -327,6 +332,26 @@ namespace AlloyCompiler
 		m_ScopeStack.back().TypeNames[type] = name;
 	}
 
+	void NamedValues::DumpTypeNames()
+	{
+		//
+		// dump all registered type names for debugging purposes
+		//
+		std::string tabs = "";
+
+		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
+		{
+			auto& scope = *it;
+			std::cout << std::vformat("{0}Scope {1}:", std::make_format_args(tabs, scope.Name)) << std::endl;
+
+			for (auto typeName = scope.TypeNames.begin(); typeName != scope.TypeNames.end(); typeName++)
+			{
+				std::cout << std::vformat("{0}{1} ==> ", std::make_format_args(tabs, typeName->second));
+				typeName->first->dump();
+			}
+			tabs = tabs + "\t";
+		}
+	}
 
 
 	/* -- PRIVATE -- */
@@ -348,18 +373,18 @@ namespace AlloyCompiler
 	}
 
 	// support for generic function parameters
-	llvm::Type* NamedValues::GetGenericType(const std::string& typeName)
+	LLVMNameType NamedValues::GetGenericType(const std::string& typeName)
 	{
 		auto found = m_ScopeStack.back().GenericTypeMap.find(typeName);
 		if (found == m_ScopeStack.back().GenericTypeMap.end()) {
-			return nullptr;
+			return std::make_tuple("", nullptr);
 		}
 		else {
 			return found->second;
 		}
 	}
 
-	void NamedValues::SetGenericType(const std::string& typeName, llvm::Type* Type)
+	void NamedValues::SetGenericType(const std::string& typeName, LLVMNameType Type)
 	{
 		m_ScopeStack.back().GenericTypeMap[typeName] = Type;
 	}
