@@ -197,6 +197,7 @@ namespace AlloyCompiler
 		Log::Error("    {0}", line);
 		Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::string(tokenSize, '~'));
 		Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::vformat(format, std::make_format_args(args...)));
+
 	}
 
 	template<typename T>

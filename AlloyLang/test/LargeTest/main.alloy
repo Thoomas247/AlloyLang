@@ -1,4 +1,4 @@
-import lib::math;
+//import lib::math;
 import lib::array;
 
 extern printf(const fmt: String, ...);

@@ -3010,6 +3010,8 @@ namespace AlloyCompiler
 	{
 		m_Allocator.Reset(m_TokenBuffer.NumTokens() * 80);	// TODO: remove magic number
 
+		getNextNonComment();
+
 		using enum TokenKind;
 
 		while (!isEOF())
