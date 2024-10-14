@@ -11,15 +11,164 @@ using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.Language.StandardClassification;
 using Microsoft.VisualStudio.Text.Projection;
 using AlloyCompiler;
+using Microsoft.VisualStudio.LanguageServer.Client;
+using Microsoft.VisualStudio.Package;
+using Microsoft.VisualStudio.Threading;
+using Newtonsoft.Json.Linq;
+using StreamJsonRpc;
+using System.Diagnostics;
+using System.IO.Pipes;
+using System.Reflection;
+using System.Threading.Tasks;
+using System.Threading;
+using System.IO;
 
 namespace AlloySyntaxHighliting
 {
-    
-    public enum AlloyTokenTypes
+#if USE_LANGUAGE_SERVER
+    [ContentType("alloy")]
+    [Export(typeof(ILanguageClient))]
+    [RunOnContext(RunningContext.RunOnHost)]
+    public class AlloyLanguageClient : ILanguageClient
     {
-        none, keyword, basictype, stringliteral, varorconst, comment
+        public AlloyLanguageClient()
+        {
+            Instance = this;
+        }
+
+        internal static AlloyLanguageClient Instance
+        {
+            get;
+            set;
+        }
+
+        internal JsonRpc Rpc
+        {
+            get;
+            set;
+        }
+
+        public event AsyncEventHandler<EventArgs> StartAsync;
+        public event AsyncEventHandler<EventArgs> StopAsync;
+
+        public string Name => "Alloy Language Extension";
+
+        public IEnumerable<string> ConfigurationSections
+        {
+            get
+            {
+                yield return "alloy";
+            }
+        }
+
+        public object InitializationOptions => null;
+
+        public IEnumerable<string> FilesToWatch => null;
+
+        public object CustomMessageTarget => null;
+
+        public bool ShowNotificationOnInitializeFailed => true;
+
+        public async Task<Connection> ActivateAsync(CancellationToken token)
+        {
+            // Debugger.Launch();
+
+            var stdInPipeName = "AlloyLanguageServer-" + Guid.NewGuid().ToString();
+            var stdOutPipeName = "AlloyLanguageServer-" + Guid.NewGuid().ToString();
+
+            var pipeAccessRule = new PipeAccessRule("Everyone", PipeAccessRights.ReadWrite, System.Security.AccessControl.AccessControlType.Allow);
+            var pipeSecurity = new PipeSecurity();
+            pipeSecurity.AddAccessRule(pipeAccessRule);
+
+            var readerPipe = new NamedPipeClientStream(stdInPipeName);
+            var writerPipe = new NamedPipeClientStream(stdOutPipeName);
+
+            ProcessStartInfo info = new ProcessStartInfo();
+            var programPath = Path.Combine("X:\\Projects\\AlloyLang\\AlloyLanguageServer\\bin\\x64\\Debug", @"AlloyLanguageServer.exe");
+            // var programPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Server", @"AlloyLanguageServer.exe");
+            info.FileName = programPath;
+            info.WorkingDirectory = Path.GetDirectoryName(programPath);
+            info.Arguments = stdOutPipeName + " " + stdInPipeName;
+
+            System.Diagnostics.Process process = new System.Diagnostics.Process();
+            process.StartInfo = info;
+
+            if (process.Start())
+            {
+                await readerPipe.ConnectAsync();
+                await writerPipe.ConnectAsync();
+
+                return new Connection(readerPipe, writerPipe);
+            }
+
+            return null;
+        }
+
+        public async Task OnLoadedAsync()
+        {
+            if (StartAsync != null)
+            {
+                await StartAsync.InvokeAsync(this, EventArgs.Empty);
+            }
+        }
+
+        public async Task StopServerAsync()
+        {
+            if (StopAsync != null)
+            {
+                await StopAsync.InvokeAsync(this, EventArgs.Empty);
+            }
+        }
+
+        public Task OnServerInitializedAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task AttachForCustomMessageAsync(JsonRpc rpc)
+        {
+            this.Rpc = rpc;
+
+            return Task.CompletedTask;
+        }
+
+        public Task<InitializationFailureContext> OnServerInitializeFailedAsync(ILanguageClientInitializationInfo initializationState)
+        {
+            string message = "Alloy Language Client failed to activate! :(";
+            string exception = initializationState.InitializationException?.ToString() ?? string.Empty;
+            message = $"{message}\n {exception}";
+
+            var failureContext = new InitializationFailureContext()
+            {
+                FailureMessage = message,
+            };
+
+            return Task.FromResult(failureContext);
+        }
     }
 
+    namespace MockLanguageExtension
+    {
+#pragma warning disable 649
+        public class AlloyContentDefinition
+        {
+            [Export]
+            [Name("alloy")]
+            [BaseDefinition(CodeRemoteContentDefinition.CodeRemoteContentTypeName)]
+            internal static ContentTypeDefinition AlloyContentTypeDefinition;
+
+
+            [Export]
+            [FileExtension(".alloy")]
+            [ContentType("alloy")]
+            internal static FileExtensionToContentTypeDefinition AlloyFileExtensionDefinition;
+        }
+#pragma warning restore 649
+    }
+
+#endif  // USE_LANGUAGE_SERVER
+
+#if VS2022_SPECIFIC
     internal static class OrdinaryClassificationDefinition
     {
         #region Type definition
@@ -48,9 +197,9 @@ namespace AlloySyntaxHighliting
 
     public class AlloyTokenTag : ITag
     {
-        public AlloyTokenTypes type { get; private set; }
+        public GlobalFunctions.AlloyTokenTypes type { get; private set; }
 
-        public AlloyTokenTag(AlloyTokenTypes type)
+        public AlloyTokenTag(GlobalFunctions.AlloyTokenTypes type)
         {
             this.type = type;
         }
@@ -72,80 +221,7 @@ namespace AlloySyntaxHighliting
             remove { }
         }
 
-        AlloyTokenTypes[] TokenKinds =
-        {
-            AlloyTokenTypes.none,       // none
-
-		    AlloyTokenTypes.none,       // end_of_file,
-
-            AlloyTokenTypes.comment,     // comment
-
-            AlloyTokenTypes.none,    // identifier,
-		    AlloyTokenTypes.none,    // long_identifier,
-
-            AlloyTokenTypes.keyword,    // extern_keyword,
-		    AlloyTokenTypes.keyword,    // struct_keyword,
-		    AlloyTokenTypes.keyword,    // enum_keyword,
-		    AlloyTokenTypes.keyword,    // function_keyword,
-		    AlloyTokenTypes.keyword,    // macro_keyword,
-
-		    AlloyTokenTypes.keyword,    // import_keyword,
-		    AlloyTokenTypes.keyword,    // as_keyword,
-
-		    AlloyTokenTypes.varorconst,    // public_keyword,
-		    AlloyTokenTypes.varorconst,    // export_keyword,
-
-		    AlloyTokenTypes.keyword,    // type_keyword,
-
-		    AlloyTokenTypes.varorconst,    // variable_keyword,
-		    AlloyTokenTypes.varorconst,    // constant_keyword,
-
-		    AlloyTokenTypes.keyword,    // for_keyword,
-		    AlloyTokenTypes.keyword,    // while_keyword,
-		    AlloyTokenTypes.keyword,    // if_keyword,
-		    AlloyTokenTypes.keyword,    // else_keyword,
-		    AlloyTokenTypes.keyword,    // switch_keyword,
-		    AlloyTokenTypes.keyword,    // case_keyword,
-		    AlloyTokenTypes.keyword,    // return_keyword,
-
-		    AlloyTokenTypes.keyword,    // new_keyword,
-		    AlloyTokenTypes.keyword,    // move_keyword,
-
-            AlloyTokenTypes.none,       // pound,
-		    AlloyTokenTypes.none,       // at_symbol,
-
-		    AlloyTokenTypes.none,       // reference,
-
-		    AlloyTokenTypes.none,       // comma,
-		    AlloyTokenTypes.none,       // colon,
-		    AlloyTokenTypes.none,       // semicolon,
-		    AlloyTokenTypes.none,       // double_colon,
-		    AlloyTokenTypes.none,       // dot,
-		    AlloyTokenTypes.none,       // arrow,
-		    AlloyTokenTypes.none,       // ellipsis,
-
-		    AlloyTokenTypes.none,       // open_paren,
-		    AlloyTokenTypes.none,       // close_paren,
-		    AlloyTokenTypes.none,       // open_brace,
-		    AlloyTokenTypes.none,       // close_brace,
-		    AlloyTokenTypes.none,       // open_bracket,
-		    AlloyTokenTypes.none,       // close_bracket,
-
-		    AlloyTokenTypes.none,       // pipe_operator,
-
-		    AlloyTokenTypes.none,       // assignment_operator,
-
-		    AlloyTokenTypes.none,       // unary_operator,
-		    AlloyTokenTypes.none,       // binary_operator,
-
-		    AlloyTokenTypes.basictype,    // integer_literal,
-		    AlloyTokenTypes.basictype,    // float_literal,
-		    AlloyTokenTypes.basictype,    // boolean_literal,
-		    AlloyTokenTypes.stringliteral,   // string_literal,
-		    AlloyTokenTypes.stringliteral,    // character_literal
-        };
-
-        public IEnumerable<ITagSpan<AlloyTokenTag>> GetTags(NormalizedSnapshotSpanCollection spans)
+    public IEnumerable<ITagSpan<AlloyTokenTag>> GetTags(NormalizedSnapshotSpanCollection spans)
         {
             foreach (SnapshotSpan curSpan in spans)
             {
@@ -165,7 +241,7 @@ namespace AlloySyntaxHighliting
                             var tokenSpan = new SnapshotSpan(curSpan.Snapshot, new Span(curLoc, len));
                             if (tokenSpan.IntersectsWith(curSpan))
                                 yield return new TagSpan<AlloyTokenTag>(tokenSpan,
-                                                                      new AlloyTokenTag(TokenKinds[token.Kind]));
+                                                                      new AlloyTokenTag(GlobalFunctions.GetTokenType(token.Kind)));
                         }
                     }
                 }
@@ -350,7 +426,7 @@ namespace AlloySyntaxHighliting
     {
         ITextBuffer _buffer;
         ITagAggregator<AlloyTokenTag> _aggregator;
-        IDictionary<AlloyTokenTypes, IClassificationType> AlloyTypes;
+        IDictionary<GlobalFunctions.AlloyTokenTypes, IClassificationType> AlloyTypes;
 
         /// <summary>
         /// Construct the classifier and define search tokens
@@ -361,13 +437,13 @@ namespace AlloySyntaxHighliting
         {
             _buffer = buffer;
             _aggregator = AlloyTagAggregator;
-            AlloyTypes = new Dictionary<AlloyTokenTypes, IClassificationType>();
-            AlloyTypes[AlloyTokenTypes.keyword] = typeService.GetClassificationType(PredefinedClassificationTypeNames.Keyword);
-            AlloyTypes[AlloyTokenTypes.basictype] = typeService.GetClassificationType(PredefinedClassificationTypeNames.Type);
-            AlloyTypes[AlloyTokenTypes.stringliteral] = typeService.GetClassificationType(PredefinedClassificationTypeNames.String);
-            AlloyTypes[AlloyTokenTypes.varorconst] = typeService.GetClassificationType("alloycustom");
-            AlloyTypes[AlloyTokenTypes.none] = typeService.GetClassificationType(PredefinedClassificationTypeNames.Text);
-            AlloyTypes[AlloyTokenTypes.comment] = typeService.GetClassificationType(PredefinedClassificationTypeNames.Comment);
+            AlloyTypes = new Dictionary<GlobalFunctions.AlloyTokenTypes, IClassificationType>();
+            AlloyTypes[GlobalFunctions.AlloyTokenTypes.keyword] = typeService.GetClassificationType(PredefinedClassificationTypeNames.Keyword);
+            AlloyTypes[GlobalFunctions.AlloyTokenTypes.basictype] = typeService.GetClassificationType(PredefinedClassificationTypeNames.Type);
+            AlloyTypes[GlobalFunctions.AlloyTokenTypes.stringliteral] = typeService.GetClassificationType(PredefinedClassificationTypeNames.String);
+            AlloyTypes[GlobalFunctions.AlloyTokenTypes.varorconst] = typeService.GetClassificationType("alloycustom");
+            AlloyTypes[GlobalFunctions.AlloyTokenTypes.none] = typeService.GetClassificationType(PredefinedClassificationTypeNames.Text);
+            AlloyTypes[GlobalFunctions.AlloyTokenTypes.comment] = typeService.GetClassificationType(PredefinedClassificationTypeNames.Comment);
         }
 
         public event EventHandler<SnapshotSpanEventArgs> TagsChanged
@@ -392,4 +468,5 @@ namespace AlloySyntaxHighliting
             }
         }
     }
+#endif
 }
