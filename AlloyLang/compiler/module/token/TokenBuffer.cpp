@@ -125,8 +125,11 @@ namespace AlloyCompiler
 			++m_Line;
 			m_Column = 1;
 		}
-
-		++m_Column;
+		else
+		{
+			++m_Column;
+		}
+		
 		++m_CharIndex;
 
 		// check that we haven't reached the end of the file

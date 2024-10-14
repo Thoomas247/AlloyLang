@@ -27,7 +27,7 @@ fn Quaternion:lerp(const qA: &Quaternion, const qB: &Quaternion, const t: &f64) 
 	q.x = qA.x + (qB.x - qA.x) * t;
 	q.y = qA.y + (qB.y - qA.y) * t;
 	q.z = qA.z + (qB.z - qA.z) * t;
-	q.w = qA.w + (qB.x - qA.w) * t;
+	q.w = qA.w + (qB.w - qA.w) * t;
 
 	return q;
 }
