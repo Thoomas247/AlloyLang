@@ -195,8 +195,8 @@ namespace AlloyCompiler
 
 		Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
 		Log::Error("    {0}", line);
-		Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::string(tokenSize, '~'));
-		Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::vformat(format, std::make_format_args(args...)));
+		Log::Error("    {0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
+		Log::Error("    {0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 
 	}
 

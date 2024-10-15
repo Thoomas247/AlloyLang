@@ -76,8 +76,8 @@ namespace AlloyCompiler
 
 			Log::Print("({0}:{1}) INFO:", location.Line, location.Column);
 			Log::Print("    {0}", line);
-			Log::Print("    {0}{1}", std::string(location.Column - 2, ' '), std::string(tokenSize, '~'));
-			Log::Print("    {0}{1}", std::string(location.Column - 2, ' '), std::vformat(format, std::make_format_args(args...)));
+			Log::Print("    {0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
+			Log::Print("    {0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 		}
 		else
 		{
@@ -98,8 +98,8 @@ namespace AlloyCompiler
 
 			Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
 			Log::Error("    {0}", line);
-			Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::string(tokenSize, '~'));
-			Log::Error("    {0}{1}", std::string(location.Column - 2, ' '), std::vformat(format, std::make_format_args(args...)));
+			Log::Error("    {0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
+			Log::Error("    {0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
 		}
 		else
 		{
@@ -1092,7 +1092,7 @@ namespace AlloyCompiler
 		else {
 			state.Builder->CreateStore(defaultValue, Ptr);
 		}
-		
+
 		/*
 		// create code to go through the list of members and initialize them to the given value
 		// we need to create the loop within the llvm code because we don't know beforehand how many objects we are creating
@@ -1794,7 +1794,7 @@ namespace AlloyCompiler
 			std::string extendedName = getExtendedFunctionName(moduleTable, state, "",
 				type == nullptr ? "" : std::string(state.NamedValues.GetTypeName(type)),
 				type == nullptr ? funcResult.MangledName : functionName,
-				funcResult.pDefiniton->pFunctionType->GenericParameters, 
+				funcResult.pDefiniton->pFunctionType->GenericParameters,
 				functionCallExpressionNode.GenericArguments, typeMap);
 
 			// make sure the built-in function has already been generated

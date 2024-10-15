@@ -21,7 +21,7 @@ fn Transform:get_transform_matrix(const self: &Self) -> Mat4
 }
 
 
-//type TransformArray = [Transform; 256];
+type TransformArray = [Transform; 256];
 type ScoreArray = Array<u32>;
 
 
@@ -40,7 +40,7 @@ type ScoreArray = Array<u32>;
 fn main() -> i32
 {
 	var x: i32 = 25;
-	var y = x:cast(u32);
+	var y = x:cast<u32>();
 
 	//var data = Data:create();
 
