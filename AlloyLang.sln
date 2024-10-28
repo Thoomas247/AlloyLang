@@ -8,6 +8,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unittests", "unittests\unittests.vcxproj", "{51F3792A-46AB-476B-9ACB-697E04D550D6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlloySyntaxHighliting", "AlloySyntaxHighliting\AlloySyntaxHighliting.csproj", "{6EC27CDB-B77C-40E1-8D5A-64F507C122D1}"
+	ProjectSection(ProjectDependencies) = postProject
+		{4520BE8D-A082-45C2-AF4F-E460347BC377} = {4520BE8D-A082-45C2-AF4F-E460347BC377}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AlloyLangClr", "AlloyLangClr\AlloyLangClr.vcxproj", "{70B5A6C2-568C-4BAB-8B03-B378A6624FD3}"
 EndProject

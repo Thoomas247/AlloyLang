@@ -1,4 +1,7 @@
-extern printf (const str : String, const param : i64) -> i64;
+//
+// References unit test
+//
+extern printf (const str : String, ...) -> i64;
 	
 fn test(var a : i64, var b : &i64) -> i64
 {

@@ -5,8 +5,20 @@ using namespace AlloyCompiler;
 
 int main(int argc, char* argv[])
 {
-	ASSERT(argc == 2, "Invalid number of arguments!");
+	ASSERT(argc >= 2, "Invalid number of arguments!");
 
-	Compiler compiler(argv[1], /*optimize*/true);
-	compiler.Compile();
+	if (argc > 2)
+	{
+		// use optimization value from command line
+		int optimization = atoi(argv[2]);
+		ASSERT(optimization >= 0 && optimization <= 2, "Invalid optimization value!");
+		Compiler compiler(argv[1], (LLVMState::LLVMOptimizations)atoi(argv[2]));
+		compiler.Compile();
+	}
+	else
+	{
+		// use default optimization value
+		Compiler compiler(argv[1]);
+		compiler.Compile();
+	}
 }

@@ -20,8 +20,6 @@ namespace AlloyLanguageServer
 
         static void Main(string[] args)
         {
-            // Debugger.Launch();
-
             var stdInPipeName = args[0];
             var stdOutPipeName = args[1];
 
@@ -35,6 +33,8 @@ namespace AlloyLanguageServer
 
             readerPipe.WaitForConnection();
             writerPipe.WaitForConnection();
+
+            // Debugger.Launch();
 
             languageServer = new LanguageServer(writerPipe, readerPipe);
 

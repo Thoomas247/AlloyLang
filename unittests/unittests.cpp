@@ -37,18 +37,14 @@ namespace unittests
 	private:
 		void RunTest(const std::string& path, int expected)
 		{
-			Compiler compiler(path, /*optimize*/true);
-			compiler.Compile();
-			int result = compiler.Execute();
-
-#if 0
-			// retrieve result and compare with expected data
-			// this only works for the interpreter and not for JIT which we are using for unit testing
-			std::string result = static_cast<redirect_stdout&>(llvm::outs()).buffer;
-			llvm::outs().flush();
-#endif
-
-			Assert::AreEqual(expected, result);
+			// run the test with all possible optimization options
+			const wchar_t* optimizations[] = { L"No optimization", L"Function optimization", L"Module optimization" };
+			for (int opt = 1; opt <= 1; opt++) {
+				Compiler compiler(path, (LLVMState::LLVMOptimizations) opt);
+				compiler.Compile();
+				int result = compiler.Execute();
+				Assert::AreEqual<int>(expected, result, optimizations[opt]);
+			}
 		}
 
 	public:

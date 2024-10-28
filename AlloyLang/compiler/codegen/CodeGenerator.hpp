@@ -6,21 +6,6 @@
 
 namespace AlloyCompiler
 {
-	struct TypeSubtypePair
-	{
-		llvm::Type* type = nullptr;				// this is the main value type, e.g. Integer, Array, Pointer, ...
-		llvm::Type* containedType = nullptr;	// this is the contained type in the case of pointers only
-		llvm::Type* parentType = nullptr;		// for enums and structs, this holds the type of the structure that contains the variable, needed for accurately comparing values
-
-		bool operator==(const TypeSubtypePair& right)
-		{ 
-			return ((type == nullptr && right.type == nullptr) || (type != nullptr && right.type != nullptr && type->getTypeID() == right.type->getTypeID())) &&
-					((containedType == nullptr && right.containedType == nullptr) || (containedType != nullptr && right.containedType != nullptr && containedType->getTypeID() == right.containedType->getTypeID())) &&
-					((parentType == nullptr && right.parentType == nullptr) || (parentType != nullptr && right.parentType != nullptr && parentType->getTypeID() == right.parentType->getTypeID()))
-				;
-		}
-	};
-
 	struct LLVMState
 	{
 		std::unique_ptr<llvm::LLVMContext> Context;
@@ -32,7 +17,10 @@ namespace AlloyCompiler
 		llvm::AllocaInst* CurrentReturnValue = nullptr;		// keep track of the return value of the current function, the value also includes the type
 		llvm::BasicBlock* FuncExitBlock = nullptr;		// to avoid having multiple returns, we simply branch to this BasicBlock
 
-		// handling llvm copde optimizations passes
+		// this map will contain for each smart pointer type, the underlying element type and whether this is an array or just a pointer
+		std::unordered_map<llvm::Type*, std::tuple<llvm::Type*, bool>> smartPointerTypeMap;
+
+		// handling llvm code optimization passes
 		std::unique_ptr<llvm::FunctionPassManager> FPM;
 		std::unique_ptr<llvm::LoopAnalysisManager> LAM;
 		std::unique_ptr<llvm::FunctionAnalysisManager> FAM;
@@ -43,14 +31,15 @@ namespace AlloyCompiler
 
 		llvm::ModulePassManager MPM;
 
-		bool Optimizations;
+		typedef enum { OptimizeNone, OptimizeFunction, OptimizeModule } LLVMOptimizations;
+		LLVMOptimizations Optimizations;
 
 		virtual ~LLVMState()
 		{
 			assert(true);
 		}
 
-		LLVMState(bool optimizations)
+		LLVMState(LLVMOptimizations optimizations)
 			: Optimizations(optimizations)
 		{
 			Context = std::make_unique<llvm::LLVMContext>();
@@ -59,7 +48,7 @@ namespace AlloyCompiler
 
 			NamedValues.RegisterDefaultTypes(*Context);
 
-			if (optimizations)
+			if (optimizations != OptimizeNone)
 			{
 				// check the LLVM tutorial for details about these optimizations
 				// create new pass and analysis managers

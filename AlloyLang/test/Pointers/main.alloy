@@ -1,4 +1,7 @@
-extern printf (const str : String, const param : i64) -> i64;
+//
+// Pointers unit test
+//
+extern printf (const str : String, ...) -> i64;
 	
 type TestStruct = struct
 {
