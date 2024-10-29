@@ -1,27 +1,16 @@
-﻿using System;
+﻿using Microsoft.VisualStudio.LanguageServer.Client;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Threading;
+using Microsoft.VisualStudio.Utilities;
+using StreamJsonRpc;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
-using Microsoft.VisualStudio.Text;
-using Microsoft.VisualStudio.Text.Classification;
-using Microsoft.VisualStudio.Text.Tagging;
-using Microsoft.VisualStudio.Utilities;
-using System.Windows.Media;
-using Microsoft.VisualStudio.Shell;
-using System.Runtime.InteropServices;
-using Microsoft.VisualStudio.Language.StandardClassification;
-using Microsoft.VisualStudio.Text.Projection;
-using AlloyCompiler;
-using Microsoft.VisualStudio.LanguageServer.Client;
-using Microsoft.VisualStudio.Package;
-using Microsoft.VisualStudio.Threading;
-using Newtonsoft.Json.Linq;
-using StreamJsonRpc;
 using System.Diagnostics;
-using System.IO.Pipes;
-using System.Reflection;
-using System.Threading.Tasks;
-using System.Threading;
 using System.IO;
+using System.IO.Pipes;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AlloySyntaxHighliting
 {

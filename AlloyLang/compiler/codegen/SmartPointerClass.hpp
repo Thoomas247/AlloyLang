@@ -1,7 +1,16 @@
+//
+// Class SmartPointerClass is a collection of static functions that handle arrays and pointers allocated using the new operator
+// Because llvm does not support arrays of complex types (e.g. arrays of structures), we are not using the llvm vector types but using the objects allocated by this class
+// The smart pointers are actually a structure that contains:
+//  - The allocated pointer
+// - The number of elements that are allocated
+// - A reference counter (for future use)
+//
 #pragma once
 
 #include "llvm/llvm.hpp"
 
+// this is the prefix for the smart pointer structure name and the indices to access the elements of the structure
 #define _SmartPointerStruct_	"_SmartPointerStruct_"
 #define SmartPointerValue	0
 #define SmartPointerElementCount	1
@@ -64,4 +73,3 @@ namespace AlloyCompiler
 		}
 	};
 }
-

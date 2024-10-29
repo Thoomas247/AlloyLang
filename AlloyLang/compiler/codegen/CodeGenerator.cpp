@@ -12,7 +12,6 @@ namespace AlloyCompiler
 	{
 		//
 		// structure that contains the pointer to a variable and its value
-		// when the value is a pointer, ContainedType contains the underlying object type when possible
 		//
 		llvm::Value* Ptr = nullptr;
 		llvm::Value* Value = nullptr;
@@ -1374,6 +1373,7 @@ namespace AlloyCompiler
 			memberValue = SmartPointerClass::getValue(state, left.Value, memberPtr, memberIndex);
 		}
 		else {
+#if 0	// code is kept here in case we go back to using llvm vectors for arrays
 			if (leftType->getTypeID() == llvm::Type::FixedVectorTyID || leftType->getTypeID() == llvm::Type::ScalableVectorTyID) {
 
 				llvm::VectorType* vectorType = static_cast<llvm::VectorType*>(leftType);
@@ -1403,9 +1403,11 @@ namespace AlloyCompiler
 				memberPtr = state.Builder->CreateGEP(identifierType.containedType, left.Value, memberIndex, "memberptr");
 				memberValue = state.Builder->CreateLoad(identifierType.containedType, memberPtr);
 			}
-			else {
+			else 
+#endif
+			{
 				logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: arrayAccessExpression.ArrayExpressionID
-					"Expected vector type!");
+					"ArrayAccessExpression: Left should be a smart pointer array!");
 				return {};
 			}
 		}
