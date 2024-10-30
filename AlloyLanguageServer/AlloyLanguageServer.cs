@@ -128,7 +128,7 @@ namespace AlloyLanguageServer
 
         public void OnTextDocumentOpened(DidOpenTextDocumentParams messageParams)
         {
-            Debugger.Launch();
+            // Debugger.Launch();
             this.textDocument = messageParams.TextDocument;
         }
 
