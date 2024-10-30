@@ -1,0 +1,94 @@
+type Nullable<type T> = enum
+{
+	Null,
+	Value: T,
+};
+
+
+// -- SharedPtr -- //
+
+pub type SharedPtr<type T> = struct
+{
+	data:		&T,
+	controller: &SharedPtrController<T>,
+};
+
+pub fn SharedPtr<type T>:create(var data_ptr: *T)
+{
+	var spc = SharedPtrController<T>:create(data_ptr);
+
+	return spc:make_shared();
+}
+
+// TODO! (operator overloading)
+//pub fn SharedPtr<type T>:operator=(var self: &Self, const other: &SharedPtr<T>)
+//{
+//	self = other.spc:make_shared();;
+//};
+
+// TODO! (destructor)
+//pub fn SharedPtr<type T>:operator~(var self: &Self)
+//{
+//	self.controller:remove_ref();
+//};
+
+
+// -- SharedPtrController -- // 
+
+/// Internal type to keep track of the number of references to the shared data.
+type SharedPtrController<type T> = struct
+{
+	data:		*T,
+	self_ptr:	Nullable<*SharedPtrController<T>>,	// own self so we can control when to get deleted
+
+	num_refs:	u64,
+};
+
+/// Returns a reference to a newly created SharedPtrController.
+/// Leaks memory if the reference is lost before calling delete()!
+fn SharedPtrController<type T>:create(var data_ptr: *T) -> &SharedPtrController<T>
+{
+	var spc = new SharedPtrController<T> {
+		data = move data_ptr,
+		self_ptr = Nullable<*SharedPtrController<T>>|Null,
+		num_refs = 0,
+	};
+
+	var spc_ref = &spc;
+
+	spc.self_ptr = move spc;
+
+	return spc_ref;
+}
+
+/// Deletes this SharedPtrController and the data it was managing.
+/// Must be called at some point to prevent memory leaks!
+fn SharedPtrController<type T>:delete(var self: &Self)
+{
+	if (self.self_ptr == Nullable<*SharedPtrController<T>>|Value) -> self_ptr
+	{
+		var tmp_ptr = move self_ptr;
+
+		// self and self.data get deleted when tmp_ptr goes out of scope
+	}
+}
+
+/// Creates a new SharedPtr which uses this SharedPtrController.
+fn SharedPtrController<type T>:make_shared(var self: &Self) -> SharedPtr<T>
+{
+	num_refs = num_refs + 1;
+
+	return SharedPtr<T> { data = &self.data, controller = &self };
+}
+
+/// Removes 1 from the number of references.
+/// If the number of references after removing 1 is 0, deletes this SharedPtrController.
+fn SharedPtrController<type T>:remove_ref(var self: &Self)
+{
+	num_refs = num_refs - 1;
+
+	if (num_refs == 0)
+	{
+		self:delete();
+	}
+}

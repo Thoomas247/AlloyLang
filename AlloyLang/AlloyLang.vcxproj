@@ -142,6 +142,7 @@
     <None Include="test\LargeTest\lib\array.alloy" />
     <None Include="test\LargeTest\lib\ecs.alloy" />
     <None Include="test\LargeTest\lib\math.alloy" />
+    <None Include="test\LargeTest\lib\shared_ptr.alloy" />
     <None Include="test\MultipleFiles2\lib\log.alloy" />
     <None Include="test\MultipleFiles2\lib\math.alloy" />
     <None Include="test\MultipleFiles2\main.alloy" />
