@@ -81,7 +81,7 @@ namespace AlloyCompiler
 #ifdef FIRST_PARAMETER_BYREF
 		//
 		// TBD: The first (and only) parameter to the cast functions is supposed to be &Self, but this creates and extra call to load the value from the pointer
-		// We need to evaluate the impact on performance and on hte inline optimizer of the extra call to "load"
+		// We need to evaluate the impact on performance and on the inline optimizer of the extra call to "load"
 		//
 		llvm::Value* fromValue = builder.CreateLoad(fromType, function->getArg(0));
 #else

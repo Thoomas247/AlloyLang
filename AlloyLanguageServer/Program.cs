@@ -1,14 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO.Pipes;
-using System.Linq;
-using System.Net.Sockets;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace AlloyLanguageServer
 {
@@ -20,8 +13,6 @@ namespace AlloyLanguageServer
 
         static void Main(string[] args)
         {
-            // Debugger.Launch();
-
             var stdInPipeName = args[0];
             var stdOutPipeName = args[1];
 
@@ -35,6 +26,8 @@ namespace AlloyLanguageServer
 
             readerPipe.WaitForConnection();
             writerPipe.WaitForConnection();
+
+            // Debugger.Launch();
 
             languageServer = new LanguageServer(writerPipe, readerPipe);
 

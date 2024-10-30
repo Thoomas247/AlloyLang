@@ -14,7 +14,7 @@ namespace AlloyCompiler
 	class Compiler
 	{
 	public:
-		Compiler(const std::string& mainFilePath, bool optimize);
+		Compiler(const std::string& mainFilePath, LLVMState::LLVMOptimizations optimize = LLVMState::OptimizeModule);
 		void Compile();
 		int Execute();
 

@@ -62,6 +62,10 @@
       <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);"Ws2_32.lib";"LLVMCore.lib";"LLVMSupport.lib";"LLVMBitReader.lib";"LLVMAsmParser.lib";"LLVMAnalysis.lib";"LLVMTransformUtils.lib";"LLVMScalarOpts.lib";"LLVMTarget.lib";"LLVMCodeGen.lib";"LLVMRemarks.lib";"LLVMDemangle.lib";"LLVMBinaryFormat.lib";"LLVMTargetParser.lib";"LLVMBitstreamReader.lib";"LLVMPasses.lib";"LLVMInstCombine.lib";"LLVMipo.lib";"LLVMAggressiveInstCombine.lib";"LLVMCoroutines.lib";"LLVMMC.lib";"LLVMBitWriter.lib";"LLVMInstrumentation.lib";"LLVMVectorize.lib";"LLVMIRPrinter.lib";"LLVMCFGuard.lib";"LLVMHipStdPar.lib";"LLVMObjCARCOpts.lib";"LLVMFrontendOpenMP.lib";"LLVMProfileData.lib";"LLVMObject.lib";"LLVMCodeGenTypes.lib";"LLVMDebugInfoDWARF.lib";"LLVMLinker.lib";"LLVMFrontendOffloading.lib";"LLVMIRReader.lib";"LLVMMCParser.lib";"LLVMTextAPI.lib"</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -103,6 +107,7 @@
     <ClCompile Include="compiler\module\node\NodeBuffer.cpp" />
     <ClCompile Include="compiler\module\source\Source.cpp" />
     <ClCompile Include="compiler\module\token\TokenBuffer.cpp" />
+    <ClCompile Include="compiler\codegen\SmartPointerClass.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\codegen\CodeGenerator.hpp" />
@@ -132,6 +137,7 @@
     <ClInclude Include="compiler\module\source\Source.hpp" />
     <ClInclude Include="compiler\module\token\Token.hpp" />
     <ClInclude Include="compiler\module\token\TokenBuffer.hpp" />
+    <ClInclude Include="compiler\codegen\SmartPointerClass.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CGTest.alloy" />

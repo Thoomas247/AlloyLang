@@ -3,7 +3,7 @@
 
 namespace AlloyCompiler
 {
-	Compiler::Compiler(const std::string& mainFilePath, bool optimize)
+	Compiler::Compiler(const std::string& mainFilePath, LLVMState::LLVMOptimizations optimize /*= LLVMState::OptimizeModule*/)
 		: m_MainFilePath(fs::absolute(mainFilePath)), m_LLVMState(optimize)
 	{}
 

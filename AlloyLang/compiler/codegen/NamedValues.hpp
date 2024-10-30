@@ -18,6 +18,21 @@ namespace llvm
 
 namespace AlloyCompiler
 {
+	struct TypeSubtypePair
+	{
+		llvm::Type* type = nullptr;				// this is the main value type, e.g. Integer, Array, Pointer, ...
+		llvm::Type* containedType = nullptr;	// this is the contained type in the case of pointers and references
+		llvm::Type* parentType = nullptr;		// for enums and structs, this holds the type of the structure that contains the variable, needed for accurately comparing values
+
+		bool operator==(const TypeSubtypePair& right)
+		{
+			return ((type == nullptr && right.type == nullptr) || (type != nullptr && right.type != nullptr && type->getTypeID() == right.type->getTypeID())) &&
+				((containedType == nullptr && right.containedType == nullptr) || (containedType != nullptr && right.containedType != nullptr && containedType->getTypeID() == right.containedType->getTypeID())) &&
+				((parentType == nullptr && right.parentType == nullptr) || (parentType != nullptr && right.parentType != nullptr && parentType->getTypeID() == right.parentType->getTypeID()))
+				;
+		}
+	};
+
 	// for pointer and reference types, llvm does not store the type pointed to by the pointer
 	// we have to keep track of it ourselves
 	// containedType is null if this is not a pointer nor a reference

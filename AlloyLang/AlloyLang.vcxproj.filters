@@ -54,6 +54,9 @@
     <ClCompile Include="compiler\codegen\Inlines.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="compiler\codegen\SmartPointerClass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\module\token\Token.hpp">
@@ -135,6 +138,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="compiler\codegen\Inlines.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\codegen\SmartPointerClass.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

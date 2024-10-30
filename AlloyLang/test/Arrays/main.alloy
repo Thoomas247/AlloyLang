@@ -1,4 +1,7 @@
-extern printf (const str : String, const param : i64) -> i64;
+//
+// Arrays unit test
+//
+extern printf (const str : String, ...) -> i64;
 
 type Array<type T> = [T; 10];
 

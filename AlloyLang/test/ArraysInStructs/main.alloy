@@ -1,4 +1,7 @@
-	extern printf (const str : String, const param : f64) -> i64;
+//
+// Arrays in structures unit test
+//
+extern printf (const str : String, ...) -> i64;
 
 type Vector3 = struct
 {

@@ -1,8 +1,6 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
 
-#include <vcclr.h>
-
 using namespace System::Runtime::InteropServices;
 
 #if defined _M_IX86

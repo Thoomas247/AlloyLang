@@ -7,8 +7,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -39,7 +37,7 @@ namespace AlloyLanguageServer
             { TokenTypes = new string[]
                 {
                     SemanticTokenTypes.Keyword,     // keyword,
-			        SemanticTokenTypes.Number,      // basic type
+			        SemanticTokenTypes.String,      // basic type
 			        SemanticTokenTypes.String,      // string literal
 			        SemanticTokenTypes.Modifier,    // var or const
 			        SemanticTokenTypes.Comment,     // comment
@@ -47,7 +45,8 @@ namespace AlloyLanguageServer
                     SemanticTokenTypes.Struct,      // struct
                 }
 
-            }, Full = true, Range = false, WorkDoneProgress = false };
+            }, Full = true, Range = true, WorkDoneProgress = false };
+
             var result = new InitializeResult();
             result.Capabilities = capabilities;
 
@@ -69,8 +68,22 @@ namespace AlloyLanguageServer
             server.OnTextDocumentOpened(parameter);
         }
 
+        [JsonRpcMethod(Methods.TextDocumentDidChangeName)]
+        public void OnTextDocumentChanged(JToken arg)
+        {
+            var parameter = arg.ToObject<DidChangeTextDocumentParams>();
+            server.OnTextDocumentChanged(parameter);
+        }
+
         [JsonRpcMethod(Methods.TextDocumentSemanticTokensFullName, UseSingleObjectParameterDeserialization = true)]
         public SemanticTokens GetDocumentSemanticTokens(SemanticTokensParams arg, CancellationToken token)
+        {
+            var result = this.server.GetDocumentSemanticTokens(arg.PartialResultToken, token);
+            return result;
+        }
+
+        [JsonRpcMethod(Methods.TextDocumentSemanticTokensRangeName, UseSingleObjectParameterDeserialization = true)]
+        public SemanticTokens GetDocumentSemanticTokensRange(SemanticTokensRangeParams arg, CancellationToken token)
         {
             var result = this.server.GetDocumentSemanticTokens(arg.PartialResultToken, token);
             return result;
@@ -115,7 +128,13 @@ namespace AlloyLanguageServer
 
         public void OnTextDocumentOpened(DidOpenTextDocumentParams messageParams)
         {
+            // Debugger.Launch();
             this.textDocument = messageParams.TextDocument;
+        }
+
+        public void OnTextDocumentChanged(DidChangeTextDocumentParams messageParams)
+        {
+            this.textDocument.Text = messageParams.ContentChanges[0].Text;
         }
 
         public void OnTextDocumentClosed(DidCloseTextDocumentParams messageParams)
@@ -167,7 +186,7 @@ namespace AlloyLanguageServer
                     GlobalFunctions.AlloyTokenTypes tokenType = GlobalFunctions.GetTokenType(tok.Kind);
                     if (tokenType != GlobalFunctions.AlloyTokenTypes.none)
                     {
-                        int len = tok.Value.Length;
+                        int len = tok.Value.TrimEnd('\r').Length;
                         if (tok.Kind == 49 /*string_literal*/ || tok.Kind == 50 /*character_literal*/) len += 2;  // for strings and single chars we want to cover the quotes
 
                         tokens.Add(tok.Line - lastLine);           // line
@@ -176,17 +195,10 @@ namespace AlloyLanguageServer
                         tokens.Add((int)tokenType-1);    // Token kind
                         tokens.Add(0);                  // Token modifier
 
-                        Trace.WriteLine("Token " + tok.Value + " at line " + tok.Line + ", column " + tok.Column + ", length " + len + ", kind " + tok.Kind + ", id " + GlobalFunctions.GetTokenType(tok.Kind));
+                        // Trace.WriteLine("Token " + tok.Value + " at line " + tok.Line + ", column " + tok.Column + ", length " + len + ", kind " + tok.Kind + ", id " + GlobalFunctions.GetTokenType(tok.Kind));
 
-                        if (lastLine == tok.Line)
-                        {
-                            lastColumn = tok.Column;
-                        }
-                        else
-                        {
-                            lastLine = tok.Line;
-                            lastColumn = 1;
-                        }
+                        lastColumn = tok.Column;
+                        lastLine = tok.Line;
                     }
 
                     token.ThrowIfCancellationRequested();

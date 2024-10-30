@@ -1,3 +1,6 @@
+//
+// Unit test for using alloy defined functions as call back functions for Windows API
+//
 extern printf (const str : String, ...) -> i64;
 extern CreateThread(var lpThreadAttributes : *i8, 
 					var dwStackSize : i64, 

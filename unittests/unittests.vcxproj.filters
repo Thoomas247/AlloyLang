@@ -51,5 +51,8 @@
     <ClCompile Include="..\AlloyLang\compiler\codegen\Inlines.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\AlloyLang\compiler\codegen\SmartPointerClass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

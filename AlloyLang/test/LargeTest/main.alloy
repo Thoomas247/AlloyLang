@@ -25,16 +25,16 @@ type TransformArray = [Transform; 256];
 type ScoreArray = Array<u32>;
 
 
-//type Data = struct
-//{
-//	score_array:		ScoreArray,
-//	transform_array:	Array(Transform),
-//};
-//
-//fn Data:create() -> Data
-//{
-//	return Data { score_array = ScoreArray:create(), transform_array = Array(Transform):create() };
-//}
+type Data = struct
+{
+	score_array:		ScoreArray,
+	transform_array:	Array<Transform>,
+};
+
+fn Data:create() -> Data
+{
+	return Data { score_array = ScoreArray:create(), transform_array = Array<Transform>:create() };
+}
 
 
 fn main() -> i32
@@ -44,13 +44,13 @@ fn main() -> i32
 
 	//var data = Data:create();
 
-	//data.score_array:add(5);
+	// data.score_array:add(5);
 
 	//printf("Hello World!");
 
 	var transformArray: TransformArray = [Transform:create(); 256];
 
-	//var transform_array = Array(Transform):create();
+	//var transform_array = Array<Transform>:create();
 
 	//var score_array = ScoreArray:create();
 	//var run = true;
