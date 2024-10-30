@@ -9,6 +9,7 @@ using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -73,8 +74,8 @@ namespace AlloySyntaxHighliting
             var writerPipe = new NamedPipeClientStream(stdOutPipeName);
 
             ProcessStartInfo info = new ProcessStartInfo();
-            var programPath = Path.Combine("X:\\Projects\\AlloyLang\\AlloyLanguageServer\\bin\\x64\\Debug", @"AlloyLanguageServer.exe");
-            // var programPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Server", @"AlloyLanguageServer.exe");
+            // var programPath = Path.Combine("X:\\Projects\\AlloyLang\\AlloyLanguageServer\\bin\\x64\\Debug", @"AlloyLanguageServer.exe");
+            var programPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Server", @"AlloyLanguageServer.exe");
             info.FileName = programPath;
             info.WorkingDirectory = Path.GetDirectoryName(programPath);
             info.Arguments = stdOutPipeName + " " + stdInPipeName;
