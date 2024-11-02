@@ -75,7 +75,7 @@ namespace AlloyCompiler
 
 	bool TokenBuffer::hasNext() const
 	{
-		return m_CharIndex < m_Source.GetSize() - 1;
+		return m_CharIndex < m_Source.GetSize();
 	}
 
 	bool TokenBuffer::eat()

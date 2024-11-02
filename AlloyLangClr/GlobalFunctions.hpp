@@ -13,14 +13,30 @@ namespace AlloyCompiler
 			int Column;
 			int Kind;
 		};
-		static System::Collections::Generic::List<CSharpToken^>^ Tokenize(System::String^ managedStr);
 
-		enum class AlloyTokenTypes
+		enum class SemanticTokenType
 		{
-			none = 0, keyword = 1, basictype = 2, stringliteral = 3, varorconst = 4, comment = 5, enumeration = 6, structure = 7
-		};
-		// given a token kind returned by the parser, convert to to token type for syntax highlighting
-		static AlloyTokenTypes GetTokenType(int TokenKind);
+			None = 0,
 
+			Keyword,
+			Label,
+			Control,
+
+			ModuleIdentifier,
+			BuiltInTypeIdentifier,
+			EnumTypeIdentifier,
+			StructTypeIdentifier,
+			FunctionIdentifier,
+			VariableIdentifier,
+			GlobalIdentifier,
+
+			StringLiteral,
+			NumberLiteral,
+			BooleanLiteral,
+
+			Comment
+		};
+
+		static System::Collections::Generic::List<CSharpToken^>^ Parse(System::String^ managedStr);
 	};
 }

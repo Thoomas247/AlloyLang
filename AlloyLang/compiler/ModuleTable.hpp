@@ -1,5 +1,6 @@
 #pragma once
 #include <deque>
+#include <array>
 
 #include "module/Module.hpp"
 
@@ -188,7 +189,7 @@ namespace AlloyCompiler
 			result.ModuleName = moduleAndDefinition.ModuleName;
 			result.pDefiniton = moduleAndDefinition.Definition.pDefinition;
 		}
-		
+
 		else
 		{
 			result.Code = SearchResultCode::Found;

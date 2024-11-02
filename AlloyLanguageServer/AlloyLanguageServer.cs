@@ -33,19 +33,36 @@ namespace AlloyLanguageServer
             capabilities.TextDocumentSync.OpenClose = true;
             capabilities.TextDocumentSync.Change = TextDocumentSyncKind.Full;
             capabilities.RenameProvider = true;
-            capabilities.SemanticTokensOptions = new SemanticTokensOptions() { Legend = new SemanticTokensLegend() 
-            { TokenTypes = new string[]
+            capabilities.SemanticTokensOptions = new SemanticTokensOptions()
+            {
+                Legend = new SemanticTokensLegend()
                 {
-                    SemanticTokenTypes.Keyword,     // keyword,
-			        SemanticTokenTypes.String,      // basic type
-			        SemanticTokenTypes.String,      // string literal
-			        SemanticTokenTypes.Modifier,    // var or const
-			        SemanticTokenTypes.Comment,     // comment
-                    SemanticTokenTypes.Enum,        // enum
-                    SemanticTokenTypes.Struct,      // struct
+                    TokenTypes = new string[]
+                {
+                    SemanticTokenTypes.Keyword,
+                    SemanticTokenTypes.Modifier,
+                    SemanticTokenTypes.Keyword,
+
+                    SemanticTokenTypes.Namespace,
+                    SemanticTokenTypes.Keyword,
+                    SemanticTokenTypes.Enum,
+                    SemanticTokenTypes.Struct,
+                    SemanticTokenTypes.Function,
+                    SemanticTokenTypes.Variable,
+                    SemanticTokenTypes.Variable,
+
+                    SemanticTokenTypes.String,
+                    SemanticTokenTypes.Number,
+                    SemanticTokenTypes.Keyword,
+
+                    SemanticTokenTypes.Comment,
                 }
 
-            }, Full = true, Range = true, WorkDoneProgress = false };
+                },
+                Full = true,
+                Range = true,
+                WorkDoneProgress = false
+            };
 
             var result = new InitializeResult();
             result.Capabilities = capabilities;
@@ -176,27 +193,25 @@ namespace AlloyLanguageServer
             //Debugger.Launch();
 
             //String text = this.textDocument.Text.Replace("\r\n", "\n");
-            List<GlobalFunctions.CSharpToken> tokenList = GlobalFunctions.Tokenize(this.textDocument.Text);
+            List<GlobalFunctions.CSharpToken> tokenList = GlobalFunctions.Parse(this.textDocument.Text);
             if (tokenList != null)
             {
                 int lastLine = 1;
                 int lastColumn = 1;
                 foreach (GlobalFunctions.CSharpToken tok in tokenList)
                 {
-                    GlobalFunctions.AlloyTokenTypes tokenType = GlobalFunctions.GetTokenType(tok.Kind);
-                    if (tokenType != GlobalFunctions.AlloyTokenTypes.none)
+                    if (tok.Kind != (int)GlobalFunctions.SemanticTokenType.None)
                     {
                         int len = tok.Value.TrimEnd('\r').Length;
-                        if (tok.Kind == 49 /*string_literal*/ || tok.Kind == 50 /*character_literal*/) len += 2;  // for strings and single chars we want to cover the quotes
+                        if (tok.Kind == (int)GlobalFunctions.SemanticTokenType.StringLiteral) len += 2;  // for strings and single chars we want to cover the quotes
 
-                        tokens.Add(tok.Line - lastLine);           // line
-                        tokens.Add(lastLine == tok.Line ? tok.Column - lastColumn : tok.Column-1);         // startChar
-                        tokens.Add(len);   // length
-                        tokens.Add((int)tokenType-1);    // Token kind
-                        tokens.Add(0);                  // Token modifier
+                        tokens.Add(tok.Line - lastLine);                                                // line
+                        tokens.Add(lastLine == tok.Line ? tok.Column - lastColumn : tok.Column - 1);    // startChar
+                        tokens.Add(len);                                                                // length
+                        tokens.Add(tok.Kind - 1);                                                       // Token kind
+                        tokens.Add(0);                                                                  // Token modifier
 
-                        // Trace.WriteLine("Token " + tok.Value + " at line " + tok.Line + ", column " + tok.Column + ", length " + len + ", kind " + tok.Kind + ", id " + GlobalFunctions.GetTokenType(tok.Kind));
-
+                        //Trace.WriteLine("Token " + tok.Value + " at line " + tok.Line + ", column " + tok.Column + ", length " + len + ", kind " + tok.Kind + ", id " + tok.Kind);
                         lastColumn = tok.Column;
                         lastLine = tok.Line;
                     }

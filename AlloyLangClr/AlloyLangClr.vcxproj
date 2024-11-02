@@ -150,6 +150,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\AlloyLang\compiler\module\node\NodeBuffer.hpp" />
     <ClInclude Include="..\AlloyLang\compiler\module\source\Source.hpp" />
     <ClInclude Include="..\AlloyLang\compiler\module\token\Token.hpp" />
     <ClInclude Include="..\AlloyLang\compiler\module\token\TokenBuffer.hpp" />
@@ -158,6 +159,10 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\AlloyLang\compiler\module\node\NodeBuffer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\AlloyLang\compiler\module\source\Source.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>

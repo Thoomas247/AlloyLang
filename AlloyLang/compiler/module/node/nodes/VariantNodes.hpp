@@ -5,7 +5,7 @@ namespace AlloyCompiler
 {
 	enum class NodeKind : uint8_t
 	{
-		None = std::numeric_limits<uint8_t>::max()
+		None = (uint8_t)-1
 	};
 
 	/// <summary>

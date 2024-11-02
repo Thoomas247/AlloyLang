@@ -36,7 +36,6 @@ fn Data:create() -> Data
 	return Data { score_array = ScoreArray:create(), transform_array = Array<Transform>:create() };
 }
 
-
 fn main() -> i32
 {
 	var x: i32 = 25;
@@ -44,7 +43,7 @@ fn main() -> i32
 
 	//var data = Data:create();
 
-	// data.score_array:add(5);
+	//data.score_array:add(5);
 
 	//printf("Hello World!");
 

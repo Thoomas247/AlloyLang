@@ -501,12 +501,10 @@ namespace AlloyCompiler
 			(void)eat();
 		}
 
-		using enum TokenKind;
-
 		VariantNode<TYPE_NAME, STRUCT_TYPE, ENUM_TYPE, ARRAY_TYPE, MACRO_CALL> type;
 		switch (token()->Kind)
 		{
-		case at_symbol:
+		case TokenKind::at_symbol:
 		{
 			MACRO_CALL* pMacroCall = parse<MACRO_CALL>();
 
@@ -519,8 +517,8 @@ namespace AlloyCompiler
 			break;
 		}
 
-		case identifier:
-		case long_identifier:
+		case TokenKind::identifier:
+		case TokenKind::long_identifier:
 		{
 			TYPE_NAME* pNamedType = parse<TYPE_NAME>();
 
@@ -532,7 +530,7 @@ namespace AlloyCompiler
 			type.Set(pNamedType);
 			break;
 		}
-		case struct_keyword:
+		case TokenKind::struct_keyword:
 		{
 			STRUCT_TYPE* pStructType = parse<STRUCT_TYPE>();
 
@@ -544,7 +542,7 @@ namespace AlloyCompiler
 			type.Set(pStructType);
 			break;
 		}
-		case enum_keyword:
+		case TokenKind::enum_keyword:
 		{
 			ENUM_TYPE* pEnumType = parse<ENUM_TYPE>();
 
@@ -556,7 +554,7 @@ namespace AlloyCompiler
 			type.Set(pEnumType);
 			break;
 		}
-		case open_bracket:
+		case TokenKind::open_bracket:
 		{
 			ARRAY_TYPE* pArrayType = parse<ARRAY_TYPE>();
 
@@ -570,7 +568,7 @@ namespace AlloyCompiler
 		}
 		default:
 		{
-			(void)expectKind<identifier, struct_keyword, open_bracket>();
+			(void)expectKind<TokenKind::identifier, TokenKind::struct_keyword, TokenKind::open_bracket>();
 			return nullptr;
 		}
 		}
@@ -1544,14 +1542,12 @@ namespace AlloyCompiler
 	template<>
 	LITERAL* NodeBuffer::parse()
 	{
-		using enum TokenKind;
-
 		Token* pLiteralToken = nullptr;
-		if (expectKind<integer_literal,
-			float_literal,
-			boolean_literal,
-			string_literal,
-			character_literal>(&pLiteralToken) != SUCCESS)
+		if (expectKind<TokenKind::integer_literal,
+			TokenKind::float_literal,
+			TokenKind::boolean_literal,
+			TokenKind::string_literal,
+			TokenKind::character_literal>(&pLiteralToken) != SUCCESS)
 		{
 			return nullptr;
 		}
@@ -1559,23 +1555,23 @@ namespace AlloyCompiler
 		LiteralType literalType;
 		switch (pLiteralToken->Kind)
 		{
-		case integer_literal:
+		case TokenKind::integer_literal:
 			literalType = LiteralType::Integer;
 			break;
 
-		case float_literal:
+		case TokenKind::float_literal:
 			literalType = LiteralType::Float;
 			break;
 
-		case boolean_literal:
+		case TokenKind::boolean_literal:
 			literalType = LiteralType::Boolean;
 			break;
 
-		case string_literal:
+		case TokenKind::string_literal:
 			literalType = LiteralType::String;
 			break;
 
-		case character_literal:
+		case TokenKind::character_literal:
 			literalType = LiteralType::Character;
 			break;
 
@@ -1862,15 +1858,13 @@ namespace AlloyCompiler
 
 	EXPRESSION* NodeBuffer::parse_PRIMARY()
 	{
-		using enum TokenKind;
-
 		switch (token()->Kind)
 		{
-		case integer_literal:
-		case float_literal:
-		case boolean_literal:
-		case string_literal:
-		case character_literal:
+		case TokenKind::integer_literal:
+		case TokenKind::float_literal:
+		case TokenKind::boolean_literal:
+		case TokenKind::string_literal:
+		case TokenKind::character_literal:
 		{
 			LITERAL* pLiteral = parse<LITERAL>();
 
@@ -1882,8 +1876,8 @@ namespace AlloyCompiler
 			return createNode(EXPRESSION(createNode(PRIMARY(pLiteral))));
 		}
 
-		case variable_keyword:
-		case constant_keyword:
+		case TokenKind::variable_keyword:
+		case TokenKind::constant_keyword:
 		{
 			VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
 
@@ -1895,8 +1889,8 @@ namespace AlloyCompiler
 			return createNode(EXPRESSION(createNode(PRIMARY(pVariableDefinition))));
 		}
 
-		case long_identifier:
-		case identifier:
+		case TokenKind::long_identifier:
+		case TokenKind::identifier:
 		{
 			// ambiguous case, look further ahead
 			if (peekToken()->Value == "<")
@@ -1940,7 +1934,7 @@ namespace AlloyCompiler
 			}
 
 			// constructor
-			else if (peekToken()->Kind == open_brace)
+			else if (peekToken()->Kind == TokenKind::open_brace)
 			{
 			parse_constructor:
 
@@ -1955,7 +1949,7 @@ namespace AlloyCompiler
 			}
 
 			// enum value
-			else if (peekToken()->Kind == pipe_operator)
+			else if (peekToken()->Kind == TokenKind::pipe_operator)
 			{
 			parse_enum_value:
 
@@ -1986,7 +1980,7 @@ namespace AlloyCompiler
 			}
 		}
 
-		case new_keyword:
+		case TokenKind::new_keyword:
 		{
 			POINTER_INIT* pPointerInit = parse<POINTER_INIT>();
 
@@ -1998,7 +1992,7 @@ namespace AlloyCompiler
 			return createNode(EXPRESSION(createNode(PRIMARY(pPointerInit))));
 		}
 
-		case move_keyword:
+		case TokenKind::move_keyword:
 		{
 			POINTER_MOVE* pPointerMove = parse<POINTER_MOVE>();
 
@@ -2010,7 +2004,7 @@ namespace AlloyCompiler
 			return createNode(EXPRESSION(createNode(PRIMARY(pPointerMove))));
 		}
 
-		case open_brace:
+		case TokenKind::open_brace:
 		{
 			INITIALIZER_LIST* pInitializerList = parse<INITIALIZER_LIST>();
 
@@ -2022,7 +2016,7 @@ namespace AlloyCompiler
 			return createNode(EXPRESSION(createNode(PRIMARY(pInitializerList))));
 		}
 
-		case open_paren:
+		case TokenKind::open_paren:
 		{
 			ENCLOSED_EXPRESSION* pEnclosedExpression = parse<ENCLOSED_EXPRESSION>();
 
@@ -2034,7 +2028,7 @@ namespace AlloyCompiler
 			return createNode(EXPRESSION(createNode(PRIMARY(pEnclosedExpression))));
 		}
 
-		case open_bracket:
+		case TokenKind::open_bracket:
 		{
 			ARRAY_INIT* pArrayInit = parse<ARRAY_INIT>();
 
@@ -2048,8 +2042,8 @@ namespace AlloyCompiler
 
 		default:
 		{
-			(void)expectKind<integer_literal, float_literal, boolean_literal, string_literal, character_literal,
-				identifier, new_keyword, move_keyword, open_brace, open_paren>();
+			(void)expectKind<TokenKind::integer_literal, TokenKind::float_literal, TokenKind::boolean_literal, TokenKind::string_literal, TokenKind::character_literal,
+				TokenKind::identifier, TokenKind::new_keyword, TokenKind::move_keyword, TokenKind::open_brace, TokenKind::open_paren>();
 			return nullptr;
 		}
 		}
@@ -3015,12 +3009,10 @@ namespace AlloyCompiler
 			getNextNonComment();
 		}
 
-		using enum TokenKind;
-
 		while (!isEOF())
 		{
 			// check for annotation
-			if (token()->Kind == pound)
+			if (token()->Kind == TokenKind::pound)
 			{
 				if (getAnnotation() != SUCCESS)
 				{
@@ -3029,7 +3021,7 @@ namespace AlloyCompiler
 			}
 
 			// check for import
-			if (token()->Kind == import_keyword)
+			if (token()->Kind == TokenKind::import_keyword)
 			{
 				if (getImport() != SUCCESS)
 				{
@@ -3042,12 +3034,12 @@ namespace AlloyCompiler
 			// check for visibility modifier
 			Visibility visibility = Visibility::Private;
 
-			if (token()->Kind == public_keyword)
+			if (token()->Kind == TokenKind::public_keyword)
 			{
 				visibility = Visibility::Public;
 				(void)eat();
 			}
-			else if (token()->Kind == export_keyword)
+			else if (token()->Kind == TokenKind::export_keyword)
 			{
 				visibility = Visibility::Export;
 				(void)eat();
@@ -3055,8 +3047,8 @@ namespace AlloyCompiler
 
 			switch (token()->Kind)
 			{
-			case variable_keyword:
-			case constant_keyword:
+			case TokenKind::variable_keyword:
+			case TokenKind::constant_keyword:
 			{
 				VARIABLE_DEFINITION* pVariableDefinition = parse<VARIABLE_DEFINITION>();
 
@@ -3077,7 +3069,7 @@ namespace AlloyCompiler
 				break;
 			}
 
-			case macro_keyword:
+			case TokenKind::macro_keyword:
 			{
 				MACRO_DEFINITION* pMacroDefinition = parse<MACRO_DEFINITION>();
 
@@ -3098,7 +3090,7 @@ namespace AlloyCompiler
 				break;
 			}
 
-			case type_keyword:
+			case TokenKind::type_keyword:
 			{
 				TYPE_DEFINITION* pTypeDefinition = parse<TYPE_DEFINITION>();
 
@@ -3120,8 +3112,8 @@ namespace AlloyCompiler
 				break;
 			}
 
-			case function_keyword:
-			case extern_keyword:
+			case TokenKind::function_keyword:
+			case TokenKind::extern_keyword:
 			{
 				FUNCTION_DEFINITION* pFunctionDefinition = parse<FUNCTION_DEFINITION>();
 
@@ -3165,7 +3157,7 @@ namespace AlloyCompiler
 
 			default:
 			{
-				(void)expectKind<macro_keyword, type_keyword, function_keyword, extern_keyword>();
+				(void)expectKind<TokenKind::macro_keyword, TokenKind::type_keyword, TokenKind::function_keyword, TokenKind::extern_keyword>();
 				(void)eat();
 				return false;
 			}
