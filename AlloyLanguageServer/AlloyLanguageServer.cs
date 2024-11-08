@@ -1,6 +1,7 @@
 ﻿using AlloyCompiler;
 using Microsoft.VisualStudio.LanguageServer.Protocol;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using StreamJsonRpc;
 using System;
 using System.Collections.Generic;
@@ -28,7 +29,7 @@ namespace AlloyLanguageServer
         [JsonRpcMethod(Methods.InitializeName)]
         public object Initialize(JToken arg)
         {
-            var capabilities = new VSServerCapabilities();
+            var capabilities = new ServerCapabilities();
             capabilities.TextDocumentSync = new TextDocumentSyncOptions();
             capabilities.TextDocumentSync.OpenClose = true;
             capabilities.TextDocumentSync.Change = TextDocumentSyncKind.Full;
@@ -38,25 +39,31 @@ namespace AlloyLanguageServer
                 Legend = new SemanticTokensLegend()
                 {
                     TokenTypes = new string[]
-                {
-                    SemanticTokenTypes.Keyword,
-                    SemanticTokenTypes.Modifier,
-                    SemanticTokenTypes.Keyword,
+                    {
+                        SemanticTokenTypes.Keyword,
+                        SemanticTokenTypes.Modifier,
+                        SemanticTokenTypes.Keyword,
 
-                    SemanticTokenTypes.Namespace,
-                    SemanticTokenTypes.Keyword,
-                    SemanticTokenTypes.Enum,
-                    SemanticTokenTypes.Struct,
-                    SemanticTokenTypes.Function,
-                    SemanticTokenTypes.Variable,
-                    SemanticTokenTypes.Variable,
+                        SemanticTokenTypes.Namespace,
+                        SemanticTokenTypes.Keyword,
+                        SemanticTokenTypes.Enum,
+                        SemanticTokenTypes.Struct,
+                        SemanticTokenTypes.Function,
+                        SemanticTokenTypes.Variable,
+                        SemanticTokenTypes.Variable,
 
-                    SemanticTokenTypes.String,
-                    SemanticTokenTypes.Number,
-                    SemanticTokenTypes.Keyword,
+                        SemanticTokenTypes.String,
+                        SemanticTokenTypes.Number,
+                        SemanticTokenTypes.Keyword,
 
-                    SemanticTokenTypes.Comment,
-                }
+                        SemanticTokenTypes.Comment,
+                    },
+
+                    TokenModifiers = new string[]
+                    {
+                        SemanticTokenModifiers.Readonly,
+                        SemanticTokenModifiers.Static,
+                    }
 
                 },
                 Full = true,
@@ -122,8 +129,8 @@ namespace AlloyLanguageServer
             this.rpc = new JsonRpc(this.messageHandler, this.target);
             this.rpc.Disconnected += OnRpcDisconnected;
 
-            ((JsonMessageFormatter)this.messageHandler.Formatter).JsonSerializer.Converters.Add(new VSExtensionConverter<TextDocumentIdentifier, VSTextDocumentIdentifier>());
-
+            // make sure that all attibutes are converted into Json in camelCase format, otherwise Javascript based editors such as VS Code cannot retrieve the attributes
+            ((JsonMessageFormatter)this.messageHandler.Formatter).JsonSerializer.ContractResolver = new CamelCasePropertyNamesContractResolver();
             this.rpc.StartListening();
 
             this.target.OnInitializeCompletion += OnTargetInitializeCompletion;

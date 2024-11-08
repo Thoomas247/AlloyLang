@@ -1,0 +1,5 @@
+out
+dist
+node_modules
+alloylangsyntaxhighlighting
+.vscode-test/

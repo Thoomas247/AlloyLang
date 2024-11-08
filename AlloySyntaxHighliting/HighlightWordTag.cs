@@ -137,24 +137,21 @@ namespace AlloySyntaxHighliting
         }
     }
 
-    namespace MockLanguageExtension
-    {
 #pragma warning disable 649
-        public class AlloyContentDefinition
-        {
-            [Export]
-            [Name("alloy")]
-            [BaseDefinition(CodeRemoteContentDefinition.CodeRemoteContentTypeName)]
-            internal static ContentTypeDefinition AlloyContentTypeDefinition;
+    public class AlloyContentDefinition
+    {
+        [Export]
+        [Name("alloy")]
+        [BaseDefinition(CodeRemoteContentDefinition.CodeRemoteBaseTypeName)]
+        internal static ContentTypeDefinition AlloyContentTypeDefinition;
 
 
-            [Export]
-            [FileExtension(".alloy")]
-            [ContentType("alloy")]
-            internal static FileExtensionToContentTypeDefinition AlloyFileExtensionDefinition;
-        }
-#pragma warning restore 649
+        [Export]
+        [FileExtension(".alloy")]
+        [ContentType("alloy")]
+        internal static FileExtensionToContentTypeDefinition AlloyFileExtensionDefinition;
     }
+#pragma warning restore 649
 
 #endif  // USE_LANGUAGE_SERVER
 
