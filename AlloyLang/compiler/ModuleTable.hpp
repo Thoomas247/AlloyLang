@@ -6,10 +6,21 @@
 
 namespace AlloyCompiler
 {
-	const std::array<std::string, 10> NUMERIC_TYPE_NAMES = {
-			"i8", "i16", "i32", "i64",
-			"u8", "u16", "u32", "u64",
-			"f32", "f64"
+	const std::array<std::string, 12> BUILT_IN_TYPE_NAMES
+	{
+		"String",
+
+		"bool",
+		"i8", "i16", "i32", "i64",
+		"u8", "u16", "u32", "u64",
+		"f32", "f64",
+	};
+
+	const std::array<std::string, 10> NUMERIC_TYPE_NAMES
+	{
+		"i8", "i16", "i32", "i64",
+		"u8", "u16", "u32", "u64",
+		"f32", "f64"
 	};
 
 	enum class SearchResultCode : uint8_t
@@ -49,6 +60,8 @@ namespace AlloyCompiler
 
 		const std::unordered_map<std::string, Module>& GetModules();
 
+		bool ResolveTypeGraph();
+
 	private:
 		template <typename T>
 		using GetDefinitionFn = Definition<T>(*)(const Module&, const std::string_view&);
@@ -70,6 +83,8 @@ namespace AlloyCompiler
 		ModuleAndSymbolName splitName(const std::string_view& name) const;
 		std::string getRelativePath(const std::string_view& rootName, const std::string_view& moduleName) const;
 
+		std::vector<std::string_view> getTypeGraph(const std::string_view& fullTypeName) const;
+
 		template <typename T>
 		ModuleDefinitionPair<T> getDefinitionInModule(GetDefinitionFn<T> getDefinitionFn, const std::string_view& moduleName, const std::string_view& symbolName) const;
 
@@ -80,6 +95,8 @@ namespace AlloyCompiler
 		Module m_GlobalModule;
 		std::unordered_map<std::string, Module>& m_Modules;
 		std::deque<std::string> m_ContextStack;
+
+		std::unordered_map<std::string_view, std::string_view> m_TypeGraph;
 	};
 
 	template<typename T>

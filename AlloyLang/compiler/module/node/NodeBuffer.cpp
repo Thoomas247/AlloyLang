@@ -837,7 +837,7 @@ namespace AlloyCompiler
 	}
 
 	template<>
-	FUNCTION_TYPE* NodeBuffer::parse(bool allowVarArg, bool allowSelf)
+	FUNCTION_TYPE* NodeBuffer::parse(bool allowVarArg, bool allowSelf, bool allowAny)
 	{
 		std::vector<GENERIC_PARAMETER*> genericParameters;
 		if (token()->Value == "<")
@@ -932,6 +932,24 @@ namespace AlloyCompiler
 				}
 			}
 
+			// check if any parameter has type 'Any'
+			else if (pParameter->pType->Type.Is<TYPE_NAME>()
+				&& pParameter->pType->Type.Get<TYPE_NAME>()->pNameToken->Value == "Any")
+			{
+				if (!allowAny)
+				{
+					logErrorAtPreviousPosition("Extern functions cannot use the 'Any' type.");
+					return nullptr;
+				}
+
+				GENERIC_PARAMETER* anyNode = createNode(GENERIC_PARAMETER
+					{
+						.pIdentifierToken = pParameter->pType->Type.Get<TYPE_NAME>()->pNameToken
+					});
+
+				genericParameters.push_back(anyNode);
+			}
+
 			parameters.push_back(pParameter);
 
 			if (token()->Kind == TokenKind::comma)
@@ -1008,7 +1026,8 @@ namespace AlloyCompiler
 		}
 
 		const bool allowSelf = !isExtern && pTypeIdentifier != nullptr;
-		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/isExtern, /*allowSelf*/allowSelf);
+		const bool allowAny = !isExtern;
+		FUNCTION_TYPE* pFunctionType = parse<FUNCTION_TYPE>(/*allowVarArg*/isExtern, /*allowSelf*/allowSelf, /*allowAny*/allowAny);
 
 		if (pFunctionType == nullptr)
 		{

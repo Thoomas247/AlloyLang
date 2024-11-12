@@ -55,20 +55,8 @@ namespace AlloyCompiler
 
 	SearchResult<TYPE_DEFINITION> ModuleTable::GetTypeDefinition(const std::string_view& name) const
 	{
-		static const std::unordered_set<std::string_view> s_BuiltInTypes
-		{
-			"String",
 
-			"bool",
-
-			"i8", "i16", "i32", "i64",
-
-			"u8", "u16", "u32", "u64",
-
-			"f32", "f64",
-		};
-
-		if (s_BuiltInTypes.contains(name))
+		if (std::find(BUILT_IN_TYPE_NAMES.begin(), BUILT_IN_TYPE_NAMES.end(), name) != BUILT_IN_TYPE_NAMES.end())
 		{
 			SearchResult<TYPE_DEFINITION> result;
 			result.Code = SearchResultCode::Found;
@@ -94,7 +82,43 @@ namespace AlloyCompiler
 				return module.GetFunctionDefinition(name);
 			};
 
-		auto result = getDefinition(fn, name);
+		SearchResult<FUNCTION_DEFINITION> result;
+
+#if 0
+		// if this is a member function, we need to check at what level the function is defined
+		// eg: given the type graph A->B->i32->any, we must check at every level if the function exists
+		size_t memberSeparatorIndex = name.find('@');
+		if (memberSeparatorIndex != std::string_view::npos)
+		{
+			std::string_view fullTypeName = name.substr(0, memberSeparatorIndex);
+			std::string_view functionName = name.substr(memberSeparatorIndex + 1);
+
+			for (auto typeName : getTypeGraph(fullTypeName))
+			{
+				std::string fullName = std::string(typeName) + "@" + std::string(functionName);
+				result = getDefinition(fn, fullName);
+
+				if (result.Code != SearchResultCode::NotFound)
+				{
+					break;
+				}
+			}
+		}
+		else
+		{
+			result = getDefinition(fn, name);
+
+			// do not include module name if extern
+			if (result.pDefiniton != nullptr && result.pDefiniton->pBody == nullptr)
+			{
+				result.MangledName = result.pDefiniton->pFunctionNameToken->Value;
+				result.ModuleName = "";
+			}
+		}
+
+#else
+
+		result = getDefinition(fn, name);
 
 		// do not include module name if extern
 		if (result.pDefiniton != nullptr && result.pDefiniton->pBody == nullptr)
@@ -102,6 +126,8 @@ namespace AlloyCompiler
 			result.MangledName = result.pDefiniton->pFunctionNameToken->Value;
 			result.ModuleName = "";
 		}
+
+#endif
 
 		return result;
 	}
@@ -126,6 +152,61 @@ namespace AlloyCompiler
 	const std::unordered_map<std::string, Module>& ModuleTable::GetModules()
 	{
 		return m_Modules;
+	}
+
+	bool ModuleTable::ResolveTypeGraph()
+	{
+		bool success = true;
+
+		m_TypeGraph.clear();
+
+		// add all the built-in types
+		for (auto& builtInTypeName : BUILT_IN_TYPE_NAMES)
+		{
+			m_TypeGraph.emplace(builtInTypeName, "any");
+		}
+
+		// iterate through every type in every module
+		for (auto& [moduleName, module] : m_Modules)
+		{
+			PushContext(moduleName);
+
+			for (auto& [typeName, typeDefinition] : module.GetNodeBuffer().GetTypeDefinitions())
+			{
+				ASSERT(!typeDefinition.IsNull(), "An error occurred!");
+
+				std::string fullTypeName = moduleName + "::" + typeName;
+				std::string_view& nextTypeName = m_TypeGraph.emplace(fullTypeName, "any").first->second;	// by default, all types point to the "any" type
+
+				auto& rightType = typeDefinition.pDefinition->pType->Type;
+
+				if (rightType.Is<TYPE_NAME>())
+				{
+					SearchResult<TYPE_DEFINITION> result = GetTypeDefinition(rightType.Get<TYPE_NAME>()->pNameToken->Value);
+
+					if (result.Code == SearchResultCode::NotFound)
+					{
+						// TODO: error not found
+						success = false;
+					}
+
+					else if (result.Code == SearchResultCode::Inaccessible)
+					{
+						// TODO: error inaccessible
+						success = false;
+					}
+
+					else
+					{
+						nextTypeName = result.MangledName;
+					}
+				}
+			}
+
+			PopContext();
+		}
+
+		return success;
 	}
 
 	ModuleTable::ModuleAndSymbolName ModuleTable::splitName(const std::string_view& name) const
@@ -158,5 +239,33 @@ namespace AlloyCompiler
 	std::string ModuleTable::getRelativePath(const std::string_view& rootName, const std::string_view& moduleName) const
 	{
 		return std::string(rootName) + "::" + std::string(moduleName);
+	}
+
+	std::vector<std::string_view> ModuleTable::getTypeGraph(const std::string_view& fullTypeName) const
+	{
+		std::vector<std::string_view> result;
+
+		result.push_back(fullTypeName);
+
+		std::string_view currentName = fullTypeName;
+
+		bool reachedEnd = false;
+		while (!reachedEnd)
+		{
+			auto it = m_TypeGraph.find(currentName);
+
+			if (it != m_TypeGraph.end())
+			{
+				result.push_back(it->second);
+				currentName = it->second;
+			}
+
+			else
+			{
+				reachedEnd = true;
+			}
+		}
+
+		return result;
 	}
 }
