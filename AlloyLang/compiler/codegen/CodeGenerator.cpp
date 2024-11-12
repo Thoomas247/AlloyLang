@@ -39,6 +39,9 @@ namespace AlloyCompiler
 	TypeSubtypePair getTypeFromTypeName(ModuleTable& moduleTable, LLVMState& state, Token* pNameToken,
 		const GenericArgumentTypes& genericArguments,
 		const GenericTypeMap& genericTypeMap);
+	TypeSubtypePair generateTypeIdentifier(ModuleTable& moduleTable, LLVMState& state, const TYPE& typeIdentifier,
+		Token* pParentTypeNameToken, TypeModifier& modifier,
+		const GenericTypeMap& genericTypeMap);
 
 	std::string GetMangledName(LLVMState& state, const std::string_view& moduleName, const std::string_view& typeName, const GenericArgumentTypes& genericArguments,
 		const GenericTypeMap& genericTypeMap)
@@ -530,6 +533,41 @@ namespace AlloyCompiler
 		//		in this case consider the parameter as constant as we cannot modify it
 		//
 		return (index < functionType.Parameters.size() ? (functionType.Parameters[index]->VarType == VariableType::Constant) : true);
+	}
+
+	bool isFunctionParameterByRef(const FUNCTION_TYPE& functionType, int index)
+	{
+		//
+		// for functions with variable number of arguments, the index can exceed the size of the parameters,
+		//		in this case the parameter cannot be ByRef
+		//
+		return (index < functionType.Parameters.size() ? (functionType.Parameters[index]->pType->Modifier == TypeModifier::Reference) : false);
+	}
+
+	TypeSubtypePair getFunctionParameterType(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_TYPE& functionType, TypeModifier& modifier, int index)
+	{
+		//
+		// return the type of function parameter
+		// the result can be null for functions with variable number of arguments or if the type is not yet know (i.e. Any)
+		//
+		TypeSubtypePair result;
+
+		if (index < functionType.Parameters.size()
+			&& !functionType.Parameters[index]->isAny
+			) {
+			result = generateTypeIdentifier(moduleTable, state, *functionType.Parameters[index]->pType,
+										nullptr,
+										modifier, 
+										{});
+			// References should be passed as pointers
+			if (modifier == TypeModifier::Reference || modifier == TypeModifier::Pointer)
+			{
+				result.containedType = result.type;
+				result.type = llvm::PointerType::get(result.containedType, 0);
+			}
+		}
+
+		return result;
 	}
 #pragma endregion
 
@@ -1674,215 +1712,38 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	llvm::Value* generateFunctionCallExpression(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
+	bool evaluateFunctionArguments(ModuleTable& moduleTable, LLVMState& state, 
+								bool insertSelfAsFirstParam,
+								FUNCTION_TYPE* pCalleeFunctionType, std::vector<EXPRESSION*> Arguments,
+								std::vector<llvm::Value*>& ArgVals
+								)
 	{
-		std::string functionName(functionCallExpressionNode.pFunctionNameToken->Value);
-		std::string mangledName(functionName);
-		std::vector<llvm::Value*> args;
-		llvm::Value* result = nullptr;
-		llvm::Function* calleeFunc = nullptr;
-		FUNCTION_TYPE* pCalleeFunctionType = nullptr;	// in addition to the LLVM function definition, we need the original function definition in order to properly handle generic and const parameters
-		enum { None, Reference, Value } insertSelfAsFirstParam = None;		// indicates whether the first parameter should be the variable value in the case of member function calls
-		std::vector<EXPRESSION*> Arguments(functionCallExpressionNode.Arguments);	// creating a copy of the arguments as we might need to insert new elements
-		EXPRESSION self;	// this is a fake expression used as a placeholder for Self as first parameter
-		SearchResult<FUNCTION_DEFINITION> funcResult;
-		llvm::Type* type = nullptr;
-		GenericTypeMap typeMap;
+		//
+		// Evaluate all the arguments of a function call
+		// returns false if an error occurs during evaluation, true otherwise
+		// the values of the arguments are returned in the args vector
+		//
 
-#ifdef TRACE_CODE_GENERATOR
-		logInfoAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken,
-			"Processing function call {0}\n", mangledName);
-#endif
+		bool result = false;
+		int startIndex = (insertSelfAsFirstParam ? 1 : 0);	// if the first parameter is Self, this will not be in the arguments list so we have to skip one parameter
 
-		// handle member function calls
-		/*
-		In order to differentiate between the different ways of calling a function, the following must be done :
-		-check if 'pTypeOrVariableName' of 'FUNCTION_CALL' is 'nullptr', if it is, we have a normal function call
-			- if 'pTypeOrVariableName' is the name of a variable which is accessible in this scope, we have a non-static member function call
-				- look up the type of the variable
-				- find the function named type_name@@func_name
-				- check that the first parameter of the function is indeed of type '&Self'
-				- pass '&variable_name' as the first parameter and the rest of the arguments as the following parameters
-			- if 'pTypeOrVariableName' is the name of a type, we have a static member function call
-				- find the function type_name@func_name
-				- call it like you would a normal function
-		*/
-
-		bool isGenericType = (functionCallExpressionNode.pTypeOrVariableName && functionCallExpressionNode.pTypeOrVariableName->GenericArguments.size() > 0);
-
-		if (functionCallExpressionNode.pObject != nullptr)
-		{
-			if (functionCallExpressionNode.pObject && functionCallExpressionNode.pObject->Is<VARIABLE>())
-			{
-				// non-static member function call
-				VARIABLE* var = functionCallExpressionNode.pObject->Get<VARIABLE>();
-				std::string varOrTypeName(var->pNameToken->Value);
-				ValueTypePair* val = state.NamedValues.GetValue(varOrTypeName);
-				if (!isGenericType && val) {
-					// variable found
-					type = val->value->getAllocatedType();
-					std::string typeName(state.NamedValues.GetTypeName(type));
-					// extract any generic parameters from the type name, otherwise we cannot locate the member function
-					size_t pos = typeName.find('@');
-					if (pos != std::string::npos) {
-						typeName = typeName.substr(0, pos);
-					}
-					mangledName = NodeBuffer::GetMangledName("", typeName, functionName);
-					// insert Self as a first argument
-					insertSelfAsFirstParam = Reference;
-					Arguments.insert(Arguments.begin(), &self);
-				}
-				else {
-					// not a variable, check if a valid type and make a static function call
-					GenericArgumentTypes genericArguments;
-					if (functionCallExpressionNode.pTypeOrVariableName)
-						genericArguments = ProcessGenericArguments(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap);
-					type = getTypeFromTypeName(moduleTable, state, var->pNameToken, genericArguments, typeMap).type;
-					if (type != nullptr) {
-						// static member function call
-						mangledName = NodeBuffer::GetMangledName("", varOrTypeName, functionName);
-					}
-					else {
-						logErrorAtCurrentPosition(moduleTable, var->pNameToken, "'{0}' is not a variable or type name.", varOrTypeName);
-						goto error;
-					}
-				}
-			}
-		}
-		else if (functionCallExpressionNode.pTypeOrVariableName) {
-			// this is another way of calling member functions, whether static or not
-			std::string varOrTypeName(functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
-			ValueTypePair* val = state.NamedValues.GetValue(varOrTypeName);
-			if (!isGenericType && val)
-			{
-				// non-static member function call
-				type = val->value->getAllocatedType();
-				std::string typeName(state.NamedValues.GetTypeName(type));
-				// extract any generic parameters from the type name, otherwise we cannot locate the member function
-				size_t pos = typeName.find('@');
-				if (pos != std::string::npos) {
-					typeName = typeName.substr(0, pos);
-				}
-				mangledName = NodeBuffer::GetMangledName("", typeName, functionName);
-				// insert Self as a first argument
-				insertSelfAsFirstParam = Reference;
-				Arguments.insert(Arguments.begin(), &self);
-			}
-			else {
-				type = getTypeFromTypeName(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->pNameToken,
-					ProcessGenericArguments(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap),
-					typeMap).type;
-				if (type != nullptr) {
-					// static member function call
-					mangledName = NodeBuffer::GetMangledName("", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value, functionName);
-				}
-				else {
-					logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pTypeOrVariableName->pNameToken, "'{0}' is not a variable or type name.", varOrTypeName);
-					goto error;
-				}
-			}
-		}
-
-		// retrieve the original function definition
-		funcResult = moduleTable.GetFunctionDefinition(mangledName);
-
-		if (funcResult.Code == SearchResultCode::NotFound)
-		{
-			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Could not find function '{0}'.", functionCallExpressionNode.pFunctionNameToken->Value);
-			goto error;
-		}
-		else if (funcResult.Code == SearchResultCode::Inaccessible)
-		{
-			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Function '{0}' is private and cannot be accessed here.", functionCallExpressionNode.pFunctionNameToken->Value);
-			goto error;
-		}
-		else
-		{
-			pCalleeFunctionType = funcResult.pDefiniton->pFunctionType;
-
-			// look up the function in the global module table
-			// for generic functions, we need the full function name including any generic parameters
-			std::string extendedName = getExtendedFunctionName(moduleTable, state, "",
-				type == nullptr ? "" : std::string(state.NamedValues.GetTypeName(type)),
-				type == nullptr ? funcResult.MangledName : functionName,
-				funcResult.pDefiniton->pFunctionType->GenericParameters,
-				functionCallExpressionNode.GenericArguments, typeMap);
-
-			// make sure the built-in function has already been generated
-			if (funcResult.Code == SearchResultCode::BuiltIn) {
-#ifndef FIRST_PARAMETER_BYREF
-				insertSelfAsFirstParam = Value;
-#endif
-				generateBuiltInFunction(state, extendedName);
-			}
-
-			calleeFunc = state.Module->getFunction(extendedName);
-		}
-
-		// function not found, it might not have been processed yet
-		// check if function is already in the parser and process it
-		if (!calleeFunc)
-		{
-			calleeFunc = generateFunctionDefinition(moduleTable, state, type, *funcResult.pDefiniton, funcResult.ModuleName, functionCallExpressionNode.GenericArguments);
-
-			// ASSERT(Arguments.size() > 0 || calleeFunc == state.Module->getFunction(funcResult.MangledName), "Function was not generated with the right name!");
-		}
-
-		if (!calleeFunc
-			|| !pCalleeFunctionType)
-		{
-			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Cannot find function '{0}'!", functionName);
-			goto error;
-		}
-
-		/* if the function was found, check for argument count mismatch (not counting the additional arguments that we added)
-		* this test does not work with generic functions as the type parameters are not actual parameters
-		* a more accurate test in done in the loop below
-		if (!calleeFunc->isVarArg() && calleeFunc->arg_size() != Arguments.size() + argi)
-		{
-			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
-			goto error;
-		}
-		*/
-
-		// evaluate all the arguments
 		for (size_t argi = 0; argi < Arguments.size(); argi++)
 		{
-			// first parameter is &Self
-			if (argi == 0 && insertSelfAsFirstParam != None)
-			{
-				VARIABLE* var = functionCallExpressionNode.pObject->Get<VARIABLE>();
-				TypeSubtypePair identifierType = {};
-				PtrValuePair ptrValue = generateIdentifier(moduleTable, state, *var, identifierType);
-				if (ptrValue.Ptr == nullptr)
-				{
-					logErrorAtCurrentPosition(moduleTable, var->pNameToken, "Error evaluating variable '{0}'!", var->pNameToken->Value);
-					goto error;
-				}
-
-				args.push_back(insertSelfAsFirstParam == Reference ? ptrValue.Ptr : ptrValue.Value);
-				continue;
-			}
-
 			const EXPRESSION& argument = *Arguments[argi];
 
-			// for functions with a variable number of arguments, check the argument types till the first optional argument
-			// e.g. if the function has 2 mandatory arguments and a number of optional arguments, check for only the first 2 types 
-			TypeSubtypePair argType = { (argi < calleeFunc->arg_size() ? calleeFunc->getArg(argi)->getType() : nullptr), nullptr };
-
 			llvm::Value* argVal = nullptr;
+			TypeSubtypePair argType;
+			TypeModifier modifier;
+
+			// retrieve the expected parameter type
+			argType = getFunctionParameterType(moduleTable, state, *pCalleeFunctionType, modifier, argi + startIndex);
 
 			// check if the function parameter was declared as const
-			bool isConst = isFunctionParameterConst(*pCalleeFunctionType, argi);
+			bool isConst = isFunctionParameterConst(*pCalleeFunctionType, argi + startIndex);
 
 			// check if the parameter is passed byref, in which case it should be a variable and we will pass the address of the identifier
-			auto attr = calleeFunc->getAttributeAtIndex(argi + 1, llvm::Attribute::AttrKind::ByRef);
-			bool isByRef = attr.hasAttribute(llvm::Attribute::AttrKind::ByRef);
-			if (isByRef) {
+			if (modifier == TypeModifier::Reference) {
 				bool foundVariable = false;
-
-				// retrieve the actual type for ByRef arguments
-				argType.containedType = calleeFunc->getArg(argi)->getParamByRefType();
 
 				if (argument.Is<UNARY>()) {
 					const UNARY& unary = *argument.Get<UNARY>();
@@ -1920,7 +1781,9 @@ namespace AlloyCompiler
 
 					argVal = generateExpression(moduleTable, state, argument, argType).Value;
 					// create a pointer to the evaluated expression and pass the pointer as argument
-					llvm::AllocaInst* ptr = state.Builder->CreateAlloca(argVal->getType(), nullptr, (argi < calleeFunc->arg_size() ? calleeFunc->getArg(argi)->getName() : "argname"));
+					llvm::AllocaInst* ptr = state.Builder->CreateAlloca(argVal->getType(), nullptr, 
+						(argi + startIndex < pCalleeFunctionType->Parameters.size() ? pCalleeFunctionType->Parameters[argi + startIndex]->pNameToken->Value : "argname")
+						);
 					state.Builder->CreateStore(argVal, ptr);
 					argVal = ptr;
 				}
@@ -1935,15 +1798,15 @@ namespace AlloyCompiler
 					goto error;
 				}
 
-				if (argi < calleeFunc->arg_size()) {
+				if (argType.type != nullptr) {
 					// convert the expression to expected type, this will also load the value pointed to by a pointer or smart pointer
-					convertValueToType(state, argVal, calleeFunc->getArg(argi)->getType());
+					convertValueToType(state, argVal, argType.type);
 
-					if (argVal->getType() != calleeFunc->getArg(argi)->getType())
+					if (argVal->getType() != argType.type)
 					{
 						logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: argumentID
 							"Function argument {0} expects value of type '{1}' but given type is '{2}'!", argi + 1,
-							state.NamedValues.GetTypeName(calleeFunc->getArg(argi)->getType()),
+							state.NamedValues.GetTypeName(argType.type),
 							state.NamedValues.GetTypeName(argVal->getType()));
 						goto error;
 					}
@@ -1962,12 +1825,218 @@ namespace AlloyCompiler
 				}
 			}
 
-			args.push_back(argVal);
+			ArgVals.push_back(argVal);
 		}
+		result = true;
+
+	error:
+		return result;
+
+	}
+
+	bool checkFunctionParameterTypes()
+	{
+#if 0	// TBI
+
+		// for functions with a variable number of arguments, check the argument types till the first optional argument
+		// e.g. if the function has 2 mandatory arguments and a number of optional arguments, check for only the first 2 types 
+		TypeSubtypePair argType = { (argi < calleeFunc->arg_size() ? calleeFunc->getArg(argi)->getType() : nullptr), nullptr };
+
+		// check if the parameter is passed byref, in which case it should be a variable and we will pass the address of the identifier
+		auto attr = calleeFunc->getAttributeAtIndex(argi + 1, llvm::Attribute::AttrKind::ByRef);
+		bool isByRef = attr.hasAttribute(llvm::Attribute::AttrKind::ByRef);
+
+		// retrieve the actual type for ByRef arguments
+		argType.containedType = calleeFunc->getArg(argi)->getParamByRefType();
 
 		if (!calleeFunc->isVarArg() && calleeFunc->arg_size() != args.size())
 		{
 			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Function '{0}' argument mismatch!", functionName);
+			goto error;
+		}
+#endif
+		return true;
+	}
+
+	llvm::Value* generateFunctionCallExpression(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_CALL& functionCallExpressionNode)
+	{
+		std::string functionName(functionCallExpressionNode.pFunctionNameToken->Value);
+		std::string mangledName(functionName);
+		std::vector<llvm::Value*> args;
+		llvm::Value* result = nullptr;
+		llvm::Function* calleeFunc = nullptr;
+		FUNCTION_TYPE* pCalleeFunctionType = nullptr;	// in addition to the LLVM function definition, we need the original function definition in order to properly handle generic and const parameters
+		enum { None, Reference, Value } insertSelfAsFirstParam = None;		// indicates whether the first parameter should be the variable value in the case of member function calls
+		std::vector<EXPRESSION*> Arguments(functionCallExpressionNode.Arguments);	// creating a copy of the arguments as we might need to insert new elements
+		EXPRESSION self;	// this is a fake expression used as a placeholder for Self as first parameter
+		SearchResult<FUNCTION_DEFINITION> funcResult;
+		llvm::Type* parentType = nullptr;	// in the case of member functions, this is the type of the parent variable
+		std::string extendedName;
+		GenericTypeMap typeMap;
+
+#ifdef TRACE_CODE_GENERATOR
+		logInfoAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken,
+			"Processing function call {0}\n", mangledName);
+#endif
+
+		// handle member function calls
+		/*
+		In order to differentiate between the different ways of calling a function, the following must be done :
+		-check if 'pTypeOrVariableName' of 'FUNCTION_CALL' is 'nullptr', if it is, we have a normal function call
+			- if 'pTypeOrVariableName' is the name of a variable which is accessible in this scope, we have a non-static member function call
+				- look up the type of the variable
+				- find the function named type_name@@func_name
+				- check that the first parameter of the function is indeed of type '&Self'
+				- pass '&variable_name' as the first parameter and the rest of the arguments as the following parameters
+			- if 'pTypeOrVariableName' is the name of a type, we have a static member function call
+				- find the function type_name@func_name
+				- call it like you would a normal function
+		*/
+
+		bool isGenericType = (functionCallExpressionNode.pTypeOrVariableName && functionCallExpressionNode.pTypeOrVariableName->GenericArguments.size() > 0);
+
+		if (functionCallExpressionNode.pObject != nullptr)
+		{
+			if (functionCallExpressionNode.pObject && functionCallExpressionNode.pObject->Is<VARIABLE>())
+			{
+				// non-static member function call
+				VARIABLE* var = functionCallExpressionNode.pObject->Get<VARIABLE>();
+				std::string varOrTypeName(var->pNameToken->Value);
+				ValueTypePair* val = state.NamedValues.GetValue(varOrTypeName);
+				if (!isGenericType && val) {
+					// variable found
+					parentType = val->value->getAllocatedType();
+					std::string typeName(state.NamedValues.GetTypeName(parentType));
+					// extract any generic parameters from the type name, otherwise we cannot locate the member function
+					size_t pos = typeName.find('@');
+					if (pos != std::string::npos) {
+						typeName = typeName.substr(0, pos);
+					}
+					mangledName = NodeBuffer::GetMangledName("", typeName, functionName);
+					// insert Self as a first argument
+					insertSelfAsFirstParam = Reference;
+					Arguments.insert(Arguments.begin(), &self);
+				}
+				else {
+					// not a variable, check if a valid type and make a static function call
+					GenericArgumentTypes genericArguments;
+					if (functionCallExpressionNode.pTypeOrVariableName)
+						genericArguments = ProcessGenericArguments(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap);
+					parentType = getTypeFromTypeName(moduleTable, state, var->pNameToken, genericArguments, typeMap).type;
+					if (parentType != nullptr) {
+						// static member function call
+						mangledName = NodeBuffer::GetMangledName("", varOrTypeName, functionName);
+					}
+					else {
+						logErrorAtCurrentPosition(moduleTable, var->pNameToken, "'{0}' is not a variable or type name.", varOrTypeName);
+						goto error;
+					}
+				}
+			}
+		}
+		else if (functionCallExpressionNode.pTypeOrVariableName) {
+			// this is another way of calling member functions, whether static or not
+			std::string varOrTypeName(functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value);
+			ValueTypePair* val = state.NamedValues.GetValue(varOrTypeName);
+			if (!isGenericType && val)
+			{
+				// non-static member function call
+				parentType = val->value->getAllocatedType();
+				std::string typeName(state.NamedValues.GetTypeName(parentType));
+				// extract any generic parameters from the type name, otherwise we cannot locate the member function
+				size_t pos = typeName.find('@');
+				if (pos != std::string::npos) {
+					typeName = typeName.substr(0, pos);
+				}
+				mangledName = NodeBuffer::GetMangledName("", typeName, functionName);
+				// insert Self as a first argument
+				insertSelfAsFirstParam = Reference;
+				Arguments.insert(Arguments.begin(), &self);
+			}
+			else {
+				parentType = getTypeFromTypeName(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->pNameToken,
+					ProcessGenericArguments(moduleTable, state, functionCallExpressionNode.pTypeOrVariableName->GenericArguments, typeMap),
+					typeMap).type;
+				if (parentType != nullptr) {
+					// static member function call
+					mangledName = NodeBuffer::GetMangledName("", functionCallExpressionNode.pTypeOrVariableName->pNameToken->Value, functionName);
+				}
+				else {
+					logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pTypeOrVariableName->pNameToken, "'{0}' is not a variable or type name.", varOrTypeName);
+					goto error;
+				}
+			}
+		}
+
+		// retrieve the original function definition
+		funcResult = moduleTable.GetFunctionDefinition(mangledName);
+
+		if (funcResult.Code == SearchResultCode::NotFound)
+		{
+			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Could not find function '{0}'.", functionCallExpressionNode.pFunctionNameToken->Value);
+			goto error;
+		}
+		else if (funcResult.Code == SearchResultCode::Inaccessible)
+		{
+			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Function '{0}' is private and cannot be accessed here.", functionCallExpressionNode.pFunctionNameToken->Value);
+			goto error;
+		}
+		else
+		{
+			pCalleeFunctionType = funcResult.pDefiniton->pFunctionType;
+		}
+
+		// evaluate all the function arguments
+		// this has to be done before trying to locate the llvm function to call because the llvm function name is derived from the argument types
+		evaluateFunctionArguments(moduleTable, state, (insertSelfAsFirstParam != None), pCalleeFunctionType, Arguments, args);
+
+		// look up the function in the global module table
+		// for generic functions, we need the full function name including any generic parameters
+		extendedName = getExtendedFunctionName(moduleTable, state, "",
+			parentType == nullptr ? "" : std::string(state.NamedValues.GetTypeName(parentType)),
+			parentType == nullptr ? funcResult.MangledName : functionName,
+			funcResult.pDefiniton->pFunctionType->GenericParameters,
+			functionCallExpressionNode.GenericArguments, typeMap);
+
+
+		// make sure the built-in function has already been generated
+		if (funcResult.Code == SearchResultCode::BuiltIn) {
+#ifndef FIRST_PARAMETER_BYREF
+			insertSelfAsFirstParam = Value;
+#endif
+			generateBuiltInFunction(state, extendedName);
+		}
+
+		// first parameter is &Self
+		if (insertSelfAsFirstParam != None)
+		{
+			VARIABLE* var = functionCallExpressionNode.pObject->Get<VARIABLE>();
+			TypeSubtypePair identifierType = {};
+			PtrValuePair ptrValue = generateIdentifier(moduleTable, state, *var, identifierType);
+			if (ptrValue.Ptr == nullptr)
+			{
+				logErrorAtCurrentPosition(moduleTable, var->pNameToken, "Error evaluating variable '{0}'!", var->pNameToken->Value);
+				goto error;
+			}
+
+			args.push_back(insertSelfAsFirstParam == Reference ? ptrValue.Ptr : ptrValue.Value);
+		}
+
+		calleeFunc = state.Module->getFunction(extendedName);
+
+		// function not found, it might not have been processed yet
+		// check if function is already in the parser and process it
+		if (!calleeFunc)
+		{
+			calleeFunc = generateFunctionDefinition(moduleTable, state, parentType, *funcResult.pDefiniton, funcResult.ModuleName, functionCallExpressionNode.GenericArguments);
+
+			// ASSERT(Arguments.size() > 0 || calleeFunc == state.Module->getFunction(funcResult.MangledName), "Function was not generated with the right name!");
+		}
+
+		if (!calleeFunc
+			|| !pCalleeFunctionType)
+		{
+			logErrorAtCurrentPosition(moduleTable, functionCallExpressionNode.pFunctionNameToken, "Cannot find function '{0}'!", functionName);
 			goto error;
 		}
 

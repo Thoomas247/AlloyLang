@@ -758,7 +758,8 @@ namespace AlloyCompiler
 			{
 				.VarType = varType,
 				.pNameToken = pNameToken,
-				.pType = pType
+				.pType = pType,
+				.isAny = false
 			}
 		);
 	}
@@ -941,6 +942,8 @@ namespace AlloyCompiler
 					logErrorAtPreviousPosition("Extern functions cannot use the 'Any' type.");
 					return nullptr;
 				}
+				
+				pParameter->isAny = true;	// mark the parameter as of type isAny
 
 				GENERIC_PARAMETER* anyNode = createNode(GENERIC_PARAMETER
 					{
