@@ -945,12 +945,14 @@ namespace AlloyCompiler
 				
 				pParameter->isAny = true;	// mark the parameter as of type isAny
 
+				/* the isAny flag is sufficient, no need to add the Any arguments to the generic parameters
 				GENERIC_PARAMETER* anyNode = createNode(GENERIC_PARAMETER
 					{
 						.pIdentifierToken = pParameter->pType->Type.Get<TYPE_NAME>()->pNameToken
 					});
 
 				genericParameters.push_back(anyNode);
+				*/
 			}
 
 			parameters.push_back(pParameter);
