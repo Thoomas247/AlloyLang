@@ -34,7 +34,7 @@ namespace AlloyCompiler
 	template <typename T>
 	struct SearchResult
 	{
-		SearchResultCode Code = SearchResultCode::Inaccessible;
+		SearchResultCode Code = SearchResultCode::NotFound;
 		T* pDefiniton = nullptr;
 		std::string MangledName;
 		std::string ModuleName;
@@ -60,8 +60,6 @@ namespace AlloyCompiler
 
 		const std::unordered_map<std::string, Module>& GetModules();
 
-		bool ResolveTypeGraph();
-
 	private:
 		template <typename T>
 		using GetDefinitionFn = Definition<T>(*)(const Module&, const std::string_view&);
@@ -83,7 +81,8 @@ namespace AlloyCompiler
 		ModuleAndSymbolName splitName(const std::string_view& name) const;
 		std::string getRelativePath(const std::string_view& rootName, const std::string_view& moduleName) const;
 
-		std::vector<std::string_view> getTypeGraph(const std::string_view& fullTypeName) const;
+		SearchResult<FUNCTION_DEFINITION> getMemberFunctionDefinition(GetDefinitionFn<FUNCTION_DEFINITION> getDefinitionFn, const std::string_view& typeName, const std::string_view& fnName) const;
+		SearchResult<TYPE_DEFINITION> getNextType(TYPE_DEFINITION* currentType) const;
 
 		template <typename T>
 		ModuleDefinitionPair<T> getDefinitionInModule(GetDefinitionFn<T> getDefinitionFn, const std::string_view& moduleName, const std::string_view& symbolName) const;
@@ -95,8 +94,6 @@ namespace AlloyCompiler
 		Module m_GlobalModule;
 		std::unordered_map<std::string, Module>& m_Modules;
 		std::deque<std::string> m_ContextStack;
-
-		std::unordered_map<std::string_view, std::string_view> m_TypeGraph;
 	};
 
 	template<typename T>

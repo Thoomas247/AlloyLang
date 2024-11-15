@@ -50,7 +50,7 @@ fn main() -> i32
 
 	//var transform_array = Array<Transform>:create();
 
-	//var score_array = ScoreArray:create();
+	var score_array = ScoreArray:create();
 	//var run = true;
 
 	//while (run)
