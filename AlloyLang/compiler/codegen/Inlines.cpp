@@ -325,7 +325,11 @@ namespace AlloyCompiler
 
 		const std::string_view& fromName = mangledName.substr(0, firstSeparator);
 		const std::string_view& funcName = mangledName.substr(firstSeparator + 1, secondSeparator - firstSeparator - 1);
-		const std::string_view& toName = mangledName.substr(secondSeparator + 1, mangledName.size() - secondSeparator);
+
+		// the mangledName contains & at the end because this a reference to Self and not Self
+		// so we're taking out the trailing & from the type name
+		ASSERT(mangledName[mangledName.length() - 1] == '&', "Built-in cast mangled name should end with '&' !");
+		const std::string_view& toName = mangledName.substr(secondSeparator + 1, mangledName.size() - secondSeparator - 2);
 
 		llvm::Function* result = nullptr;
 

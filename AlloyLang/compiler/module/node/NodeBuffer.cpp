@@ -758,7 +758,8 @@ namespace AlloyCompiler
 			{
 				.VarType = varType,
 				.pNameToken = pNameToken,
-				.pType = pType
+				.pType = pType,
+				.isAny = false
 			}
 		);
 	}
@@ -941,13 +942,17 @@ namespace AlloyCompiler
 					logErrorAtPreviousPosition("Extern functions cannot use the 'Any' type.");
 					return nullptr;
 				}
+				
+				pParameter->isAny = true;	// mark the parameter as of type isAny
 
+				/* the isAny flag is sufficient, no need to add the Any arguments to the generic parameters
 				GENERIC_PARAMETER* anyNode = createNode(GENERIC_PARAMETER
 					{
 						.pIdentifierToken = pParameter->pType->Type.Get<TYPE_NAME>()->pNameToken
 					});
 
 				genericParameters.push_back(anyNode);
+				*/
 			}
 
 			parameters.push_back(pParameter);
