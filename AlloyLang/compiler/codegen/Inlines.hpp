@@ -1,7 +1,5 @@
 #pragma once
 
-#include "CodeGenerator.hpp"
-
 constexpr auto CAST_FUNCTION_NAME = "cast";
 constexpr auto BIT_CAST_FUNCTION_NAME = "bit_cast";
 

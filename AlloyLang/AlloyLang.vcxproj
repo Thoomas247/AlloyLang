@@ -97,6 +97,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">LLVMCodeGenerator/llvm.hpp</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="compiler\codegen\AlloyValue.cpp" />
+    <ClCompile Include="compiler\codegen\AlloyType.cpp" />
     <ClCompile Include="compiler\codegen\CodeGenerator.cpp" />
     <ClCompile Include="compiler\codegen\Inlines.cpp" />
     <ClCompile Include="compiler\codegen\LibraryFunctions.cpp" />
@@ -110,6 +112,8 @@
     <ClCompile Include="compiler\codegen\SmartPointerClass.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="compiler\codegen\AlloyValue.hpp" />
+    <ClInclude Include="compiler\codegen\AlloyType.hpp" />
     <ClInclude Include="compiler\codegen\CodeGenerator.hpp" />
     <ClInclude Include="compiler\codegen\Inlines.hpp" />
     <ClInclude Include="compiler\codegen\LibraryFunctions.hpp" />

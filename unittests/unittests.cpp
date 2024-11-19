@@ -1,15 +1,19 @@
 #include "CppUnitTest.h"
 #include "../AlloyLang/compiler/codegen/llvm/llvm.hpp"
 
-#include "../AlloyLang/compiler/Compiler.hpp"
-#include "../AlloyLang/compiler/module/token/TokenBuffer.hpp"
-#include "../AlloyLang/compiler/module/node/NodeBuffer.hpp"
-#include "../AlloyLang/compiler/codegen/CodeGenerator.hpp"
-
 #include <iostream>
 #include <fstream>
 #include <chrono>
 #include <io.h>
+
+#include "../AlloyLang/compiler/codegen/NamedValues.hpp"
+#include "../AlloyLang/compiler/codegen/CodeGenerator.hpp"
+#include "../AlloyLang/compiler/Compiler.hpp"
+#include "../AlloyLang/compiler/module/token/TokenBuffer.hpp"
+#include "../AlloyLang/compiler/module/node/NodeBuffer.hpp"
+#include "../AlloyLang/compiler/codegen/AlloyType.hpp"
+#include "../AlloyLang/compiler/codegen/AlloyValue.hpp"
+#include "../AlloyLang/compiler/codegen/SmartPointerClass.hpp"
 
 using namespace AlloyCompiler;
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;

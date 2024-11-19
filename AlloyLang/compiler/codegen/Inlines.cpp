@@ -1,4 +1,11 @@
+#include "llvm/llvm.hpp"
+#include "NamedValues.hpp"
+#include "CodeGenerator.hpp"
+#include "AlloyType.hpp"
+#include "AlloyValue.hpp"
+#include "LibraryFunctions.hpp"
 #include "Inlines.hpp"
+#include "SmartPointerClass.hpp"
 
 namespace AlloyCompiler
 {
@@ -49,14 +56,14 @@ namespace AlloyCompiler
 
 	llvm::Function* generateCastFunction(LLVMState& state, const std::string_view& mangledName, const std::string_view& fromName, const std::string_view& toName)
 	{
-		llvm::Type* fromType = state.NamedValues.GetType(fromName);
-		llvm::Type* toType = state.NamedValues.GetType(toName);
+		llvm::Type* fromType = state.NamedValues.GetType(fromName)->llvmType;
+		llvm::Type* toType = state.NamedValues.GetType(toName)->llvmType;
 
 		ASSERT(fromType != nullptr && toType != nullptr, "Invalid type names!");
 
 		llvm::Type* returnType = toType;
 #ifdef FIRST_PARAMETER_BYREF
-		std::vector<llvm::Type*> paramTypes = { llvm::PointerType::get(fromType, 0) };
+		std::vector<llvm::Type*> paramTypes = { AlloyType::getPointerType(fromType) };
 #else
 		std::vector<llvm::Type*> paramTypes = { fromType };
 #endif
@@ -190,14 +197,14 @@ namespace AlloyCompiler
 
 	llvm::Function* generateBitCastFunction(LLVMState& state, const std::string_view& mangledName, const std::string_view& fromName, const std::string_view& toName)
 	{
-		llvm::Type* fromType = state.NamedValues.GetType(fromName);
-		llvm::Type* toType = state.NamedValues.GetType(toName);
+		llvm::Type* fromType = state.NamedValues.GetType(fromName)->llvmType;
+		llvm::Type* toType = state.NamedValues.GetType(toName)->llvmType;
 
 		ASSERT(fromType != nullptr && toType != nullptr, "Invalid type names!");
 
 		llvm::Type* returnType = toType;
 #ifdef FIRST_PARAMETER_BYREF
-		std::vector<llvm::Type*> paramTypes = { llvm::PointerType::get(fromType, 0) };
+		std::vector<llvm::Type*> paramTypes = { AlloyType::getPointerType(fromType) };
 #else
 		std::vector<llvm::Type*> paramTypes = { fromType };
 #endif
@@ -252,7 +259,7 @@ namespace AlloyCompiler
 
 					else if (fromInfo.Size == 32)
 					{
-						fromValue = builder.CreateFPToSI(fromValue, llvm::IntegerType::getInt32Ty(*state.Context));
+						fromValue = builder.CreateFPToSI(fromValue, AlloyType::get("i32")->llvmType);
 					}
 				}
 
@@ -265,7 +272,7 @@ namespace AlloyCompiler
 
 					else if (fromInfo.Size == 32)
 					{
-						fromValue = builder.CreateFPToUI(fromValue, llvm::IntegerType::getInt32Ty(*state.Context));
+						fromValue = builder.CreateFPToUI(fromValue, AlloyType::get("i32")->llvmType);
 					}
 				}
 
@@ -316,30 +323,27 @@ namespace AlloyCompiler
 			return function;
 		}
 
-		// currently, all built-in functions are casts, which must be member functions and have one generic parameter
-		// therefore, we assume the mangled name matches the format "type@function@param"
-		const size_t firstSeparator = mangledName.find('@');
-		const size_t secondSeparator = mangledName.find('@', firstSeparator + 1);
-
-		ASSERT(firstSeparator != std::string_view::npos && secondSeparator != std::string_view::npos, "Invalid built-in function name!");
-
-		const std::string_view& fromName = mangledName.substr(0, firstSeparator);
-		const std::string_view& funcName = mangledName.substr(firstSeparator + 1, secondSeparator - firstSeparator - 1);
-
-		// the mangledName contains & at the end because this a reference to Self and not Self
-		// so we're taking out the trailing & from the type name
-		ASSERT(mangledName[mangledName.length() - 1] == '&', "Built-in cast mangled name should end with '&' !");
-		const std::string_view& toName = mangledName.substr(secondSeparator + 1, mangledName.size() - secondSeparator - 2);
+		// currently, all built-in functions are casts, which must be member functions and have one generic parameter and the Self parameter
+		// therefore, we assume the mangled name matches the format "type@function@param_type@self_type"
+		std::vector<std::string_view> parts;
+		size_t separator = 0, last = 0;
+		while (separator = mangledName.find('@', last)) {
+			parts.push_back(mangledName.substr(last, separator - last));
+			if (separator == std::string_view::npos)
+				break;
+			last = separator + 1;
+		}
+		ASSERT(parts.size() == 4, "Invalid built-in function name!");
 
 		llvm::Function* result = nullptr;
 
-		if (funcName == CAST_FUNCTION_NAME)
+		if (parts[1] == CAST_FUNCTION_NAME)
 		{
-			result = generateCastFunction(state, mangledName, fromName, toName);
+			result = generateCastFunction(state, mangledName, parts[0], parts[2]);
 		}
-		else if (funcName == BIT_CAST_FUNCTION_NAME)
+		else if (parts[1] == BIT_CAST_FUNCTION_NAME)
 		{
-			result = generateBitCastFunction(state, mangledName, fromName, toName);
+			result = generateBitCastFunction(state, mangledName, parts[0], parts[2]);
 		}
 
 		return result;

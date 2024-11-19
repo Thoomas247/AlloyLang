@@ -57,6 +57,12 @@
     <ClCompile Include="compiler\codegen\SmartPointerClass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="compiler\codegen\AlloyType.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="compiler\codegen\AlloyValue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="compiler\module\token\Token.hpp">
@@ -141,6 +147,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="compiler\codegen\SmartPointerClass.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\codegen\AlloyType.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compiler\codegen\AlloyValue.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

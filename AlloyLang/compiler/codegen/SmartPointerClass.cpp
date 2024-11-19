@@ -1,18 +1,26 @@
+#include "llvm/llvm.hpp"
+#include "NamedValues.hpp"
 #include "CodeGenerator.hpp"
+#include "AlloyType.hpp"
+#include "AlloyValue.hpp"
+#include "LibraryFunctions.hpp"
+#include "Inlines.hpp"
 #include "SmartPointerClass.hpp"
+#include "../../log/Log.hpp"
 
 namespace AlloyCompiler
 {
 	std::vector<llvm::Value*> getGEPIndex(LLVMState& state, int index);
 	
 	/*static*/
-	llvm::Value* SmartPointerClass::create(
+	AlloyValue SmartPointerClass::create(
 		LLVMState& state,
-		llvm::Type* PtrType,	// llvm Type as created by GetSmartPointerStruct
+		AlloyType* alloyType,	// Type as created by GetSmartPointerStruct
 		llvm::Value* Ptr,		// The actual pointer that we are storing
 		llvm::Value* Count		// The number of elements pointed to by the pointer
 		)
 	{
+		llvm::Type* PtrType = alloyType->llvmType;
 		llvm::AllocaInst* alloca = state.Builder->CreateAlloca(PtrType);
 
 		if (alloca) {
@@ -29,7 +37,7 @@ namespace AlloyCompiler
 			state.Builder->CreateStore(llvm::ConstantInt::get(*state.Context, llvm::APInt(64, 1)), memberPtr);
 		}
 
-		return state.Builder->CreateLoad(PtrType, alloca);
+		return AlloyValue(state.Builder->CreateLoad(PtrType, alloca), alloyType, alloca);
 	}
 	
 	/*static*/
@@ -40,7 +48,7 @@ namespace AlloyCompiler
 	{
 		// get the actual pointer value (first element of SmartPointerStruct)
 		return state.Builder->CreateExtractValue(Ptr, SmartPointerValue, "actualptr");
-		// return state.Builder->CreateLoad(llvm::PointerType::get(*state.Context, 0), actualPtr, "actualval");
+		// return state.Builder->CreateLoad(AlloyType::getPointerType("i8"), actualPtr, "actualval");
 	}
 
 	//
@@ -54,7 +62,7 @@ namespace AlloyCompiler
 	)
 	{
 		llvm::Type* elementType = std::get<0>(state.smartPointerTypeMap[Ptr->getType()]);
-		llvm::Value* memberPtr = state.Builder->CreateGEP(elementType, actualPtr, llvm::ConstantInt::get(*state.Context, llvm::APInt(32, SmartPointerValue, true)), "memberptr");
+		llvm::Value* memberPtr = state.Builder->CreateGEP(elementType, actualPtr, AlloyValue::getConstantInt(*state.Context, 32, SmartPointerValue), "memberptr");
 		state.Builder->CreateStore(actualPtr, memberPtr);
 	}
 
@@ -64,7 +72,7 @@ namespace AlloyCompiler
 		//
 		// given a smart pointer representing an array or a single value, set the value at a specific index
 		//
-		ASSERT(index->getType() == llvm::IntegerType::get(*state.Context, 32), "Only 32-bit indices are supported!");
+		ASSERT(index->getType() == AlloyType::get("i32")->llvmType, "Only 32-bit indices are supported!");
 		llvm::Value* actualPtr = get(state, Ptr);
 		llvm::Type* elementType = std::get<0>(state.smartPointerTypeMap[Ptr->getType()]);
 		llvm::Value* memberPtr = state.Builder->CreateGEP(elementType, actualPtr, index, "memberptr");
@@ -78,7 +86,7 @@ namespace AlloyCompiler
 		//
 		// given a smart pointer representing an array or a single value, get the value at a specific index
 		//
-		ASSERT(index->getType() == llvm::IntegerType::get(*state.Context, 32), "Only 32-bit indices are supported!");
+		ASSERT(index->getType() == AlloyType::get("i32")->llvmType, "Only 32-bit indices are supported!");
 		llvm::Value* value = nullptr;
 		llvm::Value* actualPtr = get(state, Ptr);
 		llvm::Type* elementType = std::get<0>(state.smartPointerTypeMap[Ptr->getType()]);
@@ -88,7 +96,7 @@ namespace AlloyCompiler
 	}
 	
 	/*static*/
-	llvm::Type* SmartPointerClass::GetSmartPointerStruct(LLVMState& state, llvm::Type* ElementType, bool IsArray)
+	AlloyType* SmartPointerClass::GetSmartPointerStruct(LLVMState& state, AlloyType* ElementType, bool IsArray)
 	{
 		// 
 		// SmartPointerStruct is a structure that contains the pointer, contained element type, number of elements and reference count of a pointer
@@ -96,22 +104,21 @@ namespace AlloyCompiler
 		// The structures are stored in the NamedValues::Types map the same way all other types are stored. The name of the structure type is _SmartPointerStruct_[ElementType]
 		// 
 
-		std::string elementTypeName;
-		llvm::raw_string_ostream rso(elementTypeName);
-		ElementType->print(rso);
+		std::string elementTypeName = ElementType->name();
+		ASSERT(!elementTypeName.empty(), "Element typename cannot be empty!");
 		std::string pointerStructName = _SmartPointerStruct_ + elementTypeName + (IsArray ? "_1" : "_0");
 
 		// check if the same structure has already been defined, otherwise define it
-		llvm::Type* SmartPointerStruct = state.NamedValues.GetType(pointerStructName);
+		AlloyType* SmartPointerStruct = state.NamedValues.GetType(pointerStructName);
 		if (nullptr == SmartPointerStruct) {
 			std::vector<llvm::Type*> memberTypes;
-			memberTypes.push_back(llvm::PointerType::get(*state.Context, 0));	// pointer value
-			memberTypes.push_back(llvm::Type::getInt64Ty(*state.Context));		// element count
-			memberTypes.push_back(llvm::Type::getInt64Ty(*state.Context));		// ref count (for future use)
-			SmartPointerStruct = llvm::StructType::create(*state.Context, memberTypes, pointerStructName, true);
+			memberTypes.push_back(AlloyType::getPointerType("i8")->llvmType);	// pointer value
+			memberTypes.push_back(AlloyType::get("i64")->llvmType);		// element count
+			memberTypes.push_back(AlloyType::get("i64")->llvmType);		// ref count (for future use)
+			SmartPointerStruct = AlloyType::get(llvm::StructType::create(*state.Context, memberTypes, pointerStructName, true));
 
 			state.NamedValues.InsertType(pointerStructName, SmartPointerStruct, NamedValues::UserDefinedType::structure);
-			state.smartPointerTypeMap[SmartPointerStruct] = std::make_tuple(ElementType, IsArray);
+			state.smartPointerTypeMap[SmartPointerStruct->llvmType] = std::make_tuple(ElementType->llvmType, IsArray);
 		}
 
 		return SmartPointerStruct;

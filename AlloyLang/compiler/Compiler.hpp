@@ -2,9 +2,6 @@
 #include <filesystem>
 #include <fstream>
 
-#include "module/Module.hpp"
-#include "codegen/CodeGenerator.hpp"
-
 namespace AlloyCompiler
 {
 	namespace fs = std::filesystem;
@@ -15,6 +12,8 @@ namespace AlloyCompiler
 	{
 	public:
 		Compiler(const std::string& mainFilePath, LLVMState::LLVMOptimizations optimize = LLVMState::OptimizeModule);
+		virtual ~Compiler();
+
 		void Compile();
 		int Execute();
 
