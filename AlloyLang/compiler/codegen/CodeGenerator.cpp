@@ -620,20 +620,22 @@ namespace AlloyCompiler
 				&& llvm::isa<llvm::PointerType>(valueOrPtr.Type->llvmType)) {
 				// the type is set in the case of pointers and references, we need to load the pointed to value
 				result.Value = state.Builder->CreateLoad(alloyValue->Type->containedType->llvmType, valueOrPtr.Value, "loadtmp");
-				identifierType = AlloyType::get(result.Value->getType());
+				result.Ptr = valueOrPtr.Value;
+				result.Type = identifierType = AlloyType::get(result.Value->getType());
 			}
 			else if (SmartPointerClass::isSmartPointer(state, identifierType, isArray)) {
 				// this is the same as the last else condition, keeping it here for debugging purposes
 				// the caller should dereference the smart pointer if needed
 				result.Value = valueOrPtr.Value;
-				return AlloyValue(valueOrPtr.Value, identifierType, alloyValue->Ptr, alloyValue->isConst);
+				result.Ptr = alloyValue->Ptr;
+				result.Type = valueOrPtr.Type;
 			}
 			else {
 				result.Value = valueOrPtr.Value;
+				result.Ptr = alloyValue->Ptr;
+				result.Type = valueOrPtr.Type;
 			}
 
-			result.Type = identifierType;
-			result.Ptr = alloyValue->Ptr;
 			result.isConst = alloyValue->isConst;
 			state.NamedValues.UpdateValue(std::string(name), result);
 			return result;
@@ -2420,6 +2422,7 @@ namespace AlloyCompiler
 		AlloyType*& expectedType)
 	{
 		AlloyValue ptrValue;
+		Token* varToken = nullptr;
 
 		if (assignment.pVariable->Is<POSTFIX>()
 			&& assignment.pVariable->Get<POSTFIX>()->Is<MEMBER_ACCESS>()
@@ -2431,6 +2434,11 @@ namespace AlloyCompiler
 			&& assignment.pVariable->Get<PRIMARY>()->Is<VARIABLE>())
 		{
 			ptrValue = generateIdentifier(moduleTable, state, *assignment.pVariable->Get<PRIMARY>()->Get<VARIABLE>(), expectedType);
+			varToken = assignment.pVariable->Get<PRIMARY>()->Get<VARIABLE>()->pNameToken;
+#ifdef TRACE_CODE_GENERATOR
+			logInfoAtCurrentPosition(moduleTable, varToken,
+					"Assigning value to variable {0}\n", varToken->Value);
+#endif
 		}
 		else if (assignment.pVariable->Is<POSTFIX>()
 			&& assignment.pVariable->Get<POSTFIX>()->Is<ARRAY_ACCESS>())
@@ -2440,13 +2448,13 @@ namespace AlloyCompiler
 
 		if (!ptrValue.isValid())
 		{
-			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID 
+			logErrorAtCurrentPosition(moduleTable, varToken, 
 				"Error evaluating identifier!");
 			return AlloyValue();
 		}
 
 		if (ptrValue.isConst) {
-			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID 
+			logErrorAtCurrentPosition(moduleTable, varToken, 
 				"Assigning a value to a constant!");
 			return AlloyValue();
 		}
@@ -2455,7 +2463,7 @@ namespace AlloyCompiler
 
 		if (!expressionVal.isValid())
 		{
-			logErrorAtCurrentPosition(moduleTable, nullptr, // TBD: nodeID
+			logErrorAtCurrentPosition(moduleTable, varToken,
 				"Error evaluating expression!");
 			return AlloyValue();
 		}
