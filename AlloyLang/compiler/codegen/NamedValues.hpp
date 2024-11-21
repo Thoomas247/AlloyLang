@@ -23,8 +23,8 @@ namespace AlloyCompiler
 
 	// GenericTypeMap is a map from a generic type T to the actual type name (e.g. i32) and the generated AlloyType
 	// Note that llvm can generate a type that is different from the one requested, e.g. generate u32 when we request i32
-	typedef std::unordered_map<std::string, AlloyType*> GenericTypeMap;
-	typedef std::vector<AlloyType*> GenericArgumentTypes;
+	typedef std::unordered_map<std::string, const AlloyType*> GenericTypeMap;
+	typedef std::vector<const AlloyType*> GenericArgumentTypes;
 
 #define _EnumPayloadStruct_	"_EnumPayloadStruct_"
 #define EnumPayloadIndex	0
@@ -43,7 +43,7 @@ namespace AlloyCompiler
 		void PopScope();
 
 		const AlloyValue* GetValue(const std::string& name, bool searchInParents = true);
-		void InsertValue(const std::string& name, llvm::AllocaInst* ptr, AlloyType* type, AlloyType* parentType, bool isConst, bool freeOnExit);
+		void InsertValue(const std::string& name, llvm::AllocaInst* ptr, const AlloyType* type, const AlloyType* parentType, bool isConst, bool freeOnExit);
 		void InsertValue(const std::string& name, const AlloyValue& value);
 		bool UpdateValue(const std::string& name, const AlloyValue& value);
 		bool RemoveValue(const std::string& name);
@@ -54,11 +54,11 @@ namespace AlloyCompiler
 		struct TypeMemberInfo
 		{
 			int memberIndex;
-			AlloyType* Type;	// contains the structure element type
+			const AlloyType* Type;	// contains the structure element type
 								// for enums : contains the type of the optional payload associated to the element
 		};
 
-		AlloyType* GetType(const std::string_view& name);
+		const AlloyType* GetType(const std::string_view& name);
 		
 		/// <summary>
 		/// Returns -1 if the struct or enum does not exist, -2 if the member does not exist.
@@ -71,7 +71,7 @@ namespace AlloyCompiler
 		std::string_view GetTypeName(const AlloyType* type);
 
 		typedef enum { basic = 0, structure = 1, enumeration = 2, array = 3 } UserDefinedType;
-		void InsertType(const std::string& name, AlloyType* type, UserDefinedType userDefinedType, 
+		void InsertType(const std::string& name, const AlloyType* type, UserDefinedType userDefinedType, 
 			const std::unordered_map<std::string_view, TypeMemberInfo>& memberInfo = {},
 			const GenericTypeMap& genericTypeMap = {}
 			);
@@ -79,8 +79,8 @@ namespace AlloyCompiler
 		bool GetEnumMembers(const std::string_view& enumName, std::unordered_map<std::string_view, TypeMemberInfo>& enumMembers);
 
 		// support for generic function parameters
-		AlloyType* GetGenericType(const std::string& typeName);
-		void SetGenericType(const std::string& typeName, AlloyType* realType);
+		const AlloyType* GetGenericType(const std::string& typeName);
+		void SetGenericType(const std::string& typeName, const AlloyType* realType);
 
 		// returns the current function's generic type map
 		GenericTypeMap GetGenericTypeMap();
@@ -93,13 +93,13 @@ namespace AlloyCompiler
 		void FreeHeapPointers(llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>& builder);
 
 		// check if specific type is an enumeration
-		bool IsEnumType(AlloyType* type);
+		bool IsEnumType(const AlloyType* type);
 
 		// return the unique ID for that type
-		unsigned int GetID(AlloyType* type);
+		unsigned int GetID(const AlloyType* type);
 
 		// return the structure type associated with a specific payload type
-		AlloyType* GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, AlloyType* PayloadType);
+		const AlloyType* GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, const AlloyType* PayloadType);
 
 		// dump all registered type names for debugging purposes
 		void DumpTypeNames();
@@ -107,7 +107,7 @@ namespace AlloyCompiler
 	private:
 		struct TypeInfo
 		{
-			AlloyType* Type;
+			const AlloyType* Type;
 			std::string_view Name;
 			UserDefinedType userDefinedType;
 			std::unordered_map<std::string_view, TypeMemberInfo> memberInfo;

@@ -14,34 +14,33 @@ namespace AlloyCompiler
     public:
         llvm::Type* llvmType;
 
-        // for pointer and reference types, llvm does not store the type pointed to by the pointer
-        // we have to keep track of it ourselves
-        // containedType is null if this is not a pointer nor a reference
-        AlloyType* containedType = nullptr;
+        static const AlloyType* getIntType(llvm::LLVMContext& llvmContext, unsigned bits, bool signedInt, const std::string& typeName);
 
-        static AlloyType* getIntType(llvm::LLVMContext& llvmContext, unsigned bits, bool signedInt, const std::string& typeName);
-
-        static inline AlloyType* get(const std::string& typeName) { return AlloyTypeMap.at(typeName); }
+        static inline const AlloyType* get(const std::string& typeName) { return AlloyTypeMap.at(typeName); }
 
         // pointer type creation methods
-        static AlloyType* getPointerType(const std::string& containedType);
-        static AlloyType* getPointerType(llvm::Type* containedType);
-        static AlloyType* getPointerType(AlloyType* containedType);
+        static const AlloyType* getPointerType(const std::string& containedType);
+        static const AlloyType* getPointerType(llvm::Type* containedType);
+        static const AlloyType* getPointerType(const AlloyType* containedType);
+
+        // create a combined Type/containedType type. Used for enumerators where we need to type of the enumerator and the type of the payload combined
+        static const AlloyType* get(llvm::Type* llvmType, const AlloyType* containedType);
 
         // accessors
-        inline const std::string& name() { ASSERT(!alloyTypeName.empty(), "Alloy types should always have a name!"); return alloyTypeName; }
-        inline const llvm::Type::TypeID getTypeID() { return llvmType->getTypeID(); }
+        inline const std::string& name() const { ASSERT(!alloyTypeName.empty(), "Alloy types should always have a name!"); return alloyTypeName; }
+        inline const llvm::Type::TypeID getTypeID() const { return llvmType->getTypeID(); }
 
         // check if this AlloyType is of the same type as the "right" parameter
-        bool operator==(const llvm::Type* right) {
+        bool operator==(const llvm::Type* right) const {
             return (llvmType == right);
         }
 
         inline bool isIntegerTy() const { return llvmType->isIntegerTy(); }
         inline int getIntegerBitWidth() const { return llvmType->getIntegerBitWidth(); }
+        inline const AlloyType* getContainedType() const { return containedType; }
 
         // get an AlloyType from an llvm Type
-        static AlloyType* get(llvm::Type* llvmType);
+        static const AlloyType* get(llvm::Type* llvmType);
 
         // clear all types before exiting the application
         static void ClearAlloyTypes();
@@ -51,9 +50,14 @@ namespace AlloyCompiler
             : llvmContext(llvmContext), llvmType(llvmType) {}
 
     private:            
-        static std::unordered_map<std::string, AlloyType*> AlloyTypeMap;
-        static std::unordered_map<llvm::Type*, AlloyType*> AlloyTypeIdMap;
+        static std::unordered_map<std::string, const AlloyType*> AlloyTypeMap;
+        static std::unordered_map<llvm::Type*, const AlloyType*> AlloyTypeIdMap;
         
+        // for pointer and reference types, llvm does not store the type pointed to by the pointer
+        // we have to keep track of it ourselves
+        // containedType is null if this is not a pointer nor a reference
+        const AlloyType* containedType = nullptr;
+
         llvm::LLVMContext& llvmContext;
         std::string alloyTypeName;
         bool isSigned;        

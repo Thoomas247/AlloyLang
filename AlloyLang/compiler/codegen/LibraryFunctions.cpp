@@ -13,7 +13,7 @@
 
 namespace AlloyCompiler
 {
-	extern llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, AlloyType* type, int numElements = 0);
+	extern llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, const AlloyType* type, int numElements = 0);
 
 	llvm::Function* generateMemCmpFunctionDeclaration(const ModuleTable& moduleTable, LLVMState& state) {
 		//
@@ -54,7 +54,7 @@ namespace AlloyCompiler
 		// Function signature : Value* _CreateStructCompare_(Value* Left, int64 LeftSize, Value* Right, int64 RightSize)
 		//
 		
-		AlloyType* returnType = nullptr;
+		const AlloyType* returnType = nullptr;
 		std::vector<llvm::Type*> paramTypes;
 		llvm::FunctionType* functionType = nullptr;
 

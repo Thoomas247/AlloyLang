@@ -53,6 +53,11 @@ namespace unittests
 
 	public:
 
+		TEST_METHOD(AnyParameters)
+		{
+			RunTest("../../AlloyLang/test/AnyParameters/main.alloy", 49);
+		}
+
 		TEST_METHOD(BasicTest)
 		{
 			RunTest("../../AlloyLang/test/Basic/main.alloy", 1);

@@ -23,7 +23,7 @@ namespace AlloyCompiler
 	public:
 		static AlloyValue create(
 			LLVMState& state,
-			AlloyType* PtrType,	// llvm Type as created by GetSmartPointerStruct
+			const AlloyType* PtrType,	// llvm Type as created by GetSmartPointerStruct
 			llvm::Value* Ptr,		// The actual pointer that we are storing
 			llvm::Value* Count		// The number of elements pointed to by the pointer
 		);
@@ -58,10 +58,10 @@ namespace AlloyCompiler
 		static llvm::Value* getValue(LLVMState& state, llvm::Value* Ptr, llvm::Value*& MemberPtr, llvm::Value* index);
 
 		// return the structure type associated with a specific pointer type
-		static AlloyType* GetSmartPointerStruct(LLVMState& state, AlloyType* ElementType, bool IsArray);
+		static const AlloyType* GetSmartPointerStruct(LLVMState& state, const AlloyType* ElementType, bool IsArray);
 
 		// check if given type is a smart pointer and return the pointed to type
-		static AlloyType* isSmartPointer(LLVMState& state, AlloyType* alloyType, bool& isArray) {
+		static const AlloyType* isSmartPointer(LLVMState& state, const AlloyType* alloyType, bool& isArray) {
 			if (alloyType && state.smartPointerTypeMap.contains(alloyType->llvmType)) {
 				std::tuple<llvm::Type*, bool> tuple = state.smartPointerTypeMap[alloyType->llvmType];
 				isArray = std::get<1>(tuple);

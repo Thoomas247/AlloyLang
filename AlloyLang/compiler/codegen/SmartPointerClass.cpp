@@ -15,7 +15,7 @@ namespace AlloyCompiler
 	/*static*/
 	AlloyValue SmartPointerClass::create(
 		LLVMState& state,
-		AlloyType* alloyType,	// Type as created by GetSmartPointerStruct
+		const AlloyType* alloyType,	// Type as created by GetSmartPointerStruct
 		llvm::Value* Ptr,		// The actual pointer that we are storing
 		llvm::Value* Count		// The number of elements pointed to by the pointer
 		)
@@ -96,7 +96,7 @@ namespace AlloyCompiler
 	}
 	
 	/*static*/
-	AlloyType* SmartPointerClass::GetSmartPointerStruct(LLVMState& state, AlloyType* ElementType, bool IsArray)
+	const AlloyType* SmartPointerClass::GetSmartPointerStruct(LLVMState& state, const AlloyType* ElementType, bool IsArray)
 	{
 		// 
 		// SmartPointerStruct is a structure that contains the pointer, contained element type, number of elements and reference count of a pointer
@@ -109,7 +109,7 @@ namespace AlloyCompiler
 		std::string pointerStructName = _SmartPointerStruct_ + elementTypeName + (IsArray ? "_1" : "_0");
 
 		// check if the same structure has already been defined, otherwise define it
-		AlloyType* SmartPointerStruct = state.NamedValues.GetType(pointerStructName);
+		const AlloyType* SmartPointerStruct = state.NamedValues.GetType(pointerStructName);
 		if (nullptr == SmartPointerStruct) {
 			std::vector<llvm::Type*> memberTypes;
 			memberTypes.push_back(AlloyType::getPointerType("i8")->llvmType);	// pointer value

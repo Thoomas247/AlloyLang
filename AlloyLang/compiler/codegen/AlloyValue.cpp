@@ -11,7 +11,7 @@
 namespace AlloyCompiler
 {
 	/*static*/
-	bool AlloyValue::convertValueToType(LLVMState& state, llvm::Value*& value, AlloyType* newType)
+	bool AlloyValue::convertValueToType(LLVMState& state, llvm::Value*& value, const AlloyType* newType)
 	{
 		//
 		// Create an llvm instruction to convert input value from its current type to another type
@@ -29,7 +29,7 @@ namespace AlloyCompiler
 			}
 
 			bool isArray;
-			AlloyType* containedType = SmartPointerClass::isSmartPointer(state, (AlloyType*)value->getType(), isArray);
+			const AlloyType* containedType = SmartPointerClass::isSmartPointer(state, AlloyType::get(value->getType()), isArray);
 			if (containedType != nullptr) {
 				// case of smart pointers, load the underlying value and convert to requested type
 				llvm::Value* Ptr = SmartPointerClass::get(state, value);
@@ -129,7 +129,7 @@ namespace AlloyCompiler
 	}
 
 	/*static*/
-	bool AlloyValue::convertValueToType(LLVMState& state, AlloyValue& value, AlloyType* newType)
+	bool AlloyValue::convertValueToType(LLVMState& state, AlloyValue& value, const AlloyType* newType)
 	{
 		bool result = convertValueToType(state, value.Value, newType);
 		if (result) {

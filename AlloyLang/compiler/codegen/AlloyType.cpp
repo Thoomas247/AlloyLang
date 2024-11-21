@@ -11,9 +11,9 @@
 namespace AlloyCompiler
 {
     /*static*/
-    std::unordered_map<std::string, AlloyType*> AlloyType::AlloyTypeMap;
+    std::unordered_map<std::string, const AlloyType*> AlloyType::AlloyTypeMap;
     /*static*/
-    std::unordered_map<llvm::Type*, AlloyType*> AlloyType::AlloyTypeIdMap;
+    std::unordered_map<llvm::Type*, const AlloyType*> AlloyType::AlloyTypeIdMap;
 
     /*static*/
     void AlloyType::ClearAlloyTypes()
@@ -28,7 +28,7 @@ namespace AlloyCompiler
     }
 
     /*static*/
-    AlloyType* AlloyType::getIntType(llvm::LLVMContext& llvmContext, unsigned bits, bool signedInt, const std::string& typeName)
+    const AlloyType* AlloyType::getIntType(llvm::LLVMContext& llvmContext, unsigned bits, bool signedInt, const std::string& typeName)
     {
         if (AlloyTypeMap.contains(typeName)) {
             return AlloyTypeMap.at(typeName);
@@ -45,12 +45,12 @@ namespace AlloyCompiler
     }
 
     /*static*/
-    AlloyType* AlloyType::get(llvm::Type* llvmType)
+    const AlloyType* AlloyType::get(llvm::Type* llvmType)
     {
         //
         // get an AlloyType from an llvm Type
         //
-        AlloyType* result = nullptr;
+        const AlloyType* result = nullptr;
 
         if (AlloyTypeIdMap.contains(llvmType)) {
             result = AlloyTypeIdMap.at(llvmType);
@@ -86,9 +86,9 @@ namespace AlloyCompiler
 
 
     /*static*/
-    AlloyType* AlloyType::getPointerType(const std::string& containedType)
+    const AlloyType* AlloyType::getPointerType(const std::string& containedType)
     {
-        AlloyType* result = get(containedType);
+        const AlloyType* result = get(containedType);
 
         if (result) {
             result = getPointerType(result);
@@ -100,14 +100,13 @@ namespace AlloyCompiler
     }
 
     /*static*/
-    AlloyType* AlloyType::getPointerType(llvm::Type* containedType)
+    const AlloyType* AlloyType::getPointerType(llvm::Type* containedType)
     {
-
         return getPointerType(get(containedType));
     }
 
     /*static*/
-    AlloyType* AlloyType::getPointerType(AlloyType* containedType)
+    const AlloyType* AlloyType::getPointerType(const AlloyType* containedType)
     {
         std::string typeName = containedType->alloyTypeName + "*";
 
@@ -126,4 +125,27 @@ namespace AlloyCompiler
         }
     }
 
+    // create a combined Type/containedType type. Used for enumerators where we need to type of the enumerator and the type of the payload combined
+    /*static*/
+    const AlloyType* AlloyType::get(llvm::Type* llvmType, const AlloyType* containedType)
+    {
+        if (containedType == nullptr)
+            return get(llvmType);
+        else {
+            std::string typeName = get(llvmType)->alloyTypeName + "|" + containedType->alloyTypeName;
+
+            if (AlloyTypeMap.contains(typeName)) {
+                return AlloyTypeMap.at(typeName);
+            }
+            else {
+                AlloyType* alloyType = new AlloyType(containedType->llvmContext, llvmType);
+                alloyType->alloyTypeName = typeName;
+                alloyType->containedType = containedType;
+                alloyType->isSigned = false;
+                AlloyTypeMap[typeName] = alloyType;
+                AlloyTypeIdMap[llvmType] = alloyType;
+                return alloyType;
+            }
+        }
+    }
 }

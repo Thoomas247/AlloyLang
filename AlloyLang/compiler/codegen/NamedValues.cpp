@@ -45,7 +45,7 @@ namespace AlloyCompiler
 		InsertType("f64", AlloyType::get(llvm::Type::getDoubleTy(llvmContext)), UserDefinedType::basic);
 	}
 
-	AlloyType* NamedValues::GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, AlloyType* PayloadType)
+	const AlloyType* NamedValues::GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, const AlloyType* PayloadType)
 	{
 		// 
 		// EnumPayloadStruct is a structure that contains the index, payload and enum ID for an enum value
@@ -56,7 +56,7 @@ namespace AlloyCompiler
 		std::string payloadStructName = _EnumPayloadStruct_ + std::string(payloadTypeName);
 		
 		// check if the same structure has already been defined, otherwise define it
-		AlloyType* EnumPayloadStruct = GetType(payloadStructName);
+		const AlloyType* EnumPayloadStruct = GetType(payloadStructName);
 		if (nullptr == EnumPayloadStruct) {
 			std::vector<llvm::Type*> memberTypes;
 			memberTypes.push_back(AlloyType::get("i64")->llvmType);		// index into the enum
@@ -104,7 +104,7 @@ namespace AlloyCompiler
 
 			// we have to make sure that we do not attempt to free references which are also pointers
 			// pointers and references have their type set explicitely
-			if (it.second.freeOnExit && it.second.Type->containedType != nullptr) {
+			if (it.second.freeOnExit && it.second.Type->getContainedType() != nullptr) {
 				// load the underlying heap pointer created using Malloc and free it
 				// llvm::Value* Ptr = builder.CreateLoad(it.second.Type, it.second.value);
 				// builder.CreateFree(Ptr);
@@ -160,7 +160,7 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	void NamedValues::InsertValue(const std::string& name, llvm::AllocaInst* ptr, AlloyType* type, AlloyType* parentType, bool isConst, bool freeOnExit)
+	void NamedValues::InsertValue(const std::string& name, llvm::AllocaInst* ptr, const AlloyType* type, const AlloyType* parentType, bool isConst, bool freeOnExit)
 	{
 		ASSERT(!m_ScopeStack.back().Values.contains(name), "Named value already exists! Should check if it exists first with NamedValues::GetValue(const std::string& name).");
 		AlloyValue alloyValue(nullptr, type, ptr, isConst);
@@ -196,7 +196,7 @@ namespace AlloyCompiler
 		m_ScopeStack.back().Values[name] = value;
 	}
 
-	AlloyType* NamedValues::GetType(const std::string_view& name)
+	const AlloyType* NamedValues::GetType(const std::string_view& name)
 	{
 		TypeInfo* typeInfo = findType(name);
 
@@ -239,7 +239,7 @@ namespace AlloyCompiler
 	}
 
 	// check if specific type is an enumeration
-	bool NamedValues::IsEnumType(AlloyType* type)
+	bool NamedValues::IsEnumType(const AlloyType* type)
 	{
 		// check if specific type is an enumeration
 		TypeInfo* typeInfo = findType(GetTypeName(type));
@@ -255,7 +255,7 @@ namespace AlloyCompiler
 	}
 
 	// check if specific type is an enumeration
-	unsigned int NamedValues::GetID(AlloyType* type)
+	unsigned int NamedValues::GetID(const AlloyType* type)
 	{
 		// check if specific type is an enumeration
 		TypeInfo* typeInfo = findType(GetTypeName(type));
@@ -345,7 +345,7 @@ namespace AlloyCompiler
 		return "";
 	}
 
-	void NamedValues::InsertType(const std::string& name, AlloyType* type, UserDefinedType userDefinedType,
+	void NamedValues::InsertType(const std::string& name, const AlloyType* type, UserDefinedType userDefinedType,
 		const std::unordered_map<std::string_view, TypeMemberInfo>& memberInfo,
 		const GenericTypeMap& genericTypeMap
 		)
@@ -406,7 +406,7 @@ namespace AlloyCompiler
 	}
 
 	// support for generic function parameters
-	AlloyType* NamedValues::GetGenericType(const std::string& typeName)
+	const AlloyType* NamedValues::GetGenericType(const std::string& typeName)
 	{
 		auto found = m_ScopeStack.back().GenericTypeMap.find(typeName);
 		if (found == m_ScopeStack.back().GenericTypeMap.end()) {
@@ -417,7 +417,7 @@ namespace AlloyCompiler
 		}
 	}
 
-	void NamedValues::SetGenericType(const std::string& typeName, AlloyType* Type)
+	void NamedValues::SetGenericType(const std::string& typeName, const AlloyType* Type)
 	{
 		m_ScopeStack.back().GenericTypeMap[typeName] = Type;
 	}
