@@ -325,10 +325,12 @@ namespace AlloyCompiler
 
 		// currently, all built-in functions are casts, which must be member functions and have one generic parameter and the Self parameter
 		// therefore, we assume the mangled name matches the format "type@function@param_type@self_type"
-		std::vector<std::string_view> parts;
+		std::vector<std::string> parts;
 		size_t separator = 0, last = 0;
-		while (separator = mangledName.find('@', last)) {
-			parts.push_back(mangledName.substr(last, separator - last));
+		std::string name(mangledName);
+		std::replace(name.begin(), name.end(), NodeBuffer::GENERICS_SEPARATOR, NodeBuffer::TYPE_SEPARATOR);
+		while (separator = name.find(NodeBuffer::TYPE_SEPARATOR, last)) {
+			parts.push_back(name.substr(last, separator - last));
 			if (separator == std::string_view::npos)
 				break;
 			last = separator + 1;

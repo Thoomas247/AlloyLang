@@ -131,10 +131,17 @@ namespace AlloyCompiler
 	{
 		Module& currentModule = m_Modules.at(std::string(m_ContextStack.back()));
 
+		// extract any generic parameters from the type name
+		std::string baseName(name);
+		size_t pos = name.find(NodeBuffer::GENERICS_SEPARATOR);
+		if (pos != std::string::npos) {
+			baseName = name.substr(0, pos);
+		}
+
 		std::string moduleName;
 		std::string symbolName;
 		{
-			auto moduleAndSymbolName = splitName(name);
+			auto moduleAndSymbolName = splitName(baseName);
 			moduleName = moduleAndSymbolName.ModuleName;
 			symbolName = moduleAndSymbolName.SymbolName;
 		}

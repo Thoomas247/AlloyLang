@@ -14,6 +14,13 @@ namespace AlloyCompiler
 	class NodeBuffer
 	{
 	public:
+		// separators used within type names to compose different parts of a type or a function
+		// the final type has a name composed of : type_name~generic_parameters|contained_type
+		// the final function has a name composed of : type_name~generic_parameters@function_name~generic_parameters
+		static const char TYPE_SEPARATOR = '@';
+		static const char GENERICS_SEPARATOR = '~';
+		static const char POINTER_SEPARATOR = '|';
+
 		template<typename T>
 		using NodeMap = std::unordered_map<std::string, Definition<T>>;
 
@@ -27,11 +34,18 @@ namespace AlloyCompiler
 			//
 			std::string result;
 
+			// extract any generic parameters from the type name
+			std::string baseName(typeName);
+			size_t pos = typeName.find(GENERICS_SEPARATOR);
+			if (pos != std::string::npos) {
+				baseName = typeName.substr(0, pos);
+			}
+
 			if (!moduleName.empty())
 			{
 				result = std::string(moduleName) + "::";
 			}
-			result += std::string(typeName) + "@" + std::string(functionName);
+			result += std::string(baseName) + TYPE_SEPARATOR + std::string(functionName);
 			return result;
 		}
 

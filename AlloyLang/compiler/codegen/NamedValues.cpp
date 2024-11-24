@@ -325,6 +325,10 @@ namespace AlloyCompiler
 
 	std::string_view NamedValues::GetTypeName(const AlloyType* type)
 	{
+		// for pointers, get the underlying type name
+		if (type->getTypeID() == llvm::Type::TypeID::PointerTyID) {
+			type = type->getContainedType();
+		}
 		// look for the type starting from the current scope and going up
 		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
 		{
@@ -335,6 +339,7 @@ namespace AlloyCompiler
 				return found->second;
 			}
 		}
+
 
 #ifdef _DEBUG
 		std::cout << "llvm Type not found: ";
@@ -362,7 +367,8 @@ namespace AlloyCompiler
 		typeInfo.ID = ++NextTypeID;		// unique ID for this type
 
 		m_ScopeStack.back().Types[name] = typeInfo;
-		m_ScopeStack.back().TypeNames[type] = name;
+		m_ScopeStack.back().Types[type->name()] = typeInfo;
+		m_ScopeStack.back().TypeNames[type] = type->name();
 	}
 
 	void NamedValues::DumpTypeNames()
@@ -422,7 +428,7 @@ namespace AlloyCompiler
 		m_ScopeStack.back().GenericTypeMap[typeName] = Type;
 	}
 
-	GenericTypeMap NamedValues::GetGenericTypeMap()
+	GenericTypeMap& NamedValues::GetGenericTypeMap()
 	{
 		return m_ScopeStack.back().GenericTypeMap;
 	}

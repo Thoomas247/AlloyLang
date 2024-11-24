@@ -83,7 +83,7 @@ namespace AlloyCompiler
 		void SetGenericType(const std::string& typeName, const AlloyType* realType);
 
 		// returns the current function's generic type map
-		GenericTypeMap GetGenericTypeMap();
+		GenericTypeMap& GetGenericTypeMap();
 		// returns the generic type map for a specific type
 		bool GetGenericTypeMap(const std::string_view& structName, GenericTypeMap& genericTypeMap);
 

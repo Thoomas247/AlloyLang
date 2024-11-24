@@ -86,7 +86,7 @@ namespace AlloyCompiler
 
 		// if this is a member function, we need to check at what level the function is defined
 		// eg: given the type graph A->B->i32->any, we must check at every level if the function exists
-		size_t memberSeparatorIndex = name.find('@');
+		size_t memberSeparatorIndex = name.find(NodeBuffer::TYPE_SEPARATOR);
 		if (memberSeparatorIndex != std::string_view::npos)
 		{
 			std::string_view fullTypeName = name.substr(0, memberSeparatorIndex);
@@ -168,7 +168,7 @@ namespace AlloyCompiler
 		std::string currentType = std::string(typeName);
 		std::string currentFn = std::string(fnName);
 
-		std::string fullName = currentType + "@" + currentFn;
+		std::string fullName = currentType + NodeBuffer::TYPE_SEPARATOR + currentFn;
 
 		SearchResult<TYPE_DEFINITION> typeResult = GetTypeDefinition(currentType);
 		SearchResult<FUNCTION_DEFINITION> funcResult = getDefinition(getDefinitionFn, fullName);
@@ -181,7 +181,7 @@ namespace AlloyCompiler
 				break;
 			}
 
-			fullName = typeResult.MangledName + "@" + currentFn;
+			fullName = typeResult.MangledName + NodeBuffer::TYPE_SEPARATOR + currentFn;
 			funcResult = getDefinition(getDefinitionFn, fullName);
 		}
 

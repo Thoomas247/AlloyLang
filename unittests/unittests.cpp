@@ -144,7 +144,7 @@ namespace unittests
 		}
 		TEST_METHOD(LargeTest)
 		{
-			RunTest("../../AlloyLang/test/LargeTest/main.alloy", 0);
+			RunTest("../../AlloyLang/test/LargeTest/main.alloy", 20);
 		}
 
 	};

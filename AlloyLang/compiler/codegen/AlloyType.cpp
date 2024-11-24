@@ -3,10 +3,6 @@
 #include "CodeGenerator.hpp"
 #include "AlloyType.hpp"
 #include "AlloyValue.hpp"
-#include "LibraryFunctions.hpp"
-#include "Inlines.hpp"
-#include "SmartPointerClass.hpp"
-#include "../../log/Log.hpp"
 
 namespace AlloyCompiler
 {
@@ -132,19 +128,24 @@ namespace AlloyCompiler
         if (containedType == nullptr)
             return get(llvmType);
         else {
-            std::string typeName = get(llvmType)->alloyTypeName + "|" + containedType->alloyTypeName;
-
-            if (AlloyTypeMap.contains(typeName)) {
-                return AlloyTypeMap.at(typeName);
+            if (llvmType->isPointerTy()) {
+                return getPointerType(containedType);
             }
             else {
-                AlloyType* alloyType = new AlloyType(containedType->llvmContext, llvmType);
-                alloyType->alloyTypeName = typeName;
-                alloyType->containedType = containedType;
-                alloyType->isSigned = false;
-                AlloyTypeMap[typeName] = alloyType;
-                AlloyTypeIdMap[llvmType] = alloyType;
-                return alloyType;
+                std::string typeName = get(llvmType)->alloyTypeName + NodeBuffer::POINTER_SEPARATOR + containedType->alloyTypeName;
+
+                if (AlloyTypeMap.contains(typeName)) {
+                    return AlloyTypeMap.at(typeName);
+                }
+                else {
+                    AlloyType* alloyType = new AlloyType(containedType->llvmContext, llvmType);
+                    alloyType->alloyTypeName = typeName;
+                    alloyType->containedType = containedType;
+                    alloyType->isSigned = false;
+                    AlloyTypeMap[typeName] = alloyType;
+                    AlloyTypeIdMap[llvmType] = alloyType;
+                    return alloyType;
+                }
             }
         }
     }
