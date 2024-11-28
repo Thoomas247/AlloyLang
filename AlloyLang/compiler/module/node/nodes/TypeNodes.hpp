@@ -38,10 +38,10 @@ namespace AlloyCompiler
 
 		Token* GetErrorToken() const
 		{
-			if (Type.Is<TYPE_NAME>()) return Type.Get<TYPE_NAME>()->pNameToken;
+			if (Type.Is<TYPE_NAME>())	return Type.Get<TYPE_NAME>()->pNameToken;
 			if (Type.Is<STRUCT_TYPE>()) return Type.Get<STRUCT_TYPE>()->pErrorToken;
-			if (Type.Is<ENUM_TYPE>()) return Type.Get<ENUM_TYPE>()->pErrorToken;
-			if (Type.Is<ARRAY_TYPE>()) return Type.Get<ARRAY_TYPE>()->pElementType->GetErrorToken();
+			if (Type.Is<ENUM_TYPE>())	return Type.Get<ENUM_TYPE>()->pErrorToken;
+			if (Type.Is<ARRAY_TYPE>())	return Type.Get<ARRAY_TYPE>()->pElementType->GetErrorToken();
 
 			return nullptr;
 			//if (Type.Is<MACRO_CALL>()) return Type.Get<MACRO_CALL>()->pMacroNameToken;

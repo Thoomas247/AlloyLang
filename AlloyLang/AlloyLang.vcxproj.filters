@@ -157,6 +157,7 @@
     <None Include="test\LargeTest\lib\ecs.alloy" />
     <None Include="test\LargeTest\lib\array.alloy" />
     <None Include="test\LargeTest\lib\shared_ptr.alloy" />
+    <None Include="test\TypeConversion\main.alloy" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="docs\Parser Issues.txt" />

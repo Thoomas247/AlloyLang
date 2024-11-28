@@ -152,6 +152,7 @@
     <None Include="test\MultipleFiles2\lib\log.alloy" />
     <None Include="test\MultipleFiles2\lib\math.alloy" />
     <None Include="test\MultipleFiles2\main.alloy" />
+    <None Include="test\TypeConversion\main.alloy" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="AlloyLang.txt" />

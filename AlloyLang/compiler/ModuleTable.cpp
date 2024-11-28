@@ -59,7 +59,7 @@ namespace AlloyCompiler
 		if (std::find(BUILT_IN_TYPE_NAMES.begin(), BUILT_IN_TYPE_NAMES.end(), name) != BUILT_IN_TYPE_NAMES.end())
 		{
 			SearchResult<TYPE_DEFINITION> result;
-			result.Code = SearchResultCode::Found;
+			result.Code = SearchResultCode::BuiltIn;
 			result.MangledName = name;
 			result.ModuleName = "";
 			result.pDefiniton = nullptr;
@@ -131,6 +131,150 @@ namespace AlloyCompiler
 		return m_Modules;
 	}
 
+	bool ModuleTable::AllowConversion(TYPE* from, TYPE* to) const
+	{
+		bool result = false;
+
+		if (to->Type.Is<TYPE_NAME>())
+		{
+			// check if 'from' contains the name of 'to' anywhere down its type graph
+
+			// get the full mangled name of 'to'
+			// to handle the case where a type is imported, ie can be used as 'module::A' or just 'A'
+			// we have to check the full mangled name, as otherwise we cannot see that these types are equal
+			SearchResult<TYPE_DEFINITION> toTypeResult = GetTypeDefinition(to->Type.Get<TYPE_NAME>()->pNameToken->Value);
+			ASSERT(toTypeResult.Code == SearchResultCode::Found || toTypeResult.Code == SearchResultCode::BuiltIn, "Invalid type!");
+			const std::string& targetName = toTypeResult.MangledName;
+
+			SearchResult<TYPE_DEFINITION> fromTypeResult = GetTypeDefinition(from->Type.Get<TYPE_NAME>()->pNameToken->Value);
+			ASSERT(fromTypeResult.Code == SearchResultCode::Found || fromTypeResult.Code == SearchResultCode::BuiltIn, "Invalid type!");
+
+			do
+			{
+				const std::string& currentName = toTypeResult.MangledName;
+
+				if (currentName == targetName)
+				{
+					result = true;
+				}
+
+				else
+				{
+					fromTypeResult = getNextType(fromTypeResult.pDefiniton);
+				}
+			} while (result == false && fromTypeResult.Code == SearchResultCode::Found);
+		}
+
+		else
+		{
+			TYPE* fromBaseType = getBaseType(from);
+
+			if (fromBaseType->Type.Is<STRUCT_TYPE>() && to->Type.Is<STRUCT_TYPE>())
+			{
+				STRUCT_TYPE* fromStruct = fromBaseType->Type.Get<STRUCT_TYPE>();
+				STRUCT_TYPE* toStruct = to->Type.Get<STRUCT_TYPE>();
+
+				if (fromStruct->Members.size() == toStruct->Members.size())
+				{
+					bool compatible = true;
+
+					for (size_t i = 0; i < fromStruct->Members.size(); i++)
+					{
+						auto& [fromNameToken, fromType] = fromStruct->Members[i];
+						auto& [toNameToken, toType] = toStruct->Members[i];
+
+						if (!AllowConversion(fromType, toType))
+						{
+							compatible = false;
+							break;
+						}
+					}
+
+					if (compatible)
+					{
+						result = true;
+					}
+				}
+			}
+
+			else if (fromBaseType->Type.Is<ENUM_TYPE>() && to->Type.Is<ENUM_TYPE>())
+			{
+				ENUM_TYPE* fromEnum = fromBaseType->Type.Get<ENUM_TYPE>();
+				ENUM_TYPE* toEnum = to->Type.Get<ENUM_TYPE>();
+
+				if (fromEnum->Members.size() == toEnum->Members.size())
+				{
+					bool compatible = true;
+
+					for (size_t i = 0; i < fromEnum->Members.size(); i++)
+					{
+						auto& [fromNameToken, fromType] = fromEnum->Members[i];
+						auto& [toNameToken, toType] = toEnum->Members[i];
+
+						if (fromType != nullptr && toType != nullptr)
+						{
+							// check if payload types are compatible
+							if (!AllowConversion(fromType, toType))
+							{
+								compatible = false;
+								break;
+							}
+						}
+
+						else if (fromType == nullptr && toType == nullptr)
+						{
+							// do nothing, both members do not have payloads and are therefore compatible
+						}
+
+						else
+						{
+							// one has a payload but the other doesn't, incompatible
+							compatible = false;
+							break;
+						}
+
+					}
+
+					if (compatible)
+					{
+						result = true;
+					}
+				}
+			}
+
+			else if (fromBaseType->Type.Is<ARRAY_TYPE>() && to->Type.Is<ARRAY_TYPE>())
+			{
+				ARRAY_TYPE* fromArray = fromBaseType->Type.Get<ARRAY_TYPE>();
+				ARRAY_TYPE* toArray = to->Type.Get<ARRAY_TYPE>();
+
+				bool compatibleSizes = false;
+				if (fromArray->pSizeLiteral->Type == LiteralType::Integer && toArray->pSizeLiteral->Type == LiteralType::Integer)
+				{
+					const std::string_view& fromLiteral = fromArray->pSizeLiteral->pValueToken->Value;
+					const std::string_view& toLiteral = toArray->pSizeLiteral->pValueToken->Value;
+
+					uint64_t fromSize = 0;
+					std::from_chars(fromLiteral.data(), fromLiteral.data() + fromLiteral.size(), fromSize);
+
+					uint64_t toSize = 0;
+					std::from_chars(toLiteral.data(), toLiteral.data() + toLiteral.size(), toSize);
+
+					if (fromSize == toSize)
+					{
+						compatibleSizes = true;
+					}
+				}
+
+				if (compatibleSizes && AllowConversion(fromArray->pElementType, toArray->pElementType))
+				{
+					result = true;
+				}
+			}
+		}
+
+		return result;
+	}
+
 	ModuleTable::ModuleAndSymbolName ModuleTable::splitName(const std::string_view& name) const
 	{
 		ModuleAndSymbolName result;
@@ -161,6 +305,27 @@ namespace AlloyCompiler
 	std::string ModuleTable::getRelativePath(const std::string_view& rootName, const std::string_view& moduleName) const
 	{
 		return std::string(rootName) + "::" + std::string(moduleName);
+	}
+
+	TYPE* ModuleTable::getBaseType(TYPE* type) const
+	{
+		TYPE* baseType = type;
+
+		if (baseType->Type.Is<TYPE_NAME>())
+		{
+			SearchResult<TYPE_DEFINITION> currentSearchResult = GetTypeDefinition(baseType->Type.Get<TYPE_NAME>()->pNameToken->Value);
+			ASSERT(currentSearchResult.Code == SearchResultCode::Found || currentSearchResult.Code == SearchResultCode::BuiltIn, "Invalid type!");
+
+			while (currentSearchResult.Code == SearchResultCode::Found && currentSearchResult.pDefiniton->pType->Type.Is<TYPE_NAME>())
+			{
+				currentSearchResult = getNextType(currentSearchResult.pDefiniton);
+				ASSERT(currentSearchResult.Code == SearchResultCode::Found || currentSearchResult.Code == SearchResultCode::BuiltIn, "Invalid type!");
+			}
+
+			baseType = currentSearchResult.pDefiniton->pType;
+		}
+
+		return baseType;
 	}
 
 	SearchResult<FUNCTION_DEFINITION> ModuleTable::getMemberFunctionDefinition(GetDefinitionFn<FUNCTION_DEFINITION> getDefinitionFn, const std::string_view& typeName, const std::string_view& fnName) const

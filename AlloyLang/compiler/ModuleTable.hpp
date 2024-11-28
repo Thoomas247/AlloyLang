@@ -60,6 +60,8 @@ namespace AlloyCompiler
 
 		const std::unordered_map<std::string, Module>& GetModules();
 
+		bool AllowConversion(TYPE* from, TYPE* to) const;
+
 	private:
 		template <typename T>
 		using GetDefinitionFn = Definition<T>(*)(const Module&, const std::string_view&);
@@ -83,6 +85,8 @@ namespace AlloyCompiler
 
 		SearchResult<FUNCTION_DEFINITION> getMemberFunctionDefinition(GetDefinitionFn<FUNCTION_DEFINITION> getDefinitionFn, const std::string_view& typeName, const std::string_view& fnName) const;
 		SearchResult<TYPE_DEFINITION> getNextType(TYPE_DEFINITION* currentType) const;
+
+		TYPE* getBaseType(TYPE* type) const;
 
 		template <typename T>
 		ModuleDefinitionPair<T> getDefinitionInModule(GetDefinitionFn<T> getDefinitionFn, const std::string_view& moduleName, const std::string_view& symbolName) const;
