@@ -1,7 +1,7 @@
 //
 // References unit test
 //
-extern printf (const str : String, ...) -> i64;
+extern printf (const str : String, var param1 : i64, ...) -> i64;
 	
 fn test(var a : i64, var b : &i64) -> i64
 {

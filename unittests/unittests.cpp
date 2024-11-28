@@ -1,15 +1,19 @@
 #include "CppUnitTest.h"
 #include "../AlloyLang/compiler/codegen/llvm/llvm.hpp"
 
-#include "../AlloyLang/compiler/Compiler.hpp"
-#include "../AlloyLang/compiler/module/token/TokenBuffer.hpp"
-#include "../AlloyLang/compiler/module/node/NodeBuffer.hpp"
-#include "../AlloyLang/compiler/codegen/CodeGenerator.hpp"
-
 #include <iostream>
 #include <fstream>
 #include <chrono>
 #include <io.h>
+
+#include "../AlloyLang/compiler/codegen/NamedValues.hpp"
+#include "../AlloyLang/compiler/codegen/CodeGenerator.hpp"
+#include "../AlloyLang/compiler/Compiler.hpp"
+#include "../AlloyLang/compiler/module/token/TokenBuffer.hpp"
+#include "../AlloyLang/compiler/module/node/NodeBuffer.hpp"
+#include "../AlloyLang/compiler/codegen/AlloyType.hpp"
+#include "../AlloyLang/compiler/codegen/AlloyValue.hpp"
+#include "../AlloyLang/compiler/codegen/SmartPointerClass.hpp"
 
 using namespace AlloyCompiler;
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
@@ -48,6 +52,11 @@ namespace unittests
 		}
 
 	public:
+
+		TEST_METHOD(AnyParameters)
+		{
+			RunTest("../../AlloyLang/test/AnyParameters/main.alloy", 49);
+		}
 
 		TEST_METHOD(BasicTest)
 		{
@@ -135,7 +144,7 @@ namespace unittests
 		}
 		TEST_METHOD(LargeTest)
 		{
-			RunTest("../../AlloyLang/test/LargeTest/main.alloy", 0);
+			RunTest("../../AlloyLang/test/LargeTest/main.alloy", 20);
 		}
 
 	};

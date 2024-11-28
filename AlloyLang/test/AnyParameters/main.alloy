@@ -1,0 +1,22 @@
+//
+// Unit test for "Any" function parameters
+//
+extern printf (const str: String, ...) -> i64;
+
+fn square(var a : &Any)
+{
+	a = a * a;
+}
+
+fn main() -> i64
+{
+	var a : i64 = 7;
+	var b : f64 = 7.0;
+
+	square(&a);
+	square(&b);
+
+	printf("7^2 = %d, 7.0^2 = %f", a, b);
+
+	return a;
+}

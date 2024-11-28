@@ -1,3 +1,11 @@
+#include "compiler/codegen/llvm/llvm.hpp"
+#include "compiler/codegen/NamedValues.hpp"
+#include "compiler/codegen/CodeGenerator.hpp"
+#include "compiler/codegen/AlloyType.hpp"
+#include "compiler/codegen/AlloyValue.hpp"
+#include "compiler/codegen/LibraryFunctions.hpp"
+#include "compiler/codegen/Inlines.hpp"
+#include "compiler/codegen/SmartPointerClass.hpp"
 #include "log/Log.hpp"
 #include "compiler/Compiler.hpp"
 

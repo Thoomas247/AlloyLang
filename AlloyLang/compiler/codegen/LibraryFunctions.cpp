@@ -1,5 +1,11 @@
+#include "llvm/llvm.hpp"
+#include "NamedValues.hpp"
 #include "CodeGenerator.hpp"
+#include "AlloyType.hpp"
+#include "AlloyValue.hpp"
 #include "LibraryFunctions.hpp"
+#include "Inlines.hpp"
+#include "SmartPointerClass.hpp"
 
 //
 // LibraryFunctions.cpp contains various procedures to generate llvm functions that can be called from various code locations to reduce code repetition
@@ -7,7 +13,7 @@
 
 namespace AlloyCompiler
 {
-	extern llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, llvm::Type* type, int numElements = 0);
+	extern llvm::AllocaInst* createEntryBlockAlloca(llvm::Function* function, const std::string_view& varName, const AlloyType* type, int numElements = 0);
 
 	llvm::Function* generateMemCmpFunctionDeclaration(const ModuleTable& moduleTable, LLVMState& state) {
 		//
@@ -28,12 +34,12 @@ namespace AlloyCompiler
 		// generate the function declaration
 
 		// set the return type
-		returnType = llvm::IntegerType::get(*state.Context, 32);
+		returnType = AlloyType::get("i32")->llvmType;
 
 		// function takes two pointers and one size as parameters
-		paramTypes.push_back(llvm::PointerType::get(*state.Context, 0));
-		paramTypes.push_back(llvm::PointerType::get(*state.Context, 0));
-		paramTypes.push_back(llvm::IntegerType::get(*state.Context, 32));
+		paramTypes.push_back(AlloyType::getPointerType("i8")->llvmType);
+		paramTypes.push_back(AlloyType::getPointerType("i8")->llvmType);
+		paramTypes.push_back(AlloyType::get("i32")->llvmType);
 
 		functionType = llvm::FunctionType::get(returnType, paramTypes, false);
 		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, MemCmpFunctionName, *state.Module);
@@ -48,7 +54,7 @@ namespace AlloyCompiler
 		// Function signature : Value* _CreateStructCompare_(Value* Left, int64 LeftSize, Value* Right, int64 RightSize)
 		//
 		
-		llvm::Type* returnType = nullptr;
+		const AlloyType* returnType = nullptr;
 		std::vector<llvm::Type*> paramTypes;
 		llvm::FunctionType* functionType = nullptr;
 
@@ -61,15 +67,15 @@ namespace AlloyCompiler
 		// generate the function declaration
 
 		// set the return type
-		returnType = llvm::IntegerType::get(*state.Context, 1);
+		returnType = AlloyType::get("bool");
 
 		// function takes two pointers and two pointer sizes as parameters
-		paramTypes.push_back(llvm::PointerType::get(*state.Context, 0));
-		paramTypes.push_back(llvm::IntegerType::get(*state.Context, 32));
-		paramTypes.push_back(llvm::PointerType::get(*state.Context, 0));
-		paramTypes.push_back(llvm::IntegerType::get(*state.Context, 32));
+		paramTypes.push_back(AlloyType::getPointerType("i8")->llvmType);
+		paramTypes.push_back(AlloyType::get("i32")->llvmType);
+		paramTypes.push_back(AlloyType::getPointerType("i8")->llvmType);
+		paramTypes.push_back(AlloyType::get("i32")->llvmType);
 
-		functionType = llvm::FunctionType::get(returnType, paramTypes, false);
+		functionType = llvm::FunctionType::get(returnType->llvmType, paramTypes, false);
 		function = llvm::Function::Create(functionType, llvm::Function::ExternalLinkage, StructCompareFunctionName, *state.Module);
 
 		if (function != nullptr) {
@@ -125,7 +131,7 @@ namespace AlloyCompiler
 			FuncBuilder->CreateBr(FuncExitBlock);
 
 			FuncBuilder->SetInsertPoint(FuncExitBlock);
-			FuncBuilder->CreateRet(FuncBuilder->CreateLoad(returnType, retInst));
+			FuncBuilder->CreateRet(FuncBuilder->CreateLoad(returnType->llvmType, retInst));
 			
 			delete FuncBuilder;
 		}

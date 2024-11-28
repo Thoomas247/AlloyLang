@@ -2,7 +2,7 @@
 // Class SmartPointerClass is a collection of static functions that handle arrays and pointers allocated using the new operator
 // Because llvm does not support arrays of complex types (e.g. arrays of structures), we are not using the llvm vector types but using the objects allocated by this class
 // The smart pointers are actually a structure that contains:
-//  - The allocated pointer
+// - The allocated pointer
 // - The number of elements that are allocated
 // - A reference counter (for future use)
 //
@@ -21,9 +21,9 @@ namespace AlloyCompiler
 	class SmartPointerClass
 	{
 	public:
-		static llvm::Value* create(
+		static AlloyValue create(
 			LLVMState& state,
-			llvm::Type* PtrType,	// llvm Type as created by GetSmartPointerStruct
+			const AlloyType* PtrType,	// llvm Type as created by GetSmartPointerStruct
 			llvm::Value* Ptr,		// The actual pointer that we are storing
 			llvm::Value* Count		// The number of elements pointed to by the pointer
 		);
@@ -58,14 +58,14 @@ namespace AlloyCompiler
 		static llvm::Value* getValue(LLVMState& state, llvm::Value* Ptr, llvm::Value*& MemberPtr, llvm::Value* index);
 
 		// return the structure type associated with a specific pointer type
-		static llvm::Type* GetSmartPointerStruct(LLVMState& state, llvm::Type* ElementType, bool IsArray);
+		static const AlloyType* GetSmartPointerStruct(LLVMState& state, const AlloyType* ElementType, bool IsArray);
 
 		// check if given type is a smart pointer and return the pointed to type
-		static llvm::Type* isSmartPointer(LLVMState& state, llvm::Type* llvmType, bool& isArray) {
-			if (state.smartPointerTypeMap.contains(llvmType)) {
-				std::tuple<llvm::Type*, bool> tuple = state.smartPointerTypeMap[llvmType];
+		static const AlloyType* isSmartPointer(LLVMState& state, const AlloyType* alloyType, bool& isArray) {
+			if (alloyType && state.smartPointerTypeMap.contains(alloyType->llvmType)) {
+				std::tuple<llvm::Type*, bool> tuple = state.smartPointerTypeMap[alloyType->llvmType];
 				isArray = std::get<1>(tuple);
-				return std::get<0>(tuple);
+				return AlloyType::get(std::get<0>(tuple));
 			}
 			else {
 				return nullptr;

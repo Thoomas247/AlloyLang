@@ -1,8 +1,12 @@
 #include "llvm/llvm.hpp"
 #include "NamedValues.hpp"
-
+#include "CodeGenerator.hpp"
+#include "AlloyType.hpp"
+#include "AlloyValue.hpp"
+#include "LibraryFunctions.hpp"
+#include "Inlines.hpp"
+#include "SmartPointerClass.hpp"
 #include "../../log/Log.hpp"
-
 
 namespace AlloyCompiler
 {
@@ -22,26 +26,26 @@ namespace AlloyCompiler
 	void NamedValues::RegisterDefaultTypes(llvm::LLVMContext& llvmContext)
 	{
 		// TODO: remove
-		InsertType("String", llvm::PointerType::get(llvm::IntegerType::get(llvmContext, 8), 0), UserDefinedType::basic); // convert string to u8*
+		InsertType("String", AlloyType::getPointerType(llvm::IntegerType::get(llvmContext, 8)), UserDefinedType::basic); // convert string to u8*
 
 		// insert the default types
-		InsertType("bool", llvm::Type::getInt1Ty(llvmContext), UserDefinedType::basic);
+		InsertType("bool", AlloyType::getIntType(llvmContext, 1, false, "bool"), UserDefinedType::basic);
 
-		InsertType("i8", llvm::Type::getInt8Ty(llvmContext), UserDefinedType::basic);
-		InsertType("i16", llvm::Type::getInt16Ty(llvmContext), UserDefinedType::basic);
-		InsertType("i32", llvm::Type::getInt32Ty(llvmContext), UserDefinedType::basic);
-		InsertType("i64", llvm::Type::getInt64Ty(llvmContext), UserDefinedType::basic);
+		InsertType("i8", AlloyType::getIntType(llvmContext, 8, true, "i8"), UserDefinedType::basic);
+		InsertType("i16", AlloyType::getIntType(llvmContext, 16, true, "i16"), UserDefinedType::basic);
+		InsertType("i32", AlloyType::getIntType(llvmContext, 32, true, "i32"), UserDefinedType::basic);
+		InsertType("i64", AlloyType::getIntType(llvmContext, 64, true, "i64"), UserDefinedType::basic);
 
-		InsertType("u8", llvm::Type::getInt8Ty(llvmContext), UserDefinedType::basic);
-		InsertType("u16", llvm::Type::getInt16Ty(llvmContext), UserDefinedType::basic);
-		InsertType("u32", llvm::Type::getInt32Ty(llvmContext), UserDefinedType::basic);
-		InsertType("u64", llvm::Type::getInt64Ty(llvmContext), UserDefinedType::basic);
+		InsertType("u8", AlloyType::getIntType(llvmContext, 8, false, "u8"), UserDefinedType::basic);
+		InsertType("u16", AlloyType::getIntType(llvmContext, 16, false, "u16"), UserDefinedType::basic);
+		InsertType("u32", AlloyType::getIntType(llvmContext, 32, false, "u32"), UserDefinedType::basic);
+		InsertType("u64", AlloyType::getIntType(llvmContext, 64, false, "u64"), UserDefinedType::basic);
 
-		InsertType("f32", llvm::Type::getFloatTy(llvmContext), UserDefinedType::basic);
-		InsertType("f64", llvm::Type::getDoubleTy(llvmContext), UserDefinedType::basic);
+		InsertType("f32", AlloyType::get(llvm::Type::getFloatTy(llvmContext)), UserDefinedType::basic);
+		InsertType("f64", AlloyType::get(llvm::Type::getDoubleTy(llvmContext)), UserDefinedType::basic);
 	}
 
-	llvm::Type* NamedValues::GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, llvm::Type* PayloadType)
+	const AlloyType* NamedValues::GetEnumPayloadStruct(llvm::LLVMContext& llvmContext, const AlloyType* PayloadType)
 	{
 		// 
 		// EnumPayloadStruct is a structure that contains the index, payload and enum ID for an enum value
@@ -52,13 +56,13 @@ namespace AlloyCompiler
 		std::string payloadStructName = _EnumPayloadStruct_ + std::string(payloadTypeName);
 		
 		// check if the same structure has already been defined, otherwise define it
-		llvm::Type* EnumPayloadStruct = GetType(payloadStructName);
+		const AlloyType* EnumPayloadStruct = GetType(payloadStructName);
 		if (nullptr == EnumPayloadStruct) {
 			std::vector<llvm::Type*> memberTypes;
-			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// index into the enum
-			memberTypes.push_back(PayloadType != nullptr ? PayloadType : llvm::Type::getInt8Ty(llvmContext));			// payload
-			memberTypes.push_back(llvm::Type::getInt64Ty(llvmContext));		// the actual enum ID, needed to compare enum values
-			EnumPayloadStruct = llvm::StructType::create(llvmContext, memberTypes, payloadStructName, true);
+			memberTypes.push_back(AlloyType::get("i64")->llvmType);		// index into the enum
+			memberTypes.push_back(PayloadType != nullptr ? PayloadType->llvmType : AlloyType::get("i8")->llvmType);			// payload
+			memberTypes.push_back(AlloyType::get("i64")->llvmType);		// the actual enum ID, needed to compare enum values
+			EnumPayloadStruct = AlloyType::get(llvm::StructType::create(llvmContext, memberTypes, payloadStructName, true));
 
 			InsertType(payloadStructName, EnumPayloadStruct, UserDefinedType::structure);
 		}
@@ -100,21 +104,21 @@ namespace AlloyCompiler
 
 			// we have to make sure that we do not attempt to free references which are also pointers
 			// pointers and references have their type set explicitely
-			if (it.second.freeOnExit && it.second.containedType != nullptr) {
-				// load the underlying hear pointer created using Malloc and free it
-				llvm::Value* Ptr = builder.CreateLoad(it.second.value->getType(), it.second.value);
-				builder.CreateFree(Ptr);
+			if (it.second.freeOnExit && it.second.Type->getContainedType() != nullptr) {
+				// load the underlying heap pointer created using Malloc and free it
+				// llvm::Value* Ptr = builder.CreateLoad(it.second.Type, it.second.value);
+				// builder.CreateFree(Ptr);
 			}
 		}
 	}
 
 
-	ValueTypePair* NamedValues::GetValue(const std::string& name, bool searchInParents /*= true*/)
+	const AlloyValue* NamedValues::GetValue(const std::string& name, bool searchInParents /*= true*/)
 	{
 		//
 		// searchInParents can be set to false in situations where we need to search the current level only and not go through the parent tree
 		//
-		ValueTypePair* result = nullptr;
+		AlloyValue* result = nullptr;
 
 		// look for the value starting from the current scope and going up
 		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
@@ -156,14 +160,43 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	void NamedValues::InsertValue(const std::string& name, llvm::AllocaInst* value, llvm::Type* type, llvm::Type* parentType, bool isConst, bool freeOnExit)
+	void NamedValues::InsertValue(const std::string& name, llvm::AllocaInst* ptr, const AlloyType* type, const AlloyType* parentType, bool isConst, bool freeOnExit)
 	{
 		ASSERT(!m_ScopeStack.back().Values.contains(name), "Named value already exists! Should check if it exists first with NamedValues::GetValue(const std::string& name).");
-		ValueTypePair valueTypePair = { value, type, parentType, isConst, freeOnExit };
-		m_ScopeStack.back().Values[name] = valueTypePair;
+		AlloyValue alloyValue(nullptr, type, ptr, isConst);
+		alloyValue.freeOnExit = freeOnExit;
+		alloyValue.parentType = parentType;
+		m_ScopeStack.back().Values[name] = alloyValue;
 	}
 
-	llvm::Type* NamedValues::GetType(const std::string_view& name)
+	bool NamedValues::UpdateValue(const std::string& name, const AlloyValue& value)
+	{
+		bool result = false;
+
+		// look for the value starting from the current scope and going up
+		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
+		{
+			auto& scope = *it;
+			auto found = scope.Values.find(name);
+			if (found != scope.Values.end())
+			{
+				found->second = value;
+				result = true;
+				break;
+			}
+		}
+
+		ASSERT(result, "Named value not found and cannot be updated.");
+		return result;
+	}
+
+	void NamedValues::InsertValue(const std::string& name, const AlloyValue& value)
+	{
+		ASSERT(!m_ScopeStack.back().Values.contains(name), "Named value already exists! Should check if it exists first with NamedValues::GetValue(const std::string& name).");
+		m_ScopeStack.back().Values[name] = value;
+	}
+
+	const AlloyType* NamedValues::GetType(const std::string_view& name)
 	{
 		TypeInfo* typeInfo = findType(name);
 
@@ -206,7 +239,7 @@ namespace AlloyCompiler
 	}
 
 	// check if specific type is an enumeration
-	bool NamedValues::IsEnumType(llvm::Type* type)
+	bool NamedValues::IsEnumType(const AlloyType* type)
 	{
 		// check if specific type is an enumeration
 		TypeInfo* typeInfo = findType(GetTypeName(type));
@@ -222,7 +255,7 @@ namespace AlloyCompiler
 	}
 
 	// check if specific type is an enumeration
-	unsigned int NamedValues::GetID(llvm::Type* type)
+	unsigned int NamedValues::GetID(const AlloyType* type)
 	{
 		// check if specific type is an enumeration
 		TypeInfo* typeInfo = findType(GetTypeName(type));
@@ -252,7 +285,7 @@ namespace AlloyCompiler
 		}
 	}
 
-	NamedValues::TypeMemberInfo NamedValues::GetStructMemberIndex(const std::string_view& structName, const std::string_view& memberName)
+	NamedValues::TypeMemberInfo NamedValues::GetStructMemberInfo(const std::string_view& structName, const std::string_view& memberName)
 	{
 		TypeInfo* typeInfo = findType(structName);
 
@@ -271,7 +304,7 @@ namespace AlloyCompiler
 		return it->second;
 	}
 
-	NamedValues::TypeMemberInfo NamedValues::GetEnumMemberIndex(const std::string_view& enumName, const std::string_view& memberName)
+	NamedValues::TypeMemberInfo NamedValues::GetEnumMemberInfo(const std::string_view& enumName, const std::string_view& memberName)
 	{
 		TypeInfo* typeInfo = findType(enumName);
 
@@ -290,8 +323,12 @@ namespace AlloyCompiler
 		return it->second;
 	}
 
-	std::string_view NamedValues::GetTypeName(const llvm::Type* type)
+	std::string_view NamedValues::GetTypeName(const AlloyType* type)
 	{
+		// for pointers, get the underlying type name
+		if (type->getTypeID() == llvm::Type::TypeID::PointerTyID) {
+			type = type->getContainedType();
+		}
 		// look for the type starting from the current scope and going up
 		for (auto it = m_ScopeStack.rbegin(); it != m_ScopeStack.rend(); ++it)
 		{
@@ -303,16 +340,17 @@ namespace AlloyCompiler
 			}
 		}
 
+
 #ifdef _DEBUG
 		std::cout << "llvm Type not found: ";
-		type->dump();
+		type->llvmType->dump();
 		DumpTypeNames();
 #endif
 		ASSERT(false, "Type name not found! This only happens if type wasn't added to NamedValues when it should.");
 		return "";
 	}
 
-	void NamedValues::InsertType(const std::string& name, llvm::Type* type, UserDefinedType userDefinedType,
+	void NamedValues::InsertType(const std::string& name, const AlloyType* type, UserDefinedType userDefinedType,
 		const std::unordered_map<std::string_view, TypeMemberInfo>& memberInfo,
 		const GenericTypeMap& genericTypeMap
 		)
@@ -329,7 +367,8 @@ namespace AlloyCompiler
 		typeInfo.ID = ++NextTypeID;		// unique ID for this type
 
 		m_ScopeStack.back().Types[name] = typeInfo;
-		m_ScopeStack.back().TypeNames[type] = name;
+		m_ScopeStack.back().Types[type->name()] = typeInfo;
+		m_ScopeStack.back().TypeNames[type] = type->name();
 	}
 
 	void NamedValues::DumpTypeNames()
@@ -347,7 +386,7 @@ namespace AlloyCompiler
 			for (auto typeName = scope.TypeNames.begin(); typeName != scope.TypeNames.end(); typeName++)
 			{
 				std::cout << std::vformat("{0}{1} ==> ", std::make_format_args(tabs, typeName->second));
-				typeName->first->dump();
+				typeName->first->llvmType->dump();
 			}
 			tabs = tabs + "\t";
 		}
@@ -373,23 +412,23 @@ namespace AlloyCompiler
 	}
 
 	// support for generic function parameters
-	LLVMNameType NamedValues::GetGenericType(const std::string& typeName)
+	const AlloyType* NamedValues::GetGenericType(const std::string& typeName)
 	{
 		auto found = m_ScopeStack.back().GenericTypeMap.find(typeName);
 		if (found == m_ScopeStack.back().GenericTypeMap.end()) {
-			return std::make_tuple("", nullptr);
+			return nullptr;
 		}
 		else {
 			return found->second;
 		}
 	}
 
-	void NamedValues::SetGenericType(const std::string& typeName, LLVMNameType Type)
+	void NamedValues::SetGenericType(const std::string& typeName, const AlloyType* Type)
 	{
 		m_ScopeStack.back().GenericTypeMap[typeName] = Type;
 	}
 
-	GenericTypeMap NamedValues::GetGenericTypeMap()
+	GenericTypeMap& NamedValues::GetGenericTypeMap()
 	{
 		return m_ScopeStack.back().GenericTypeMap;
 	}

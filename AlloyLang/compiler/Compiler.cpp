@@ -1,3 +1,11 @@
+#include "codegen/llvm/llvm.hpp"
+#include "codegen/NamedValues.hpp"
+#include "codegen/CodeGenerator.hpp"
+#include "codegen/AlloyType.hpp"
+#include "codegen/AlloyValue.hpp"
+#include "codegen/LibraryFunctions.hpp"
+#include "codegen/Inlines.hpp"
+#include "codegen/SmartPointerClass.hpp"
 #include "Compiler.hpp"
 #include "ModuleTable.hpp"
 
@@ -6,6 +14,12 @@ namespace AlloyCompiler
 	Compiler::Compiler(const std::string& mainFilePath, LLVMState::LLVMOptimizations optimize /*= LLVMState::OptimizeModule*/)
 		: m_MainFilePath(fs::absolute(mainFilePath)), m_LLVMState(optimize)
 	{}
+
+	Compiler::~Compiler()
+	{
+		AlloyType::ClearAlloyTypes();
+	}
+
 
 	void Compiler::Compile()
 	{

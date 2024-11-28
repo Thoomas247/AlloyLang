@@ -51,14 +51,18 @@ fn main() -> i32
 	//var transform_array = Array<Transform>:create();
 
 	var score_array = ScoreArray:create();
+	score_array:resize_fill(10, 20);
 	//var run = true;
 
-	//while (run)
-	//{
-	//	increment_scores(&score_array);
-	//}
+	while (x > 0)
+	{
+		increment_scores(&score_array);
+		x = x - 1;
+	}
 
-	return 0;
+	printf("Current score = %d", score_array.data[5]);
+
+	return score_array.data[5];
 }
 
 fn increment_scores(const score_array: &ScoreArray)

@@ -54,5 +54,11 @@
     <ClCompile Include="..\AlloyLang\compiler\codegen\SmartPointerClass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\AlloyLang\compiler\codegen\AlloyType.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\AlloyLang\compiler\codegen\AlloyValue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

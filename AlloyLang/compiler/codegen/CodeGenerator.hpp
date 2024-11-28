@@ -1,7 +1,5 @@
 #pragma once
 
-#include "llvm/llvm.hpp"
-#include "NamedValues.hpp"
 #include "../ModuleTable.hpp"
 
 namespace AlloyCompiler
