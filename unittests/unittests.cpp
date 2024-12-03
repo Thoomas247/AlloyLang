@@ -146,6 +146,10 @@ namespace unittests
 		{
 			RunTest("../../AlloyLang/test/LargeTest/main.alloy", 20);
 		}
+		TEST_METHOD(TypeConversion)
+		{
+			RunTest("../../AlloyLang/test/TypeConversion/main.alloy", 0);
+		}
 
 	};
 }

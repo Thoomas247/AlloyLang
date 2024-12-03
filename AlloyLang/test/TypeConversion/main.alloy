@@ -35,4 +35,6 @@ fn main() -> i64
 
 	score_array_sum(&array);		// not allowed
 	score_array_sum(&score_array);	// allowed
+
+	return 0;
 }

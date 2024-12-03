@@ -65,7 +65,8 @@ namespace AlloyCompiler
 
 		for (auto& [name, module] : m_Modules)
 		{
-			if (!module.Generate())
+			bool success = module.Generate();
+			if (!success)
 			{
 				Log::Error("Failed to compile module '{0}'. See output for errors.", name);
 				return;
@@ -74,7 +75,16 @@ namespace AlloyCompiler
 
 		ModuleTable moduleTable(m_Modules, getModuleName(m_MainFilePath));
 
-		Generate(moduleTable, m_LLVMState);
+		bool success = Generate(moduleTable, m_LLVMState);
+
+		if (success)
+		{
+			Log::Error("Compilation successful.");
+		}
+		else
+		{
+			Log::Error("Compilation failed.");
+		}
 	}
 
 	int Compiler::Execute()
