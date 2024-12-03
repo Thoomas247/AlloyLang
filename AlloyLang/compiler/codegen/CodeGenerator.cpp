@@ -378,13 +378,18 @@ namespace AlloyCompiler
 			VARIABLE_DECLARATION* var = Parameters[i];
 			TypeModifier modifier = var->pType->Modifier;
 			const AlloyType* result;
-			TYPE_NAME* typeName_ = var->pType->Type.Get<TYPE_NAME>();
+
+			/// first check if this is a generic type and retrieve the actual type
+			TYPE_NAME* typeName_ = nullptr;
+			if (var->pType->Type.Is<TYPE_NAME>())
+				typeName_ = var->pType->Type.Get<TYPE_NAME>();
 			if (typeName_
 				&& typeMap.contains(std::string(typeName_->pNameToken->Value))
 				) {
 				mangled += NodeBuffer::GENERICS_SEPARATOR;
 				mangled += typeMap.at(std::string(typeName_->pNameToken->Value))->name();
 			}
+			///
 			else if (var->isAny) {
 				if (modifier == TypeModifier::Reference || modifier == TypeModifier::Pointer)
 					result = argumentValues[i].Type->getContainedType();
