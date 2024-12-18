@@ -92,10 +92,11 @@ namespace AlloyCompiler
 			const size_t tokenSize = pToken->Value.size();
 			const std::string_view line = currentModule.GetSource().GetLine(location.LineStart);
 
-			Log::Error("({0}:{1}) ERROR:", location.Line, location.Column);
-			Log::Error("    {0}", line);
-			Log::Error("    {0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
-			Log::Error("    {0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+			Log::Error("ERROR ({0}:{1}) :", location.Line, location.Column);
+			Log::Error("{0}", line);
+			Log::Error("{0}{1}", std::string(location.Column - 1, ' '), std::string(tokenSize, '~'));
+			Log::Error("{0}{1}", std::string(location.Column - 1, ' '), std::vformat(format, std::make_format_args(args...)));
+			Log::Error("In module '{0}'", moduleTable.GetCurrentContext());
 		}
 		else
 		{
@@ -444,8 +445,8 @@ namespace AlloyCompiler
 
 			// check that the generic parameter has not been encountered already
 			if (typeMap.contains(std::string(genericParameter->pIdentifierToken->Value))) {
-				logErrorAtCurrentPosition(moduleTable, genericParameter->pIdentifierToken, "Type {0} ({1}) cannot be defined more than once.", 
-								genericParameter->pIdentifierToken->Value, alloyType->name());
+				logErrorAtCurrentPosition(moduleTable, genericParameter->pIdentifierToken, "Type {0} ({1}) cannot be defined more than once.",
+					genericParameter->pIdentifierToken->Value, alloyType->name());
 
 				goto failed;
 			}
@@ -460,7 +461,7 @@ namespace AlloyCompiler
 		return result;
 	}
 
-	
+
 	bool isFunctionParameterConst(const FUNCTION_TYPE& functionType, int index)
 	{
 		//
@@ -479,11 +480,11 @@ namespace AlloyCompiler
 		return (index < functionType.Parameters.size() ? (functionType.Parameters[index]->pType->Modifier == TypeModifier::Reference) : false);
 	}
 
-	const AlloyType* getFunctionParameterType(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_TYPE& functionType, 
-											const GenericTypeMap& typeMap, 
-											TypeModifier& modifier, 
-											int index
-											)
+	const AlloyType* getFunctionParameterType(ModuleTable& moduleTable, LLVMState& state, const FUNCTION_TYPE& functionType,
+		const GenericTypeMap& typeMap,
+		TypeModifier& modifier,
+		int index
+	)
 	{
 		//
 		// return the type of function parameter
@@ -836,7 +837,7 @@ namespace AlloyCompiler
 			functionDeclarationNode.pFunctionType->GenericParameters,
 			functionArguments,
 			typeMap
-			);
+		);
 		std::vector<VARIABLE_DECLARATION*> empty;
 		std::string name = getExtendedFunctionName(
 			moduleTable, state,
@@ -890,7 +891,7 @@ namespace AlloyCompiler
 				identifierType = argumentValues[argi].Type;
 			}
 			else {
-				Token tok{ ((parentType != nullptr) ? state.NamedValues.GetTypeName(parentType) : ""), pParameterVariableDeclaration->pNameToken->Location, TokenKind::string_literal};
+				Token tok{ ((parentType != nullptr) ? state.NamedValues.GetTypeName(parentType) : ""), pParameterVariableDeclaration->pNameToken->Location, TokenKind::string_literal };
 				identifierType = generateTypeIdentifier(moduleTable, state, *pParameterVariableDeclaration->pType,
 					((parentType != nullptr) ? &tok : nullptr),
 					typeMap);
@@ -1271,7 +1272,7 @@ namespace AlloyCompiler
 			}
 
 			// set the value of this element into the array
-			llvm::Value* memberPtr = state.Builder->CreateGEP(elementType->llvmType, arrayPtr, 
+			llvm::Value* memberPtr = state.Builder->CreateGEP(elementType->llvmType, arrayPtr,
 				AlloyValue::getConstantInt(*state.Context, 32, i));
 			state.Builder->CreateStore(expressionVal.Value, memberPtr);
 		}
@@ -1595,8 +1596,8 @@ namespace AlloyCompiler
 
 		// set the types that we are expecting in return
 		expectedType = AlloyType::get(EnumPayloadStruct->llvmType,
-										memberInfo.Type		// this is the type of payload, can be null
-										);
+			memberInfo.Type		// this is the type of payload, can be null
+		);
 		result.parentType = enumType;
 
 		// store the index of the enum value in the first element of EnumPayloadStruct
@@ -1678,8 +1679,8 @@ namespace AlloyCompiler
 
 		// set the types that we are expecting in return
 		expectedType = AlloyType::get(AlloyType::get("i64")->llvmType,	// the index is returned in 64-bit int format
-								memberInfo.Type							// this is the type of payload, can be null
-								);		
+			memberInfo.Type							// this is the type of payload, can be null
+		);
 		result.parentType = enumType;
 		result.Value = llvm::ConstantInt::get(*state.Context, llvm::APInt(64, memberInfo.memberIndex));
 
@@ -2052,7 +2053,7 @@ namespace AlloyCompiler
 		{
 			llvm::Value* value = state.Builder->CreateCall(calleeFunc, argVals,
 				(calleeFunc->getReturnType()->getTypeID() != llvm::Type::VoidTyID ? functionName : "")	// giving the return value a name solves a bug internal to llvm, e.g. the switch/case unit test
-				);
+			);
 			if (expectedType != nullptr) {
 				AlloyValue::convertValueToType(state, value, expectedType);
 			}
@@ -2440,7 +2441,7 @@ namespace AlloyCompiler
 			varToken = assignment.pVariable->Get<PRIMARY>()->Get<VARIABLE>()->pNameToken;
 #ifdef TRACE_CODE_GENERATOR
 			logInfoAtCurrentPosition(moduleTable, varToken,
-					"Assigning value to variable {0}\n", varToken->Value);
+				"Assigning value to variable {0}\n", varToken->Value);
 #endif
 		}
 		else if (assignment.pVariable->Is<POSTFIX>()
@@ -2451,13 +2452,13 @@ namespace AlloyCompiler
 
 		if (!ptrValue.isValid())
 		{
-			logErrorAtCurrentPosition(moduleTable, varToken, 
+			logErrorAtCurrentPosition(moduleTable, varToken,
 				"Error evaluating identifier!");
 			return AlloyValue();
 		}
 
 		if (ptrValue.isConst) {
-			logErrorAtCurrentPosition(moduleTable, varToken, 
+			logErrorAtCurrentPosition(moduleTable, varToken,
 				"Assigning a value to a constant!");
 			return AlloyValue();
 		}

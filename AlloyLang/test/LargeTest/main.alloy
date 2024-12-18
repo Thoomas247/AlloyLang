@@ -23,7 +23,6 @@ fn Transform:get_transform_matrix(const self: &Self) -> Mat4
 type TransformArray = [Transform; 256];
 type ScoreArray = Array<u32>;
 
-
 type Data = struct
 {
 	score_array:		ScoreArray,
@@ -37,22 +36,16 @@ fn Data:create() -> Data
 
 fn main() -> i32
 {
+	printf("Hello World!");
+
 	var x: i32 = 25;
 	var y = x:cast<u32>();
 
-	//var data = Data:create();
-
-	//data.score_array:add(5);
-
-	//printf("Hello World!");
-
-	var transformArray: TransformArray = [Transform:create(); 256];
-
-	//var transform_array = Array<Transform>:create();
+	var data = Data:create();
+	data.score_array:add(5);
 
 	var score_array = ScoreArray:create();
 	score_array:resize_fill(10, 20);
-	//var run = true;
 
 	while (x > 0)
 	{
